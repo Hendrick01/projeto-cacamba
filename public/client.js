@@ -3,7 +3,7 @@
 // ============================================================================
 
 import {
-  findContractMelds, layoffOption, removableCards, SUITS, SUIT_RED, rankLabel,
+  planBaixada, layoffOption, layoffEnds, removableCards, SUITS, SUIT_RED, rankLabel,
   isJoker, JOKER_LABEL, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
 } from '/shared/engine.js';
 
@@ -61,11 +61,17 @@ function handleMessage(msg) {
     case 'welcome':
       saveSession({ code: msg.code, playerId: msg.playerId, token: msg.token });
       break;
-    case 'lobby':
+    case 'lobby': {
+      // Anfitrião pode mudar no meio (o antigo caiu): quem foi promovido
+      // precisa re-renderizar o modal de fim de rodada/jogo para ganhar o
+      // botão de continuar — senão a sala fica presa em "esperando…".
+      const hostMudou = lobby && msg.hostId !== lobby.hostId;
       lobby = msg;
       if (!msg.started) showScreen('lobby');
       renderLobby();
+      if (hostMudou && view) { modalPhaseShown = null; render(); }
       break;
+    }
     case 'state':
       view = msg.view;
       showScreen('game');
@@ -365,7 +371,10 @@ function renderOpponents() {
 
     const badges = document.createElement('div');
     badges.className = 'opp-badges';
+    const totalJogos = view.contract ? view.contract.t + view.contract.s : 0;
+    const jogosFeitos = p.baixados ? p.baixados.t + p.baixados.s : 0;
     if (p.baixou) badges.appendChild(badge('baixou', 'gold'));
+    else if (jogosFeitos > 0) badges.appendChild(badge(`baixou ${jogosFeitos}/${totalJogos}`, 'gold'));
     if (view.claims.includes(p.id)) badges.appendChild(badge('🛒 quer a carta', 'cart'));
     if (!p.isBot && !p.connected) badges.appendChild(badge('fora', 'off'));
     el.appendChild(badges);
@@ -488,11 +497,38 @@ function decorateMeld(el, meld) {
     if (card && layoffOption(card, meld)) {
       el.classList.add('droppable');
       el.onclick = () => {
+        // Coringa entra nas duas pontas (e um Ás pode servir nas duas também):
+        // quando as duas valem, quem escolhe é o jogador.
+        const ends = layoffEnds(card, meld);
+        if (ends.length > 1) return escolherPonta(card, meld, ends);
         selected.clear();
         sendAction({ a: 'layoff', cardId: card.id, meldId: meld.id });
       };
     }
   }
+}
+
+// A carta serve nas duas pontas da sequência: pergunta onde ela entra.
+function escolherPonta(card, meld, ends) {
+  const opcoes = ends.map((end) => ({ end, opt: layoffOption(card, meld, 0, end) }));
+  showModal(
+    `<h3>Em qual ponta?</h3>
+     <p><strong>${cardText(card)}</strong> pode entrar nas duas pontas ${noJogoDe(meld)}:<br>${cartasDoJogo(meld)}</p>`,
+    [
+      ...opcoes.map(({ end, opt }) => ({
+        label: `${valorText(opt.v, meld.suit)} ${end === 'lo' ? 'embaixo' : 'em cima'}`,
+        cls: 'btn-primary',
+        fn: () => {
+          closeModal();
+          selected.clear();
+          sendAction({ a: 'layoff', cardId: card.id, meldId: meld.id, end });
+        },
+      })),
+      { label: 'Cancelar', fn: closeModal, cls: 'btn-ghost' },
+    ],
+    closeModal,
+    true,
+  );
 }
 
 function renderMyMelds() {
@@ -533,16 +569,13 @@ function renderHand() {
   }
 }
 
+// O que dá para baixar agora (um jogo por vez!): devolve os cardIds a enviar,
+// ou null. Usa o mesmo planBaixada do juiz, sobre o que AINDA falta.
 function contractPlayable() {
-  if (!view.you || view.you.baixou || !view.contract) return null;
-  const ct = view.contract;
-  const need = ct.t * 3 + ct.s * 4;
-  if (selected.size > 0) {
-    if (selected.size !== need) return null;
-    const pool = view.you.hand.filter((c) => selected.has(c.id));
-    return findContractMelds(pool, ct.t, ct.s) ? [...selected] : null;
-  }
-  return findContractMelds(view.you.hand, ct.t, ct.s) ? [] : null;
+  if (!view.you || view.you.baixou || !view.contract || !view.you.remaining) return null;
+  const ids = selected.size > 0 ? [...selected] : null;
+  const plan = planBaixada(view.you.hand, view.you.remaining, ids);
+  return plan ? (ids || []) : null;
 }
 
 function renderActions() {
@@ -553,9 +586,11 @@ function renderActions() {
   $('btn-draw-deck').hidden = !drawing;
   $('btn-draw-discard').hidden = !(drawing && view.discardTop && view.discardBuyable);
 
+  // O botão fica sempre clicável: sem o contrato pronto, o toque explica o que
+  // falta em vez de morrer num botão desabilitado e mudo.
   const playable = playing ? contractPlayable() : null;
   $('btn-baixar').hidden = !(playing && !view.you.baixou && !meldDiscardMode);
-  $('btn-baixar').disabled = playable === null;
+  $('btn-baixar').classList.toggle('soft-disabled', playable === null);
 
   $('btn-discard').hidden = !(playing && !meldDiscardMode);
   $('btn-discard').disabled = selected.size !== 1;
@@ -584,10 +619,33 @@ $('btn-claim').onclick = () => {
 };
 $('btn-baixar').onclick = () => {
   const ids = contractPlayable();
-  if (ids === null) return;
+  if (ids === null) { explicaBaixar(); return; }
   sendAction({ a: 'baixar', cardIds: ids });
   selected.clear();
 };
+
+// Por que o "Baixar jogo" não foi? Explica em termos do que ainda falta.
+function explicaBaixar() {
+  const ct = view?.contract;
+  const rem = view?.you?.remaining;
+  if (!ct || !rem) return;
+  const partes = [];
+  if (rem.t > 0) partes.push(`${rem.t} trinca${rem.t > 1 ? 's' : ''}`);
+  if (rem.s > 0) partes.push(`${rem.s} sequência${rem.s > 1 ? 's' : ''}`);
+  const falta = partes.join(' + ') || 'nada';
+  // Formaria jogo, mas deixaria a mão vazia sem completar o contrato?
+  const ids = selected.size > 0 ? [...selected] : null;
+  const preso = planBaixada(view.you.hand, rem, ids, { permitirMaoVazia: true });
+  if (preso) {
+    toast('Baixar isso agora te deixaria sem nenhuma carta sem completar o contrato — guarde pelo menos uma para descartar.');
+    return;
+  }
+  if (selected.size > 0) {
+    toast(`Essa seleção não forma um jogo que ainda falta (${falta}). Dá para baixar um jogo de cada vez: 3 iguais de naipes diferentes, ou 4 seguidas do mesmo naipe.`);
+  } else {
+    toast(`Você ainda não tem nenhum jogo completo para baixar (falta: ${falta}). Pode baixar um de cada vez, quando ficar pronto.`);
+  }
+}
 $('btn-discard').onclick = () => {
   if (selected.size !== 1) return;
   sendAction({ a: 'discard', cardId: [...selected][0] });
@@ -612,6 +670,10 @@ function announce(ev) {
     case 'roundStart':
       toast(`🎴 Rodada ${ev.round + 1}: ${playerName(ev.first)} começa.`);
       meldDiscardMode = false;
+      // Os ids das cartas recomeçam a cada rodada: seleção antiga poderia
+      // "grudar" numa carta nova por coincidência de id e armar um descarte
+      // que o jogador nunca escolheu.
+      selected.clear();
       break;
     case 'draw':
       if (ev.source === 'discard') toast(`${playerName(ev.p)} pegou ${cardText(ev.card)} do meio.`);
@@ -625,9 +687,17 @@ function announce(ev) {
     case 'buy':
       toast(`🛒 ${playerName(ev.p)} comprou ${cardText(ev.card)} fora da vez (+${ev.penalty} de castigo).`);
       break;
-    case 'baixou':
-      toast(`🔻 ${playerName(ev.p)} baixou o jogo!`);
+    case 'baixou': {
+      if (ev.completa || ev.t === undefined) {
+        toast(`🔻 ${playerName(ev.p)} baixou o jogo!`);
+      } else {
+        const pedacos = [];
+        if (ev.t) pedacos.push(`${ev.t} trinca${ev.t > 1 ? 's' : ''}`);
+        if (ev.s) pedacos.push(`${ev.s} sequência${ev.s > 1 ? 's' : ''}`);
+        toast(`🔻 ${playerName(ev.p)} baixou ${pedacos.join(' e ')}.`);
+      }
       break;
+    }
     case 'layoff':
       if (ev.p !== me()) toast(`${playerName(ev.p)} encaixou ${cardText(ev.card)}.`);
       break;
@@ -636,6 +706,9 @@ function announce(ev) {
       break;
     case 'swapJoker':
       toast(`${JOKER_LABEL} ${playerName(ev.p)} pôs ${cardText(ev.card)} no lugar do coringa.`);
+      break;
+    case 'away':
+      toast(`📴 ${playerName(ev.p)} caiu — o jogo joga por ${ev.p === me() ? 'você' : 'ele'} até voltar.`);
       break;
     case 'reshuffle':
       toast('🔄 O monte acabou — o meio foi embaralhado de volta.');
@@ -703,8 +776,13 @@ function renderPhaseModal() {
     modalPhaseShown = 'gameEnd';
     showGameEnd();
   } else {
-    modalPhaseShown = null;
-    closeModal();
+    // Só os modais de FASE (fim de rodada/jogo) fecham sozinhos. Placar,
+    // Regras e a troca de coringa ficam abertos — cada broadcast de estado
+    // (bots jogam a cada ~1s) fechava o modal no meio da leitura.
+    if (modalPhaseShown) {
+      modalPhaseShown = null;
+      closeModal();
+    }
   }
 }
 
@@ -789,10 +867,18 @@ function showRules() {
        <li><strong>Trinca:</strong> 3 cartas de mesmo valor com naipes diferentes.</li>
        <li><strong>Sequência:</strong> 4 cartas seguidas do mesmo naipe. Ás vale 1 (A-2-3-4) ou 14 (J-Q-K-A), mas não “vira a esquina”.</li>
      </ul>
+     <h3>Coringa ${JOKER_LABEL}</h3>
+     <ul>
+       <li>Vale <strong>só em sequência</strong> (nunca em trinca), no máximo <strong>1 por sequência</strong>.</li>
+       <li>Nas rodadas só de trincas (1ª e 4ª) ele <strong>fica fora do baralho</strong>.</li>
+       <li>Na sua vez, quem tem a <strong>carta exata</strong> que o coringa representa pode trocá-lo em qualquer sequência da mesa: a carta entra no lugar e o coringa <strong>vem para a mão</strong>.</li>
+       <li>Coringa descartado <strong>tranca o meio</strong>: ninguém compra do descarte até alguém descartar por cima.</li>
+       <li>Na mão ao fim da rodada, custa <strong>20 pontos</strong>.</li>
+     </ul>
      <h3>Na sua vez</h3>
      <ol>
        <li><strong>Puxe uma carta</strong> (obrigatório): do monte ou do meio (descarte).</li>
-       <li><strong>Baixe o contrato</strong> quando tiver tudo; depois de baixar, pode <strong>encaixar</strong> cartas nos jogos da mesa (seus e dos outros).</li>
+       <li><strong>Baixe seus jogos</strong> — pode ser <strong>um de cada vez</strong>: qualquer trinca ou sequência completa que o contrato ainda peça já pode descer (na 1ª rodada, uma trinca sozinha desce). <strong>Encaixar</strong> cartas nos jogos da mesa (seus e dos outros), só depois de baixar o contrato <strong>inteiro</strong>. E nunca baixe tudo a ponto de ficar de mão vazia sem completar o contrato.</li>
        <li><strong>Descarte uma carta</strong> (obrigatório). Se não quiser descartar da mão, pode tirar de um jogo seu com sobra: sequência com mais de 4 cartas (pelas pontas) ou trinca com mais de 3.</li>
      </ol>
      <h3>Compra fora da vez</h3>

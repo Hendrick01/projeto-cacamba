@@ -100,6 +100,8 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 }
 .btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.35; pointer-events: none; }
+/* Ainda não dá para usar, mas o toque explica o porquê (não fica mudo) */
+.btn.soft-disabled { opacity: 0.45; }
 .btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
 .btn-primary { background: var(--gold); border-color: var(--gold); color: #3d2c07; }
