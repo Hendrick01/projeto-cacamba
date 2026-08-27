@@ -68,7 +68,7 @@ tocar em lógica.
 
 | Constante | Valor | O que decide |
 |---|---|---|
-| `JOKERS_PER_DECK` | `2` | Coringas por baralho. Com 2 baralhos, **4 no total**. |
+| `JOKERS_PER_DECK` | `4` | Coringas por baralho. Com 2 baralhos, **8 no total**. Em rodada cujo contrato não tem sequência (1ª e 4ª), o coringa fica **fora do baralho**. |
 | `MAX_JOKERS_PER_SEQ` | `1` | Quantos coringas cabem numa mesma sequência. A sequência tem 4 cartas: com 2 coringas, metade do jogo seria curinga. |
 | `SWAP_JOKER_SAME_TURN` | `false` | Ligado, a troca vira atômica e o coringa vai direto para outro jogo sem passar pela mão. Desligado (o valor de hoje), o coringa **vem para a mão** e pode ser guardado. |
 | `CORINGA_DESCARTADO_TRANCA` | `true` | Coringa descoberto no topo trava o monte de descarte. |
@@ -88,7 +88,11 @@ E em `DEFAULT_OPTS`, as regras da casa ajustáveis por sala:
 
 ## As regras do coringa
 
-**Existe:** 2 por baralho, 4 no total. Na tela é uma carta dourada, distinta de relance.
+**Existe:** 4 por baralho, 8 no total. Na tela é uma carta dourada, distinta de relance.
+
+**Só entra em rodada com sequência no contrato.** Como o coringa vale apenas em
+sequência, nas rodadas só de trincas (1ª e 4ª) ele seria carta morta de 20 pontos —
+então `startRound` monta o baralho dessas rodadas **sem coringa nenhum**.
 
 **Vale só para sequência.** Trinca exige cartas reais. Isso sai de graça da
 representação: o coringa é `{ rank: 0, suit: -1, joker: true }`, e as buscas varrem
@@ -149,7 +153,8 @@ vêm primeiro**, então o solver só queima coringa quando não tem alternativa.
 
 | Função | O que faz |
 |---|---|
-| `layoffOption(card, meld, coringasRemovidos = 0)` | A carta encaixa neste jogo? Coringa da mão estica sequência pela ponta (respeitando o limite) e é recusado em trinca. O terceiro parâmetro pergunta "e se eu tirasse N coringas daqui antes?" — é o que a troca usa para saber se o coringa cabe de volta na sequência de onde saiu, sem mexer no estado antes de validar. |
+| `layoffOption(card, meld, coringasRemovidos = 0, preferredEnd = null)` | A carta encaixa neste jogo? Coringa da mão estica sequência por **qualquer ponta** (respeitando o limite) e é recusado em trinca. `coringasRemovidos` pergunta "e se eu tirasse N coringas daqui antes?" — é o que a troca usa para validar sem mexer no estado. `preferredEnd` (`'lo'`/`'hi'`) escolhe a ponta quando as duas servem; sem ele, coringa vai para a alta. |
+| `layoffEnds(card, meld, coringasRemovidos = 0)` | Em quais pontas a carta encaixa (`['lo','hi']`…). A tela usa para perguntar a ponta ao jogador quando as duas valem (coringa, ou o Ás numa sequência de 2 a K). |
 | `removableCards(meld)` | Cartas que dá para tirar de um jogo com sobra para descartar. **Nunca devolve coringa.** |
 
 ### Descarte
@@ -175,6 +180,8 @@ para não oferecer gesto que o motor recusaria:
 
 - `discardBuyable` — o topo pode ser comprado? Falso quando o coringa trava o meio.
 - `you.podeTrocarCoringa` — resposta pronta do motor, para o cliente não reimplementar a regra.
+- `you.remaining` e `players[].baixados` — o que falta do contrato e quantos jogos cada
+  um já baixou (baixa-se um por vez; o selo "baixou 1/2" dos oponentes vem daqui).
 
 ### Ações
 
@@ -186,10 +193,11 @@ descartar) → `roundEnd` → próxima rodada → … → `gameEnd`.
 
 | Ação | O que faz |
 |---|---|
-| `actClaim` / `actUnclaim` | Pede (ou desiste de) a carta do descarte fora da vez. Com o meio travado, o pedido nem é registrado. |
+| `actClaim` / `actUnclaim` | Pede (ou desiste de) a carta do descarte fora da vez. Com o meio travado, o pedido nem é registrado. Só geram evento quando mudam algo — o servidor não rebroadcast (nem reagenda bot) para ação sem efeito. |
 | `actDraw(state, playerId, source)` | Puxa do `'deck'` ou do `'discard'`. Ao puxar do monte, **primeiro resolve a compra fora da vez** de quem pediu. |
-| `actBaixar(state, playerId, cardIds?)` | Baixa o contrato inteiro de uma vez. |
-| `actLayoff(state, playerId, cardId, meldId)` | Encaixa uma carta em qualquer jogo da mesa — seu ou dos outros. Só depois de ter baixado. |
+| `actBaixar(state, playerId, cardIds?)` | Baixa jogos **um de cada vez**: qualquer trinca/sequência completa que o contrato ainda peça desce sozinha (`player.baixados` acumula; `player.baixou` só vira `true` com o contrato inteiro — e é ele que libera o encaixe). Sem `cardIds`, baixa o máximo; com, exatamente a seleção. Recusa baixada que deixe a mão vazia sem completar o contrato. |
+| `planBaixada(hand, remaining, cardIds?, opts?)` | O plano do `actBaixar`, compartilhado com a tela e o bot: quais jogos descem agora, maximizando cartas usadas dentro do que **falta** (`contractRemaining`). |
+| `actLayoff(state, playerId, cardId, meldId, end?)` | Encaixa uma carta em qualquer jogo da mesa — seu ou dos outros. Só depois de ter baixado. `end` escolhe a ponta quando a carta serve nas duas. |
 | `actSwapJoker(state, playerId, meldId, cardId, destMeldId?)` | **Troca o coringa pela carta real.** Só na vez do jogador; não exige ter baixado. `destMeldId` só é usado quando `SWAP_JOKER_SAME_TURN` está ligado. |
 | `actDiscard` / `actMeldDiscard` | Descarta da mão, ou de um jogo seu com sobra, e passa a vez. |
 | `actNextRound` | Avança do placar para a rodada seguinte. |
@@ -226,7 +234,9 @@ visão de cada um. Nenhuma regra é confiada ao navegador.
 |---|---|---|
 | `PORT` | `3000` | Porta. As hospedagens injetam esta. |
 | `HOST` | `0.0.0.0` | Interface. O padrão é o que as plataformas esperam; use `127.0.0.1` para restringir. |
-| `PUBLIC_URL` | — | Endereço público fixo, para o link de convite e o QR. Sem ela, o endereço sai dos cabeçalhos da requisição (funciona atrás de túnel e de proxy) e, em último caso, do IP da rede local. |
+| `PUBLIC_URL` | — | Endereço público fixo, para o link de convite e o QR. Sem ela, o endereço sai dos cabeçalhos da requisição (funciona atrás de túnel e de proxy) e, em último caso, do IP da rede local. **Em produção, defina-a**: mata a classe inteira de host forjado no convite. |
+| `TRUST_PROXY` | — | `1` para honrar `x-forwarded-host`/`x-forwarded-proto` (só atrás de proxy reverso confiável). Sem ela, esses cabeçalhos são ignorados. |
+| `ALLOWED_HOSTS` | — | Lista (vírgulas) de hosts aceitos no link/QR quando não há `PUBLIC_URL`. Host fora da lista (ou com sintaxe inválida) cai para o IP da rede local. |
 
 O processo encerra limpo em `SIGTERM`/`SIGINT`, que é como a hospedagem o para.
 
@@ -245,7 +255,15 @@ poder importar o motor. Normaliza o caminho contra travessia de diretório.
 Cada sala guarda por onde quem a criou chegou.
 
 `scheduleBots` agenda a próxima jogada de bot. Na vez deles a espera é de ~0,7 s — ou
-**2,2 s quando há carta comprável**, para dar tempo do humano pedir.
+**2,2 s quando há carta comprável**, para dar tempo do humano pedir. O timer tem uma
+**chave de momento** (`gameSeq:rodada:turno:fase:…`): mensagens repetidas de cliente
+que não mudam o jogo não o reagendam — sem isso, spam de `claim`/`unclaim` seguraria o
+bot para sempre e congelaria a partida. Ação sem evento também não gera rebroadcast.
+
+**Jogador da vez caiu?** O jogo espera `AWAY_TAKEOVER_MS` (45 s) e passa a **jogar por
+ele** com a heurística de bot (evento `away` avisa a mesa), em ritmo de bot dali em
+diante, até ele reconectar — `attach` desarma a retomada. Sem isso, uma queda
+definitiva na vez travaria a sala inteira até o GC de 30 min.
 
 ### Protocolo WebSocket
 
