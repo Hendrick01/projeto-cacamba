@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CONTRACTS, TOTAL_ROUNDS, buildDecks, cardPoints, cardValues, findContractMelds,
-  layoffOption, removableCards, createGame, startRound, actDraw, actBaixar,
-  actLayoff, actDiscard, actMeldDiscard, actClaim, actNextRound, applyAction,
+  layoffOption, layoffEnds, removableCards, createGame, startRound, actDraw, actBaixar,
+  actLayoff, actDiscard, actMeldDiscard, actClaim, actUnclaim, actNextRound, applyAction,
   botNextAction, botWantsCard, mulberry32, viewFor, allMelds, playerById,
   podeComprarDoDescarte, isJoker, topoDoDescarte,
 } from '../shared/engine.js';
@@ -14,6 +14,9 @@ const RK = { A: 1, J: 11, Q: 12, K: 13 };
 let nextId = 1000;
 function c(rank, suit) {
   return { id: nextId++, rank: RK[rank] ?? Number(rank), suit: SU[suit] };
+}
+function J() {
+  return { id: nextId++, rank: 0, suit: -1, joker: true };
 }
 
 test('contratos batem com a contagem de cartas das rodadas (6 a 12)', () => {
@@ -215,17 +218,74 @@ test('pedidos de compra inválidos são ignorados em silêncio (corridas de toqu
   assert.equal(state.claims.length, 0);
 });
 
-test('baixar exige o contrato exato; visão não vaza mão alheia', () => {
+test('sem nenhum jogo completo não baixa nada; visão não vaza mão alheia', () => {
   const state = freshGame();
   const p = state.players[state.turn];
   actDraw(state, p.id, 'deck');
   // Força uma mão sem contrato: valores todos espalhados
   p.hand = [c('2', '♠'), c('4', '♥'), c('6', '♦'), c('8', '♣'), c('10', '♠'), c('Q', '♥'), c('K', '♦')];
-  assert.throws(() => actBaixar(state, p.id), /não formam o contrato/);
+  assert.throws(() => actBaixar(state, p.id), /nenhum jogo completo/);
 
   const view = viewFor(state, p.id);
   assert.ok(view.you.hand.length > 0);
   for (const pl of view.players) assert.equal(pl.hand, undefined);
+});
+
+test('baixa um jogo de cada vez: trinca sozinha desce, contrato completa depois', () => {
+  const state = freshGame(); // rodada 1: 2 trincas
+  const p = state.players[state.turn];
+  actDraw(state, p.id, 'deck');
+  p.hand = [c('7', '♠'), c('7', '♥'), c('7', '♦'), c('2', '♠'), c('4', '♥'), c('6', '♦'), c('8', '♣')];
+  const ev1 = actBaixar(state, p.id);
+  assert.equal(ev1[0].e, 'baixou');
+  assert.equal(ev1[0].completa, false, 'só metade do contrato');
+  assert.deepEqual(p.baixados, { t: 1, s: 0 });
+  assert.equal(p.baixou, false);
+  assert.equal(p.melds.length, 1);
+  // Sem o contrato inteiro, ainda não pode encaixar
+  assert.throws(() => actLayoff(state, p.id, p.hand[0].id, p.melds[0].id), /baixar o jogo antes/);
+  // Segunda trinca chega: baixa e completa
+  p.hand.push(c('Q', '♠'), c('Q', '♥'), c('Q', '♣'));
+  const ev2 = actBaixar(state, p.id);
+  assert.equal(ev2[0].completa, true);
+  assert.equal(p.baixou, true);
+  assert.deepEqual(p.baixados, { t: 2, s: 0 });
+});
+
+test('só desce o que o contrato ainda pede: sequência não vale na rodada de trincas', () => {
+  const state = freshGame(); // rodada 1: 2 trincas
+  const p = state.players[state.turn];
+  actDraw(state, p.id, 'deck');
+  p.hand = [c('3', '♥'), c('4', '♥'), c('5', '♥'), c('6', '♥'), c('9', '♠'), c('J', '♦'), c('2', '♣')];
+  assert.throws(() => actBaixar(state, p.id), /nenhum jogo completo/);
+  // Nem selecionando a sequência na marra
+  const ids = p.hand.slice(0, 4).map((x) => x.id);
+  assert.throws(() => actBaixar(state, p.id, ids), /não formam jogos que o contrato ainda pede/);
+});
+
+test('não pode baixar até ficar de mão vazia sem completar o contrato', () => {
+  const state = freshGame(); // rodada 1: 2 trincas
+  const p = state.players[state.turn];
+  actDraw(state, p.id, 'deck');
+  p.hand = [c('7', '♠'), c('7', '♥'), c('7', '♦')]; // só a trinca, nada mais
+  assert.throws(() => actBaixar(state, p.id), /sem nenhuma carta sem completar/);
+  // Com uma carta sobrando, a mesma trinca desce numa boa
+  p.hand.push(c('2', '♣'));
+  const ev = actBaixar(state, p.id);
+  assert.equal(ev[0].completa, false);
+  assert.equal(p.hand.length, 1);
+});
+
+test('seleção parcial: baixa exatamente a trinca escolhida', () => {
+  const state = freshGame();
+  const p = state.players[state.turn];
+  actDraw(state, p.id, 'deck');
+  const trinca = [c('9', '♠'), c('9', '♥'), c('9', '♣')];
+  p.hand = [...trinca, c('Q', '♠'), c('Q', '♥'), c('Q', '♣'), c('2', '♦')];
+  actBaixar(state, p.id, trinca.map((x) => x.id));
+  assert.deepEqual(p.baixados, { t: 1, s: 0 });
+  assert.equal(p.melds[0].rank, 9, 'desceu a trinca selecionada, não a outra');
+  assert.equal(p.hand.length, 4);
 });
 
 test('baixar contrato e bater: rodada termina e pontua os demais', () => {
@@ -282,14 +342,20 @@ function totalCards(state) {
   );
 }
 
+// Cartas em jogo na rodada atual: rodada só de trincas fica sem os coringas
+function expectedCards(state) {
+  const ct = CONTRACTS[state.round];
+  return state.opts.decks * (52 + (ct.s > 0 ? state.opts.jokersPerDeck : 0));
+}
+
 function simulateGame(seed, numPlayers = 4) {
   const players = Array.from({ length: numPlayers }, (_, i) => ({ id: `b${i}`, name: `Bot ${i}`, isBot: true }));
   const state = createGame(players, { rnd: mulberry32(seed) });
   startRound(state);
-  const expected = state.opts.decks * (52 + state.opts.jokersPerDeck);
   let rounds = 0;
 
   while (state.phase !== 'gameEnd') {
+    const expected = expectedCards(state);
     let guard = 0;
     while (state.phase === 'draw' || state.phase === 'play') {
       assert.ok(guard++ < 5000, `rodada ${state.round + 1} não terminou (semente ${seed})`);
@@ -321,12 +387,13 @@ function simulateGame(seed, numPlayers = 4) {
 test('cada rodada recomeça com o baralho inteiro de volta, coringas inclusive', () => {
   const players = [0, 1, 2, 3].map((i) => ({ id: `b${i}`, name: `Bot ${i}`, isBot: true }));
   const state = createGame(players, { rnd: mulberry32(7) });
-  const esperado = state.opts.decks * (52 + state.opts.jokersPerDeck);
-  const coringasEsperados = state.opts.decks * state.opts.jokersPerDeck;
 
   for (let rodada = 0; rodada < TOTAL_ROUNDS; rodada++) {
     startRound(state);
     assert.equal(state.round, rodada);
+    const esperado = expectedCards(state);
+    // Rodada só de trincas joga sem coringa (ele só vale em sequência)
+    const coringasEsperados = CONTRACTS[rodada].s > 0 ? state.opts.decks * state.opts.jokersPerDeck : 0;
     // Nada some entre rodadas: mãos, jogos baixados, descarte e monte somados
     // têm que dar o baralho inteiro no começo de cada uma das 7 rodadas.
     assert.equal(totalCards(state), esperado, `rodada ${rodada + 1}`);
@@ -343,6 +410,72 @@ test('cada rodada recomeça com o baralho inteiro de volta, coringas inclusive',
     p0.melds.push({ id: 9000 + rodada, type: 't', rank: 5, ownerId: p0.id, cards: p0.hand.splice(0, 3) });
     state.discard.push(...state.players[1].hand.splice(0, 2));
   }
+});
+
+test('coringa pode cobrir valor que também existe como carta real (janelas sobrepostas)', () => {
+  // 3♥ 4♥ 5♥ 5♥ 6♥ 6♥ + 2 coringas = contrato da rodada 3 (2 sequências):
+  // [3♥ 🃏 5♥ 6♥] + [🃏 4♥ 5♥ 6♥]. A busca gulosa antiga só usava coringa em
+  // buraco sem carta real e recusava esta mão legal.
+  const hand = [c('3', '♥'), c('4', '♥'), c('5', '♥'), c('5', '♥'), c('6', '♥'), c('6', '♥'), J(), J()];
+  const res = findContractMelds(hand, 0, 2);
+  assert.ok(res, 'contrato legal recusado');
+  assert.equal(res.seqs.length, 2);
+  for (const { cards } of res.seqs) {
+    assert.ok(cards.filter(isJoker).length <= 1, 'no máximo 1 coringa por sequência');
+    assert.equal(cards.length, 4);
+  }
+});
+
+test('encaixe do coringa: dá para escolher a ponta, e o padrão continua a alta', () => {
+  const meld = { id: 60, type: 's', suit: SU['♥'], values: [5, 6, 7, 8], cards: [c('5', '♥'), c('6', '♥'), c('7', '♥'), c('8', '♥')], ownerId: 'x' };
+  const joker = J();
+  assert.equal(layoffOption(joker, meld).end, 'hi', 'sem preferência, ponta alta');
+  const lo = layoffOption(joker, meld, 0, 'lo');
+  assert.ok(lo && lo.end === 'lo' && lo.v === 4);
+  assert.deepEqual(layoffEnds(joker, meld), ['lo', 'hi']);
+  // Carta real continua com uma ponta só
+  assert.deepEqual(layoffEnds(c('9', '♥'), meld), ['hi']);
+  assert.deepEqual(layoffEnds(c('2', '♥'), meld), []);
+});
+
+test('bater com o coringa na ponta baixa (mesa 5♥6♥7♥8♥, mão [🃏, 3♥])', () => {
+  const state = freshGame();
+  const p = state.players[state.turn];
+  actDraw(state, p.id, 'deck');
+  const seq = { id: 777, type: 's', suit: SU['♥'], values: [5, 6, 7, 8], cards: [c('5', '♥'), c('6', '♥'), c('7', '♥'), c('8', '♥')], ownerId: p.id };
+  p.baixou = true;
+  p.melds.push(seq);
+  const joker = J();
+  const tres = c('3', '♥');
+  p.hand = [joker, tres];
+  actLayoff(state, p.id, joker.id, seq.id, 'lo'); // coringa vira 4♥
+  assert.deepEqual(seq.values, [4, 5, 6, 7, 8]);
+  actLayoff(state, p.id, tres.id, seq.id);        // e o 3♥ entra em seguida
+  assert.equal(state.phase, 'roundEnd');
+  assert.equal(state.lastRound.winnerId, p.id, 'bateu esvaziando a mão');
+});
+
+test('unclaim só gera evento (e rebroadcast) quando havia pedido de verdade', () => {
+  const state = freshGame();
+  const a = state.players[state.turn];
+  actDraw(state, a.id, 'deck');
+  actDiscard(state, a.id, a.hand[0].id);
+  const other = state.players.find((p) => p.id !== state.players[state.turn].id && p.id !== a.id);
+  assert.deepEqual(actUnclaim(state, other.id), [], 'sem pedido, sem evento');
+  actClaim(state, other.id);
+  const events = actUnclaim(state, other.id);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].e, 'unclaim');
+  assert.equal(state.claims.length, 0);
+});
+
+test('rodadas só de trincas (1ª e 4ª) jogam sem coringa no baralho', () => {
+  const players = [0, 1].map((i) => ({ id: `b${i}`, name: `Bot ${i}`, isBot: true }));
+  const state = createGame(players, { rnd: mulberry32(11) });
+  startRound(state); // rodada 1: 2 trincas
+  const todas1 = [...state.deck, ...state.discard, ...state.players.flatMap((p) => p.hand)];
+  assert.equal(todas1.filter(isJoker).length, 0, 'rodada 1 sem coringa');
+  assert.equal(todas1.length, state.opts.decks * 52);
 });
 
 test('30 partidas completas: terminam, conservam as cartas e pontuam', () => {

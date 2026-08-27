@@ -158,6 +158,17 @@ export function findContractMelds(cards, needT, needS) {
     const comJoker = []; // sequências que gastam coringa
     const jokers = freeJokers();
     const maxJokers = Math.min(jokers.length, MAX_JOKERS_PER_SEQ);
+    // Máscaras de posições cobertas por coringa (bit i = posição i da janela).
+    // O coringa também pode cobrir um valor que EXISTE como carta real: a
+    // carta liberada pode ser exatamente a que outra sequência precisa (ex.:
+    // 3♥ 4♥ 5♥ 5♥ 6♥ 6♥ + 2 coringas fecha duas sequências de copas). Por
+    // isso geramos todas as variantes, não só a gulosa que tapa buraco.
+    const masks = [0];
+    for (let m = 1; m < 16; m++) {
+      let bits = 0;
+      for (let b = 0; b < 4; b++) if (m & (1 << b)) bits++;
+      if (bits <= maxJokers) masks.push(m);
+    }
     for (let s = 0; s < 4; s++) {
       const byVal = {};
       for (const c of cards) {
@@ -167,17 +178,19 @@ export function findContractMelds(cards, needT, needS) {
       for (let start = 1; start <= 11; start++) {
         const key = s * 16 + start;
         if (key < minKey) continue;
-        const run = [];
-        let usados = 0;
-        let ok = true;
-        for (let v = start; v < start + 4; v++) {
-          if (byVal[v]) { run.push(byVal[v]); continue; }
-          if (usados < maxJokers) { run.push(jokers[usados]); usados++; continue; }
-          ok = false;
-          break;
+        for (const mask of masks) {
+          const run = [];
+          let usados = 0;
+          let ok = true;
+          for (let i = 0; i < 4; i++) {
+            const v = start + i;
+            if (mask & (1 << i)) { run.push(jokers[usados]); usados++; continue; }
+            if (byVal[v]) run.push(byVal[v]);
+            else { ok = false; break; }
+          }
+          if (!ok) continue;
+          (usados === 0 ? puras : comJoker).push({ key, suit: s, start, cards: run });
         }
-        if (!ok) continue;
-        (usados === 0 ? puras : comJoker).push({ key, suit: s, start, cards: run });
       }
     }
     // Primeiro as puras: assim o solver só queima coringa quando precisa.
@@ -209,6 +222,38 @@ export function findContractMelds(cards, needT, needS) {
   return solve(needT, needS, 1, 0) ? { trincas: resT, seqs: resS } : null;
 }
 
+// O que dá para baixar AGORA? Baixa-se um jogo de cada vez: qualquer conjunto
+// de trincas/sequências completas que caiba no que ainda falta do contrato.
+// Sem `cardIds`, propõe o máximo que a mão alcança; com `cardIds`, a seleção
+// tem que ser usada inteira. Nunca propõe baixada que deixe a mão vazia sem
+// completar o contrato — sem descarte possível e sem poder bater, o jogador
+// ficaria preso (a menos que `permitirMaoVazia` seja ligado, usado pela tela
+// só para explicar o porquê ao jogador).
+// Devolve { trincas, seqs, a, b, completa } ou null.
+export function planBaixada(hand, remaining, cardIds = null, { permitirMaoVazia = false } = {}) {
+  const temSelecao = !!(cardIds && cardIds.length);
+  const pool = temSelecao ? hand.filter((c) => cardIds.includes(c.id)) : hand;
+  if (temSelecao && pool.length !== cardIds.length) return null; // carta fora da mão
+  const planos = [];
+  for (let a = remaining.t; a >= 0; a--) {
+    for (let b = remaining.s; b >= 0; b--) {
+      if (a === 0 && b === 0) continue;
+      const size = a * 3 + b * 4;
+      if (temSelecao ? size !== pool.length : size > pool.length) continue;
+      planos.push({ a, b, size });
+    }
+  }
+  planos.sort((x, y) => y.size - x.size); // baixa o máximo possível primeiro
+  for (const { a, b, size } of planos) {
+    const completa = a === remaining.t && b === remaining.s;
+    if (!completa && !permitirMaoVazia && size === hand.length) continue;
+    const res = findContractMelds(pool, a, b);
+    if (!res) continue;
+    return { ...res, a, b, completa };
+  }
+  return null;
+}
+
 // ============================================================================
 // Jogos na mesa (melds) e encaixes
 // ============================================================================
@@ -232,7 +277,11 @@ function makeSeqMeld(cards, start, ownerId) {
 // antes?" — é o que a troca precisa para saber se o coringa resgatado cabe de
 // volta na própria sequência de onde saiu, sem ter que mexer no estado antes
 // de validar.
-export function layoffOption(card, meld, coringasRemovidos = 0) {
+// `preferredEnd` ('lo'/'hi') escolhe a ponta quando as duas servem — o coringa
+// entra em qualquer ponta, e até uma carta real pode servir nas duas (um Ás
+// numa sequência de 2 a K). Sem preferência, mantém o padrão de sempre:
+// coringa vai para a ponta alta, carta real para a primeira que couber.
+export function layoffOption(card, meld, coringasRemovidos = 0, preferredEnd = null) {
   if (meld.type === 't') {
     // Trinca é só com carta real: o coringa vale apenas para sequência.
     if (isJoker(card) || card.rank !== meld.rank) return null;
@@ -243,20 +292,30 @@ export function layoffOption(card, meld, coringasRemovidos = 0) {
   }
   const lo = meld.values[0];
   const hi = meld.values[meld.values.length - 1];
+  const opcoes = [];
   // Coringa da mão estica a sequência pela ponta, respeitando o limite do jogo.
   // Vem antes da checagem de naipe porque o coringa não tem naipe próprio.
   if (isJoker(card)) {
     if (meld.cards.filter(isJoker).length - coringasRemovidos >= MAX_JOKERS_PER_SEQ) return null;
-    if (hi + 1 <= 14) return { kind: 's', end: 'hi', v: hi + 1 };
-    if (lo - 1 >= 1) return { kind: 's', end: 'lo', v: lo - 1 };
-    return null;
+    if (hi + 1 <= 14) opcoes.push({ kind: 's', end: 'hi', v: hi + 1 });
+    if (lo - 1 >= 1) opcoes.push({ kind: 's', end: 'lo', v: lo - 1 });
+  } else {
+    if (card.suit !== meld.suit) return null;
+    for (const v of cardValues(card)) {
+      if (v === lo - 1 && v >= 1) opcoes.push({ kind: 's', end: 'lo', v });
+      if (v === hi + 1 && v <= 14) opcoes.push({ kind: 's', end: 'hi', v });
+    }
   }
-  if (card.suit !== meld.suit) return null;
-  for (const v of cardValues(card)) {
-    if (v === lo - 1 && v >= 1) return { kind: 's', end: 'lo', v };
-    if (v === hi + 1 && v <= 14) return { kind: 's', end: 'hi', v };
-  }
-  return null;
+  if (opcoes.length === 0) return null;
+  if (preferredEnd) return opcoes.find((o) => o.end === preferredEnd) || null;
+  return opcoes[0];
+}
+
+// Em quais pontas desta sequência a carta encaixa? ([], ['hi'], ['lo','hi']…)
+// A tela usa para saber quando precisa perguntar a ponta ao jogador.
+export function layoffEnds(card, meld, coringasRemovidos = 0) {
+  if (meld.type !== 's') return [];
+  return ['lo', 'hi'].filter((end) => layoffOption(card, meld, coringasRemovidos, end));
 }
 
 function applyLayoff(meld, card, opt) {
@@ -315,7 +374,8 @@ export function createGame(players, opts = {}) {
       isBot: !!p.isBot,
       hand: [],
       melds: [],
-      baixou: false,
+      baixou: false,               // contrato COMPLETO na mesa
+      baixados: { t: 0, s: 0 },    // jogos já baixados nesta rodada
       score: 0,
     })),
     round: -1,          // índice 0..6 (rodada 1..7)
@@ -334,6 +394,16 @@ export function createGame(players, opts = {}) {
 
 export function currentContract(state) {
   return CONTRACTS[Math.max(0, state.round)];
+}
+
+// O que AINDA falta do contrato para este jogador (baixa-se um jogo por vez)
+export function contractRemaining(state, player) {
+  const ct = currentContract(state);
+  if (!ct) return { t: 0, s: 0 }; // fim de jogo: não há contrato corrente
+  return {
+    t: Math.max(0, ct.t - player.baixados.t),
+    s: Math.max(0, ct.s - player.baixados.s),
+  };
 }
 
 export function playerById(state, id) {
@@ -361,11 +431,16 @@ export function startRound(state) {
     return [{ e: 'gameEnd', ranking: finalRanking(state) }];
   }
   const cardsEach = 6 + state.round;
-  state.deck = shuffle(buildDecks(state.opts.decks, state.opts.jokersPerDeck), state.rnd);
+  // Rodada só de trincas (1ª e 4ª) não usa coringa: ele só vale em sequência,
+  // então num contrato sem sequência seria carta morta de 20 pontos na mão.
+  const ct = CONTRACTS[state.round];
+  const jokers = ct.s > 0 ? state.opts.jokersPerDeck : 0;
+  state.deck = shuffle(buildDecks(state.opts.decks, jokers), state.rnd);
   for (const p of state.players) {
     p.hand = [];
     p.melds = [];
     p.baixou = false;
+    p.baixados = { t: 0, s: 0 };
   }
   for (let i = 0; i < cardsEach; i++) {
     for (const p of state.players) p.hand.push(state.deck.pop());
@@ -466,9 +541,13 @@ export function actClaim(state, playerId) {
   return [{ e: 'claim', p: playerId }];
 }
 
+// Desistir do pedido. Só gera evento quando havia pedido de verdade — assim o
+// servidor não é obrigado a rebroadcast (nem a reagendar bots) por spam de
+// unclaim sem efeito.
 export function actUnclaim(state, playerId) {
+  if (!state.claims.includes(playerId)) return [];
   state.claims = state.claims.filter((id) => id !== playerId);
-  return [];
+  return [{ e: 'unclaim', p: playerId }];
 }
 
 // Puxar carta (obrigatório na vez): 'deck' = monte, 'discard' = meio/descarte
@@ -517,43 +596,50 @@ export function actDraw(state, playerId, source) {
   return events;
 }
 
-// Baixar o contrato da rodada (tudo de uma vez). cardIds opcional: escolha manual.
+// Baixar jogos — UM DE CADA VEZ, se quiser: qualquer trinca/sequência completa
+// que o contrato ainda peça pode descer sozinha (na 1ª rodada, uma trinca já
+// pode ser baixada antes da outra). O direito de encaixar nos jogos da mesa
+// só vem quando o contrato INTEIRO estiver baixado (player.baixou).
+// cardIds opcional: baixa exatamente a seleção; sem ele, baixa o máximo.
 export function actBaixar(state, playerId, cardIds = null) {
   if (state.phase !== 'play') fail('Puxe uma carta antes de baixar.');
   const player = state.players[state.turn];
   if (player.id !== playerId) fail('Não é a sua vez.');
-  if (player.baixou) fail('Você já baixou o jogo nesta rodada.');
-
   const ct = currentContract(state);
-  let pool = player.hand;
-  if (cardIds && cardIds.length > 0) {
-    const need = ct.t * 3 + ct.s * 4;
-    if (cardIds.length !== need) fail(`O contrato desta rodada usa exatamente ${need} cartas (${ct.label}).`);
-    pool = player.hand.filter((c) => cardIds.includes(c.id));
-    if (pool.length !== cardIds.length) fail('Alguma carta selecionada não está na sua mão.');
+  const remaining = contractRemaining(state, player);
+  if (remaining.t === 0 && remaining.s === 0) fail('Você já baixou o contrato inteiro desta rodada.');
+
+  const plan = planBaixada(player.hand, remaining, cardIds);
+  if (!plan) {
+    // Distingue "não forma jogo" de "formaria, mas te deixaria preso"
+    const preso = planBaixada(player.hand, remaining, cardIds, { permitirMaoVazia: true });
+    if (preso) fail('Baixar isso agora te deixaria sem nenhuma carta sem completar o contrato — guarde pelo menos uma para descartar.');
+    if (cardIds && cardIds.length) fail(`Essas cartas não formam jogos que o contrato ainda pede (${ct.label}).`);
+    fail(`Você ainda não tem nenhum jogo completo para baixar (${ct.label}).`);
   }
-  const res = findContractMelds(pool, ct.t, ct.s);
-  if (!res) fail(`Essas cartas não formam o contrato da rodada (${ct.label}).`);
 
   const usedIds = new Set();
-  for (const cards of res.trincas) {
+  for (const cards of plan.trincas) {
     player.melds.push(makeTrincaMeld(cards, playerId));
     cards.forEach((c) => usedIds.add(c.id));
   }
-  for (const { cards, start } of res.seqs) {
+  for (const { cards, start } of plan.seqs) {
     player.melds.push(makeSeqMeld(cards, start, playerId));
     cards.forEach((c) => usedIds.add(c.id));
   }
   player.hand = player.hand.filter((c) => !usedIds.has(c.id));
-  player.baixou = true;
+  player.baixados.t += plan.a;
+  player.baixados.s += plan.b;
+  player.baixou = player.baixados.t >= ct.t && player.baixados.s >= ct.s;
 
-  const events = [{ e: 'baixou', p: playerId }];
+  const events = [{ e: 'baixou', p: playerId, t: plan.a, s: plan.b, completa: player.baixou }];
   if (player.hand.length === 0) return endRound(state, playerId, 'bateu', events);
   return events;
 }
 
-// Encaixar uma carta da mão em qualquer jogo da mesa (só depois de baixar)
-export function actLayoff(state, playerId, cardId, meldId) {
+// Encaixar uma carta da mão em qualquer jogo da mesa (só depois de baixar).
+// `end` ('lo'/'hi') escolhe a ponta quando a carta serve nas duas.
+export function actLayoff(state, playerId, cardId, meldId, end = null) {
   if (state.phase !== 'play') fail('Puxe uma carta antes de encaixar.');
   const player = state.players[state.turn];
   if (player.id !== playerId) fail('Não é a sua vez.');
@@ -562,8 +648,8 @@ export function actLayoff(state, playerId, cardId, meldId) {
   if (!card) fail('Essa carta não está na sua mão.');
   const meld = meldById(state, meldId);
   if (!meld) fail('Jogo não encontrado na mesa.');
-  const opt = layoffOption(card, meld);
-  if (!opt) fail('Essa carta não encaixa nesse jogo.');
+  const opt = layoffOption(card, meld, 0, end || null);
+  if (!opt) fail(end ? 'Essa carta não encaixa nesse jogo por essa ponta.' : 'Essa carta não encaixa nesse jogo.');
 
   applyLayoff(meld, card, opt);
   player.hand = player.hand.filter((c) => c.id !== cardId);
@@ -728,7 +814,14 @@ export function viewFor(state, playerId) {
     // `podeTrocarCoringa` vai pronto do motor: o cliente não reimplementa a
     // regra de "baixou em turno anterior", só reflete o que o juiz respondeu.
     you: me
-      ? { id: me.id, hand: me.hand, baixou: me.baixou, podeTrocarCoringa: podeTrocarCoringa(state, me) }
+      ? {
+          id: me.id,
+          hand: me.hand,
+          baixou: me.baixou,
+          baixados: me.baixados,
+          remaining: state.round >= 0 ? contractRemaining(state, me) : null,
+          podeTrocarCoringa: podeTrocarCoringa(state, me),
+        }
       : null,
     players: state.players.map((p) => ({
       id: p.id,
@@ -736,6 +829,7 @@ export function viewFor(state, playerId) {
       isBot: p.isBot,
       handCount: p.hand.length,
       baixou: p.baixou,
+      baixados: p.baixados,
       score: p.score,
       melds: p.melds,
     })),
@@ -769,18 +863,18 @@ function bestCover(cards, ct) {
   return melhorCobertura(cards, ct).score;
 }
 
-// A carta avança o contrato de verdade, ou encaixa em algum jogo da mesa?
+// A carta avança o que FALTA do contrato, ou encaixa em algum jogo da mesa?
 export function botWantsCard(state, player, card) {
   if (player.baixou) {
     return allMelds(state).some((m) => layoffOption(card, m));
   }
-  const ct = currentContract(state);
-  const before = bestCover(player.hand, ct);
-  if (before >= ct.t * 3 + ct.s * 4) return false; // contrato já fechado
+  const rem = contractRemaining(state, player);
+  const before = bestCover(player.hand, rem);
+  if (before >= rem.t * 3 + rem.s * 4) return false; // o que falta já está na mão
   // Vale para o coringa também: só pega se a cobertura melhorar de verdade.
   // Querer uma carta que a heurística de descarte depois larga é o que criava
   // o pega-e-devolve infinito com o descarte.
-  return bestCover([...player.hand, card], ct) > before;
+  return bestCover([...player.hand, card], rem) > before;
 }
 
 // Utilidade de manter uma carta na mão (para escolher descarte).
@@ -820,24 +914,24 @@ function cardUsefulness(state, player, card, faltam) {
 // a aumenta e nunca descarta carta que a sustenta, então ele converge para o
 // contrato em vez de ficar rodando em círculo com o monte de descarte.
 function protectedIds(state, player) {
-  const ct = currentContract(state);
+  const rem = contractRemaining(state, player);
   const ids = new Set();
   const guarda = (res) => {
     if (!res) return;
     for (const cards of res.trincas) cards.forEach((c) => ids.add(c.id));
     for (const { cards } of res.seqs) cards.forEach((c) => ids.add(c.id));
   };
-  // 1) A melhor cobertura — obrigatória, é a que bestCover mede.
-  guarda(melhorCobertura(player.hand, ct).res);
+  // 1) A melhor cobertura do que FALTA — obrigatória, é a que bestCover mede.
+  guarda(melhorCobertura(player.hand, rem).res);
   // 2) Mais os jogos completos avulsos. Uma trinca e uma sequência podem
   //    disputar a mesma carta e não caber na mesma cobertura; ainda assim as
   //    duas são progresso e nenhuma delas deve virar descarte. Proteger a
   //    união é sempre seguro: continua contendo tudo que a cobertura conta.
-  for (let k = Math.min(ct.t, 3); k >= 1; k--) {
+  for (let k = Math.min(rem.t, 3); k >= 1; k--) {
     const parcial = findContractMelds(player.hand, k, 0);
     if (parcial) { guarda(parcial); break; }
   }
-  for (let k = Math.min(ct.s, 3); k >= 1; k--) {
+  for (let k = Math.min(rem.s, 3); k >= 1; k--) {
     const parcial = findContractMelds(player.hand, 0, k);
     if (parcial) { guarda(parcial); break; }
   }
@@ -845,11 +939,11 @@ function protectedIds(state, player) {
 }
 
 export function botPickDiscard(state, player) {
-  const ct = currentContract(state);
-  const cobertura = melhorCobertura(player.hand, ct).res;
+  const rem = contractRemaining(state, player);
+  const cobertura = melhorCobertura(player.hand, rem).res;
   const faltam = {
-    t: ct.t - (cobertura ? cobertura.trincas.length : 0),
-    s: ct.s - (cobertura ? cobertura.seqs.length : 0),
+    t: rem.t - (cobertura ? cobertura.trincas.length : 0),
+    s: rem.s - (cobertura ? cobertura.seqs.length : 0),
   };
   const safe = protectedIds(state, player);
   let candidates = player.hand.filter((c) => !safe.has(c.id));
@@ -918,6 +1012,24 @@ export function botFindJokerSwap(state, player) {
   return null;
 }
 
+// Qual ponta aproveita melhor a carta (importa para o coringa, que entra nas
+// duas)? Prefere a ponta que abre encaixe para outra carta da mão — é o que
+// destrava o "bateu" (ex.: mesa 5♥6♥7♥8♥, mão [coringa, 3♥]: coringa como 4♥
+// embaixo deixa o 3♥ entrar em seguida).
+function melhorPonta(player, card, meld) {
+  const ends = layoffEnds(card, meld);
+  if (ends.length <= 1) return ends[0] || null;
+  for (const end of ends) {
+    const opt = layoffOption(card, meld, 0, end);
+    const proximoValor = opt.end === 'lo' ? opt.v - 1 : opt.v + 1;
+    if (proximoValor < 1 || proximoValor > 14) continue;
+    const abreEncaixe = player.hand.some((c) =>
+      c.id !== card.id && !isJoker(c) && c.suit === meld.suit && cardValues(c).includes(proximoValor));
+    if (abreEncaixe) return end;
+  }
+  return ends[0];
+}
+
 // Próxima ação do bot na vez dele (uma por chamada, para o servidor dar ritmo)
 export function botNextAction(state, playerId) {
   const player = state.players[state.turn];
@@ -932,12 +1044,18 @@ export function botNextAction(state, playerId) {
   }
 
   if (state.phase === 'play') {
-    const ct = currentContract(state);
-    if (!player.baixou && findContractMelds(player.hand, ct.t, ct.s)) return { a: 'baixar' };
+    // Baixa o que der, assim que der (um jogo por vez conta): menos pontos na
+    // mão se alguém bater. planBaixada já evita a baixada que deixaria a mão
+    // vazia sem completar o contrato, então a ação nunca é recusada.
+    if (!player.baixou && planBaixada(player.hand, contractRemaining(state, player))) {
+      return { a: 'baixar' };
+    }
     if (player.baixou) {
       for (const card of player.hand) {
         for (const meld of allMelds(state)) {
-          if (layoffOption(card, meld)) return { a: 'layoff', cardId: card.id, meldId: meld.id };
+          if (!layoffOption(card, meld)) continue;
+          const end = melhorPonta(player, card, meld);
+          return { a: 'layoff', cardId: card.id, meldId: meld.id, end };
         }
       }
     }
@@ -962,7 +1080,7 @@ export function applyAction(state, playerId, action) {
     case 'claim': return actClaim(state, playerId);
     case 'unclaim': return actUnclaim(state, playerId);
     case 'baixar': return actBaixar(state, playerId, action.cardIds || null);
-    case 'layoff': return actLayoff(state, playerId, action.cardId, action.meldId);
+    case 'layoff': return actLayoff(state, playerId, action.cardId, action.meldId, action.end || null);
     case 'swapJoker': return actSwapJoker(state, playerId, action.meldId, action.cardId, action.destMeldId || null);
     case 'discard': return actDiscard(state, playerId, action.cardId);
     case 'meldDiscard': return actMeldDiscard(state, playerId, action.meldId, action.cardId);
