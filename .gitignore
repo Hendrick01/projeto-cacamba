@@ -1,0 +1,17 @@
+# Dependências
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Variáveis de ambiente
+.env
+.env.*
+
+# Artefatos de sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0e3b2c">
+<title>Caçamba</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Paytone+One&family=Nunito:wght@500;700;800;900&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ======================= TELA INICIAL ======================= -->
+<section id="screen-home" class="screen">
+  <div class="home-box">
+    <h1 class="logo">Caçamba</h1>
+    <p class="tagline">7 rodadas, trincas e sequências.<br>Quem fizer menos pontos leva.</p>
+
+    <label class="field">
+      <span>Seu nome</span>
+      <input id="name-input" maxlength="16" placeholder="ex.: Matheus" autocomplete="nickname">
+    </label>
+
+    <button id="btn-create" class="btn btn-primary">Criar sala</button>
+
+    <div class="join-row">
+      <input id="code-input" maxlength="4" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off">
+      <button id="btn-join" class="btn">Entrar</button>
+    </div>
+
+    <button id="btn-rules-home" class="btn btn-ghost">Como se joga?</button>
+    <p id="home-error" class="error" hidden></p>
+  </div>
+</section>
+
+<!-- ======================= LOBBY / SALA ======================= -->
+<section id="screen-lobby" class="screen" hidden>
+  <div class="home-box">
+    <p class="lobby-label">Código da sala</p>
+    <div id="lobby-code" class="lobby-code">····</div>
+    <img id="lobby-qr" class="lobby-qr" alt="QR para entrar na sala" hidden>
+    <p id="lobby-url" class="lobby-url"></p>
+
+    <ul id="lobby-players" class="lobby-players"></ul>
+
+    <div class="lobby-actions">
+      <button id="btn-add-bot" class="btn" hidden>+ Robô</button>
+      <button id="btn-start" class="btn btn-primary" hidden>Começar partida</button>
+    </div>
+    <p id="lobby-wait" class="lobby-wait" hidden>Esperando quem criou a sala começar…</p>
+    <button id="btn-leave-lobby" class="btn btn-ghost">Sair da sala</button>
+  </div>
+</section>
+
+<!-- ======================= MESA DE JOGO ======================= -->
+<section id="screen-game" class="screen" hidden>
+  <header class="topbar">
+    <div class="round-pill"><span id="round-label">Rodada 1/7</span><strong id="contract-label">2 trincas</strong></div>
+    <div class="topbar-btns">
+      <button id="btn-score" class="icon-btn" title="Placar">Σ</button>
+      <button id="btn-rules" class="icon-btn" title="Regras">?</button>
+    </div>
+  </header>
+
+  <div id="opponents" class="opponents"></div>
+
+  <div class="table-center">
+    <div class="piles">
+      <button id="deck-pile" class="pile deck-pile">
+        <div class="card back"></div>
+        <span id="deck-count" class="pile-count">55</span>
+      </button>
+      <button id="discard-pile" class="pile discard-pile">
+        <div id="discard-card" class="card empty"></div>
+        <span class="pile-count">meio</span>
+      </button>
+    </div>
+    <button id="btn-claim" class="btn btn-claim" hidden>🛒 Quero essa carta!</button>
+    <p id="turn-banner" class="turn-banner">…</p>
+  </div>
+
+  <div id="my-melds" class="my-melds"></div>
+
+  <div class="action-bar" id="action-bar">
+    <button id="btn-draw-deck" class="btn" hidden>Puxar do monte</button>
+    <button id="btn-draw-discard" class="btn" hidden>Pegar do meio</button>
+    <button id="btn-baixar" class="btn btn-primary" hidden>Baixar jogo</button>
+    <button id="btn-discard" class="btn btn-danger" hidden>Descartar</button>
+    <button id="btn-meld-discard" class="btn" hidden>Descartar de jogo</button>
+    <button id="btn-cancel-mode" class="btn btn-ghost" hidden>Cancelar</button>
+    <button id="btn-sort" class="btn btn-ghost">A↔♠</button>
+  </div>
+
+  <div id="hand" class="hand"></div>
+
+  <div id="toasts" class="toasts"></div>
+</section>
+
+<!-- ======================= MODAIS ======================= -->
+<div id="modal-backdrop" class="modal-backdrop" hidden>
+  <div id="modal" class="modal">
+    <div id="modal-body"></div>
+    <div id="modal-actions" class="modal-actions"></div>
+  </div>
+</div>
+
+<script type="module" src="client.js"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Caçamba">
+  <title>Caçamba</title>
+  <defs>
+    <radialGradient id="felt" cx="50%" cy="0%" r="110%">
+      <stop offset="0%" stop-color="#0e3b2c"/>
+      <stop offset="100%" stop-color="#092a1f"/>
+    </radialGradient>
+    <!-- Sombra suave das cartas sobre o feltro -->
+    <filter id="drop" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Feltro da mesa (ocupa tudo: funciona como ícone maskable) -->
+  <rect width="512" height="512" fill="url(#felt)"/>
+  <rect x="26" y="26" width="460" height="460" rx="86" fill="none" stroke="#e9b94e" stroke-opacity="0.55" stroke-width="10"/>
+
+  <!-- Leque de três cartas -->
+  <g filter="url(#drop)">
+    <g transform="rotate(-20 256 356)">
+      <rect x="182" y="150" width="148" height="206" rx="16" fill="#e9e2d2" stroke="#caa348" stroke-width="5"/>
+    </g>
+    <g transform="rotate(20 256 356)">
+      <rect x="182" y="150" width="148" height="206" rx="16" fill="#e9e2d2" stroke="#caa348" stroke-width="5"/>
+      <!-- Pipa de copas na borda que fica à mostra no leque -->
+      <path transform="translate(292 170) scale(0.30)" fill="#c93a3a"
+            d="M50 92 C 50 92, 4 58, 4 30 C 4 12, 18 2, 31 2 C 40 2, 47 7, 50 14 C 53 7, 60 2, 69 2 C 82 2, 96 12, 96 30 C 96 58, 50 92, 50 92 Z"/>
+    </g>
+    <!-- Carta da frente -->
+    <rect x="182" y="150" width="148" height="206" rx="16" fill="#fbf8f1" stroke="#caa348" stroke-width="5"/>
+    <!-- Espadas -->
+    <path transform="translate(206 186) scale(1.34)" fill="#232a33"
+          d="M50 12 C 50 12, 20 40, 20 58 C 20 70, 29 78, 39 78 C 44 78, 48 76, 50 73
+             C 48 84, 44 90, 38 93 L 62 93 C 56 90, 52 84, 50 73
+             C 52 76, 56 78, 61 78 C 71 78, 80 70, 80 58 C 80 40, 50 12, 50 12 Z"/>
+  </g>
+</svg>

@@ -1,0 +1,29 @@
+{
+  "name": "Caçamba",
+  "short_name": "Caçamba",
+  "description": "Jogo de cartas multiplayer para celular: 7 rodadas de contratos com trincas e sequências. Quem fizer menos pontos leva.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#092a1f",
+  "theme_color": "#0e3b2c",
+  "categories": ["games"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "maskable"
+    }
+  ]
+}
