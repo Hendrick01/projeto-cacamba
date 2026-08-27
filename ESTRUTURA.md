@@ -1,14 +1,14 @@
 # Estrutura do projeto — Caçamba
 
 Jogo de cartas multiplayer para celular: 7 rodadas de contratos (trincas e sequências),
-2 a 4 jogadores, salas por código de 4 letras com QR para entrar. Quem faz **menos**
+2 a 8 jogadores, salas por código de 4 letras com QR para entrar. Quem faz **menos**
 pontos ganha.
 
 **Stack:** Node.js puro em ESM, sem framework e sem build. Duas dependências: `ws`
 (WebSocket) e `qrcode`. O front-end é HTML/CSS/JS vanilla servido estaticamente e
 importa o motor de regras direto do servidor, em `/shared/engine.js`.
 
-**Rodar:** `npm start`. **Testar:** `npm test` (23 testes do motor). O teste de
+**Rodar:** `npm start`. **Testar:** `npm test` (38 testes do motor). O teste de
 integração é separado e exige o servidor no ar: `node test/e2e.mjs`.
 
 > As regras vêm de quem joga o jogo, e ainda estão evoluindo. Tudo que é decisão de
@@ -38,7 +38,7 @@ projeto-caçamba/
 │   ├── icon.svg             # ícone do app (também serve de favicon)
 │   └── manifest.json        # manifesto PWA
 └── test/
-    ├── engine.test.js       # 23 testes unitários do motor
+    ├── engine.test.js       # 38 testes unitários do motor
     └── e2e.mjs              # integração: 2 jogadores contra o servidor real
 ```
 
@@ -46,13 +46,13 @@ projeto-caçamba/
 
 | Arquivo | Linhas | O que faz |
 |---|---:|---|
-| [`shared/engine.js`](shared/engine.js) | 971 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
-| [`public/client.js`](public/client.js) | 814 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
-| [`server.js`](server.js) | 397 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
-| [`public/style.css`](public/style.css) | 371 | Tema único de feltro escuro, com variáveis CSS na `:root`; layout pensado para celular em pé. |
-| [`test/engine.test.js`](test/engine.test.js) | 352 | Testes do motor com `node:test`, incluindo 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
+| [`shared/engine.js`](shared/engine.js) | 1143 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
+| [`public/client.js`](public/client.js) | 1035 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
+| [`server.js`](server.js) | 480 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
+| [`public/style.css`](public/style.css) | 416 | Tema único de feltro escuro, com variáveis CSS na `:root`; layout pensado para celular em pé. |
+| [`test/engine.test.js`](test/engine.test.js) | 576 | Testes do motor com `node:test`, incluindo 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 122 | Dois jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket, exercitando compra fora da vez. |
-| [`public/index.html`](public/index.html) | 116 | Esqueleto das três telas (`screen-home`, `screen-lobby`, `screen-game`) e do modal genérico. |
+| [`public/index.html`](public/index.html) | 117 | Esqueleto das três telas (`screen-home`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`public/icon.svg`](public/icon.svg) | 37 | Ícone: leque de três cartas sobre o feltro, com moldura dourada. Fundo ocupa o quadro todo, então funciona como ícone *maskable*. |
 | [`.claude/settings.json`](.claude/settings.json) | 34 | Allowlist de comandos de leitura para reduzir aprovações; `sudo` e `rm -rf` bloqueados. |
 | [`public/manifest.json`](public/manifest.json) | 29 | Manifesto PWA: nome, `pt-BR`, `standalone`, retrato, cores casando com o `theme-color` do HTML. |
@@ -77,12 +77,45 @@ E em `DEFAULT_OPTS`, as regras da casa ajustáveis por sala:
 
 | Opção | Valor | O que decide |
 |---|---|---|
-| `decks` | `2` | Baralhos em jogo. |
+| `decks` | derivado | Baralhos em jogo. Sai de `decksParaJogadores()` no `createGame`; só é lido do padrão se alguém montar opções à mão. |
 | `jokersPerDeck` | `JOKERS_PER_DECK` | Coringas por baralho. |
 | `buyPenalty` | `1` | Cartas de castigo de quem compra fora da vez. |
 | `maxReshuffles` | `3` | Monte esgotado 3× na rodada → rodada acaba sem vencedor. |
 | `maxTurnsPerRound` | `300` | Rede de segurança. Se todos só pegarem do descarte, o monte nunca esgota e `maxReshuffles` nunca é atingido; este teto impede a rodada eterna. Rodadas normais ficam bem abaixo de 60 turnos. |
-| `minPlayers` / `maxPlayers` | `2` / `4` | Tamanho da sala. |
+| `minPlayers` / `maxPlayers` | `2` / `8` | Tamanho da sala. |
+
+---
+
+## Tamanho da mesa e baralhos
+
+A mesa vai de 2 a 8 lugares, e o número de baralhos sai do número de jogadores —
+tabela `DECKS_POR_JOGADORES`, no topo do motor:
+
+| Jogadores | Baralhos | Cartas |
+|---|---|---|
+| 2 a 3 | 1 | 56 |
+| 4 a 6 | 2 | 112 |
+| 7 a 8 | 3 | 168 |
+
+Os cortes vieram de simulação. O que decide é a **rodada 7**, que distribui 12
+cartas por jogador: quando sobra pouco monte, a rodada morre por esgotamento
+antes de alguém fechar o contrato. Com 4 jogadores em 1 baralho ela termina sem
+vencedor em **97,5%** das vezes; com 8 em 2 baralhos, em **100%**. Com a tabela,
+nenhuma configuração de 2 a 8 passa de 1% na rodada 7.
+
+Duas funções sustentam isso, e são o que se deve usar antes de abrir uma mesa:
+
+| Função | O que faz |
+|---|---|
+| `decksParaJogadores(n)` | Consulta a tabela. |
+| `cartasNecessarias(n, round)` | Cartas que a rodada exige: `(6 + round) × n + 1`. |
+| `cartasDoBaralho(round, opts)` | Quanto o baralho tem naquela rodada — rodada só de trincas vai sem coringa, então 52 por baralho em vez de 56. |
+| `conferirBaralho(n, opts)` | `null` se as 7 rodadas cabem; senão, a rodada mais apertada. O servidor chama antes de começar, para recusar no lobby em vez de quebrar no meio. |
+
+`startRound` confere de novo antes de distribuir e **recusa a rodada** com erro
+de regra se o baralho não der. Sem essa guarda, `deck.pop()` num baralho curto
+colocava `undefined` na mão e a partida só quebrava lá adiante, na contagem de
+pontos, com um `TypeError` sem relação aparente com a causa.
 
 ---
 
@@ -223,6 +256,31 @@ progresso e volta a querê-la, travando a rodada.
 
 ---
 
+## A mesa no celular
+
+O cliente troca de layout conforme o tamanho da mesa, em `renderOpponents`:
+
+| Adversários | Layout | Por quê |
+|---|---|---|
+| até 3 | cartão largo, com os jogos baixados à vista | cabe na largura e mostra tudo |
+| 4 ou mais | **grade compacta**, todos visíveis, detalhe sob toque | sete cartões largos pedem ~744px numa tela de 375 |
+
+Na grade cabe o essencial de relance — nome, cartas na mão, progresso do
+contrato (`2/3`), quem pediu a carta, quem está fora e quantos jogos tem. Os
+jogos baixados saem do bloco e vão para o toque (`mostraOponente`), o que não
+custa jogabilidade: para encaixar carta, os jogos dos outros já aparecem na
+fileira de baixo junto com os seus.
+
+`avisaAdversariosForaDaVista` fica como rede de segurança. Com a grade todos
+cabem, mas nome muito longo ou tela muito estreita ainda podem estourar a
+largura — e então ela avisa quantos ficaram fora e rola até quem está na vez,
+para o aviso "Vez de Fulano" nunca apontar para alguém invisível. Fica dormente
+quando tudo cabe.
+
+O limite de quando trocar está em `COMPACTO_A_PARTIR_DE`, no cliente.
+
+---
+
 ## `server.js` — salas e juiz
 
 Único dono do estado da partida: o cliente só pede, o servidor decide e reenvia a
@@ -249,6 +307,16 @@ poder importar o motor. Normaliza o caminho contra travessia de diretório.
 
 `makeCode` (4 letras, sem `I` nem `O`), `newRoom` (gera o QR), `hostOf`,
 `sanitizeName`, `lobbyView`, `broadcastLobby`, `broadcastState`.
+
+`comPresenca()` carimba `connected` em cada jogador antes de mandar a visão.
+Presença é assunto da sala, não do motor — o `engine.js` não sabe de sockets e
+por isso `viewFor` não devolve esse campo. Sem o carimbo, o cliente lia
+`undefined` e marcava **todo adversário humano como "fora" o tempo todo**.
+
+Antes de começar, `conferirBaralho()` recusa a partida no lobby quando o baralho
+não comporta a mesa, com mensagem, em vez de deixar o motor barrar na rodada
+mais apertada. `BOT_NAMES` tem oito nomes distintos, escolhidos pelo primeiro
+livre, para não haver dois robôs homônimos numa mesa de 8.
 
 `originFrom(req)` decide o endereço que vai no convite e no QR, nesta ordem:
 `PUBLIC_URL` → cabeçalhos `x-forwarded-host` / `x-forwarded-proto` → IP da rede local.
