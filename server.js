@@ -89,12 +89,26 @@ const LAN_HOST = `http://${lanAddress()}:${PORT}`;
 // De onde o jogador acessou a sala: é isso que vai no link de convite e no QR.
 // Ordem: PUBLIC_URL (fixa, para deploy) → cabeçalhos da requisição (funciona
 // atrás de túnel e de proxy reverso) → IP da rede local (uso caseiro).
+// Cabeçalho é entrada do cliente: um criador malicioso poderia forjar o host e
+// fazer o QR mostrado aos convidados apontar para um clone. Por isso:
+// x-forwarded-* só vale atrás de proxy declarado (TRUST_PROXY=1), o host tem
+// que ter cara de host, e ALLOWED_HOSTS (lista separada por vírgula) fecha de
+// vez quando definida. Em produção, prefira simplesmente PUBLIC_URL.
+function hostValido(h) {
+  return typeof h === 'string' && h.length <= 260 && /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/i.test(h);
+}
+const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS || '')
+  .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
 function originFrom(req) {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/+$/, '');
-  const host = req && (req.headers['x-forwarded-host'] || req.headers.host);
-  if (!host) return LAN_HOST;
-  const forwarded = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
-  const proto = forwarded || (req.socket && req.socket.encrypted ? 'https' : 'http');
+  const trustProxy = process.env.TRUST_PROXY === '1';
+  const fwdHost = trustProxy ? String(req?.headers['x-forwarded-host'] || '').split(',')[0].trim() : '';
+  const host = fwdHost || (req && req.headers.host);
+  if (!hostValido(host)) return LAN_HOST;
+  if (ALLOWED_HOSTS.length && !ALLOWED_HOSTS.includes(host.toLowerCase())) return LAN_HOST;
+  const fwdProto = trustProxy ? String(req?.headers['x-forwarded-proto'] || '').split(',')[0].trim() : '';
+  const proto = /^https?$/.test(fwdProto) ? fwdProto : (req.socket && req.socket.encrypted ? 'https' : 'http');
   return `${proto}://${host}`;
 }
 
@@ -108,7 +122,9 @@ function newRoom(origin = LAN_HOST) {
     code: makeCode(),
     players: [], // { id, name, token, isBot, ws, connected, lastSeen }
     game: null,
+    gameSeq: 0,     // sobe a cada partida nova: invalida chave de timer antiga
     botTimer: null,
+    botTimerKey: null,
     qr: null,
     origin,
     createdAt: Date.now(),
@@ -158,10 +174,16 @@ function broadcastState(room, events = []) {
 // Bots: agem com ritmo humano; dão janela para compra fora da vez
 // ---------------------------------------------------------------------------
 
+// Quanto tempo um humano da vez pode ficar caído antes de o jogo jogar por
+// ele (até ele reconectar). Sem isso, uma queda definitiva travaria a sala.
+const AWAY_TAKEOVER_MS = 45_000;
+
 function scheduleBots(room) {
-  if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; }
   const game = room.game;
-  if (!game || (game.phase !== 'draw' && game.phase !== 'play')) return;
+  if (!game || (game.phase !== 'draw' && game.phase !== 'play')) {
+    if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; room.botTimerKey = null; }
+    return;
+  }
 
   const current = game.players[game.turn];
   const currentPlayer = room.players.find((p) => p.id === current.id);
@@ -180,22 +202,49 @@ function scheduleBots(room) {
     if (claimed) broadcastState(room, [{ e: 'claimUpdate' }]);
   }
 
-  if (!currentPlayer || !currentPlayer.isBot) return; // vez de humano: só esperamos
+  // Vez de humano presente: nada a agendar (o jogo espera por ele).
+  const away = currentPlayer && !currentPlayer.isBot && !currentPlayer.connected;
+  if (!currentPlayer || (!currentPlayer.isBot && !away)) {
+    if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; room.botTimerKey = null; }
+    return;
+  }
 
-  // Janela maior quando há carta comprável (dá tempo do humano pedir)
-  // Sem janela de espera quando a carta não é comprável: ninguém vai pedir.
+  // O timer só é reagendado quando o MOMENTO do jogo muda (vez, fase, carta
+  // fresca…). Sem esta chave, qualquer mensagem repetida de um cliente
+  // (ex.: spam de claim/unclaim) limparia e recriaria o timer para sempre e o
+  // bot nunca jogaria — a partida inteira congelaria.
+  const key = `${room.gameSeq}:${game.round}:${game.turnNo}:${game.phase}:${game.discardFresh}:${current.id}:${away ? 'away' : 'bot'}`;
+  if (room.botTimer && room.botTimerKey === key) return;
+  if (room.botTimer) clearTimeout(room.botTimer);
+  room.botTimerKey = key;
+
+  // Janela maior quando há carta comprável (dá tempo do humano pedir).
+  // Humano caído: espera generosa na primeira ação; depois ritmo de bot.
   const buyWindow = game.phase === 'draw' && game.discardFresh && podeComprarDoDescarte(game);
-  const delay = buyWindow ? 2200 : 700 + Math.random() * 500;
+  const delay = away
+    ? (currentPlayer.awayActed ? 1000 : AWAY_TAKEOVER_MS)
+    : (buyWindow ? 2200 : 700 + Math.random() * 500);
 
   room.botTimer = setTimeout(() => {
     room.botTimer = null;
+    room.botTimerKey = null;
     if (!room.game || room.game !== game) return;
     if (game.phase !== 'draw' && game.phase !== 'play') return;
     if (game.players[game.turn].id !== current.id) return;
+    const actor = room.players.find((p) => p.id === current.id);
+    if (!actor) return;
+    if (!actor.isBot) {
+      if (actor.connected) return; // voltou a tempo: a vez é dele de verdade
+      actor.awayActed = true;
+    }
     try {
       const action = botNextAction(game, current.id);
       if (!action) return;
-      const events = applyAction(game, current.id, action);
+      let events = applyAction(game, current.id, action);
+      if (!actor.isBot && !actor.awayNotified) {
+        actor.awayNotified = true;
+        events = [{ e: 'away', p: current.id }, ...events];
+      }
       broadcastState(room, events);
       scheduleBots(room);
     } catch (err) {
@@ -234,6 +283,9 @@ wss.on('connection', (ws, req) => {
       player.lastSeen = Date.now();
       broadcastLobby(room);
       if (room.game) broadcastState(room, [{ e: 'presence' }]);
+      // Se ele caiu na própria vez, arma a retomada (o jogo joga por ele
+      // depois de AWAY_TAKEOVER_MS até ele reconectar)
+      scheduleBots(room);
     }
   });
 });
@@ -256,6 +308,8 @@ function attach(ws, room, player) {
   player.ws = ws;
   player.connected = true;
   player.lastSeen = Date.now();
+  player.awayActed = false;    // reconectou: o jogo para de jogar por ele
+  player.awayNotified = false;
   send(ws, { t: 'welcome', playerId: player.id, token: player.token, code: room.code });
   broadcastLobby(room);
   if (room.game) send(ws, { t: 'state', view: viewFor(room.game, player.id), events: [] });
@@ -323,6 +377,7 @@ function handle(ws, msg) {
       if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
       if (room.players.length < DEFAULT_OPTS.minPlayers) { const e = new Error('Chame pelo menos mais 1 jogador (ou adicione um robô).'); e.gameRule = true; throw e; }
       room.game = createGame(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })));
+      room.gameSeq++;
       const events = startRound(room.game);
       broadcastLobby(room);
       broadcastState(room, events);
@@ -334,7 +389,10 @@ function handle(ws, msg) {
       const player = currentPlayer(ws, room);
       if (!room.game) { const e = new Error('A partida ainda não começou.'); e.gameRule = true; throw e; }
       const events = applyAction(room.game, player.id, msg.action || {});
-      broadcastState(room, events);
+      // Ação sem efeito (ex.: pedido de compra atrasado) não gera rebroadcast:
+      // junto com a chave do timer em scheduleBots, isso impede que spam de
+      // mensagens inofensivas congele os bots ou inunde os outros clientes.
+      if (events.length > 0) broadcastState(room, events);
       scheduleBots(room);
       break;
     }
@@ -354,6 +412,7 @@ function handle(ws, msg) {
       if (!room.game || room.game.phase !== 'gameEnd') return;
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode recomeçar.'); e.gameRule = true; throw e; }
       room.game = createGame(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })));
+      room.gameSeq++;
       const events = startRound(room.game);
       broadcastState(room, events);
       scheduleBots(room);
