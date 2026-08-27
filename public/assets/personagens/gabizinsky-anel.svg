@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320" role="img" aria-label="Gabizinsky - anel de prata com coracao vermelho, mao direita">
+  <defs><clipPath id="gabizinsky-anel-clip"><circle cx="160" cy="160" r="150"/></clipPath></defs>
+
+  <g clip-path="url(#gabizinsky-anel-clip)">
+    <circle cx="160" cy="160" r="150" fill="#7A4A2B"/>
+    <ellipse cx="160" cy="150" rx="132" ry="128" fill="#8C5733"/>
+
+    <g stroke="#2A1B12" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+
+      <!-- antebraco nu (a peca de cima e de manga curta) -->
+      <path fill="none" stroke="#2A1B12"   stroke-width="80" d="M 152 -20 C 150 20, 152 56, 156 86"/>
+      <path fill="none" stroke="#F4CFAA"  stroke-width="70" d="M 152 -20 C 150 20, 152 56, 156 86"/>
+
+      <!-- dedos: mindinho, ANELAR, medio, indicador (esq -> dir) -->
+      <g fill="none">
+        <path stroke="#2A1B12"  stroke-width="36" d="M 116 168 C 111 200, 110 224, 113 242"/>
+        <path stroke="#F4CFAA" stroke-width="28" d="M 116 168 C 111 200, 110 224, 113 242"/>
+        <path stroke="#2A1B12"  stroke-width="38" d="M 147 170 C 145 204, 145 238, 148 262"/>
+        <path stroke="#F4CFAA" stroke-width="30" d="M 147 170 C 145 204, 145 238, 148 262"/>
+        <path stroke="#2A1B12"  stroke-width="38" d="M 178 170 C 179 206, 181 242, 178 268"/>
+        <path stroke="#F4CFAA" stroke-width="30" d="M 178 170 C 179 206, 181 242, 178 268"/>
+        <path stroke="#2A1B12"  stroke-width="36" d="M 208 168 C 213 198, 214 226, 209 248"/>
+        <path stroke="#F4CFAA" stroke-width="28" d="M 208 168 C 213 198, 214 226, 209 248"/>
+      </g>
+
+      <!-- polegar, lado interno (direita, virado para o corpo) -->
+      <path fill="none" stroke="#2A1B12"  stroke-width="44" d="M 216 120 C 240 132, 256 150, 262 172"/>
+      <path fill="none" stroke="#F4CFAA" stroke-width="36" d="M 216 120 C 240 132, 256 150, 262 172"/>
+
+      <!-- dorso da mao -->
+      <path fill="#F4CFAA" d="M 106 108
+        C 100 130, 100 158, 106 176
+        C 132 190, 190 190, 216 174
+        C 222 152, 222 126, 214 106
+        C 190 92, 130 92, 106 108 Z"/>
+      <!-- tendoes -->
+      <g fill="none" stroke="#E0B189" stroke-width="5">
+        <path d="M 122 126 L 120 168"/>
+        <path d="M 152 122 L 151 172"/>
+        <path d="M 182 122 L 184 172"/>
+      </g>
+
+      <!-- ANEL DE PRATA - dedo ANELAR da mao DIREITA -->
+      <g stroke-width="4">
+        <rect x="125" y="200" width="44" height="30" rx="7" fill="#C9CDD2"/>
+        <path fill="#8D949B" stroke="none" d="M 127 220 L 167 220 L 167 224 C 167 227, 164 229, 161 229 L 133 229 C 129 229, 127 227, 127 224 Z"/>
+        <path fill="#EDEFF2" stroke="none" d="M 131 204 L 137 204 L 137 226 L 131 226 Z" opacity="0.7"/>
+        <!-- pedra em coracao -->
+        <path fill="#C6362F" d="M 147 206.0 C 114.0 185.0 121.0 159.0 147 177.5 C 173.0 159.0 180.0 185.0 147 206.0 Z"/>
+        <path fill="#95221E" stroke="none" d="M 147 206 C 156 197, 166 188, 169 178 C 168 192, 159 202, 147 206 Z"/>
+        <path fill="#F5F1E6" stroke="none" opacity="0.8" d="M 136 172 C 131 177, 130 184, 133 189 C 131 182, 133 177, 139 174 Z"/>
+      </g>
+    </g>
+
+    <!-- brilhos -->
+    <g fill="#F2C14E" stroke="none">
+      <path d="M 92 172 L 96 186 L 110 190 L 96 194 L 92 208 L 88 194 L 74 190 L 88 186 Z" opacity="0.9"/>
+      <path d="M 198 140 L 200 148 L 208 150 L 200 152 L 198 160 L 196 152 L 188 150 L 196 148 Z" opacity="0.7"/>
+    </g>
+  </g>
+
+  <circle cx="160" cy="160" r="150" fill="none" stroke="#2A1B12" stroke-width="12"/>
+  <circle cx="160" cy="160" r="150" fill="none" stroke="#F2C14E" stroke-width="6"/>
+</svg>

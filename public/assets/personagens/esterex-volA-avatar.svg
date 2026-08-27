@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="EstereX - avatar">
+  <defs><clipPath id="ex-avatar-clip"><circle cx="128" cy="128" r="120"/></clipPath></defs>
+
+  <g clip-path="url(#ex-avatar-clip)">
+    <circle cx="128" cy="128" r="120" fill="#7A4A2B"/>
+    <ellipse cx="128" cy="122" rx="106" ry="102" fill="#8C5733"/>
+
+    <g stroke="#2A1B12" stroke-width="5.00" stroke-linejoin="round"><path fill="#26242C" d="M 128 18 C 72 18, 35 56, 32 112 C 27 166, 29 220, 36 266 C 31 284, 36 304, 41 324 C 51 329, 62 318, 66 300 C 63 238, 94 178, 78 108 L 178 108 C 162 178, 193 238, 190 300 C 194 318, 205 329, 215 324 C 220 304, 225 284, 220 266 C 227 220, 229 166, 224 112 C 221 56, 184 18, 128 18 Z"/><path fill="#3B3945" stroke="none" opacity="0.85" d="M 42 104 C 46 60, 70 28, 104 22 C 80 40, 58 68, 54 110 C 50 158, 54 208, 62 252 C 54 250, 46 212, 44 168 Z"/><path fill="#3B3945" stroke="none" opacity="0.5" d="M 214 104 C 210 60, 186 28, 152 22 C 176 40, 198 68, 202 110 C 206 158, 202 208, 194 252 C 202 250, 210 212, 212 168 Z"/></g>
+
+    <g stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <!-- pescoco (mais longo: ela e a mais alta do elenco) -->
+      <path fill="#F0C89A" d="M 110 144 L 110 198 C 110 210, 146 210, 146 198 L 146 144 Z"/>
+      <path fill="#E0B189" stroke="none" d="M 110 146 C 122 168, 136 168, 146 148 L 146 146 L 110 146 Z"/>
+
+      <!-- ombros / blusa -->
+      <path fill="#C24A3B" d="M 18 262
+        C 22 214, 62 192, 100 184
+        L 156 184
+        C 194 192, 234 214, 238 262 Z"/>
+      <path fill="#A03A2F" stroke="none" d="M 18 262 C 22 218, 54 198, 88 190 C 58 206, 38 232, 34 262 Z"/>
+      <path fill="#D9664F" stroke="none" opacity="0.5" d="M 156 184 C 196 192, 232 214, 238 262 L 226 262 C 218 220, 188 200, 152 192 Z"/>
+
+      <!-- decote em V -->
+      <path fill="#F0C89A" d="M 102 184 C 106 228, 150 228, 154 184 Z"/>
+      <path fill="none" stroke="#D9664F" stroke-width="4" d="M 107 188 C 111 223, 145 223, 149 188"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="5.60" stroke-linecap="round" d="M 106 196 Q 128 205.2 150 196"/><path fill="none" stroke="#9A7A34" stroke-width="2.80" stroke-linecap="round" d="M 106 196 Q 128 205.2 150 196"/><ellipse cx="106.0" cy="196.0" rx="1.55" ry="2.50" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="109.4" cy="197.3" rx="2.30" ry="1.55" fill="#E4C378" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="112.8" cy="198.4" rx="1.55" ry="2.50" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="116.2" cy="199.3" rx="2.30" ry="1.55" fill="#E4C378" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="119.5" cy="199.9" rx="1.55" ry="2.50" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="122.9" cy="200.4" rx="2.30" ry="1.55" fill="#E4C378" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="126.3" cy="200.6" rx="1.55" ry="2.50" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="129.7" cy="200.6" rx="2.30" ry="1.55" fill="#E4C378" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="133.1" cy="200.4" rx="1.55" ry="2.50" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="136.5" cy="199.9" rx="2.30" ry="1.55" fill="#E4C378" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="139.8" cy="199.3" rx="1.55" ry="2.50" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="143.2" cy="198.4" rx="2.30" ry="1.55" fill="#E4C378" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="146.6" cy="197.3" rx="1.55" ry="2.50" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.85"/><ellipse cx="150.0" cy="196.0" rx="2.30" ry="1.55" fill="#E4C378" stroke="#2A1B12" stroke-width="0.85"/>
+    </g>
+
+
+  <g stroke="#2A1B12" stroke-width="5.00" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- orelhas -->
+    <ellipse cx="76"  cy="114" rx="9" ry="12" fill="#F0C89A"/>
+    <ellipse cx="180" cy="114" rx="9" ry="12" fill="#F0C89A"/>
+
+    <!-- rosto -->
+    <path fill="#F0C89A" d="M 78 98
+      C 78 60, 99 46, 128 46
+      C 157 46, 178 60, 178 98
+      C 178 130, 168 155, 150 162
+      C 143 165, 113 165, 106 162
+      C 88 155, 78 130, 78 98 Z"/>
+
+    <!-- linha do cabelo: RISCA LATERAL (foto) -->
+    <path fill="#26242C" stroke="none" d="M 76 112
+      C 80 82, 94 62, 114 56 L 122 68
+      C 148 60, 172 78, 180 112
+      C 188 50, 158 18, 128 18 C 92 18, 66 50, 76 112 Z"/>
+    <path fill="#3B3945" stroke="none" d="M 96 84 C 102 68, 110 60, 120 57
+      L 122 62 C 112 68, 104 78, 100 90 Z"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="5.00" d="M 76 112
+      C 80 82, 94 62, 114 56 L 122 68
+      C 148 60, 172 78, 180 112"/>
+
+    <!-- sobrancelhas suavemente arqueadas -->
+    <path fill="#231F26" stroke="none" d="M 94 91 C 101 83, 114 82, 123 87
+      C 122.5 89.5, 121 90.5, 119 89.8 C 111 86, 102 87, 96.5 93 Z"/>
+    <path fill="#231F26" stroke="none" d="M 162 91 C 155 83, 142 82, 133 87
+      C 133.5 89.5, 135 90.5, 137 89.8 C 145 86, 154 87, 159.5 93 Z"/>
+
+    <!-- olhos PRETOS (precisam de brilho grande para nao virarem buraco) -->
+    <g>
+      <ellipse cx="108" cy="115" rx="12" ry="12.5" fill="#F5F1E6"/>
+      <circle cx="109" cy="116" r="8.4" fill="#2A2630" stroke="#454050" stroke-width="1.3"/>
+      <circle cx="109" cy="116" r="3.6" fill="#171520" stroke="none"/>
+      <circle cx="105.6" cy="111.8" r="2.9" fill="#F5F1E6" stroke="none"/>
+      <circle cx="112.5" cy="119.5" r="1.4" fill="#F5F1E6" stroke="none" opacity="0.8"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="6.00" d="M 97 109 C 102 102, 115 102, 120 110"/>
+    </g>
+    <g>
+      <ellipse cx="150" cy="115" rx="12" ry="12.5" fill="#F5F1E6"/>
+      <circle cx="149" cy="116" r="8.4" fill="#2A2630" stroke="#454050" stroke-width="1.3"/>
+      <circle cx="149" cy="116" r="3.6" fill="#171520" stroke="none"/>
+      <circle cx="145.6" cy="111.8" r="2.9" fill="#F5F1E6" stroke="none"/>
+      <circle cx="152.5" cy="119.5" r="1.4" fill="#F5F1E6" stroke="none" opacity="0.8"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="6.00" d="M 138 110 C 143 102, 156 102, 161 109"/>
+    </g>
+
+    <!-- nariz -->
+    <path fill="none" stroke="#2A1B12" stroke-width="5.00" d="M 126 126 C 128 134, 133 136, 137 132"/>
+
+    <!-- SORRISO LARGO E ABERTO: a expressao mais calorosa do elenco -->
+    <path fill="#7A2430" stroke="#2A1B12" stroke-width="4.00" d="M 112 143
+      C 119 139, 137 139, 144 143 C 143 155, 136 161, 128 161
+      C 120 161, 113 155, 112 143 Z"/>
+    <path fill="#F7F3EA" stroke="none" d="M 115 145 C 121 142.5, 135 142.5, 141 145
+      C 140.5 149.5, 115.5 149.5, 115 145 Z"/>
+    <path fill="none" stroke="#B0303F" stroke-width="5.00" stroke-linecap="round"
+      d="M 112 143 C 119 139, 137 139, 144 143"/>
+    <path fill="none" stroke="#B0303F" stroke-width="6.50" stroke-linecap="round"
+      d="M 114 152 C 120 160, 136 160, 142 152"/>
+
+    <!-- blush -->
+    <ellipse cx="92"  cy="132" rx="11" ry="5.5" fill="#E08A6A" opacity="0.26" stroke="none"/>
+    <ellipse cx="164" cy="132" rx="11" ry="5.5" fill="#E08A6A" opacity="0.26" stroke="none"/>
+    <!-- MECHAS FRONTAIS: duas massas largas, SEM contorno interno.
+         A separacao e sugerida so por variacao de tom. -->
+    <path fill="#26242C" stroke="none" d="M 44 108 C 40 158, 46 214, 46 254 C 48 290, 51 304, 56 314 C 61 312, 64 304, 63 292 C 60 250, 93 196, 92 150 C 91 128, 90 114, 90 108 Z"/>
+    <path fill="#26242C" stroke="none" d="M 212 108 C 216 158, 210 214, 210 254 C 208 290, 205 304, 200 314 C 195 312, 192 304, 193 292 C 196 250, 163 196, 164 150 C 165 128, 166 114, 166 108 Z"/>
+    <path fill="#3B3945" stroke="none" opacity="0.7" d="M 49 126
+      C 45 178, 51 230, 56 274
+      C 51 288, 54 302, 58 310
+      C 61 306, 62 300, 61 292
+      C 57 248, 57 200, 57 156
+      C 56 136, 55 130, 55 126 Z"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="5.00" stroke-linecap="round" d="M 90 108 C 91 128, 92 150, 92 150 C 93 196, 60 250, 63 292 C 64 304, 61 312, 56 314"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="5.00" stroke-linecap="round" d="M 166 108 C 165 128, 164 150, 164 150 C 163 196, 196 250, 193 292 C 192 304, 195 312, 200 314"/>
+
+    <!-- argolas pequenas douradas -->
+    <path fill="none" stroke="#C9A24E" stroke-width="2.75" d="M 76 124 C 71 126, 71 133, 76 134"/>
+    <path fill="none" stroke="#C9A24E" stroke-width="2.75" d="M 180 124 C 185 126, 185 133, 180 134"/>
+
+    <defs>
+      <clipPath id="ex-av-ll"><path d="M 82 103 C 82 98, 85 96, 90 96 L 121 96 C 125 96, 127 98, 127 102 L 127 125 C 127 130, 124 132, 119 132 L 88 132 C 84 132, 82 129, 82 124 Z"/></clipPath>
+      <clipPath id="ex-av-lr"><path d="M 174 103 C 174 98, 171 96, 166 96 L 135 96 C 131 96, 129 98, 129 102 L 129 125 C 129 130, 132 132, 137 132 L 168 132 C 172 132, 174 129, 174 124 Z"/></clipPath>
+    </defs>
+    <path d="M 82 103 C 82 98, 85 96, 90 96 L 121 96 C 125 96, 127 98, 127 102 L 127 125 C 127 130, 124 132, 119 132 L 88 132 C 84 132, 82 129, 82 124 Z" fill="#DCE6EE" opacity="0.09" stroke="none"/>
+    <path d="M 174 103 C 174 98, 171 96, 166 96 L 135 96 C 131 96, 129 98, 129 102 L 129 125 C 129 130, 132 132, 137 132 L 168 132 C 172 132, 174 129, 174 124 Z" fill="#DCE6EE" opacity="0.09" stroke="none"/>
+    <g clip-path="url(#ex-av-ll)" stroke="#F5F1E6" fill="none" opacity="0.38" stroke-linecap="round">
+      <path stroke-width="4.65" d="M 87 110 L 97 98"/>
+    </g>
+    <g clip-path="url(#ex-av-lr)" stroke="#F5F1E6" fill="none" opacity="0.38" stroke-linecap="round">
+      <path stroke-width="4.65" d="M 135 110 L 145 98"/>
+    </g>
+    <g fill="none" stroke="#C9A24E" stroke-width="3.10" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 82 103 C 82 98, 85 96, 90 96 L 121 96 C 125 96, 127 98, 127 102 L 127 125 C 127 130, 124 132, 119 132 L 88 132 C 84 132, 82 129, 82 124 Z"/>
+      <path d="M 174 103 C 174 98, 171 96, 166 96 L 135 96 C 131 96, 129 98, 129 102 L 129 125 C 129 130, 132 132, 137 132 L 168 132 C 172 132, 174 129, 174 124 Z"/>
+      <path d="M 127 104 L 129 104"/>
+      <path d="M 82 104 C 78 105, 75 107, 72 110"/>
+      <path d="M 174 104 C 178 105, 181 107, 184 110"/>
+    </g>
+    <g fill="none" stroke="#E4C378" stroke-width="1.40" stroke-linecap="round">
+      <path d="M 86 99 L 118 98"/>
+      <path d="M 170 99 L 138 98"/>
+    </g>
+
+  </g>
+  </g>
+
+  <circle cx="128" cy="128" r="120" fill="none" stroke="#2A1B12" stroke-width="10"/>
+  <circle cx="128" cy="128" r="120" fill="none" stroke="#F2C14E" stroke-width="5"/>
+</svg>
