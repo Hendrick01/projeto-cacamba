@@ -14,6 +14,7 @@ import QRCode from 'qrcode';
 import {
   createGame, startRound, applyAction, actNextRound, viewFor,
   botNextAction, botWantsCard, actClaim, DEFAULT_OPTS,
+  podeComprarDoDescarte, topoDoDescarte,
 } from './shared/engine.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -165,9 +166,10 @@ function scheduleBots(room) {
   const current = game.players[game.turn];
   const currentPlayer = room.players.find((p) => p.id === current.id);
 
-  // Bots fora da vez pedem a carta recém-descartada (se ela ajuda)
-  if (game.phase === 'draw' && game.discardFresh && game.discard.length) {
-    const top = game.discard[game.discard.length - 1];
+  // Bots fora da vez pedem a carta recém-descartada (se ela ajuda e se ela
+  // está comprável — coringa descartado tranca o meio)
+  if (game.phase === 'draw' && game.discardFresh && podeComprarDoDescarte(game)) {
+    const top = topoDoDescarte(game);
     let claimed = false;
     for (const gp of game.players) {
       if (gp.id === current.id || !gp.isBot) continue;
@@ -181,7 +183,8 @@ function scheduleBots(room) {
   if (!currentPlayer || !currentPlayer.isBot) return; // vez de humano: só esperamos
 
   // Janela maior quando há carta comprável (dá tempo do humano pedir)
-  const buyWindow = game.phase === 'draw' && game.discardFresh;
+  // Sem janela de espera quando a carta não é comprável: ninguém vai pedir.
+  const buyWindow = game.phase === 'draw' && game.discardFresh && podeComprarDoDescarte(game);
   const delay = buyWindow ? 2200 : 700 + Math.random() * 500;
 
   room.botTimer = setTimeout(() => {

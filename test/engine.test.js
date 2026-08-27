@@ -5,7 +5,7 @@ import {
   layoffOption, removableCards, createGame, startRound, actDraw, actBaixar,
   actLayoff, actDiscard, actMeldDiscard, actClaim, actNextRound, applyAction,
   botNextAction, botWantsCard, mulberry32, viewFor, allMelds, playerById,
-  isJoker,
+  podeComprarDoDescarte, isJoker, topoDoDescarte,
 } from '../shared/engine.js';
 
 // Atalho para criar cartas nos testes: c('A','♠') etc.
@@ -23,13 +23,21 @@ test('contratos batem com a contagem de cartas das rodadas (6 a 12)', () => {
   assert.equal(TOTAL_ROUNDS, 7);
 });
 
-test('pontos: coringa=20, A=15, figuras e 10 = 10, resto = 5', () => {
-  assert.equal(cardPoints({ id: 1, rank: 0, suit: -1, joker: true }), 20);
+test('pontos: valor de face, A=15, coringa=20', () => {
   assert.equal(cardPoints(c('A', '♠')), 15);
-  assert.equal(cardPoints(c('K', '♠')), 10);
+  assert.equal(cardPoints(c('K', '♠')), 13);
+  assert.equal(cardPoints(c('Q', '♠')), 12);
+  assert.equal(cardPoints(c('J', '♠')), 11);
   assert.equal(cardPoints(c('10', '♥')), 10);
-  assert.equal(cardPoints(c('9', '♦')), 5);
-  assert.equal(cardPoints(c('2', '♣')), 5);
+  assert.equal(cardPoints(c('9', '♦')), 9);
+  assert.equal(cardPoints(c('2', '♣')), 2);
+  assert.equal(cardPoints({ id: 1, rank: 0, suit: -1, joker: true }), 20);
+  // O exemplo do jogador: 5 + valete + coringa = 36
+  assert.equal(
+    [c('5', '♠'), c('J', '♥'), { id: 2, rank: 0, suit: -1, joker: true }]
+      .reduce((s, card) => s + cardPoints(card), 0),
+    36,
+  );
 });
 
 test('rodada 1: duas trincas válidas são encontradas', () => {
@@ -290,7 +298,7 @@ function simulateGame(seed, numPlayers = 4) {
         const top = state.discard[state.discard.length - 1];
         for (const p of state.players) {
           if (p.id === state.players[state.turn].id) continue;
-          if (botWantsCard(state, p, top)) actClaim(state, p.id);
+          if (podeComprarDoDescarte(state) && botWantsCard(state, p, top)) actClaim(state, p.id);
         }
       }
       const current = state.players[state.turn];

@@ -23,6 +23,11 @@ export const MAX_JOKERS_PER_SEQ = 1;
 // Ligando esta constante, a troca vira atômica: o coringa sai da sequência e
 // já tem de ser encaixado na mesma ação, sem passar pela mão.
 export const SWAP_JOKER_SAME_TURN = false;
+// Coringa descartado trava o monte de descarte enquanto estiver descoberto no
+// topo: ninguém compra do meio até alguém descartar por cima. É a jogada
+// defensiva de quem está com um coringa caro na mão e quer se livrar dele sem
+// presentear ninguém.
+export const CORINGA_DESCARTADO_TRANCA = true;
 
 export function isJoker(card) { return !!card && card.joker === true; }
 
@@ -59,12 +64,13 @@ export function cardLabel(card) {
   return isJoker(card) ? JOKER_LABEL : rankLabel(card.rank) + SUITS[card.suit];
 }
 
-// Pontos das cartas que sobram na mão: coringa=20, A=15, 10/J/Q/K=10, demais=5
+// Pontos das cartas que sobram na mão: valor de face. 2 vale 2, 10 vale 10,
+// J=11, Q=12, K=13. O Ás vale 15 fixo, mesmo tendo jogado como 1 ou como 14.
+// O coringa vale 20.
 export function cardPoints(card) {
   if (isJoker(card)) return 20;
   if (card.rank === 1) return 15;
-  if (card.rank >= 10) return 10;
-  return 5;
+  return card.rank;
 }
 
 // Ás vale 1 (A-2-3-4) ou 14 (J-Q-K-A); nunca "vira a esquina" (K-A-2 não vale).
@@ -414,6 +420,28 @@ export function finalRanking(state) {
     .sort((a, b) => a.score - b.score);
 }
 
+export function topoDoDescarte(state) {
+  return state.discard.length ? state.discard[state.discard.length - 1] : null;
+}
+
+// O MONTE DE DESCARTE INTEIRO fica travado enquanto um coringa estiver
+// descoberto no topo: ninguém compra nada de lá — nem a carta do topo, nem as
+// de baixo. Assim que alguém descarta por cima, o monte volta ao normal.
+// Hoje só o topo é alcançável, então a distinção não muda o jogo; a regra está
+// escrita no nível do monte para continuar valendo se um dia a compra chegar
+// mais fundo.
+export function descarteTravado(state) {
+  const topo = topoDoDescarte(state);
+  return CORINGA_DESCARTADO_TRANCA && !!topo && isJoker(topo);
+}
+
+// Vale para os DOIS caminhos de compra: a normal da vez e a fora da vez com
+// carta de castigo.
+export function podeComprarDoDescarte(state) {
+  if (state.discard.length === 0) return false;
+  return !descarteTravado(state);
+}
+
 // Ordem de prioridade para compra fora da vez: assentos após quem está na vez
 function claimPriority(state) {
   const n = state.players.length;
@@ -429,6 +457,8 @@ function claimPriority(state) {
 // é ignorado sem erro: essas corridas são normais com toques simultâneos.
 export function actClaim(state, playerId) {
   if (state.phase !== 'draw' || !state.discardFresh) return [];
+  // Monte travado por coringa descoberto: nem vale registrar o pedido.
+  if (!podeComprarDoDescarte(state)) return [];
   if (state.players[state.turn].id === playerId) return [];
   if (state.claims.includes(playerId)) return [];
   if (!playerById(state, playerId)) fail('Jogador desconhecido.');
@@ -450,6 +480,7 @@ export function actDraw(state, playerId, source) {
 
   if (source === 'discard') {
     if (state.discard.length === 0) fail('O descarte está vazio.');
+    if (!podeComprarDoDescarte(state)) fail('Tem coringa descoberto no meio: o monte está travado até alguém descartar por cima.');
     const card = state.discard.pop();
     player.hand.push(card);
     if (state.claims.length > 0) {
@@ -461,7 +492,7 @@ export function actDraw(state, playerId, source) {
   } else {
     // Antes de puxar do monte, resolve a compra fora da vez (se houver pedido)
     const buyers = claimPriority(state);
-    if (buyers.length > 0 && state.discardFresh && state.discard.length > 0) {
+    if (buyers.length > 0 && state.discardFresh && podeComprarDoDescarte(state)) {
       const buyerId = buyers[0];
       const buyer = playerById(state, buyerId);
       const card = state.discard.pop();
@@ -688,6 +719,9 @@ export function viewFor(state, playerId) {
     discardTop: state.discard.length ? state.discard[state.discard.length - 1] : null,
     discardCount: state.discard.length,
     discardFresh: state.discardFresh,
+    // O topo pode ser comprado? Falso quando um coringa tranca o meio — a tela
+    // precisa disso para não oferecer um toque que o motor vai recusar.
+    discardBuyable: podeComprarDoDescarte(state),
     claims: state.claims.slice(),
     lastRound: state.lastRound,
     ranking: state.phase === 'gameEnd' ? finalRanking(state) : null,
@@ -890,8 +924,10 @@ export function botNextAction(state, playerId) {
   if (!player || player.id !== playerId) return null;
 
   if (state.phase === 'draw') {
-    const top = state.discard.length ? state.discard[state.discard.length - 1] : null;
-    if (top && botWantsCard(state, player, top)) return { a: 'draw', source: 'discard' };
+    const top = topoDoDescarte(state);
+    if (top && podeComprarDoDescarte(state) && botWantsCard(state, player, top)) {
+      return { a: 'draw', source: 'discard' };
+    }
     return { a: 'draw', source: 'deck' };
   }
 

@@ -62,7 +62,7 @@ function act(c) {
   const myTurn = v.turnId === c.id;
 
   // Fora da vez: de vez em quando pede a carta do meio (testa a compra)
-  if (!myTurn && v.phase === 'draw' && v.discardFresh && v.discardTop && !v.claims.includes(c.id)) {
+  if (!myTurn && v.phase === 'draw' && v.discardFresh && v.discardBuyable && !v.claims.includes(c.id)) {
     if (Math.random() < 0.25) { claimsMade++; action(c, { a: 'claim' }); }
     return;
   }
@@ -74,7 +74,7 @@ function act(c) {
   c.lastSig = sig;
 
   if (v.phase === 'draw') {
-    const source = v.discardTop && Math.random() < 0.3 ? 'discard' : 'deck';
+    const source = v.discardBuyable && Math.random() < 0.3 ? 'discard' : 'deck';
     action(c, { a: 'draw', source });
     return;
   }

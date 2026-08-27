@@ -396,11 +396,14 @@ function renderCenter() {
   ));
 
   const canDraw = myTurn() && view.phase === 'draw';
+  const trancado = !!view.discardTop && !view.discardBuyable;
   $('deck-pile').classList.toggle('glow', canDraw);
-  $('discard-pile').classList.toggle('glow', canDraw && !!view.discardTop);
+  $('discard-pile').classList.toggle('glow', canDraw && !!view.discardTop && !trancado);
+  $('discard-pile').classList.toggle('trancado', trancado);
+  $('discard-pile').querySelector('.pile-count').textContent = trancado ? '🔒 trancado' : 'meio';
 
-  // Compra fora da vez
-  const claimable = view.phase === 'draw' && !myTurn() && view.discardFresh && view.discardTop
+  // Compra fora da vez — coringa no topo não é comprável por ninguém
+  const claimable = view.phase === 'draw' && !myTurn() && view.discardFresh && view.discardBuyable
     && view.phase !== 'roundEnd' && view.you;
   const claimed = view.claims.includes(me());
   $('btn-claim').hidden = !claimable;
@@ -548,7 +551,7 @@ function renderActions() {
   const playing = my && view.phase === 'play';
 
   $('btn-draw-deck').hidden = !drawing;
-  $('btn-draw-discard').hidden = !(drawing && view.discardTop);
+  $('btn-draw-discard').hidden = !(drawing && view.discardTop && view.discardBuyable);
 
   const playable = playing ? contractPlayable() : null;
   $('btn-baixar').hidden = !(playing && !view.you.baixou && !meldDiscardMode);
@@ -566,7 +569,12 @@ function renderActions() {
 // Ações dos botões da mesa
 $('deck-pile').onclick = () => { if (myTurn() && view.phase === 'draw') sendAction({ a: 'draw', source: 'deck' }); };
 $('discard-pile').onclick = () => {
-  if (myTurn() && view.phase === 'draw' && view.discardTop) sendAction({ a: 'draw', source: 'discard' });
+  if (!myTurn() || view.phase !== 'draw' || !view.discardTop) return;
+  if (!view.discardBuyable) {
+    toast('🔒 Coringa descoberto: o meio está travado até alguém descartar por cima.');
+    return;
+  }
+  sendAction({ a: 'draw', source: 'discard' });
 };
 $('btn-draw-deck').onclick = () => sendAction({ a: 'draw', source: 'deck' });
 $('btn-draw-discard').onclick = () => sendAction({ a: 'draw', source: 'discard' });
@@ -754,7 +762,7 @@ function showScore() {
     .join('');
   showModal(
     `<h2>Placar</h2>
-     <p>Menos pontos ganha. A = 15 · K/Q/J/10 = 10 · demais = 5 · coringa = 20.</p>
+     <p>Menos pontos ganha. Cada carta vale o número dela · J = 11 · Q = 12 · K = 13 · Ás = 15 · coringa = 20.</p>
      <table class="score-table"><tr><th>Jogador</th><th style="text-align:right">Total</th></tr>${rows}</table>`,
     [{ label: 'Fechar', fn: closeModal }],
     closeModal,
@@ -790,7 +798,7 @@ function showRules() {
      <h3>Compra fora da vez</h3>
      <p>Quando alguém descarta, outro jogador pode pedir a carta — mas <strong>quem está na vez tem preferência</strong>. Quem compra fora da vez leva a carta <strong>+ 1 carta de castigo</strong> do monte e não descarta.</p>
      <h3>Pontos</h3>
-     <p>Cartas que sobram na mão: <strong>Ás = 15</strong> · <strong>K, Q, J e 10 = 10</strong> · demais = 5 · <strong>coringa = 20</strong>. Se o monte esgotar 3 vezes na mesma rodada, a rodada acaba sem vencedor e todos contam a mão.</p>`,
+     <p>Cartas que sobram na mão contam pelo <strong>valor de face</strong>: o 5 vale 5, o 10 vale 10, e assim por diante. <strong>J = 11</strong> · <strong>Q = 12</strong> · <strong>K = 13</strong> · <strong>Ás = 15</strong> (mesmo tendo jogado como 1) · <strong>coringa = 20</strong>. Se o monte esgotar 3 vezes na mesma rodada, a rodada acaba sem vencedor e todos contam a mão.</p>`,
     [{ label: 'Fechar', fn: closeModal }],
     closeModal,
   );
