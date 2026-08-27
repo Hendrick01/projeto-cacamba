@@ -21,6 +21,7 @@
       "Bash(git log:*)",
       "Bash(git show:*)",
       "Bash(git branch:*)",
+      "Bash(git commit:*)",
 
       "Bash(npm test:*)",
       "Bash(npm start:*)",
