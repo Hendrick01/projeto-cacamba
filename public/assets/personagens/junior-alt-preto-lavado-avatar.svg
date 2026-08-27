@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Junior (preto lavado) - avatar">
+  <defs>
+    <clipPath id="jr-av-clip"><circle cx="128" cy="128" r="120"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#jr-av-clip)">
+    <circle cx="128" cy="128" r="120" fill="#7A4A2B"/>
+    <ellipse cx="128" cy="122" rx="106" ry="102" fill="#8C5733"/>
+
+    <g stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <!-- camiseta preta larga, ombro caido -->
+      <path fill="#4E443B" d="M 14 262 C 18 210, 58 186, 100 178 L 156 178 C 198 186, 238 210, 242 262 Z"/>
+      <path fill="#3E352F" stroke="none" d="M 14 262 C 18 210, 44 192, 64 185 C 50 204, 42 232, 40 262 Z"/>
+      <path fill="#5E5349" stroke="none" opacity="0.8" d="M 192 185 C 212 192, 238 210, 242 262 L 218 262 C 216 230, 208 204, 192 185 Z"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="5" d="M 14 262 C 18 210, 58 186, 100 178 L 156 178 C 198 186, 238 210, 242 262"/>
+
+      <!-- pescoco -->
+      <path fill="#F4CFAA" d="M 110 148 L 110 188 C 110 202, 146 202, 146 188 L 146 148 Z"/>
+      <path fill="#E0B189" stroke="none" d="M 110 150 C 122 174, 134 174, 146 152 L 146 150 L 110 150 Z"/>
+
+      <!-- gola redonda, com friso de costura -->
+      <path fill="#F4CFAA" d="M 104 179 C 108 208, 148 208, 152 179 Z"/>
+      <path fill="none" stroke="#3E352F" stroke-width="7" d="M 103 178 C 107 210, 149 210, 153 178"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="4" d="M 103 178 C 107 210, 149 210, 153 178"/>
+
+      <!-- CORRENTE de prata com medalhao, por cima da camiseta -->
+      <path fill="none" stroke="#2A1B12" stroke-width="5.80" stroke-linecap="round" d="M 103 206 Q 128 219.0 153 206"/><path fill="none" stroke="#8D949B" stroke-width="2.90" stroke-linecap="round" d="M 103 206 Q 128 219.0 153 206"/><ellipse cx="103.0" cy="206.0" rx="1.67" ry="2.70" fill="#C9CDD2" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="106.3" cy="207.6" rx="2.48" ry="1.67" fill="#A8AEB5" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="109.7" cy="209.0" rx="1.67" ry="2.70" fill="#C9CDD2" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="113.0" cy="210.2" rx="2.48" ry="1.67" fill="#A8AEB5" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="116.3" cy="211.1" rx="1.67" ry="2.70" fill="#C9CDD2" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="119.7" cy="211.8" rx="2.48" ry="1.67" fill="#A8AEB5" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="123.0" cy="212.2" rx="1.67" ry="2.70" fill="#C9CDD2" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="126.3" cy="212.5" rx="2.48" ry="1.67" fill="#A8AEB5" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="129.7" cy="212.5" rx="1.67" ry="2.70" fill="#C9CDD2" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="133.0" cy="212.2" rx="2.48" ry="1.67" fill="#A8AEB5" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="136.3" cy="211.8" rx="1.67" ry="2.70" fill="#C9CDD2" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="139.7" cy="211.1" rx="2.48" ry="1.67" fill="#A8AEB5" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="143.0" cy="210.2" rx="1.67" ry="2.70" fill="#C9CDD2" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="146.3" cy="209.0" rx="2.48" ry="1.67" fill="#A8AEB5" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="149.7" cy="207.6" rx="1.67" ry="2.70" fill="#C9CDD2" stroke="#2A1B12" stroke-width="0.92"/><ellipse cx="153.0" cy="206.0" rx="2.48" ry="1.67" fill="#A8AEB5" stroke="#2A1B12" stroke-width="0.92"/>
+      <circle cx="128" cy="232" r="11.00" fill="#C9CDD2" stroke="#2A1B12" stroke-width="3.20"/><circle cx="128" cy="232" r="6.82" fill="none" stroke="#8D949B" stroke-width="2.40"/><circle cx="128" cy="232" r="2.42" fill="#8D949B" stroke="none"/><path fill="#F5F1E6" stroke="none" opacity="0.5" d="M 121.2 228.7 A 7.7 7.7 0 0 1 126.0 224.7 L 126.9 226.5 A 6.1 6.1 0 0 0 122.7 229.6 Z"/>
+    </g>
+
+    <!-- CHOKER + CRISTAL. No busto ele e ~30% maior que a escala fiel, do
+         mesmo jeito que o sinal da Gabizinsky: e o detalhe que precisa
+         sobreviver a 48 px. -->
+    <g>
+      <path fill="none" stroke="#2A1B12" stroke-width="6.46" stroke-linecap="round" d="M 108 166 Q 128 172.0 148 166"/><path fill="none" stroke="#241C18" stroke-width="3.40" stroke-linecap="round" d="M 108 166 Q 128 172.0 148 166"/><circle cx="108.0" cy="166" r="3.06" fill="#241C18" stroke="#2A1B12" stroke-width="1.36"/><circle cx="148.0" cy="166" r="3.06" fill="#241C18" stroke="#2A1B12" stroke-width="1.36"/>
+      <g transform="translate(128 186) scale(0.375)">
+    <!-- argola e capa de prata -->
+    <circle cx="0" cy="-30" r="5.6" fill="none" stroke="#2A1B12" stroke-width="10.40"/>
+    <circle cx="0" cy="-30" r="5.6" fill="none" stroke="#C9CDD2" stroke-width="5.89"/>
+    <path fill="#C9CDD2" stroke="#2A1B12" stroke-width="6.93" stroke-linejoin="round"
+      d="M -15 -14 C -15 -25, 15 -25, 15 -14 C 15 -18, 10 -20, 0 -20 C -10 -20, -15 -18, -15 -14 Z"/>
+    <!-- as tres faixas -->
+    <path fill="#C97AB0" stroke="none" d="M -13 -15 L 0 -22 L 13 -15 L 13 -1 L -13 -1 Z"/>
+    <path fill="#5B8DC9" stroke="none" d="M -13 -1 L 13 -1 L 13 15 L -13 15 Z"/>
+    <path fill="#3A7D6E" stroke="none" d="M -13 15 L 13 15 L 13 19 L 0 43 L -13 19 Z"/>
+    <!-- faceta acesa: a mesma que corre nas tres faixas, so mais clara -->
+    <path fill="#EBE4EE" stroke="none" opacity="0.34" d="M -13 -15 L -5 -19 L -5 25 L -13 19 Z"/>
+    <path fill="#2A1B12" stroke="none" opacity="0.20" d="M 6 -18 L 13 -15 L 13 19 L 6 30 Z"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="6.93" stroke-linejoin="round" d="M -13 -15 L 0 -22 L 13 -15 L 13 19 L 0 43 L -13 19 Z"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="3.81" opacity="0.55" d="M -5 -19 L -5 25 M 6 -18 L 6 30"/>
+  </g>
+    </g>
+
+
+  <g stroke="#2A1B12" stroke-width="5.00" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- orelhas: a esquerda dele leva as duas argolas -->
+    <ellipse cx="82"  cy="112" rx="8" ry="12" fill="#F4CFAA"/>
+    <ellipse cx="174" cy="112" rx="8" ry="12" fill="#F4CFAA"/>
+
+    <!-- rosto: mandibula masculina, queixo um pouco mais estreito que o do
+         Matheus — a barba cheia ja da o peso ali embaixo -->
+    <path fill="#F4CFAA" d="M 85 100
+      C 85 57, 104 43, 128 43
+      C 152 43, 171 57, 171 100
+      C 171 129, 163 151, 150 162
+      C 143 168, 136 170, 128 170
+      C 120 170, 113 168, 106 162
+      C 93 151, 85 129, 85 100 Z"/>
+
+    <!-- FADE: as laterais nao sao pele lisa, sao pelo rapado. Duas passadas —
+         uma fraca larga, uma mais forte colada na borda do cabelo. E o que faz
+         a lateral ler como raspada em vez de careca. -->
+    <g stroke="none" fill="#31241C">
+      <path opacity="0.30" d="M 86 92 C 88 104, 90 116, 95 128
+        C 90 122, 86 110, 85 98 Z"/>
+      <path opacity="0.30" d="M 175 92 C 173 104, 171 116, 166 128
+        C 171 122, 175 110, 176 98 Z"/>
+      <path opacity="0.54" d="M 86 92 C 90 84, 96 79, 104 76
+        C 100 86, 97 98, 96 110 C 91 106, 87 99, 86 92 Z"/>
+      <path opacity="0.54" d="M 175 92 C 171 84, 165 79, 157 76
+        C 161 86, 164 98, 165 110 C 170 106, 174 99, 175 92 Z"/>
+      <!-- costeletas: e por elas que o fade encontra a barba -->
+      <path opacity="0.68" d="M 90 103 C 95 105, 98 112, 98 124 L 92 121 Z"/>
+      <path opacity="0.68" d="M 171 103 C 166 105, 163 112, 163 124 L 169 121 Z"/>
+    </g>
+
+    <!-- BARBA CHEIA, com a linha da bochecha marcada. A do Matheus e rala e
+         sem borda; esta tem borda. -->
+    <path stroke="none" fill="#31241C" opacity="0.72" d="M 89 121
+      C 90 138, 96 152, 106 162
+      C 113 168, 120 170, 128 170
+      C 136 170, 143 168, 150 162
+      C 161 152, 167 138, 168 121
+      C 164 132, 158 139, 150 143
+      C 146 145, 144 146, 143 149
+      C 140 153, 134 155, 128 155
+      C 122 155, 116 153, 114 147
+      C 113 146, 111 145, 107 143
+      C 99 139, 92 132, 89 121 Z"/>
+    <path stroke="none" fill="#241A13" opacity="0.34" d="M 104 156
+      C 112 163, 144 163, 152 156
+      C 148 166, 139 170, 128 170 C 117 170, 108 166, 104 156 Z"/>
+    <!-- bigode cheio, encostando na barba nas pontas -->
+    <path stroke="none" fill="#31241C" opacity="0.78" d="M 106 134
+      C 114 128, 123 130, 128 134 C 133 130, 142 128, 150 134
+      C 146 141, 135 139, 128 138.5 C 121 139, 110 141, 106 134 Z"/>
+
+    <!-- ARGOLAS: duas, pequenas, so na orelha esquerda dele. Detalhe de
+         tamanho grande — nao e sinal a 48 px. -->
+    <g fill="none">
+      <circle cx="177" cy="118" r="4.0" stroke="#2A1B12" stroke-width="4.25"/>
+      <circle cx="177" cy="118" r="4.0" stroke="#C9CDD2" stroke-width="2.25"/>
+      <circle cx="177" cy="128" r="4.6" stroke="#2A1B12" stroke-width="4.25"/>
+      <circle cx="177" cy="128" r="4.6" stroke="#C9CDD2" stroke-width="2.25"/>
+    </g>
+
+    <!-- CABELO: cap alto e ondulado, laterais raspadas. Halo por fora — e o
+         cabelo mais escuro do elenco. -->
+    <path fill="none" stroke="#8C6A45" stroke-width="7.25" opacity="0.8" stroke-linejoin="round" d="M 86 92 C 81 74, 78 54, 92 38 C 99 27, 110 18, 122 20 C 131 11, 147 10, 155 21 C 165 17, 176 26, 178 42 C 181 58, 180 76, 175 92 C 173 80, 169 71, 162 66 C 152 74, 136 77, 122 74 C 110 71, 98 74, 90 82 C 88 85, 87 89, 86 92 Z"/>
+    <path fill="#31241C" d="M 86 92 C 81 74, 78 54, 92 38 C 99 27, 110 18, 122 20 C 131 11, 147 10, 155 21 C 165 17, 176 26, 178 42 C 181 58, 180 76, 175 92 C 173 80, 169 71, 162 66 C 152 74, 136 77, 122 74 C 110 71, 98 74, 90 82 C 88 85, 87 89, 86 92 Z"/>
+    <path fill="#241A13" stroke="none" d="M 86 92 C 83 80, 82 66, 84 54
+      C 89 64, 92 78, 94 90 C 90 90, 88 91, 86 92 Z"/>
+    <path fill="#241A13" stroke="none" d="M 175 92 C 178 80, 179 66, 177 54
+      C 172 64, 169 78, 167 90 C 171 90, 173 91, 175 92 Z"/>
+    <!-- ondas do topo: variacao longa da silhueta, sem contorno interno -->
+    <g stroke="none" fill="#54402F">
+      <path d="M 95 60 C 101 46, 113 34, 128 28 C 116 39, 106 51, 101 66 Z"/>
+      <path d="M 104 44 C 113 33, 127 24, 142 22 C 129 28, 117 37, 110 48 Z"/>
+      <path d="M 121 27 C 132 20, 146 17, 157 21 C 145 23, 133 27, 126 32 Z"/>
+      <path d="M 158 28 C 167 34, 173 44, 176 56 C 171 46, 165 38, 155 33 Z"/>
+      <path d="M 90 80 C 93 68, 98 58, 106 50 C 100 62, 96 72, 94 84 Z"/>
+    </g>
+
+    <!-- sobrancelhas: grossas, retas e baixas. Sao a marca do rosto dele
+         junto com a barba. -->
+    <path fill="none" stroke="#241A13" stroke-width="8.10" d="M 93 95 C 103 89, 117 89, 124 93"/>
+    <path fill="none" stroke="#241A13" stroke-width="8.10" d="M 132 93 C 139 89, 153 89, 163 95"/>
+
+    <!-- olhos -->
+    <g>
+      <ellipse cx="108" cy="116" rx="11" ry="11" fill="#F5F1E6"/>
+      <circle cx="109" cy="117" r="7.6" fill="#4A3526" stroke="none"/>
+      <circle cx="109" cy="117" r="3.4" fill="#2A1B12" stroke="none"/>
+      <circle cx="106" cy="113.5" r="2.5" fill="#F5F1E6" stroke="none"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="6.50" d="M 98 111 C 103 104, 114 104, 119 111"/>
+    </g>
+    <g>
+      <ellipse cx="150" cy="116" rx="11" ry="11" fill="#F5F1E6"/>
+      <circle cx="149" cy="117" r="7.6" fill="#4A3526" stroke="none"/>
+      <circle cx="149" cy="117" r="3.4" fill="#2A1B12" stroke="none"/>
+      <circle cx="146" cy="113.5" r="2.5" fill="#F5F1E6" stroke="none"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="6.50" d="M 139 111 C 144 104, 155 104, 160 111"/>
+    </g>
+
+    <!-- nariz -->
+    <path fill="none" stroke="#2A1B12" stroke-width="5.00" d="M 125 125 C 127 135, 133 138, 138 133"/>
+
+    <!-- boca: sorriso curto e quase reto. Nas duas fotos ele esta serio; o
+         meio-termo mantem o elenco coeso sem inventar um sujeito alegre. -->
+    <path fill="none" stroke="#2A1B12" stroke-width="6.00" d="M 117 147 C 123 152, 134 152, 140 146"/>
+  </g>
+  </g>
+
+  <circle cx="128" cy="128" r="120" fill="none" stroke="#2A1B12" stroke-width="10"/>
+  <circle cx="128" cy="128" r="120" fill="none" stroke="#F2C14E" stroke-width="5"/>
+</svg>

@@ -7,7 +7,8 @@ E ~6% mais alta que a Gabizinsky e a Dri.
 """
 import os
 
-OUT = os.path.dirname(os.path.abspath(__file__))
+# Os SVGs ficam um nivel acima: este diretorio guarda so os geradores.
+OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ------------------------------------------------------- paleta do jogo
 INK        = "#2A1B12"

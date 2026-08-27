@@ -4,7 +4,8 @@ Gera: avatar circular (busto), corpo inteiro e close da mao direita com o anel.
 """
 import os
 
-OUT = os.path.dirname(os.path.abspath(__file__))
+# Os SVGs ficam um nivel acima: este diretorio guarda so os geradores.
+OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ---------------------------------------------------------------- paleta
 INK        = "#2A1B12"   # contorno / fundo escuro do jogo

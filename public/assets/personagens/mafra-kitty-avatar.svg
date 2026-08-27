@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Mafra Kitty - avatar">
+  <defs>
+    <clipPath id="mk-av-clip"><circle cx="128" cy="128" r="120"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#mk-av-clip)">
+    <circle cx="128" cy="128" r="120" fill="#7A4A2B"/>
+    <ellipse cx="128" cy="122" rx="106" ry="102" fill="#8C5733"/>
+
+    <g stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <!-- camiseta larga: o unico torso CLARO do elenco -->
+      <path fill="#EBE4D5" d="M 18 262 C 22 212, 60 188, 100 180 L 156 180 C 196 188, 234 212, 238 262 Z"/>
+      <path fill="#D3CAB6" stroke="none" d="M 18 262 C 22 212, 46 194, 66 187 C 52 206, 44 232, 42 262 Z"/>
+      <path fill="#D3CAB6" stroke="none" d="M 238 262 C 234 212, 210 194, 190 187 C 204 206, 212 232, 214 262 Z"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="5" d="M 18 262 C 22 212, 60 188, 100 180 L 156 180 C 196 188, 234 212, 238 262"/>
+
+      <!-- ESTAMPA aumentada: no corpo inteiro o gatinho ocupa ~0.8 do peito;
+           aqui ocupa mais, porque o corte circular come a barra da camisa e
+           sobraria pouco desenho. Mesmo truque do sinal da Gabizinsky. Desenhada
+           ANTES da gola: e tecido, tem de passar POR BAIXO do decote. -->
+      <g transform="translate(128 230) scale(0.48)" stroke="#2A1B12"
+       stroke-width="6.25" stroke-linecap="round" stroke-linejoin="round">
+    <!-- orelhas -->
+    <path fill="#F7F3E9" d="M -44 -18 L -40 -60 C -39 -65, -34 -66, -30 -62 L -8 -40 Z"/>
+    <path fill="#F7F3E9" d="M 44 -18 L 40 -60 C 39 -65, 34 -66, 30 -62 L 8 -40 Z"/>
+    <path fill="#E9A79A" stroke="none" d="M -37 -26 L -34 -53 C -33.5 -56, -31 -56.5, -29 -54 L -14 -38 Z"/>
+    <path fill="#E9A79A" stroke="none" d="M 37 -26 L 34 -53 C 33.5 -56, 31 -56.5, 29 -54 L 14 -38 Z"/>
+    <!-- cabeca REDONDA (a da Sanrio e oval e deitada) -->
+    <path fill="#F7F3E9" d="M -48 -4
+      C -48 -34, -27 -48, 0 -48
+      C 27 -48, 48 -34, 48 -4
+      C 48 26, 27 42, 0 42
+      C -27 42, -48 26, -48 -4 Z"/>
+    
+    <!-- olhos -->
+    <ellipse cx="-19" cy="-6" rx="6.4" ry="8.2" fill="#2A1B12" stroke="none"/>
+    <ellipse cx="19"  cy="-6" rx="6.4" ry="8.2" fill="#2A1B12" stroke="none"/>
+    <circle cx="-21" cy="-9.5" r="2.1" fill="#F7F3E9" stroke="none"/>
+    <circle cx="17"  cy="-9.5" r="2.1" fill="#F7F3E9" stroke="none"/>
+    <!-- bochechas coradas -->
+    <ellipse cx="-33" cy="10" rx="8" ry="5.4" fill="#E9A79A" stroke="none" opacity="0.85"/>
+    <ellipse cx="33"  cy="10" rx="8" ry="5.4" fill="#E9A79A" stroke="none" opacity="0.85"/>
+    <!-- focinho de CORACAO -->
+    <path fill="#E4572E" stroke="#2A1B12" stroke-width="3.88"
+      d="M 0 16 C -4 10, -10 9, -10 4 C -10 0.5, -7 -1, -4.4 0.4 C -2.4 1.5, -1 3, 0 4.6
+         C 1 3, 2.4 1.5, 4.4 0.4 C 7 -1, 10 0.5, 10 4 C 10 9, 4 10, 0 16 Z"/>
+    <!-- BOCA: a Hello Kitty nao tem. Esta tem. -->
+    <path fill="none" stroke="#2A1B12" stroke-width="4.88"
+      d="M 0 16 L 0 21 M 0 21 C -3 27, -11 26, -13 20 M 0 21 C 3 27, 11 26, 13 20"/>
+    <!-- coleira + guizo (no lugar do laco) -->
+    <path fill="#F2C14E" d="M -35 30 C -22 42, 22 42, 35 30 C 33 38, 26 45, 18 48
+      C 8 51, -8 51, -18 48 C -26 45, -33 38, -35 30 Z"/>
+    <circle cx="0" cy="52" r="9" fill="#D9A83E"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="4.38" d="M -7.5 50 L 7.5 50 M 0 52 L 0 60"/>
+  </g>
+
+      <!-- pescoco -->
+      <path fill="#F4CFAA" d="M 110 150 L 110 190 C 110 204, 146 204, 146 190 L 146 150 Z"/>
+      <path fill="#E0B189" stroke="none" d="M 110 152 C 122 176, 134 176, 146 154 L 146 152 L 110 152 Z"/>
+
+      <!-- gola redonda, com friso de costura -->
+      <path fill="#F4CFAA" d="M 104 181 C 108 210, 148 210, 152 181 Z"/>
+      <path fill="none" stroke="#D3CAB6" stroke-width="7" d="M 103 180 C 107 212, 149 212, 153 180"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="4" d="M 103 180 C 107 212, 149 212, 153 180"/>
+    </g>
+
+
+  <g stroke="#2A1B12" stroke-width="5.00" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- orelhas: a esquerda dele leva a argola -->
+    <ellipse cx="82"  cy="112" rx="8" ry="12" fill="#F4CFAA"/>
+    <ellipse cx="174" cy="112" rx="8" ry="12" fill="#F4CFAA"/>
+
+    <!-- rosto: mandibula masculina, mas o queixo e mais redondo que o do
+         Matheus — ele nao tem barba para dar peso ali embaixo -->
+    <path fill="#F4CFAA" d="M 84 100
+      C 84 56, 104 42, 128 42
+      C 152 42, 172 56, 172 100
+      C 172 130, 164 152, 150 163
+      C 143 169, 136 171, 128 171
+      C 120 171, 113 169, 106 163
+      C 92 152, 84 130, 84 100 Z"/>
+
+    <!-- sombra leve sob o cabelo: da profundidade a franja sem contorno interno -->
+    <path fill="#E0B189" stroke="none" opacity="0.38" d="M 88 82
+      C 96 92, 112 96, 128 94 C 144 96, 160 92, 168 82
+      C 166 94, 150 101, 128 101 C 106 101, 90 94, 88 82 Z"/>
+
+    <!-- ARGOLA de prata (unico metal do personagem) -->
+    <circle cx="176" cy="126" r="5.6" fill="none" stroke="#2A1B12" stroke-width="4.50"/>
+    <circle cx="176" cy="126" r="5.6" fill="none" stroke="#C9CDD2" stroke-width="2.50"/>
+
+    <!-- CABELO: franja ondulada, volume no topo, laterais cobrindo o alto da
+         orelha. Halo por fora — castanho escuro contra fundo escuro. -->
+    <path fill="none" stroke="#8C6A45" stroke-width="7.25" opacity="0.8" stroke-linejoin="round" d="M 72 120 C 65 90, 65 42, 92 26 C 111 13, 149 13, 170 30 C 189 45, 191 90, 184 120 C 181 97, 176 76, 169 67 C 164 80, 154 84, 145 74 C 140 86, 127 89, 117 76 C 111 85, 100 85, 93 74 C 88 79, 80 88, 76 104 C 74 110, 73 116, 72 120 Z"/>
+    <path fill="#4A3527" d="M 72 120 C 65 90, 65 42, 92 26 C 111 13, 149 13, 170 30 C 189 45, 191 90, 184 120 C 181 97, 176 76, 169 67 C 164 80, 154 84, 145 74 C 140 86, 127 89, 117 76 C 111 85, 100 85, 93 74 C 88 79, 80 88, 76 104 C 74 110, 73 116, 72 120 Z"/>
+    <path fill="#33241A" stroke="none" d="M 72 120 C 68 104, 68 88, 70 76
+      C 76 84, 80 98, 82 114 C 78 116, 74 119, 72 120 Z"/>
+    <path fill="#33241A" stroke="none" d="M 184 120 C 188 104, 188 88, 186 76
+      C 180 84, 176 98, 174 114 C 178 116, 182 119, 184 120 Z"/>
+    <!-- ondas: variacao longa, sem contorno interno (contorno interno ja virou
+         leitura de "cordas" na Dri) -->
+    <g stroke="none" fill="#6B5038">
+      <path d="M 96 38 C 108 26, 128 21, 146 24 C 130 30, 112 38, 100 50 Z"/>
+      <path d="M 88 62 C 100 44, 122 32, 144 32 C 124 40, 104 54, 94 72 Z"/>
+      <path d="M 152 30 C 166 36, 176 50, 178 66 C 172 52, 162 42, 148 38 Z"/>
+      <path d="M 100 86 C 108 72, 122 62, 138 58 C 122 68, 110 80, 105 94 Z"/>
+    </g>
+
+    <!-- sobrancelhas GROSSAS e retas: a marca do rosto dele -->
+    <path fill="none" stroke="#33241A" stroke-width="8.00" d="M 94 96 C 104 90, 117 90, 124 94"/>
+    <path fill="none" stroke="#33241A" stroke-width="8.00" d="M 132 94 C 139 90, 152 90, 162 96"/>
+
+    <!-- olhos -->
+    <g>
+      <ellipse cx="108" cy="115" rx="11" ry="11.5" fill="#F5F1E6"/>
+      <circle cx="109" cy="116" r="7.6" fill="#5A4230" stroke="none"/>
+      <circle cx="109" cy="116" r="3.4" fill="#2A1B12" stroke="none"/>
+      <circle cx="106" cy="112.5" r="2.5" fill="#F5F1E6" stroke="none"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="6.00" d="M 98 110 C 103 103, 114 103, 119 110"/>
+    </g>
+    <g>
+      <ellipse cx="150" cy="115" rx="11" ry="11.5" fill="#F5F1E6"/>
+      <circle cx="149" cy="116" r="7.6" fill="#5A4230" stroke="none"/>
+      <circle cx="149" cy="116" r="3.4" fill="#2A1B12" stroke="none"/>
+      <circle cx="146" cy="112.5" r="2.5" fill="#F5F1E6" stroke="none"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="6.00" d="M 139 110 C 144 103, 155 103, 160 110"/>
+    </g>
+
+    <!-- nariz -->
+    <path fill="none" stroke="#2A1B12" stroke-width="5.00" d="M 125 124 C 127 134, 133 137, 138 132"/>
+
+    <!-- sorriso fechado, curto: sem barba nem bigode competindo com ele -->
+    <path fill="none" stroke="#2A1B12" stroke-width="6.00" d="M 115 146 C 122 154, 135 154, 142 145"/>
+  </g>
+  </g>
+
+  <circle cx="128" cy="128" r="120" fill="none" stroke="#2A1B12" stroke-width="10"/>
+  <circle cx="128" cy="128" r="120" fill="none" stroke="#F2C14E" stroke-width="5"/>
+</svg>
