@@ -188,6 +188,18 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .badge.off { background: #444; color: #bbb; }
 .opp-melds { display: flex; gap: 5px; margin-top: 5px; overflow-x: auto; }
 
+/* PROVISÓRIO — mesa grande no celular.
+   Com 7 adversários a faixa precisa de ~744px e a tela tem 375: metade fica
+   fora do enquadramento. Até a mesa ganhar um desenho próprio para salas
+   grandes, pelo menos avisamos que há gente fora da vista e trazemos quem
+   está na vez para o centro. Some sozinho quando tudo cabe. */
+.opponents-hint {
+  margin: -4px 12px 6px;
+  font-size: 0.76rem;
+  color: var(--sage);
+  text-align: center;
+}
+
 /* Centro: monte e descarte */
 
 .table-center { text-align: center; padding: 2px 0 4px; }
