@@ -18,6 +18,9 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
+// Hospedagens injetam a porta e esperam que o processo escute em todas as
+// interfaces. HOST permite restringir de novo (ex.: 127.0.0.1) se precisar.
+const HOST = process.env.HOST || '0.0.0.0';
 
 // ---------------------------------------------------------------------------
 // Arquivos estáticos
@@ -80,24 +83,37 @@ function lanAddress() {
   return 'localhost';
 }
 
-const JOIN_HOST = `http://${lanAddress()}:${PORT}`;
+const LAN_HOST = `http://${lanAddress()}:${PORT}`;
+
+// De onde o jogador acessou a sala: é isso que vai no link de convite e no QR.
+// Ordem: PUBLIC_URL (fixa, para deploy) → cabeçalhos da requisição (funciona
+// atrás de túnel e de proxy reverso) → IP da rede local (uso caseiro).
+function originFrom(req) {
+  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/+$/, '');
+  const host = req && (req.headers['x-forwarded-host'] || req.headers.host);
+  if (!host) return LAN_HOST;
+  const forwarded = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+  const proto = forwarded || (req.socket && req.socket.encrypted ? 'https' : 'http');
+  return `${proto}://${host}`;
+}
 
 function sanitizeName(name) {
   const clean = String(name || '').replace(/[<>\n\r\t]/g, '').trim().slice(0, 16);
   return clean || 'Jogador';
 }
 
-function newRoom() {
+function newRoom(origin = LAN_HOST) {
   const room = {
     code: makeCode(),
     players: [], // { id, name, token, isBot, ws, connected, lastSeen }
     game: null,
     botTimer: null,
     qr: null,
+    origin,
     createdAt: Date.now(),
   };
   rooms.set(room.code, room);
-  QRCode.toDataURL(`${JOIN_HOST}/?sala=${room.code}`, { margin: 1, width: 220 })
+  QRCode.toDataURL(`${room.origin}/?sala=${room.code}`, { margin: 1, width: 220 })
     .then((dataUrl) => { room.qr = dataUrl; broadcastLobby(room); })
     .catch(() => {});
   return room;
@@ -117,7 +133,7 @@ function lobbyView(room) {
     t: 'lobby',
     code: room.code,
     hostId: hostOf(room),
-    joinUrl: `${JOIN_HOST}/?sala=${room.code}`,
+    joinUrl: `${room.origin}/?sala=${room.code}`,
     qr: room.qr,
     started: !!room.game,
     players: room.players.map((p) => ({
@@ -191,9 +207,10 @@ function scheduleBots(room) {
 
 const wss = new WebSocketServer({ server });
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   ws.roomCode = null;
   ws.playerId = null;
+  ws.origin = originFrom(req); // endereço por onde ESTE jogador chegou
 
   ws.on('message', (raw) => {
     let msg;
@@ -244,7 +261,7 @@ function attach(ws, room, player) {
 function handle(ws, msg) {
   switch (msg.t) {
     case 'create': {
-      const room = newRoom();
+      const room = newRoom(ws.origin);
       const player = {
         id: crypto.randomUUID(), name: sanitizeName(msg.name), token: crypto.randomUUID(),
         isBot: false, ws: null, connected: false, lastSeen: Date.now(),
@@ -358,8 +375,20 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
   console.log('🃏 Caçamba no ar!');
   console.log(`   Neste computador:  http://localhost:${PORT}`);
-  console.log(`   Celulares (mesmo Wi-Fi):  ${JOIN_HOST}`);
+  console.log(`   Celulares (mesmo Wi-Fi):  ${LAN_HOST}`);
+  if (process.env.PUBLIC_URL) console.log(`   Endereço público:  ${process.env.PUBLIC_URL}`);
 });
+
+// Hospedagens param o processo com SIGTERM e esperam que ele saia sozinho.
+for (const sinal of ['SIGTERM', 'SIGINT']) {
+  process.on(sinal, () => {
+    console.log(`\n${sinal} recebido, encerrando…`);
+    for (const room of rooms.values()) if (room.botTimer) clearTimeout(room.botTimer);
+    wss.close();
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5000).unref();
+  });
+}
