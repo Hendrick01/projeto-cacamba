@@ -5,7 +5,7 @@ import {
   layoffOption, layoffEnds, removableCards, createGame, startRound, actDraw, actBaixar,
   actLayoff, actDiscard, actMeldDiscard, actClaim, actUnclaim, actNextRound, applyAction,
   botNextAction, botWantsCard, mulberry32, viewFor, allMelds, playerById,
-  podeComprarDoDescarte, isJoker, topoDoDescarte,
+  podeComprarDoDescarte, isJoker, topoDoDescarte, cartasNecessarias,
 } from '../shared/engine.js';
 
 // Atalho para criar cartas nos testes: c('A','♠') etc.
@@ -481,5 +481,33 @@ test('rodadas só de trincas (1ª e 4ª) jogam sem coringa no baralho', () => {
 test('30 partidas completas: terminam, conservam as cartas e pontuam', () => {
   for (let seed = 1; seed <= 30; seed++) {
     simulateGame(seed, 2 + (seed % 3)); // 2, 3 e 4 jogadores
+  }
+});
+
+test('baralho insuficiente é recusado com erro de regra, sem sujar o estado', () => {
+  // 8 jogadores em 1 baralho: a rodada 1 ainda cabe, as de mão grande não.
+  const mesa = Array.from({ length: 8 }, (_, i) => ({ id: `p${i}`, name: `P${i}` }));
+  const state = createGame(mesa, { rnd: mulberry32(1), decks: 1 });
+  assert.equal(cartasNecessarias(8, 0), 49);
+  startRound(state);
+  assert.equal(state.round, 0, 'a rodada 1 cabe em 52 cartas');
+
+  let recusou = null;
+  for (let i = 0; i < TOTAL_ROUNDS && !recusou; i++) {
+    const roundAntes = state.round;
+    try {
+      state.phase = 'roundEnd';
+      state.lastRound = { winnerId: null, scores: {}, reason: 'esgotado' };
+      actNextRound(state);
+    } catch (err) {
+      recusou = err;
+      assert.equal(err.gameRule, true, 'erro de regra, não TypeError');
+      assert.match(err.message, /Baralho insuficiente/);
+      assert.equal(state.round, roundAntes, 'a rodada não pode ficar pela metade');
+    }
+  }
+  assert.ok(recusou, 'a distribuição impossível tem que ser recusada');
+  for (const p of state.players) {
+    assert.equal(p.hand.filter((c) => !c).length, 0, 'nenhuma carta indefinida na mão');
   }
 });

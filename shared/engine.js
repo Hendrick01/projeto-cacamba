@@ -58,6 +58,11 @@ export const DEFAULT_OPTS = {
   maxPlayers: 4,
 };
 
+// Cartas que a rodada exige na mesa: a mão de cada jogador mais a virada.
+export function cartasNecessarias(numPlayers, round) {
+  return (6 + round) * numPlayers + 1;
+}
+
 export function rankLabel(rank) { return RANK_LABELS[rank - 1] || ''; }
 export function suitLabel(suit) { return SUITS[suit] || ''; }
 export function cardLabel(card) {
@@ -435,7 +440,16 @@ export function startRound(state) {
   // então num contrato sem sequência seria carta morta de 20 pontos na mão.
   const ct = CONTRACTS[state.round];
   const jokers = ct.s > 0 ? state.opts.jokersPerDeck : 0;
-  state.deck = shuffle(buildDecks(state.opts.decks, jokers), state.rnd);
+  const baralho = buildDecks(state.opts.decks, jokers);
+  // Sem esta conferência, distribuir com deck.pop() num baralho curto coloca
+  // `undefined` na mão e a partida só quebra lá na frente, na contagem de
+  // pontos, com um TypeError sem relação aparente. Melhor recusar aqui.
+  const precisa = cartasNecessarias(state.players.length, state.round);
+  if (baralho.length < precisa) {
+    state.round--; // não deixa a rodada pela metade
+    fail(`Baralho insuficiente: a rodada ${state.round + 2} precisa de ${precisa} cartas para ${state.players.length} jogadores, e ${state.opts.decks} baralho(s) dão ${baralho.length}.`);
+  }
+  state.deck = shuffle(baralho, state.rnd);
   for (const p of state.players) {
     p.hand = [];
     p.melds = [];
