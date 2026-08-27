@@ -5,7 +5,8 @@ import {
   layoffOption, layoffEnds, removableCards, createGame, startRound, actDraw, actBaixar,
   actLayoff, actDiscard, actMeldDiscard, actClaim, actUnclaim, actNextRound, applyAction,
   botNextAction, botWantsCard, mulberry32, viewFor, allMelds, playerById,
-  podeComprarDoDescarte, isJoker, topoDoDescarte, cartasNecessarias,
+  podeComprarDoDescarte, isJoker, topoDoDescarte,
+  decksParaJogadores, conferirBaralho, cartasNecessarias, DEFAULT_OPTS,
 } from '../shared/engine.js';
 
 // Atalho para criar cartas nos testes: c('A','♠') etc.
@@ -484,30 +485,92 @@ test('30 partidas completas: terminam, conservam as cartas e pontuam', () => {
   }
 });
 
-test('baralho insuficiente é recusado com erro de regra, sem sujar o estado', () => {
-  // 8 jogadores em 1 baralho: a rodada 1 ainda cabe, as de mão grande não.
-  const mesa = Array.from({ length: 8 }, (_, i) => ({ id: `p${i}`, name: `P${i}` }));
-  const state = createGame(mesa, { rnd: mulberry32(1), decks: 1 });
-  assert.equal(cartasNecessarias(8, 0), 49);
-  startRound(state);
-  assert.equal(state.round, 0, 'a rodada 1 cabe em 52 cartas');
+// ---------------------------------------------------------------------------
+// Tamanho da mesa: baralhos conforme o número de jogadores, até 8 lugares
+// ---------------------------------------------------------------------------
 
+test('baralhos seguem a tabela: até 3 → 1, de 4 a 6 → 2, de 7 a 8 → 3', () => {
+  assert.deepEqual([2, 3].map(decksParaJogadores), [1, 1]);
+  assert.deepEqual([4, 5, 6].map(decksParaJogadores), [2, 2, 2]);
+  assert.deepEqual([7, 8].map(decksParaJogadores), [3, 3]);
+});
+
+test('createGame tira os baralhos do tamanho da mesa, e opts explícito manda', () => {
+  const mesa = (n) => Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `P${i}` }));
+  assert.equal(createGame(mesa(3)).opts.decks, 1);
+  assert.equal(createGame(mesa(6)).opts.decks, 2);
+  assert.equal(createGame(mesa(8)).opts.decks, 3);
+  // testes e regras da casa continuam podendo forçar
+  assert.equal(createGame(mesa(8), { decks: 1 }).opts.decks, 1);
+});
+
+test('a mesa vai até 8 jogadores e todas as 7 rodadas cabem no baralho', () => {
+  assert.equal(DEFAULT_OPTS.maxPlayers, 8);
+  for (let n = DEFAULT_OPTS.minPlayers; n <= DEFAULT_OPTS.maxPlayers; n++) {
+    assert.equal(conferirBaralho(n), null, `${n} jogadores`);
+  }
+});
+
+test('baralho insuficiente é recusado com erro de regra, sem sujar o estado', () => {
+  const mesa = Array.from({ length: 8 }, (_, i) => ({ id: `p${i}`, name: `P${i}` }));
+  const state = createGame(mesa, { rnd: mulberry32(1), decks: 1 }); // 1 baralho para 8: não dá
+  // A rodada 1 ainda cabe (6 × 8 + 1 = 49 de 52); o aperto aparece adiante.
+  assert.equal(conferirBaralho(8, { decks: 1 }).round > 0, true);
+  startRound(state);
+  assert.equal(state.round, 0);
+  // Avança até a rodada que não cabe e confirma a recusa limpa
   let recusou = null;
   for (let i = 0; i < TOTAL_ROUNDS && !recusou; i++) {
-    const roundAntes = state.round;
+    const antes = { round: state.round, maos: state.players.map((p) => p.hand.length) };
     try {
       state.phase = 'roundEnd';
       state.lastRound = { winnerId: null, scores: {}, reason: 'esgotado' };
       actNextRound(state);
     } catch (err) {
       recusou = err;
-      assert.equal(err.gameRule, true, 'erro de regra, não TypeError');
+      assert.equal(err.gameRule, true, 'tem que ser erro de regra, não TypeError');
       assert.match(err.message, /Baralho insuficiente/);
-      assert.equal(state.round, roundAntes, 'a rodada não pode ficar pela metade');
+      assert.equal(state.round, antes.round, 'a rodada não pode ficar pela metade');
     }
   }
   assert.ok(recusou, 'a distribuição impossível tem que ser recusada');
-  for (const p of state.players) {
-    assert.equal(p.hand.filter((c) => !c).length, 0, 'nenhuma carta indefinida na mão');
+  // Nenhuma carta indefinida chegou a entrar em mão nenhuma
+  for (const p of state.players) assert.equal(p.hand.filter((c) => !c).length, 0);
+});
+
+test('assentos e prioridade de compra funcionam em mesa de 7 e de 8', () => {
+  for (const n of [7, 8]) {
+    const mesa = Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `P${i}` }));
+    const state = createGame(mesa, { rnd: mulberry32(7) });
+    startRound(state);
+    assert.equal(state.players.length, n);
+    assert.equal(cartasNecessarias(n, 0), 6 * n + 1);
+    // A vez dá a volta na mesa inteira, na ordem dos assentos
+    const vistos = [];
+    for (let i = 0; i < n; i++) {
+      const atual = state.players[state.turn];
+      vistos.push(atual.id);
+      actDraw(state, atual.id, 'deck');
+      actDiscard(state, atual.id, atual.hand[0].id);
+    }
+    assert.equal(new Set(vistos).size, n, `todos jogaram uma vez (${n})`);
+    // Prioridade da compra fora da vez: o assento seguinte ao da vez ganha
+    const daVez = state.players[state.turn];
+    const ordem = [];
+    for (let k = 1; k < n; k++) ordem.push(state.players[(state.turn + k) % n]);
+    const ultimo = ordem[ordem.length - 1];
+    const primeiro = ordem[0];
+    actClaim(state, ultimo.id);
+    actClaim(state, primeiro.id);
+    const antes = primeiro.hand.length;
+    const eventos = actDraw(state, daVez.id, 'deck');
+    const buy = eventos.find((ev) => ev.e === 'buy');
+    assert.ok(buy, `alguém devia ter comprado (${n})`);
+    assert.equal(buy.p, primeiro.id, `o assento mais próximo da vez tem prioridade (${n})`);
+    assert.equal(primeiro.hand.length, antes + 1 + state.opts.buyPenalty);
   }
+});
+
+test('partidas completas em mesa grande: 5 a 8 jogadores', () => {
+  for (let n = 5; n <= 8; n++) simulateGame(100 + n, n);
 });

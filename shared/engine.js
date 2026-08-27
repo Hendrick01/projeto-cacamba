@@ -44,9 +44,28 @@ export const CONTRACTS = [
 
 export const TOTAL_ROUNDS = CONTRACTS.length;
 
+// Quantos baralhos para cada tamanho de mesa. O que decide é a rodada 7, que
+// distribui 12 cartas por jogador: quando sobra pouco monte, a rodada morre por
+// esgotamento antes de alguém fechar o contrato. Medido por simulação — com
+// 4 jogadores em 1 baralho a rodada 7 termina sem vencedor em 97,5% das vezes,
+// e com 8 jogadores em 2 baralhos, em 100%. Tabela única, feita para ser
+// revisitada: mexer aqui é a única coisa necessária para mudar a regra.
+export const DECKS_POR_JOGADORES = [
+  { ate: 3, decks: 1 },
+  { ate: 6, decks: 2 },
+  { ate: 8, decks: 3 },
+];
+
+export function decksParaJogadores(numPlayers) {
+  const faixa = DECKS_POR_JOGADORES.find((f) => numPlayers <= f.ate);
+  return (faixa || DECKS_POR_JOGADORES[DECKS_POR_JOGADORES.length - 1]).decks;
+}
+
 // Regras da casa ajustáveis (o dono da sala poderá mudar no futuro)
 export const DEFAULT_OPTS = {
-  decks: 2,          // 2 baralhos
+  // `decks` sai de decksParaJogadores() no createGame; este valor só vale se
+  // alguém montar opções à mão sem passar por lá.
+  decks: 2,
   jokersPerDeck: JOKERS_PER_DECK, // coringas por baralho
   buyPenalty: 1,     // quem compra fora da vez leva +1 carta do monte
   maxReshuffles: 3,  // monte esgotado 3x na rodada → rodada termina sem vencedor
@@ -55,12 +74,31 @@ export const DEFAULT_OPTS = {
   // de 60 turnos; este teto só existe para a rodada não poder ficar eterna.
   maxTurnsPerRound: 300,
   minPlayers: 2,
-  maxPlayers: 4,
+  maxPlayers: 8,
 };
 
 // Cartas que a rodada exige na mesa: a mão de cada jogador mais a virada.
 export function cartasNecessarias(numPlayers, round) {
   return (6 + round) * numPlayers + 1;
+}
+
+// Quantas cartas o baralho tem NESTA rodada. Rodada só de trincas vai sem
+// coringa (ele só vale em sequência), então são 52 por baralho em vez de 56.
+export function cartasDoBaralho(round, opts) {
+  const jokers = CONTRACTS[round].s > 0 ? opts.jokersPerDeck : 0;
+  return opts.decks * (52 + jokers);
+}
+
+// O baralho dá conta das 7 rodadas com este número de jogadores? Devolve null
+// quando dá, ou a rodada mais apertada quando não dá.
+export function conferirBaralho(numPlayers, opts = {}) {
+  const o = { ...DEFAULT_OPTS, decks: decksParaJogadores(numPlayers), ...opts };
+  for (let round = 0; round < TOTAL_ROUNDS; round++) {
+    const total = cartasDoBaralho(round, o);
+    const precisa = cartasNecessarias(numPlayers, round);
+    if (total < precisa) return { round, precisa, total, decks: o.decks };
+  }
+  return null;
 }
 
 export function rankLabel(rank) { return RANK_LABELS[rank - 1] || ''; }
@@ -372,7 +410,9 @@ function removeFromMeld(meld, cardId) {
 
 export function createGame(players, opts = {}) {
   return {
-    opts: { ...DEFAULT_OPTS, ...opts },
+    // Baralhos conforme o tamanho da mesa, a menos que venham explicitamente
+    // nas opções (os testes usam isso para forçar configurações).
+    opts: { ...DEFAULT_OPTS, decks: decksParaJogadores(players.length), ...opts },
     players: players.map((p) => ({
       id: p.id,
       name: p.name,

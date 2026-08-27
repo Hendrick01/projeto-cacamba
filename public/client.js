@@ -5,6 +5,7 @@
 import {
   planBaixada, layoffOption, layoffEnds, removableCards, SUITS, SUIT_RED, rankLabel,
   isJoker, JOKER_LABEL, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
+  DEFAULT_OPTS,
 } from '/shared/engine.js';
 
 const $ = (id) => document.getElementById(id);
@@ -170,9 +171,9 @@ function renderLobby() {
     list.appendChild(li);
   }
 
-  $('btn-add-bot').hidden = !isHost() || lobby.players.length >= 4;
+  $('btn-add-bot').hidden = !isHost() || lobby.players.length >= DEFAULT_OPTS.maxPlayers;
   $('btn-start').hidden = !isHost();
-  $('btn-start').disabled = lobby.players.length < 2;
+  $('btn-start').disabled = lobby.players.length < DEFAULT_OPTS.minPlayers;
   $('lobby-wait').hidden = isHost();
 }
 
@@ -387,148 +388,6 @@ function renderOpponents() {
     }
     box.appendChild(el);
   }
-}
-
-function badge(text, cls) {
-  const b = document.createElement('span');
-  b.className = 'badge' + (cls ? ` ${cls}` : '');
-  b.textContent = text;
-  return b;
-}
-
-function renderCenter() {
-  $('deck-count').textContent = view.deckCount;
-  const dc = $('discard-card');
-  dc.replaceWith(Object.assign(
-    view.discardTop ? cardEl(view.discardTop) : emptyCard(),
-    { id: 'discard-card' },
-  ));
-
-  const canDraw = myTurn() && view.phase === 'draw';
-  const trancado = !!view.discardTop && !view.discardBuyable;
-  $('deck-pile').classList.toggle('glow', canDraw);
-  $('discard-pile').classList.toggle('glow', canDraw && !!view.discardTop && !trancado);
-  $('discard-pile').classList.toggle('trancado', trancado);
-  $('discard-pile').querySelector('.pile-count').textContent = trancado ? '🔒 trancado' : 'meio';
-
-  // Compra fora da vez — coringa no topo não é comprável por ninguém
-  const claimable = view.phase === 'draw' && !myTurn() && view.discardFresh && view.discardBuyable
-    && view.phase !== 'roundEnd' && view.you;
-  const claimed = view.claims.includes(me());
-  $('btn-claim').hidden = !claimable;
-  if (claimable) {
-    $('btn-claim').classList.toggle('claimed', claimed);
-    $('btn-claim').textContent = claimed
-      ? '✓ Pedido feito — quem está na vez tem preferência'
-      : `🛒 Quero o ${cardText(view.discardTop)}!`;
-  }
-
-  // Aviso da vez
-  const banner = $('turn-banner');
-  if (view.phase === 'draw' || view.phase === 'play') {
-    if (myTurn()) {
-      banner.textContent = view.phase === 'draw' ? 'Sua vez! Puxe do monte ou pegue do meio.' : 'Baixe, encaixe ou descarte uma carta.';
-      banner.className = 'turn-banner me';
-    } else {
-      banner.textContent = `Vez de ${playerName(view.turnId)}…`;
-      banner.className = 'turn-banner';
-    }
-  } else {
-    banner.textContent = '';
-  }
-}
-
-function emptyCard() {
-  const el = document.createElement('div');
-  el.className = 'card empty';
-  return el;
-}
-
-function meldEl(meld, mini) {
-  const el = document.createElement('div');
-  el.className = 'meld';
-  el.dataset.meldId = meld.id;
-  for (const c of meld.cards) {
-    const ce = cardEl(c, true);
-    ce.dataset.cardId = c.id;
-    el.appendChild(ce);
-  }
-  if (!mini) decorateMeld(el, meld);
-  return el;
-}
-
-// Realces de encaixe/descarte de jogo nos meus jogos e nos da mesa
-function decorateMeld(el, meld) {
-  const my = myTurn() && view.phase === 'play';
-  if (!my) return;
-
-  // Coringa acionável só quando a troca realmente é possível para mim agora:
-  // já baixei em turno anterior, é minha vez, e tenho a carta exata na mão.
-  const troca = trocaDoJogo(meld.id);
-  if (troca && !meldDiscardMode) {
-    el.classList.add('swappable');
-    for (const ce of el.children) {
-      if (Number(ce.dataset.cardId) !== troca.info.joker.id) continue;
-      ce.classList.add('swappable');
-      ce.onclick = (e) => {
-        e.stopPropagation();
-        abrirTrocaCoringa(meld.id);
-      };
-    }
-  }
-
-  if (meldDiscardMode) {
-    if (meld.ownerId !== me()) return;
-    const rem = removableCards(meld).map((c) => c.id);
-    for (const ce of el.children) {
-      if (rem.includes(Number(ce.dataset.cardId))) {
-        ce.classList.add('removable');
-        ce.onclick = () => {
-          meldDiscardMode = false;
-          sendAction({ a: 'meldDiscard', meldId: meld.id, cardId: Number(ce.dataset.cardId) });
-        };
-      }
-    }
-    return;
-  }
-
-  if (view.you.baixou && selected.size === 1) {
-    const card = view.you.hand.find((c) => c.id === [...selected][0]);
-    if (card && layoffOption(card, meld)) {
-      el.classList.add('droppable');
-      el.onclick = () => {
-        // Coringa entra nas duas pontas (e um Ás pode servir nas duas também):
-        // quando as duas valem, quem escolhe é o jogador.
-        const ends = layoffEnds(card, meld);
-        if (ends.length > 1) return escolherPonta(card, meld, ends);
-        selected.clear();
-        sendAction({ a: 'layoff', cardId: card.id, meldId: meld.id });
-      };
-    }
-  }
-}
-
-// A carta serve nas duas pontas da sequência: pergunta onde ela entra.
-function escolherPonta(card, meld, ends) {
-  const opcoes = ends.map((end) => ({ end, opt: layoffOption(card, meld, 0, end) }));
-  showModal(
-    `<h3>Em qual ponta?</h3>
-     <p><strong>${cardText(card)}</strong> pode entrar nas duas pontas ${noJogoDe(meld)}:<br>${cartasDoJogo(meld)}</p>`,
-    [
-      ...opcoes.map(({ end, opt }) => ({
-        label: `${valorText(opt.v, meld.suit)} ${end === 'lo' ? 'embaixo' : 'em cima'}`,
-        cls: 'btn-primary',
-        fn: () => {
-          closeModal();
-          selected.clear();
-          sendAction({ a: 'layoff', cardId: card.id, meldId: meld.id, end });
-        },
-      })),
-      { label: 'Cancelar', fn: closeModal, cls: 'btn-ghost' },
-    ],
-    closeModal,
-    true,
-  );
 }
 
 function renderMyMelds() {

@@ -13,7 +13,7 @@ import { WebSocketServer } from 'ws';
 import QRCode from 'qrcode';
 import {
   createGame, startRound, applyAction, actNextRound, viewFor,
-  botNextAction, botWantsCard, actClaim, DEFAULT_OPTS,
+  botNextAction, botWantsCard, actClaim, DEFAULT_OPTS, conferirBaralho,
   podeComprarDoDescarte, topoDoDescarte,
 } from './shared/engine.js';
 
@@ -65,7 +65,12 @@ const server = http.createServer((req, res) => {
 
 const rooms = new Map(); // code → room
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // sem I e O (confundem com 1 e 0)
-const BOT_NAMES = ['Robô Zé', 'Robô Lia', 'Robô Gui'];
+// Oito nomes distintos: a mesa vai até 8 lugares, então nenhum robô repete
+// nome com outro na mesma sala.
+const BOT_NAMES = [
+  'Robô Zé', 'Robô Lia', 'Robô Gui', 'Robô Nina',
+  'Robô Téo', 'Robô Vera', 'Robô Bento', 'Robô Cacá',
+];
 
 function makeCode() {
   let code;
@@ -331,7 +336,7 @@ function handle(ws, msg) {
       const room = rooms.get(String(msg.code || '').toUpperCase().trim());
       if (!room) { const e = new Error('Sala não encontrada. Confira o código.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('Essa partida já começou.'); e.gameRule = true; throw e; }
-      if (room.players.length >= DEFAULT_OPTS.maxPlayers) { const e = new Error('A sala está cheia (4 jogadores).'); e.gameRule = true; throw e; }
+      if (room.players.length >= DEFAULT_OPTS.maxPlayers) { const e = new Error(`A sala está cheia (${DEFAULT_OPTS.maxPlayers} jogadores).`); e.gameRule = true; throw e; }
       const player = {
         id: crypto.randomUUID(), name: sanitizeName(msg.name), token: crypto.randomUUID(),
         isBot: false, ws: null, connected: false, lastSeen: Date.now(),
@@ -352,10 +357,11 @@ function handle(ws, msg) {
       const room = currentRoom(ws);
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode mexer nos robôs.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
-      if (room.players.length >= DEFAULT_OPTS.maxPlayers) { const e = new Error('A sala está cheia (4 jogadores).'); e.gameRule = true; throw e; }
-      const used = room.players.filter((p) => p.isBot).length;
+      if (room.players.length >= DEFAULT_OPTS.maxPlayers) { const e = new Error(`A sala está cheia (${DEFAULT_OPTS.maxPlayers} jogadores).`); e.gameRule = true; throw e; }
+      const emUso = new Set(room.players.map((p) => p.name));
+      const nome = BOT_NAMES.find((n) => !emUso.has(n)) || `Robô ${room.players.length + 1}`;
       room.players.push({
-        id: `bot-${crypto.randomUUID()}`, name: BOT_NAMES[used % BOT_NAMES.length], token: '',
+        id: `bot-${crypto.randomUUID()}`, name: nome, token: '',
         isBot: true, ws: null, connected: true, lastSeen: Date.now(),
       });
       broadcastLobby(room);
@@ -376,6 +382,13 @@ function handle(ws, msg) {
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode começar.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
       if (room.players.length < DEFAULT_OPTS.minPlayers) { const e = new Error('Chame pelo menos mais 1 jogador (ou adicione um robô).'); e.gameRule = true; throw e; }
+      // O motor recusaria na hora de distribuir; conferir aqui dá uma mensagem
+      // no lobby em vez de derrubar a partida na rodada mais apertada.
+      const aperto = conferirBaralho(room.players.length);
+      if (aperto) {
+        const e = new Error(`Não dá para jogar com ${room.players.length} jogadores: a rodada ${aperto.round + 1} precisaria de ${aperto.precisa} cartas e o baralho tem ${aperto.total}.`);
+        e.gameRule = true; throw e;
+      }
       room.game = createGame(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })));
       room.gameSeq++;
       const events = startRound(room.game);
