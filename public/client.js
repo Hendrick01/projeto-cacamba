@@ -155,6 +155,7 @@ function renderLobby() {
     const dot = document.createElement('span');
     dot.className = 'dot' + (p.connected ? '' : ' off');
     li.appendChild(dot);
+    li.appendChild(avatarEl(p.id, lobby.players, 30));
     li.appendChild(document.createTextNode(p.id === me() ? `${p.name} (você)` : p.name));
     const tag = document.createElement('span');
     tag.className = 'tag';
@@ -184,6 +185,36 @@ $('btn-leave-lobby').onclick = () => {
   history.replaceState(null, '', location.pathname);
   location.reload();
 };
+
+// ---------------- Avatares ----------------
+
+// O elenco atual. Com mais jogadores que personagens o rosto repete, e é o
+// anel de cor do assento que continua distinguindo — até o elenco crescer.
+const AVATARES = ['gabizinsky', 'dri', 'esterex', 'matheus'];
+// Uma cor por assento, na paleta do jogo. Oito, que é o tamanho máximo da mesa.
+const CORES_DE_ASSENTO = [
+  '#F2C14E', '#3A7D6E', '#E4572E', '#8C6A45',
+  '#C97AB0', '#5B8DC9', '#7FB069', '#B0605D',
+];
+
+// Assento do jogador na lista — é dele que saem o rosto e a cor, então todo
+// mundo vê o mesmo avatar para a mesma pessoa.
+function assentoDe(playerId, lista) {
+  const i = (lista || []).findIndex((p) => p.id === playerId);
+  return i < 0 ? 0 : i;
+}
+
+function avatarEl(playerId, lista, tamanho = 24) {
+  const assento = assentoDe(playerId, lista);
+  const el = document.createElement('img');
+  el.className = 'avatar';
+  el.src = `/assets/personagens/${AVATARES[assento % AVATARES.length]}-avatar.svg`;
+  el.alt = '';
+  el.width = tamanho;
+  el.height = tamanho;
+  el.style.setProperty('--anel', CORES_DE_ASSENTO[assento % CORES_DE_ASSENTO.length]);
+  return el;
+}
 
 // ---------------- Cartas (DOM) ----------------
 
@@ -394,7 +425,7 @@ function oponenteCartao(p) {
   const count = document.createElement('span');
   count.className = 'opp-count';
   count.textContent = `🂠${p.handCount}`;
-  head.append(name, count);
+  head.append(avatarEl(p.id, view.players, 22), name, count);
   el.appendChild(head);
 
   const badges = document.createElement('div');
@@ -430,14 +461,17 @@ function oponenteCompacto(p) {
   const name = document.createElement('span');
   name.className = 'opp-name';
   name.textContent = p.name;
-  const count = document.createElement('span');
-  count.className = 'opp-count';
-  count.textContent = `🂠${p.handCount}`;
-  head.append(name, count);
+  head.append(avatarEl(p.id, view.players, 20), name);
   el.appendChild(head);
 
+  // A contagem de cartas desce para o resumo: no cabeçalho ela disputava
+  // largura com o nome e quebrava linha, desalinhando os blocos da grade.
   const linha = document.createElement('div');
   linha.className = 'opp-resumo';
+  const cartas = document.createElement('span');
+  cartas.className = 'm-cartas';
+  cartas.textContent = `🂠${p.handCount}`;
+  linha.appendChild(cartas);
   const prog = progressoDoContrato(p);
   if (prog) {
     const m = document.createElement('span');
@@ -463,7 +497,6 @@ function oponenteCompacto(p) {
     m.textContent = `${p.melds.length} jogo${p.melds.length > 1 ? 's' : ''}`;
     linha.appendChild(m);
   }
-  if (!linha.childNodes.length) linha.textContent = '—';
   el.appendChild(linha);
 
   el.onclick = () => mostraOponente(p.id);
@@ -481,6 +514,7 @@ function mostraOponente(playerId) {
     ? (prog.completo ? 'contrato baixado' : `baixou ${prog.texto} do contrato`)
     : 'ainda não baixou';
   const linhas = [
+    '<div id="oponente-topo" class="oponente-topo"></div>',
     `<h3>${escapeHTML(p.name)}${naVez(p) ? ' — é a vez dele' : ''}</h3>`,
     `<p>${p.handCount} carta${p.handCount === 1 ? '' : 's'} na mão · ${situacao}</p>`,
   ];
@@ -491,6 +525,7 @@ function mostraOponente(playerId) {
     [{ label: 'Fechar', fn: closeModal }],
     closeModal,
   );
+  $('oponente-topo').appendChild(avatarEl(p.id, view.players, 72));
   const caixa = $('oponente-jogos');
   if (p.melds.length) {
     for (const m of p.melds) caixa.appendChild(meldEl(m, true));

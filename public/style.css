@@ -175,9 +175,22 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   padding: 7px 8px;
 }
 .opponent.turn { border-color: var(--gold); box-shadow: 0 0 12px rgba(233, 185, 78, 0.35); }
-.opponent .opp-head { display: flex; align-items: baseline; gap: 6px; }
+.opponent .opp-head { display: flex; align-items: center; gap: 6px; }
+
+/* Avatar do elenco. O anel de cor é do assento, não da personagem: com mais
+   jogadores que personagens o rosto repete, e é o anel que segue distinguindo. */
+.avatar {
+  --anel: var(--gold-soft);
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #2A1B12;
+  box-shadow: 0 0 0 2px var(--anel);
+  display: block;
+}
+.oponente-topo { display: flex; justify-content: center; margin-bottom: 6px; }
+.lobby-players .avatar { margin-right: 2px; }
 .opponent .opp-name { font-weight: 900; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.opponent .opp-count { color: var(--sage); font-size: 0.8rem; font-variant-numeric: tabular-nums; margin-left: auto; }
+.opponent .opp-count { color: var(--sage); font-size: 0.8rem; font-variant-numeric: tabular-nums; margin-left: auto; white-space: nowrap; }
 .opponent .opp-badges { display: flex; gap: 4px; margin-top: 3px; min-height: 16px; flex-wrap: wrap; }
 .badge {
   font-size: 0.62rem; font-weight: 800; padding: 1px 7px; border-radius: 20px;
@@ -207,8 +220,9 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   color: inherit;
   cursor: pointer;
 }
-.opponent.compacto .opp-name { font-size: 0.86rem; }
-.opponent.compacto .opp-count { font-size: 0.74rem; }
+.opponent.compacto { min-height: 46px; }
+.opponent.compacto .opp-name { font-size: 0.86rem; min-width: 0; }
+.opp-resumo .m-cartas { color: var(--cream-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .opp-resumo {
   display: flex; flex-wrap: wrap; gap: 5px;
   margin-top: 3px; min-height: 14px;

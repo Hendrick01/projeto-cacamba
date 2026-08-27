@@ -279,6 +279,17 @@ quando tudo cabe.
 
 O limite de quando trocar está em `COMPACTO_A_PARTIR_DE`, no cliente.
 
+### Avatares
+
+Cada jogador ganha um rosto do elenco (`public/assets/personagens/*-avatar.svg`),
+escolhido pelo **assento** — determinístico, então todos veem o mesmo rosto para
+a mesma pessoa. Aparecem no lobby, nos blocos de adversário e no detalhe.
+
+O elenco tem 4 personagens e a mesa vai a 8, então de 5 lugares em diante o
+rosto repete. Quem continua distinguindo é o **anel de cor do assento**
+(`CORES_DE_ASSENTO`, oito cores da paleta do jogo). Quando o elenco crescer,
+basta acrescentar nomes em `AVATARES`.
+
 ---
 
 ## `server.js` — salas e juiz
