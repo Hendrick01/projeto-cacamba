@@ -67,7 +67,8 @@ export const DEFAULT_OPTS = {
   // alguém montar opções à mão sem passar por lá.
   decks: 2,
   jokersPerDeck: JOKERS_PER_DECK, // coringas por baralho
-  buyPenalty: 1,     // quem compra fora da vez leva +1 carta do monte
+  // Compra fora da vez não custa nada: quem pede primeiro leva só a carta que
+  // pediu — mas quem está na vez tem preferência sobre todos.
   maxReshuffles: 3,  // monte esgotado 3x na rodada → rodada termina sem vencedor
   // Rede de segurança: se todo mundo só pegar do descarte, o monte nunca
   // esgota e maxReshuffles nunca é atingido. Rodadas normais ficam bem abaixo
@@ -273,13 +274,16 @@ export function findContractMelds(cards, needT, needS) {
 // ficaria preso (a menos que `permitirMaoVazia` seja ligado, usado pela tela
 // só para explicar o porquê ao jogador).
 // Devolve { trincas, seqs, a, b, completa } ou null.
+// Quantos jogos cabem no bolo. O teto NÃO vem do contrato: jogo a mais pode
+// descer antes ou depois dele. O que o contrato decide é outra coisa — se dá
+// para BATER (ver `completa` abaixo).
 export function planBaixada(hand, remaining, cardIds = null, { permitirMaoVazia = false } = {}) {
   const temSelecao = !!(cardIds && cardIds.length);
   const pool = temSelecao ? hand.filter((c) => cardIds.includes(c.id)) : hand;
   if (temSelecao && pool.length !== cardIds.length) return null; // carta fora da mão
   const planos = [];
-  for (let a = remaining.t; a >= 0; a--) {
-    for (let b = remaining.s; b >= 0; b--) {
+  for (let a = Math.floor(pool.length / 3); a >= 0; a--) {
+    for (let b = Math.floor(pool.length / 4); b >= 0; b--) {
       if (a === 0 && b === 0) continue;
       const size = a * 3 + b * 4;
       if (temSelecao ? size !== pool.length : size > pool.length) continue;
@@ -288,7 +292,9 @@ export function planBaixada(hand, remaining, cardIds = null, { permitirMaoVazia 
   }
   planos.sort((x, y) => y.size - x.size); // baixa o máximo possível primeiro
   for (const { a, b, size } of planos) {
-    const completa = a === remaining.t && b === remaining.s;
+    // Cobrir o que o contrato ainda pede é o que libera esvaziar a mão. Baixar
+    // A MAIS não atrapalha: o excedente é jogo extra, e continua valendo.
+    const completa = a >= remaining.t && b >= remaining.s;
     if (!completa && !permitirMaoVazia && size === hand.length) continue;
     const res = findContractMelds(pool, a, b);
     if (!res) continue;
@@ -564,19 +570,19 @@ export function descarteTravado(state) {
   return CORINGA_DESCARTADO_TRANCA && !!topo && isJoker(topo);
 }
 
-// Vale para os DOIS caminhos de compra: a normal da vez e a fora da vez com
-// carta de castigo.
+// Vale para os DOIS caminhos de compra: a normal da vez e a fora da vez.
 export function podeComprarDoDescarte(state) {
   if (state.discard.length === 0) return false;
   return !descarteTravado(state);
 }
 
-// Ordem de prioridade para compra fora da vez: assentos após quem está na vez
+// Ordem de prioridade para compra fora da vez: QUEM PEDIU PRIMEIRO leva.
+// `state.claims` já está na ordem de chegada dos pedidos, então é só ele —
+// a posição do assento não conta, e quem está na vez nunca entra aqui (ele
+// tem preferência por outro caminho, pegando a carta direto).
 function claimPriority(state) {
-  const n = state.players.length;
-  const order = [];
-  for (let i = 1; i < n; i++) order.push(state.players[(state.turn + i) % n].id);
-  return order.filter((id) => state.claims.includes(id));
+  const daVez = state.players[state.turn].id;
+  return state.claims.filter((id) => id !== daVez && playerById(state, id));
 }
 
 // --- Ações -----------------------------------------------------------------
@@ -631,12 +637,7 @@ export function actDraw(state, playerId, source) {
       const card = state.discard.pop();
       buyer.hand.push(card);
       state.discardFresh = false;
-      const penalty = [];
-      for (let i = 0; i < state.opts.buyPenalty; i++) {
-        if (ensureDeck(state, events)) penalty.push(state.deck.pop());
-      }
-      buyer.hand.push(...penalty);
-      events.push({ e: 'buy', p: buyerId, card: { ...card }, penalty: penalty.length, losers: buyers.slice(1) });
+      events.push({ e: 'buy', p: buyerId, card: { ...card }, losers: buyers.slice(1) });
     }
     state.claims = [];
     state.discardFresh = false;
@@ -655,22 +656,48 @@ export function actDraw(state, playerId, source) {
 // pode ser baixada antes da outra). O direito de encaixar nos jogos da mesa
 // só vem quando o contrato INTEIRO estiver baixado (player.baixou).
 // cardIds opcional: baixa exatamente a seleção; sem ele, baixa o máximo.
-export function actBaixar(state, playerId, cardIds = null) {
+// Jogo EXTRA — trinca ou sequência que o contrato não pediu — pode descer
+// **antes ou depois** de o contrato estar cumprido. Regra do usuário. O que o
+// contrato ainda governa é **bater**: só esvazia a mão quem já o cumpriu.
+// O extra não entra em `baixados`, senão o progresso apareceria como 4/3.
+export function actBaixar(state, playerId, cardIds = null, sobra = null) {
   if (state.phase !== 'play') fail('Puxe uma carta antes de baixar.');
   const player = state.players[state.turn];
   if (player.id !== playerId) fail('Não é a sua vez.');
   const ct = currentContract(state);
   const remaining = contractRemaining(state, player);
-  if (remaining.t === 0 && remaining.s === 0) fail('Você já baixou o contrato inteiro desta rodada.');
 
-  const plan = planBaixada(player.hand, remaining, cardIds);
-  if (!plan) {
-    // Distingue "não forma jogo" de "formaria, mas te deixaria preso"
-    const preso = planBaixada(player.hand, remaining, cardIds, { permitirMaoVazia: true });
-    if (preso) fail('Baixar isso agora te deixaria sem nenhuma carta sem completar o contrato — guarde pelo menos uma para descartar.');
-    if (cardIds && cardIds.length) fail(`Essas cartas não formam jogos que o contrato ainda pede (${ct.label}).`);
-    fail(`Você ainda não tem nenhum jogo completo para baixar (${ct.label}).`);
+  // Carta que está SOBRANDO num jogo da mesa (seu ou de outro) e que vai
+  // direto para o jogo que está descendo agora. Ela nunca passa pela mão: ou
+  // o jogo fecha com ela, ou nada acontece.
+  let daMesa = null;
+  let meldDaSobra = null;
+  if (sobra) {
+    meldDaSobra = meldById(state, sobra.meldId);
+    if (!meldDaSobra) fail('Esse jogo não está na mesa.');
+    const podeSair = removableCards(meldDaSobra);
+    if (!podeSair.some((c) => c.id === sobra.cardId)) {
+      fail('Essa carta não está sobrando: só dá para tirar de sequência com mais de 4 cartas (pelas pontas) ou trinca com mais de 3.');
+    }
+    daMesa = meldDaSobra.cards.find((c) => c.id === sobra.cardId);
   }
+
+  // A carta da mesa entra no bolo como se já fosse da mão, para o mesmo
+  // planejador decidir. A mão de verdade só é tocada se o plano fechar.
+  const bolo = daMesa ? [...player.hand, daMesa] : player.hand;
+  const ids = daMesa ? [...(cardIds || []), daMesa.id] : cardIds;
+  const plan = planBaixada(bolo, remaining, ids);
+  if (!plan) {
+    if (daMesa) fail('Com essa carta da mesa não fecha nenhum jogo completo — e ela só sai de lá se for para baixar na hora.');
+    // Distingue "não forma jogo" de "formaria, mas te deixaria sem bater"
+    const preso = planBaixada(bolo, remaining, ids, { permitirMaoVazia: true });
+    if (preso) fail(`Isso baixaria a mão inteira, e só dá para bater com o contrato cumprido (${ct.label}) — guarde pelo menos uma carta para descartar.`);
+    if (cardIds && cardIds.length) fail('Essas cartas não formam uma trinca (3 iguais de naipes diferentes) nem uma sequência (4 seguidas do mesmo naipe).');
+    fail('Você ainda não tem nenhum jogo completo para baixar.');
+  }
+
+  // Daqui para baixo o plano fechou: agora sim o estado muda.
+  if (daMesa) removeFromMeld(meldDaSobra, daMesa.id);
 
   const usedIds = new Set();
   for (const cards of plan.trincas) {
@@ -682,13 +709,51 @@ export function actBaixar(state, playerId, cardIds = null) {
     cards.forEach((c) => usedIds.add(c.id));
   }
   player.hand = player.hand.filter((c) => !usedIds.has(c.id));
-  player.baixados.t += plan.a;
-  player.baixados.s += plan.b;
-  player.baixou = player.baixados.t >= ct.t && player.baixados.s >= ct.s;
 
-  const events = [{ e: 'baixou', p: playerId, t: plan.a, s: plan.b, completa: player.baixou }];
+  // Crédito no contrato só até o que ele pede; o que passar disso é extra.
+  const creditoT = Math.min(plan.a, remaining.t);
+  const creditoS = Math.min(plan.b, remaining.s);
+  player.baixados.t += creditoT;
+  player.baixados.s += creditoS;
+  player.baixou = player.baixados.t >= ct.t && player.baixados.s >= ct.s;
+  const extraT = plan.a - creditoT;
+  const extraS = plan.b - creditoS;
+
+  const events = [{
+    e: 'baixou',
+    p: playerId,
+    t: creditoT,
+    s: creditoS,
+    extraT,
+    extraS,
+    extra: extraT + extraS > 0,
+    completa: player.baixou,
+    ...(daMesa ? { daMesa: { ...daMesa }, deMeldId: meldDaSobra.id, deQuem: meldDaSobra.ownerId } : {}),
+  }];
   if (player.hand.length === 0) return endRound(state, playerId, 'bateu', events);
   return events;
+}
+
+// Esta carta que está sobrando na mesa fecha um jogo junto com as cartas que
+// eu escolhi na mão? Mesma pergunta que `actBaixar` vai fazer — vive aqui, e
+// não no cliente, para o realce da tela e a decisão do juiz nunca divergirem.
+export function sobraFechaJogo(cartasDaMao, sobra, alvo, opts = {}) {
+  if (!sobra || !cartasDaMao.length) return false;
+  const bolo = [...cartasDaMao, sobra];
+  return !!planBaixada(bolo, alvo, bolo.map((c) => c.id), opts);
+}
+
+// As cartas que estão sobrando em algum jogo da mesa — as que podem sair para
+// completar um jogo que desça na hora. É o que a tela precisa para oferecer o
+// gesto só quando ele existe.
+export function sobrasNaMesa(state) {
+  const fora = [];
+  for (const meld of allMelds(state)) {
+    for (const card of removableCards(meld)) {
+      fora.push({ meldId: meld.id, ownerId: meld.ownerId, card });
+    }
+  }
+  return fora;
 }
 
 // Encaixar uma carta da mão em qualquer jogo da mesa (só depois de baixar).
@@ -1133,7 +1198,7 @@ export function applyAction(state, playerId, action) {
     case 'draw': return actDraw(state, playerId, action.source);
     case 'claim': return actClaim(state, playerId);
     case 'unclaim': return actUnclaim(state, playerId);
-    case 'baixar': return actBaixar(state, playerId, action.cardIds || null);
+    case 'baixar': return actBaixar(state, playerId, action.cardIds || null, action.sobra || null);
     case 'layoff': return actLayoff(state, playerId, action.cardId, action.meldId, action.end || null);
     case 'swapJoker': return actSwapJoker(state, playerId, action.meldId, action.cardId, action.destMeldId || null);
     case 'discard': return actDiscard(state, playerId, action.cardId);

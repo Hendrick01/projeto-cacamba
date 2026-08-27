@@ -5,7 +5,7 @@ import {
   layoffOption, layoffEnds, removableCards, createGame, startRound, actDraw, actBaixar,
   actLayoff, actDiscard, actMeldDiscard, actClaim, actUnclaim, actNextRound, applyAction,
   botNextAction, botWantsCard, mulberry32, viewFor, allMelds, playerById,
-  podeComprarDoDescarte, isJoker, topoDoDescarte,
+  podeComprarDoDescarte, isJoker, topoDoDescarte, sobrasNaMesa, sobraFechaJogo,
   decksParaJogadores, conferirBaralho, cartasNecessarias, DEFAULT_OPTS,
 } from '../shared/engine.js';
 
@@ -166,7 +166,7 @@ test('compra fora da vez: quem está na vez tem preferência', () => {
   assert.equal(other.hand.some((card) => card.id === discarded.id), false);
 });
 
-test('compra fora da vez: leva a carta + castigo quando a vez libera', () => {
+test('compra fora da vez: leva SÓ a carta pedida, sem castigo', () => {
   const state = freshGame();
   const a = state.players[state.turn];
   actDraw(state, a.id, 'deck');
@@ -182,24 +182,28 @@ test('compra fora da vez: leva a carta + castigo quando a vez libera', () => {
   assert.ok(buy);
   assert.equal(buy.p, other.id);
   assert.ok(other.hand.some((card) => card.id === discarded.id));
-  assert.equal(other.hand.length, handBefore + 2, 'carta comprada + 1 de castigo');
+  assert.equal(other.hand.length, handBefore + 1, 'só a carta comprada');
+  assert.equal(buy.penalty, undefined, 'o evento não fala mais de castigo');
 });
 
-test('prioridade entre compradores segue a ordem dos assentos após a vez', () => {
+test('prioridade entre compradores: quem pediu primeiro leva, não o assento', () => {
   const state = freshGame();
   const a = state.players[state.turn];
   actDraw(state, a.id, 'deck');
-  actDiscard(state, a.id, a.hand[0].id);
+  const discarded = a.hand[0];
+  actDiscard(state, a.id, discarded.id);
 
   const n = state.players.length;
   const turnIdx = state.turn;
-  const near = state.players[(turnIdx + 1) % n];   // logo depois de quem está na vez
-  const far = state.players[(turnIdx + 2) % n];
-  actClaim(state, far.id);
-  actClaim(state, near.id); // pediu depois, mas está mais perto na ordem
+  const perto = state.players[(turnIdx + 1) % n]; // assento logo após a vez
+  const longe = state.players[(turnIdx + 2) % n];
+  actClaim(state, longe.id);  // apertou primeiro, mesmo estando mais longe
+  actClaim(state, perto.id);
   const events = actDraw(state, state.players[turnIdx].id, 'deck');
   const buy = events.find((ev) => ev.e === 'buy');
-  assert.equal(buy.p, near.id);
+  assert.equal(buy.p, longe.id, 'quem apertou primeiro leva');
+  assert.ok(longe.hand.some((card) => card.id === discarded.id));
+  assert.deepEqual(buy.losers, [perto.id]);
 });
 
 test('pedidos de compra inválidos são ignorados em silêncio (corridas de toque)', () => {
@@ -253,23 +257,177 @@ test('baixa um jogo de cada vez: trinca sozinha desce, contrato completa depois'
   assert.deepEqual(p.baixados, { t: 2, s: 0 });
 });
 
-test('só desce o que o contrato ainda pede: sequência não vale na rodada de trincas', () => {
+test('com o contrato na mesa, ainda dá para baixar jogo extra', () => {
+  const state = freshGame(); // rodada 1: 2 trincas
+  const p = state.players[state.turn];
+  actDraw(state, p.id, 'deck');
+  p.hand = [
+    c('7', '♠'), c('7', '♥'), c('7', '♦'),
+    c('Q', '♠'), c('Q', '♥'), c('Q', '♣'),
+    c('9', '♠'), c('9', '♥'), c('9', '♦'),
+    c('2', '♣'),
+  ];
+  actBaixar(state, p.id, [p.hand[0].id, p.hand[1].id, p.hand[2].id]);
+  actBaixar(state, p.id, [p.hand[0].id, p.hand[1].id, p.hand[2].id]);
+  assert.equal(p.baixou, true, 'contrato inteiro na mesa');
+  assert.deepEqual(p.baixados, { t: 2, s: 0 });
+
+  // Agora a trinca de 9: é jogo EXTRA, não faz parte do contrato
+  const noves = p.hand.filter((x) => x.rank === 9).map((x) => x.id);
+  const ev = actBaixar(state, p.id, noves);
+  assert.equal(ev[0].e, 'baixou');
+  assert.equal(ev[0].extra, true);
+  assert.equal(p.melds.length, 3);
+  assert.deepEqual(p.baixados, { t: 2, s: 0 }, 'extra não infla o progresso do contrato');
+  assert.equal(p.hand.length, 1, 'sobrou só a carta de descarte');
+});
+
+test('jogo extra que esvazia a mão bate a rodada', () => {
+  const state = freshGame();
+  const p = state.players[state.turn];
+  actDraw(state, p.id, 'deck');
+  p.hand = [
+    c('7', '♠'), c('7', '♥'), c('7', '♦'),
+    c('Q', '♠'), c('Q', '♥'), c('Q', '♣'),
+    c('9', '♠'), c('9', '♥'), c('9', '♦'),
+  ];
+  actBaixar(state, p.id, p.hand.slice(0, 3).map((x) => x.id));
+  actBaixar(state, p.id, p.hand.slice(0, 3).map((x) => x.id));
+  const ev = actBaixar(state, p.id, p.hand.map((x) => x.id));
+  assert.equal(p.hand.length, 0);
+  assert.ok(ev.some((e) => e.e === 'roundEnd' && e.reason === 'bateu' && e.winnerId === p.id));
+});
+
+test('carta sobrando de jogo alheio completa jogo que desce na hora', () => {
+  const state = freshGame(); // rodada 1: 2 trincas
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+
+  // B tem na mesa uma trinca de 5 com QUATRO cartas: uma está sobrando
+  b.melds = [{
+    id: 9001, type: 't', rank: 5, ownerId: b.id,
+    cards: [c('5', '♠'), c('5', '♥'), c('5', '♦'), c('5', '♣')],
+  }];
+  const sobrando = sobrasNaMesa(state);
+  assert.ok(sobrando.length > 0, 'a quarta carta da trinca está sobrando');
+
+  // O naipe importa: trinca exige naipes diferentes, então a carta que vem da
+  // mesa tem de ser a de naipe que falta na mão.
+  const alvo = sobrando.find((x) => x.card.suit === SU['♦']);
+  a.hand = [c('5', '♠'), c('5', '♥'), c('K', '♦'), c('K', '♣'), c('K', '♥'), c('2', '♣')];
+  const cincos = a.hand.filter((x) => x.rank === 5).map((x) => x.id);
+
+  const ev = actBaixar(state, a.id, cincos, { meldId: alvo.meldId, cardId: alvo.card.id });
+  assert.equal(ev[0].e, 'baixou');
+  assert.equal(ev[0].daMesa.rank, 5);
+  assert.equal(a.melds.length, 1, 'a trinca desceu com a carta da mesa');
+  assert.equal(a.melds[0].cards.length, 3);
+  assert.equal(b.melds[0].cards.length, 3, 'o jogo do B continua válido, com 3');
+  assert.equal(a.hand.some((x) => x.rank === 5), false, 'a carta da mesa não passou pela mão');
+});
+
+test('sobraFechaJogo acende só onde o juiz deixaria baixar', () => {
+  const mao = [c('5', '♠'), c('5', '♥')];
+  const contrato = { t: 1, s: 0 };
+  // Naipe que falta: fecha
+  assert.equal(sobraFechaJogo(mao, c('5', '♦'), contrato, { permitirMaoVazia: true }), true);
+  // Naipe repetido: trinca exige naipes diferentes
+  assert.equal(sobraFechaJogo(mao, c('5', '♠'), contrato, { permitirMaoVazia: true }), false);
+  // Carta que não tem nada a ver
+  assert.equal(sobraFechaJogo(mao, c('9', '♣'), contrato, { permitirMaoVazia: true }), false);
+  // Sem nada escolhido na mão, não acende
+  assert.equal(sobraFechaJogo([], c('5', '♦'), contrato, { permitirMaoVazia: true }), false);
+  // Sequência: 3♥ 4♥ 5♥ na mão + 6♥ da mesa fecha as quatro
+  const seq = [c('3', '♥'), c('4', '♥'), c('5', '♥')];
+  assert.equal(sobraFechaJogo(seq, c('6', '♥'), { t: 0, s: 1 }, { permitirMaoVazia: true }), true);
+  assert.equal(sobraFechaJogo(seq, c('6', '♠'), { t: 0, s: 1 }, { permitirMaoVazia: true }), false);
+  // E com o contrato já cumprido, o que desce é jogo extra
+  assert.equal(sobraFechaJogo(mao, c('5', '♦'), { t: 0, s: 0 }, { permitirMaoVazia: true }), true);
+});
+
+test('carta da mesa só sai se fechar jogo — senão nada muda', () => {
+  const state = freshGame();
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+  b.melds = [{
+    id: 9002, type: 't', rank: 5, ownerId: b.id,
+    cards: [c('5', '♠'), c('5', '♥'), c('5', '♦'), c('5', '♣')],
+  }];
+  const alvo = sobrasNaMesa(state)[0];
+  a.hand = [c('9', '♠'), c('2', '♥'), c('4', '♦')]; // não fecha nada com um 5
+
+  assert.throws(
+    () => actBaixar(state, a.id, [a.hand[0].id], { meldId: alvo.meldId, cardId: alvo.card.id }),
+    /só sai de lá se for para baixar na hora/,
+  );
+  assert.equal(b.melds[0].cards.length, 4, 'o jogo do B ficou intacto');
+  assert.equal(a.melds.length, 0);
+  assert.equal(a.hand.length, 3, 'a mão do A ficou intacta');
+});
+
+test('carta que NÃO está sobrando não sai do jogo alheio', () => {
+  const state = freshGame();
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+  // Trinca de exatamente 3: nada sobra nela
+  b.melds = [{
+    id: 9003, type: 't', rank: 5, ownerId: b.id,
+    cards: [c('5', '♠'), c('5', '♥'), c('5', '♦')],
+  }];
+  assert.deepEqual(sobrasNaMesa(state), []);
+  a.hand = [c('5', '♣'), c('5', '♠'), c('2', '♥')];
+  assert.throws(
+    () => actBaixar(state, a.id, [a.hand[0].id, a.hand[1].id], { meldId: 9003, cardId: b.melds[0].cards[0].id }),
+    /não está sobrando/,
+  );
+  assert.equal(b.melds[0].cards.length, 3);
+});
+
+test('jogo extra desce ANTES do contrato, e não conta nele', () => {
   const state = freshGame(); // rodada 1: 2 trincas
   const p = state.players[state.turn];
   actDraw(state, p.id, 'deck');
   p.hand = [c('3', '♥'), c('4', '♥'), c('5', '♥'), c('6', '♥'), c('9', '♠'), c('J', '♦'), c('2', '♣')];
-  assert.throws(() => actBaixar(state, p.id), /nenhum jogo completo/);
-  // Nem selecionando a sequência na marra
   const ids = p.hand.slice(0, 4).map((x) => x.id);
-  assert.throws(() => actBaixar(state, p.id, ids), /não formam jogos que o contrato ainda pede/);
+  const ev = actBaixar(state, p.id, ids);
+  assert.equal(ev[0].e, 'baixou');
+  assert.equal(ev[0].extra, true);
+  assert.equal(ev[0].extraS, 1, 'a sequência desceu como jogo extra');
+  assert.deepEqual(p.baixados, { t: 0, s: 0 }, 'sequência não conta num contrato de trincas');
+  assert.equal(p.baixou, false, 'o contrato continua de pé');
+  assert.equal(p.melds.length, 1);
 });
 
-test('não pode baixar até ficar de mão vazia sem completar o contrato', () => {
+test('sem contrato cumprido não bate, nem baixando jogo extra', () => {
+  const state = freshGame(); // rodada 1: 2 trincas
+  const p = state.players[state.turn];
+  actDraw(state, p.id, 'deck');
+  // Uma trinca e uma sequência: dá 7 cartas, a mão inteira. Baixar tudo
+  // esvaziaria a mão faltando ainda uma trinca do contrato.
+  p.hand = [c('7', '♠'), c('7', '♥'), c('7', '♦'), c('3', '♥'), c('4', '♥'), c('5', '♥'), c('6', '♥')];
+  assert.throws(
+    () => actBaixar(state, p.id, p.hand.map((x) => x.id)),
+    /só dá para bater com o contrato cumprido/,
+  );
+  assert.equal(p.melds.length, 0, 'nada desceu');
+  assert.equal(p.hand.length, 7);
+
+  // Deixando uma carta de fora, desce numa boa (e ainda não bate)
+  const semUm = p.hand.slice(0, 3).map((x) => x.id);
+  actBaixar(state, p.id, semUm);
+  assert.equal(p.melds.length, 1);
+  assert.equal(state.phase, 'play', 'a rodada não acabou');
+});
+
+test('não esvazia a mão sem ter cumprido o contrato', () => {
   const state = freshGame(); // rodada 1: 2 trincas
   const p = state.players[state.turn];
   actDraw(state, p.id, 'deck');
   p.hand = [c('7', '♠'), c('7', '♥'), c('7', '♦')]; // só a trinca, nada mais
-  assert.throws(() => actBaixar(state, p.id), /sem nenhuma carta sem completar/);
+  assert.throws(() => actBaixar(state, p.id), /só dá para bater com o contrato cumprido/);
   // Com uma carta sobrando, a mesma trinca desce numa boa
   p.hand.push(c('2', '♣'));
   const ev = actBaixar(state, p.id);
@@ -554,20 +712,21 @@ test('assentos e prioridade de compra funcionam em mesa de 7 e de 8', () => {
       actDiscard(state, atual.id, atual.hand[0].id);
     }
     assert.equal(new Set(vistos).size, n, `todos jogaram uma vez (${n})`);
-    // Prioridade da compra fora da vez: o assento seguinte ao da vez ganha
+    // Prioridade da compra fora da vez: quem apertou primeiro leva, mesmo
+    // sendo o assento mais distante da vez
     const daVez = state.players[state.turn];
     const ordem = [];
     for (let k = 1; k < n; k++) ordem.push(state.players[(state.turn + k) % n]);
     const ultimo = ordem[ordem.length - 1];
     const primeiro = ordem[0];
-    actClaim(state, ultimo.id);
-    actClaim(state, primeiro.id);
-    const antes = primeiro.hand.length;
+    actClaim(state, ultimo.id);   // pediu primeiro
+    actClaim(state, primeiro.id); // assento melhor, pedido depois
+    const antes = ultimo.hand.length;
     const eventos = actDraw(state, daVez.id, 'deck');
     const buy = eventos.find((ev) => ev.e === 'buy');
     assert.ok(buy, `alguém devia ter comprado (${n})`);
-    assert.equal(buy.p, primeiro.id, `o assento mais próximo da vez tem prioridade (${n})`);
-    assert.equal(primeiro.hand.length, antes + 1 + state.opts.buyPenalty);
+    assert.equal(buy.p, ultimo.id, `quem apertou primeiro leva (${n})`);
+    assert.equal(ultimo.hand.length, antes + 1, `só a carta comprada (${n})`);
   }
 });
 
