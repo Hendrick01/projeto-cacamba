@@ -351,50 +351,158 @@ function render() {
   renderPhaseModal();
 }
 
+// A partir de quantos adversários a faixa vira grade compacta. Até 3 (mesa de
+// 4) o cartão largo cabe e mostra os jogos baixados; acima disso ele não cabe
+// mais na largura de um celular, e esconder gente é pior do que resumir.
+const COMPACTO_A_PARTIR_DE = 4;
+
+function naVez(p) {
+  return view.turnId === p.id && view.phase !== 'roundEnd';
+}
+
+// Progresso do contrato: "baixou" quando completo, "2/3" quando parcial.
+function progressoDoContrato(p) {
+  const total = view.contract ? view.contract.t + view.contract.s : 0;
+  const feitos = p.baixados ? p.baixados.t + p.baixados.s : 0;
+  if (p.baixou) return { texto: 'baixou', completo: true };
+  if (feitos > 0) return { texto: `${feitos}/${total}`, completo: false };
+  return null;
+}
+
 function renderOpponents() {
   const box = $('opponents');
   box.innerHTML = '';
-  for (const p of view.players) {
-    if (p.id === me()) continue;
-    const el = document.createElement('div');
-    el.className = 'opponent' + (view.turnId === p.id && view.phase !== 'roundEnd' ? ' turn' : '');
-
-    const head = document.createElement('div');
-    head.className = 'opp-head';
-    const name = document.createElement('span');
-    name.className = 'opp-name';
-    name.textContent = p.name;
-    const count = document.createElement('span');
-    count.className = 'opp-count';
-    count.textContent = `🂠${p.handCount}`;
-    head.append(name, count);
-    el.appendChild(head);
-
-    const badges = document.createElement('div');
-    badges.className = 'opp-badges';
-    const totalJogos = view.contract ? view.contract.t + view.contract.s : 0;
-    const jogosFeitos = p.baixados ? p.baixados.t + p.baixados.s : 0;
-    if (p.baixou) badges.appendChild(badge('baixou', 'gold'));
-    else if (jogosFeitos > 0) badges.appendChild(badge(`baixou ${jogosFeitos}/${totalJogos}`, 'gold'));
-    if (view.claims.includes(p.id)) badges.appendChild(badge('🛒 quer a carta', 'cart'));
-    if (!p.isBot && !p.connected) badges.appendChild(badge('fora', 'off'));
-    el.appendChild(badges);
-
-    if (p.melds.length) {
-      const melds = document.createElement('div');
-      melds.className = 'opp-melds';
-      for (const m of p.melds) melds.appendChild(meldEl(m, true));
-      el.appendChild(melds);
-    }
-    if (view.turnId === p.id) el.dataset.daVez = '1';
-    box.appendChild(el);
+  const adversarios = view.players.filter((p) => p.id !== me());
+  const compacto = adversarios.length >= COMPACTO_A_PARTIR_DE;
+  box.classList.toggle('compacto', compacto);
+  for (const p of adversarios) {
+    box.appendChild(compacto ? oponenteCompacto(p) : oponenteCartao(p));
   }
   avisaAdversariosForaDaVista(box);
 }
 
-// PROVISÓRIO — ver o comentário em style.css. Enquanto a faixa de adversários
-// não couber na tela, ela não pode esconder ninguém em silêncio: avisa quantos
-// estão fora do enquadramento e rola até quem está na vez.
+// Mesa pequena: cartão largo, com os jogos baixados à vista.
+function oponenteCartao(p) {
+  const el = document.createElement('div');
+  el.className = 'opponent' + (naVez(p) ? ' turn' : '');
+
+  const head = document.createElement('div');
+  head.className = 'opp-head';
+  const name = document.createElement('span');
+  name.className = 'opp-name';
+  name.textContent = p.name;
+  const count = document.createElement('span');
+  count.className = 'opp-count';
+  count.textContent = `🂠${p.handCount}`;
+  head.append(name, count);
+  el.appendChild(head);
+
+  const badges = document.createElement('div');
+  badges.className = 'opp-badges';
+  const prog = progressoDoContrato(p);
+  if (prog) badges.appendChild(badge(prog.completo ? 'baixou' : `baixou ${prog.texto}`, 'gold'));
+  if (view.claims.includes(p.id)) badges.appendChild(badge('🛒 quer a carta', 'cart'));
+  if (!p.isBot && !p.connected) badges.appendChild(badge('fora', 'off'));
+  el.appendChild(badges);
+
+  if (p.melds.length) {
+    const melds = document.createElement('div');
+    melds.className = 'opp-melds';
+    for (const m of p.melds) melds.appendChild(meldEl(m, true));
+    el.appendChild(melds);
+  }
+  if (naVez(p)) el.dataset.daVez = '1';
+  return el;
+}
+
+// Mesa grande: um bloco por adversário numa grade, todos visíveis ao mesmo
+// tempo. Os jogos baixados saem daqui (não cabem) e vão para o toque — o que
+// não custa jogabilidade, porque para encaixar carta os jogos dos outros já
+// aparecem na fileira de baixo, junto com os seus.
+function oponenteCompacto(p) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'opponent compacto' + (naVez(p) ? ' turn' : '');
+  el.setAttribute('aria-label', `Ver a situação de ${p.name}`);
+
+  const head = document.createElement('div');
+  head.className = 'opp-head';
+  const name = document.createElement('span');
+  name.className = 'opp-name';
+  name.textContent = p.name;
+  const count = document.createElement('span');
+  count.className = 'opp-count';
+  count.textContent = `🂠${p.handCount}`;
+  head.append(name, count);
+  el.appendChild(head);
+
+  const linha = document.createElement('div');
+  linha.className = 'opp-resumo';
+  const prog = progressoDoContrato(p);
+  if (prog) {
+    const m = document.createElement('span');
+    m.className = 'm-gold';
+    m.textContent = prog.completo ? '✔ baixou' : prog.texto;
+    linha.appendChild(m);
+  }
+  if (view.claims.includes(p.id)) {
+    const m = document.createElement('span');
+    m.className = 'm-cart';
+    m.textContent = '🛒';
+    linha.appendChild(m);
+  }
+  if (!p.isBot && !p.connected) {
+    const m = document.createElement('span');
+    m.className = 'm-off';
+    m.textContent = 'fora';
+    linha.appendChild(m);
+  }
+  if (p.melds.length) {
+    const m = document.createElement('span');
+    m.className = 'm-jogos';
+    m.textContent = `${p.melds.length} jogo${p.melds.length > 1 ? 's' : ''}`;
+    linha.appendChild(m);
+  }
+  if (!linha.childNodes.length) linha.textContent = '—';
+  el.appendChild(linha);
+
+  el.onclick = () => mostraOponente(p.id);
+  if (naVez(p)) el.dataset.daVez = '1';
+  return el;
+}
+
+// Detalhe de um adversário: é aqui que os jogos baixados dele aparecem quando
+// a mesa está em modo compacto.
+function mostraOponente(playerId) {
+  const p = view.players.find((x) => x.id === playerId);
+  if (!p) return;
+  const prog = progressoDoContrato(p);
+  const situacao = prog
+    ? (prog.completo ? 'contrato baixado' : `baixou ${prog.texto} do contrato`)
+    : 'ainda não baixou';
+  const linhas = [
+    `<h3>${escapeHTML(p.name)}${naVez(p) ? ' — é a vez dele' : ''}</h3>`,
+    `<p>${p.handCount} carta${p.handCount === 1 ? '' : 's'} na mão · ${situacao}</p>`,
+  ];
+  if (view.claims.includes(p.id)) linhas.push('<p>🛒 Pediu a carta do meio.</p>');
+  if (!p.isBot && !p.connected) linhas.push('<p class="modal-hint">Está fora no momento — se demorar, o jogo segue por ele.</p>');
+  showModal(
+    `${linhas.join('')}<div id="oponente-jogos" class="oponente-jogos"></div>`,
+    [{ label: 'Fechar', fn: closeModal }],
+    closeModal,
+  );
+  const caixa = $('oponente-jogos');
+  if (p.melds.length) {
+    for (const m of p.melds) caixa.appendChild(meldEl(m, true));
+  } else {
+    caixa.textContent = 'Nenhum jogo na mesa ainda.';
+    caixa.classList.add('vazio');
+  }
+}
+
+// Rede de segurança. Com a grade compacta todos cabem, mas nome muito longo ou
+// tela muito estreita ainda podem estourar a largura — e ninguém pode sumir em
+// silêncio: avisa quantos ficaram fora e rola até quem está na vez.
 function avisaAdversariosForaDaVista(box) {
   const hint = $('opponents-hint');
   if (!hint) return;

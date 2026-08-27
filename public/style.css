@@ -188,11 +188,42 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .badge.off { background: #444; color: #bbb; }
 .opp-melds { display: flex; gap: 5px; margin-top: 5px; overflow-x: auto; }
 
-/* PROVISÓRIO — mesa grande no celular.
-   Com 7 adversários a faixa precisa de ~744px e a tela tem 375: metade fica
-   fora do enquadramento. Até a mesa ganhar um desenho próprio para salas
-   grandes, pelo menos avisamos que há gente fora da vista e trazemos quem
-   está na vez para o centro. Some sozinho quando tudo cabe. */
+/* Mesa grande: a partir de 4 adversários o cartão largo não cabe mais (7 deles
+   pedem ~744px numa tela de 375), então a faixa vira grade e todos ficam
+   visíveis ao mesmo tempo. Os jogos baixados saem do bloco e vão para o
+   toque — cabe nome, cartas na mão, progresso do contrato e quem pediu carta,
+   que é o que se precisa saber de relance. */
+.opponents.compacto {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 6px;
+  overflow-x: visible;
+}
+.opponent.compacto {
+  min-width: 0;
+  padding: 6px 8px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.opponent.compacto .opp-name { font-size: 0.86rem; }
+.opponent.compacto .opp-count { font-size: 0.74rem; }
+.opp-resumo {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-top: 3px; min-height: 14px;
+  font-size: 0.68rem; font-weight: 800; color: var(--sage);
+}
+.opp-resumo .m-gold { color: var(--gold); }
+.opp-resumo .m-cart { color: var(--danger); }
+.opp-resumo .m-off { color: #999; }
+
+/* Jogos do adversário, no detalhe sob toque */
+.oponente-jogos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.oponente-jogos.vazio { color: var(--sage); font-size: 0.9rem; }
+
+/* Rede de segurança: se ainda assim algo estourar a largura, ninguém some sem
+   aviso. Fica escondida quando tudo cabe. */
 .opponents-hint {
   margin: -4px 12px 6px;
   font-size: 0.76rem;
