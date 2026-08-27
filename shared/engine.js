@@ -18,6 +18,11 @@ export const JOKER_LABEL = '🃏';
 // 4 cartas: com 2 coringas metade do jogo seria curinga, o que esvazia a
 // dificuldade do contrato. Regra da casa, fácil de afrouxar aqui.
 export const MAX_JOKERS_PER_SEQ = 1;
+// Troca do coringa pela carta real: quem tem a carta que o coringa representa
+// pode resgatá-lo, e o coringa VEM PARA A MÃO — pode ser guardado para depois.
+// Ligando esta constante, a troca vira atômica: o coringa sai da sequência e
+// já tem de ser encaixado na mesma ação, sem passar pela mão.
+export const SWAP_JOKER_SAME_TURN = false;
 
 export function isJoker(card) { return !!card && card.joker === true; }
 
@@ -217,7 +222,11 @@ function makeSeqMeld(cards, start, ownerId) {
 }
 
 // Uma carta encaixa neste jogo? Retorna descrição do encaixe ou null.
-export function layoffOption(card, meld) {
+// `coringasRemovidos` permite perguntar "e se eu tirasse N coringas daqui
+// antes?" — é o que a troca precisa para saber se o coringa resgatado cabe de
+// volta na própria sequência de onde saiu, sem ter que mexer no estado antes
+// de validar.
+export function layoffOption(card, meld, coringasRemovidos = 0) {
   if (meld.type === 't') {
     // Trinca é só com carta real: o coringa vale apenas para sequência.
     if (isJoker(card) || card.rank !== meld.rank) return null;
@@ -231,7 +240,7 @@ export function layoffOption(card, meld) {
   // Coringa da mão estica a sequência pela ponta, respeitando o limite do jogo.
   // Vem antes da checagem de naipe porque o coringa não tem naipe próprio.
   if (isJoker(card)) {
-    if (meld.cards.filter(isJoker).length >= MAX_JOKERS_PER_SEQ) return null;
+    if (meld.cards.filter(isJoker).length - coringasRemovidos >= MAX_JOKERS_PER_SEQ) return null;
     if (hi + 1 <= 14) return { kind: 's', end: 'hi', v: hi + 1 };
     if (lo - 1 >= 1) return { kind: 's', end: 'lo', v: lo - 1 };
     return null;
@@ -264,7 +273,11 @@ function applyLayoff(meld, card, opt) {
 export function removableCards(meld) {
   if (meld.type === 's') {
     if (meld.cards.length <= 4) return [];
-    return [meld.cards[0], meld.cards[meld.cards.length - 1]];
+    // O coringa nunca sai por aqui: a única porta de saída dele é a troca pela
+    // carta real. Descartá-lo da ponta jogaria fora uma carta escassa e, pior,
+    // colocaria um coringa no lixo para qualquer um comprar — furando a
+    // exigência de ter exatamente a carta que ele representa.
+    return [meld.cards[0], meld.cards[meld.cards.length - 1]].filter((c) => !isJoker(c));
   }
   if (meld.cards.length <= 3) return [];
   return meld.cards.filter((card) => {
@@ -529,6 +542,86 @@ export function actLayoff(state, playerId, cardId, meldId) {
   return events;
 }
 
+// Já pode trocar coringa? A ÚNICA restrição do jogo é ser a vez do jogador,
+// checada em actSwapJoker junto com as demais jogadas. Não precisa ter baixado
+// o próprio contrato: quem ainda está montando a mão também pode resgatar o
+// coringa da mesa entregando a carta que ele representa.
+export function podeTrocarCoringa(state, player) {
+  return !!player;
+}
+
+// Onde, na sequência, está o coringa e que carta ele representa.
+export function coringaNaSequencia(meld) {
+  if (!meld || meld.type !== 's') return null;
+  const idx = meld.cards.findIndex(isJoker);
+  if (idx < 0) return null;
+  return { idx, joker: meld.cards[idx], valor: meld.values[idx], suit: meld.suit };
+}
+
+// A carta da mão é exatamente a que o coringa representa (valor E naipe)?
+export function cardCobreCoringa(card, meld) {
+  const info = coringaNaSequencia(meld);
+  if (!info || isJoker(card)) return false;
+  if (card.suit !== info.suit) return false;
+  return cardValues(card).includes(info.valor);
+}
+
+// Trocar o coringa de uma sequência pela carta real que ele representa. Vale
+// para qualquer sequência da mesa, própria ou de outro jogador, tendo baixado
+// o próprio contrato ou não, e o coringa vem para a mão de quem trocou.
+// Única restrição: ser a vez do jogador. Com SWAP_JOKER_SAME_TURN ligado a
+// troca vira atômica e o coringa vai direto para `destMeldId`.
+export function actSwapJoker(state, playerId, meldId, cardId, destMeldId = null) {
+  if (state.phase !== 'play') fail('Puxe uma carta antes de trocar o coringa.');
+  const player = state.players[state.turn];
+  if (player.id !== playerId) fail('Não é a sua vez.');
+
+  const meld = meldById(state, meldId);
+  if (!meld) fail('Jogo não encontrado na mesa.');
+  if (meld.type !== 's') fail('Só existe coringa em sequência.');
+  const info = coringaNaSequencia(meld);
+  if (!info) fail('Esse jogo não tem coringa.');
+
+  const card = player.hand.find((c) => c.id === cardId);
+  if (!card) fail('Essa carta não está na sua mão.');
+  if (!cardCobreCoringa(card, meld)) {
+    fail(`O coringa aí faz ${rankLabel(info.valor > 13 ? 1 : info.valor)}${SUITS[info.suit]}: precisa ser essa carta exata.`);
+  }
+
+  // Valida o destino ANTES de mexer em qualquer coisa. O `1` diz ao
+  // layoffOption para considerar a sequência já sem este coringa, no caso de
+  // ele voltar para a própria sequência de onde saiu.
+  let dest = null;
+  let opt = null;
+  if (SWAP_JOKER_SAME_TURN) {
+    if (!destMeldId) fail('Escolha onde encaixar o coringa: ele tem que ser usado neste turno.');
+    dest = meldById(state, destMeldId);
+    if (!dest) fail('Jogo de destino não encontrado.');
+    opt = layoffOption(info.joker, dest, dest === meld ? 1 : 0);
+    if (!opt) fail('O coringa não encaixa nesse jogo, e ele precisa ser usado neste turno.');
+  }
+
+  // Daqui para baixo nada mais falha: o estado só muda depois de tudo validado.
+  meld.cards[info.idx] = card;
+  player.hand = player.hand.filter((c) => c.id !== cardId);
+
+  if (SWAP_JOKER_SAME_TURN) {
+    applyLayoff(dest, info.joker, opt);
+  } else {
+    player.hand.push(info.joker);
+  }
+
+  const events = [{
+    e: 'swapJoker',
+    p: playerId,
+    meldId: meld.id,
+    card: { ...card },
+    destMeldId: dest ? dest.id : null,
+  }];
+  if (player.hand.length === 0) return endRound(state, playerId, 'bateu', events);
+  return events;
+}
+
 // Descartar da mão (obrigatório para encerrar a vez)
 export function actDiscard(state, playerId, cardId) {
   if (state.phase !== 'play') fail('Puxe uma carta antes de descartar.');
@@ -598,7 +691,11 @@ export function viewFor(state, playerId) {
     claims: state.claims.slice(),
     lastRound: state.lastRound,
     ranking: state.phase === 'gameEnd' ? finalRanking(state) : null,
-    you: me ? { id: me.id, hand: me.hand, baixou: me.baixou } : null,
+    // `podeTrocarCoringa` vai pronto do motor: o cliente não reimplementa a
+    // regra de "baixou em turno anterior", só reflete o que o juiz respondeu.
+    you: me
+      ? { id: me.id, hand: me.hand, baixou: me.baixou, podeTrocarCoringa: podeTrocarCoringa(state, me) }
+      : null,
     players: state.players.map((p) => ({
       id: p.id,
       name: p.name,
@@ -736,6 +833,57 @@ export function botPickDiscard(state, player) {
   return worst;
 }
 
+// Troca de coringa que valha a pena.
+// Com o coringa vindo para a MÃO a troca não diminui a mão: é uma permuta —
+// entrega uma carta real e recebe 20 pontos de coringa. Só compensa quando o
+// coringa rende mais do que a carta entregue, senão o bot ficaria juntando
+// coringa sem destino, que é exatamente o que travava as rodadas.
+export function botFindJokerSwap(state, player) {
+  if (!podeTrocarCoringa(state, player)) return null;
+  const melds = allMelds(state);
+  const ct = currentContract(state);
+  const coberturaAtual = bestCover(player.hand, ct);
+  // Carta mais cara primeiro: entre trocas equivalentes, larga o peso morto.
+  const mao = [...player.hand].sort((a, b) => cardPoints(b) - cardPoints(a));
+
+  for (const meld of melds) {
+    const info = coringaNaSequencia(meld);
+    if (!info) continue;
+    for (const card of mao) {
+      if (!cardCobreCoringa(card, meld)) continue;
+
+      if (SWAP_JOKER_SAME_TURN) {
+        // Atômica: o coringa tem de ir direto para algum jogo.
+        for (const dest of melds) {
+          if (layoffOption(info.joker, dest, dest.id === meld.id ? 1 : 0)) {
+            return { meldId: meld.id, cardId: card.id, destMeldId: dest.id };
+          }
+        }
+        continue;
+      }
+
+      if (player.baixou) {
+        // Já baixou: o objetivo é esvaziar a mão. A troca só ajuda se a carta
+        // entregue não tinha encaixe nenhum e o coringa tiver — aí ele sai da
+        // mão na jogada seguinte. Sem isso a permuta seria pura perda.
+        const cartaEncaixa = melds.some((m) => layoffOption(card, m));
+        const coringaEncaixa = melds.some((m) => layoffOption(info.joker, m, m.id === meld.id ? 1 : 0));
+        if (!cartaEncaixa && coringaEncaixa) {
+          return { meldId: meld.id, cardId: card.id, destMeldId: null };
+        }
+        continue;
+      }
+
+      // Ainda não baixou: só troca se o coringa fizer a cobertura crescer.
+      const maoDepois = player.hand.filter((c) => c.id !== card.id).concat(info.joker);
+      if (bestCover(maoDepois, ct) > coberturaAtual) {
+        return { meldId: meld.id, cardId: card.id, destMeldId: null };
+      }
+    }
+  }
+  return null;
+}
+
 // Próxima ação do bot na vez dele (uma por chamada, para o servidor dar ritmo)
 export function botNextAction(state, playerId) {
   const player = state.players[state.turn];
@@ -757,6 +905,13 @@ export function botNextAction(state, playerId) {
         }
       }
     }
+    // A troca vale para quem já baixou (segunda saída, depois do encaixe) e
+    // também para quem ainda não baixou: pegar o coringa da mesa pode ser o
+    // que faltava para fechar o contrato. Se fechar, o `baixar` acima pega na
+    // chamada seguinte, ainda neste turno.
+    const troca = botFindJokerSwap(state, player);
+    if (troca) return { a: 'swapJoker', ...troca };
+
     const card = botPickDiscard(state, player);
     return { a: 'discard', cardId: card.id };
   }
@@ -772,6 +927,7 @@ export function applyAction(state, playerId, action) {
     case 'unclaim': return actUnclaim(state, playerId);
     case 'baixar': return actBaixar(state, playerId, action.cardIds || null);
     case 'layoff': return actLayoff(state, playerId, action.cardId, action.meldId);
+    case 'swapJoker': return actSwapJoker(state, playerId, action.meldId, action.cardId, action.destMeldId || null);
     case 'discard': return actDiscard(state, playerId, action.cardId);
     case 'meldDiscard': return actMeldDiscard(state, playerId, action.meldId, action.cardId);
     default: fail('Ação desconhecida.');

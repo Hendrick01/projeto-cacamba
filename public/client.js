@@ -4,7 +4,7 @@
 
 import {
   findContractMelds, layoffOption, removableCards, SUITS, SUIT_RED, rankLabel,
-  isJoker, JOKER_LABEL,
+  isJoker, JOKER_LABEL, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
 } from '/shared/engine.js';
 
 const $ = (id) => document.getElementById(id);
@@ -201,6 +201,122 @@ function cardText(card) {
   return isJoker(card) ? `${JOKER_LABEL} coringa` : rankLabel(card.rank) + SUITS[card.suit];
 }
 
+// Rótulo de um valor de sequência (14 = Ás alto) com o naipe do jogo
+function valorText(v, suit) {
+  return rankLabel(v === 14 ? 1 : v) + SUITS[suit];
+}
+
+// ---------------- Troca de coringa ----------------
+// Tudo aqui usa as mesmas funções do motor que o servidor usa, então a tela só
+// oferece o que o juiz aceitaria. Nada de regra reimplementada no cliente.
+
+function todosOsJogos() {
+  return view ? view.players.flatMap((p) => p.melds) : [];
+}
+
+// Trocas possíveis agora, já com os destinos válidos de cada uma.
+function trocasDisponiveis() {
+  if (!view || !view.you || !view.you.podeTrocarCoringa) return [];
+  if (!myTurn() || view.phase !== 'play' || meldDiscardMode) return [];
+  const jogos = todosOsJogos();
+  const out = [];
+  for (const meld of jogos) {
+    const info = coringaNaSequencia(meld);
+    if (!info) continue;
+    const card = view.you.hand.find((c) => cardCobreCoringa(c, meld));
+    if (!card) continue;
+    // Só quando a troca é atômica é que existe destino a escolher; no modo
+    // normal o coringa simplesmente vem para a mão.
+    if (!SWAP_JOKER_SAME_TURN) { out.push({ meld, info, card, destinos: [] }); continue; }
+    const destinos = [];
+    for (const dest of jogos) {
+      const opt = layoffOption(info.joker, dest, dest.id === meld.id ? 1 : 0);
+      if (opt) destinos.push({ meld: dest, opt });
+    }
+    if (destinos.length) out.push({ meld, info, card, destinos });
+  }
+  return out;
+}
+
+function trocaDoJogo(meldId) {
+  return trocasDisponiveis().find((t) => t.meld.id === meldId) || null;
+}
+
+// "no seu jogo" / "no jogo de Fulano"
+function noJogoDe(meld) {
+  const dono = view.players.find((p) => p.melds.some((m) => m.id === meld.id));
+  if (!dono) return 'no jogo da mesa';
+  return dono.id === me() ? 'no seu jogo' : `no jogo de ${escapeHTML(dono.name)}`;
+}
+
+// Na listagem de um jogo o coringa é só o símbolo: "5♠ 6♠ 🃏 8♠" lê melhor
+// que "5♠ 6♠ 🃏 coringa 8♠".
+function cartasDoJogo(meld) {
+  return meld.cards.map((c) => (isJoker(c) ? JOKER_LABEL : cardText(c))).join(' ');
+}
+
+function descreveDestino({ meld, opt }) {
+  const ponta = opt.end === 'lo' ? 'embaixo' : 'em cima';
+  return `${ponta}, valendo <strong>${valorText(opt.v, meld.suit)}</strong> — ${noJogoDe(meld)}: ${cartasDoJogo(meld)}`;
+}
+
+// Passo 1: escolher destino — só existe quando a troca é atômica.
+function abrirTrocaCoringa(meldId) {
+  const troca = trocaDoJogo(meldId);
+  if (!troca) return; // a visão mudou no meio do caminho
+  if (!SWAP_JOKER_SAME_TURN) return confirmarTroca(troca, null);
+  if (troca.destinos.length === 1) return confirmarTroca(troca, troca.destinos[0]);
+
+  const cabecalho = `
+    <h3>Trocar o coringa</h3>
+    <p>Este coringa vale <strong>${valorText(troca.info.valor, troca.info.suit)}</strong>, ${noJogoDe(troca.meld)}:<br>${cartasDoJogo(troca.meld)}</p>
+    <p>Entra no lugar dele a sua carta <strong>${cardText(troca.card)}</strong>.</p>
+    <p class="modal-hint">Onde o coringa vai ficar? Ele precisa ser usado agora, neste turno.</p>`;
+  showModal(
+    cabecalho,
+    [
+      ...troca.destinos.map((d) => ({
+        label: `${valorText(d.opt.v, d.meld.suit)} ${d.opt.end === 'lo' ? 'embaixo' : 'em cima'} · ${noJogoDe(d.meld)}`,
+        fn: () => confirmarTroca(troca, d),
+      })),
+      { label: 'Cancelar', fn: closeModal, cls: 'btn-ghost' },
+    ],
+    closeModal,
+    true,
+  );
+}
+
+// Passo 2: confirmação final — a jogada não tem volta
+function confirmarTroca(troca, destino) {
+  const destinoHTML = destino
+    ? `<p>O coringa vai para ${descreveDestino(destino)}.</p>`
+    : `<p>O coringa <strong>vem para a sua mão</strong> — dá para guardar e usar depois.</p>
+       <p class="modal-hint">Atenção: na mão ele vale 20 pontos se a rodada acabar com ele lá.</p>`;
+  showModal(
+    `<h3>Confirmar a troca</h3>
+     <p>Você entrega <strong>${cardText(troca.card)}</strong> e ela ocupa o lugar do coringa ${noJogoDe(troca.meld)}:<br>${cartasDoJogo(troca.meld)}</p>
+     ${destinoHTML}
+     <p class="modal-hint">Não dá para desfazer.</p>`,
+    [
+      {
+        label: 'Trocar',
+        cls: 'btn-primary',
+        fn: () => {
+          closeModal();
+          sendAction({
+            a: 'swapJoker',
+            meldId: troca.meld.id,
+            cardId: troca.card.id,
+            destMeldId: destino ? destino.meld.id : null,
+          });
+        },
+      },
+      { label: 'Cancelar', fn: closeModal, cls: 'btn-ghost' },
+    ],
+    closeModal,
+  );
+}
+
 function sortedHand() {
   const hand = [...(view?.you?.hand || [])];
   if (sortMode === 'suit') hand.sort((a, b) => a.suit - b.suit || a.rank - b.rank);
@@ -334,6 +450,21 @@ function decorateMeld(el, meld) {
   const my = myTurn() && view.phase === 'play';
   if (!my) return;
 
+  // Coringa acionável só quando a troca realmente é possível para mim agora:
+  // já baixei em turno anterior, é minha vez, e tenho a carta exata na mão.
+  const troca = trocaDoJogo(meld.id);
+  if (troca && !meldDiscardMode) {
+    el.classList.add('swappable');
+    for (const ce of el.children) {
+      if (Number(ce.dataset.cardId) !== troca.info.joker.id) continue;
+      ce.classList.add('swappable');
+      ce.onclick = (e) => {
+        e.stopPropagation();
+        abrirTrocaCoringa(meld.id);
+      };
+    }
+  }
+
   if (meldDiscardMode) {
     if (meld.ownerId !== me()) return;
     const rem = removableCards(meld).map((c) => c.id);
@@ -374,6 +505,12 @@ function renderMyMelds() {
       const card = view.you.hand.find((c) => c.id === [...selected][0]);
       for (const m of p.melds) if (card && layoffOption(card, m)) meldsToShow.push({ m, own: false });
     }
+  }
+  // Jogo alheio com coringa que eu posso trocar também vem para cá: nos
+  // adversários os jogos são só miniatura, sem gesto.
+  for (const t of trocasDisponiveis()) {
+    if (meldsToShow.some(({ m }) => m.id === t.meld.id)) continue;
+    meldsToShow.push({ m: t.meld, own: false });
   }
   for (const { m } of meldsToShow) box.appendChild(meldEl(m, false));
 }
@@ -489,6 +626,9 @@ function announce(ev) {
     case 'meldDiscard':
       toast(`${playerName(ev.p)} descartou ${cardText(ev.card)} de um jogo da mesa.`);
       break;
+    case 'swapJoker':
+      toast(`${JOKER_LABEL} ${playerName(ev.p)} pôs ${cardText(ev.card)} no lugar do coringa.`);
+      break;
     case 'reshuffle':
       toast('🔄 O monte acabou — o meio foi embaralhado de volta.');
       break;
@@ -523,9 +663,10 @@ function notifyTurn() {
 
 // ---------------- Modais ----------------
 
-function showModal(bodyHTML, actions = [], onclose = null) {
+function showModal(bodyHTML, actions = [], onclose = null, empilhado = false) {
   $('modal-body').innerHTML = bodyHTML;
   const box = $('modal-actions');
+  box.className = `modal-actions${empilhado ? ' empilhado' : ''}`;
   box.innerHTML = '';
   for (const a of actions) {
     const b = document.createElement('button');

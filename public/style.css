@@ -259,6 +259,24 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .meld .card.mini { margin-left: -12px; }
 .meld .card.mini:first-child { margin-left: 0; }
 .meld.droppable { border-color: var(--gold); box-shadow: 0 0 10px rgba(233, 185, 78, 0.4); cursor: pointer; }
+
+/* Jogo com coringa que dá para trocar agora: o coringa pulsa e cresce um
+   pouco, para virar alvo de toque confortável no celular. */
+.meld.swappable { border-color: var(--gold-soft); border-style: dashed; }
+.card.mini.swappable {
+  cursor: pointer;
+  transform: translateY(-6px) scale(1.14);
+  outline: 3px solid var(--gold);
+  outline-offset: 1px;
+  animation: pulsaCoringa 1.5s ease-in-out infinite;
+}
+@keyframes pulsaCoringa {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(233, 185, 78, 0.65); }
+  50%      { box-shadow: 0 0 0 7px rgba(233, 185, 78, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card.mini.swappable { animation: none; }
+}
 .meld .card.mini.removable { outline: 3px solid var(--danger); outline-offset: -2px; cursor: pointer; }
 .opp-melds .meld { padding: 3px 4px; }
 
@@ -326,9 +344,14 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .modal h2 { font-family: var(--font-display); color: var(--gold); font-size: 1.5rem; margin-bottom: 12px; }
 .modal h3 { color: var(--gold-soft); font-size: 1.02rem; margin: 14px 0 6px; }
 .modal p, .modal li { font-size: 0.95rem; line-height: 1.5; color: var(--cream-dim); }
+.modal .modal-hint { color: var(--sage); font-size: 0.86rem; margin-top: 8px; }
 .modal ul, .modal ol { padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
 .modal-actions .btn { flex: 1; }
+/* Lista de escolhas (destinos do coringa): empilhado, porque no celular um
+   rótulo como "9♠ em cima" quebra em várias linhas se disputar a largura. */
+.modal-actions.empilhado { flex-direction: column; }
+.modal-actions.empilhado .btn { flex: none; width: 100%; }
 
 .score-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
 .score-table th, .score-table td {
