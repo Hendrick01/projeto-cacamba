@@ -1,0 +1,25 @@
+# Publicação no Render — https://render.com
+#
+# O Caçamba guarda as salas em memória e conversa por WebSocket, então precisa
+# de um servidor de verdade rodando o tempo todo: não funciona em Vercel,
+# Netlify ou Cloudflare Pages, que são serverless.
+#
+# Como usar: no painel do Render, "New" → "Blueprint" e aponte para este
+# repositório. Ele lê este arquivo e cria o serviço sozinho.
+services:
+  - type: web
+    name: cacamba
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      # O Render fica atrás do proxy dele, então o endereço real do site chega
+      # em x-forwarded-host. Sem isto o link de convite e o QR sairiam com o
+      # endereço interno, e ninguém conseguiria entrar na sala pelo celular.
+      - key: TRUST_PROXY
+        value: "1"
+      - key: NODE_VERSION
+        value: "22"
