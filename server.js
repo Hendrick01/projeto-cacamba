@@ -168,10 +168,21 @@ function broadcastLobby(room) {
   for (const p of room.players) if (!p.isBot) send(p.ws, lobbyView(room));
 }
 
+// Presença é assunto da sala, não do motor — o engine não sabe de sockets, e
+// por isso viewFor não devolve `connected`. Sem carimbar aqui, o cliente lia
+// `undefined` e marcava TODO adversário humano como "fora" o tempo todo.
+function comPresenca(room, view) {
+  for (const vp of view.players) {
+    const rp = room.players.find((x) => x.id === vp.id);
+    vp.connected = rp ? (rp.isBot || rp.connected) : true;
+  }
+  return view;
+}
+
 function broadcastState(room, events = []) {
   if (!room.game) return;
   for (const p of room.players) {
-    if (!p.isBot) send(p.ws, { t: 'state', view: viewFor(room.game, p.id), events });
+    if (!p.isBot) send(p.ws, { t: 'state', view: comPresenca(room, viewFor(room.game, p.id)), events });
   }
 }
 
@@ -317,7 +328,7 @@ function attach(ws, room, player) {
   player.awayNotified = false;
   send(ws, { t: 'welcome', playerId: player.id, token: player.token, code: room.code });
   broadcastLobby(room);
-  if (room.game) send(ws, { t: 'state', view: viewFor(room.game, player.id), events: [] });
+  if (room.game) send(ws, { t: 'state', view: comPresenca(room, viewFor(room.game, player.id)), events: [] });
 }
 
 function handle(ws, msg) {
