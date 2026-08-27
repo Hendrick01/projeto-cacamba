@@ -16,6 +16,7 @@ import {
   botNextAction, botWantsCard, actClaim, DEFAULT_OPTS, conferirBaralho,
   podeComprarDoDescarte, topoDoDescarte,
 } from './shared/engine.js';
+import { personagemValido } from './shared/elenco.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -150,6 +151,13 @@ function send(ws, msg) {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
 }
 
+// Personagem escolhido pelo jogador. Fora da lista vira `null`, e aí o rosto
+// volta a sair do assento — nunca o texto cru do cliente, que acabaria virando
+// caminho de arquivo na tela dos outros.
+function personagemEscolhido(slug) {
+  return personagemValido(slug) ? slug : null;
+}
+
 function lobbyView(room) {
   return {
     t: 'lobby',
@@ -160,6 +168,7 @@ function lobbyView(room) {
     started: !!room.game,
     players: room.players.map((p) => ({
       id: p.id, name: p.name, isBot: p.isBot, connected: p.isBot || p.connected,
+      avatar: p.avatar || null, desistiu: !!p.desistiu,
     })),
   };
 }
@@ -175,6 +184,8 @@ function comPresenca(room, view) {
   for (const vp of view.players) {
     const rp = room.players.find((x) => x.id === vp.id);
     vp.connected = rp ? (rp.isBot || rp.connected) : true;
+    vp.avatar = rp ? (rp.avatar || null) : null;
+    vp.desistiu = rp ? !!rp.desistiu : false;
   }
   return view;
 }
@@ -337,6 +348,7 @@ function handle(ws, msg) {
       const room = newRoom(ws.origin);
       const player = {
         id: crypto.randomUUID(), name: sanitizeName(msg.name), token: crypto.randomUUID(),
+        avatar: personagemEscolhido(msg.avatar),
         isBot: false, ws: null, connected: false, lastSeen: Date.now(),
       };
       room.players.push(player);
@@ -350,10 +362,39 @@ function handle(ws, msg) {
       if (room.players.length >= DEFAULT_OPTS.maxPlayers) { const e = new Error(`A sala está cheia (${DEFAULT_OPTS.maxPlayers} jogadores).`); e.gameRule = true; throw e; }
       const player = {
         id: crypto.randomUUID(), name: sanitizeName(msg.name), token: crypto.randomUUID(),
+        avatar: personagemEscolhido(msg.avatar),
         isBot: false, ws: null, connected: false, lastSeen: Date.now(),
       };
       room.players.push(player);
       attach(ws, room, player);
+      break;
+    }
+    // Sair da partida de vez. Antes de começar, o assento some. Com a partida
+    // em andamento não dá para tirar o assento sem quebrar a rodada — mão,
+    // jogos e pontuação são todos por assento —, então o assento fica e o robô
+    // assume NA HORA, pelo mesmo caminho de quem cai, sem os 45 s de espera.
+    case 'leave': {
+      const room = currentRoom(ws);
+      const player = currentPlayer(ws, room);
+      if (!room.game) {
+        room.players = room.players.filter((p) => p.id !== player.id);
+        send(ws, { t: 'gone' });
+        try { ws.close(); } catch { /* já fechou */ }
+        broadcastLobby(room);
+        break;
+      }
+      player.desistiu = true;
+      player.connected = false;
+      player.awayActed = true;     // sem a espera generosa da primeira ação
+      player.awayNotified = true;  // o aviso de "caiu" não é este caso
+      player.ws = null;
+      // Token novo: quem desistiu não volta com o link antigo. É o que
+      // distingue desistir de cair — cair é reversível, desistir não.
+      player.token = crypto.randomUUID();
+      send(ws, { t: 'gone' });
+      try { ws.close(); } catch { /* já fechou */ }
+      broadcastState(room, [{ e: 'desistiu', p: player.id }]);
+      scheduleBots(room);
       break;
     }
     case 'resume': {

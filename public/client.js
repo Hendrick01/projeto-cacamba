@@ -5,8 +5,11 @@
 import {
   planBaixada, layoffOption, layoffEnds, removableCards, SUITS, SUIT_RED, rankLabel,
   isJoker, JOKER_LABEL, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
-  DEFAULT_OPTS,
+  DEFAULT_OPTS, sobraFechaJogo,
 } from '/shared/engine.js';
+import {
+  ELENCO, SLUGS, personagemValido, personagemDoAssento, peleDe, temExpressao,
+} from '/shared/elenco.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -78,6 +81,9 @@ function handleMessage(msg) {
       showScreen('game');
       for (const ev of msg.events || []) announce(ev);
       render();
+      // Depois do render: a distribuição precisa dos assentos já no lugar para
+      // saber para onde as cartas voam.
+      if (distribuirPendente) { distribuirPendente = false; animaDistribuicao(); }
       break;
     case 'error':
       toast(`⚠️ ${msg.msg}`);
@@ -92,7 +98,7 @@ function handleMessage(msg) {
 // ---------------- Telas ----------------
 
 function showScreen(name) {
-  for (const s of ['home', 'lobby', 'game']) $(`screen-${s}`).hidden = s !== name;
+  for (const s of ['home', 'avatar', 'lobby', 'game']) $(`screen-${s}`).hidden = s !== name;
 }
 
 const me = () => session?.playerId;
@@ -124,7 +130,7 @@ function myNameInput() {
 
 $('btn-create').onclick = () => {
   const name = myNameInput();
-  if (name) { saveSession(null); sendMsg({ t: 'create', name }); }
+  if (name) { saveSession(null); sendMsg({ t: 'create', name, avatar: meuPersonagem }); }
 };
 $('btn-join').onclick = () => {
   const name = myNameInput();
@@ -136,8 +142,77 @@ $('btn-join').onclick = () => {
     return;
   }
   saveSession(null);
-  sendMsg({ t: 'join', code, name });
+  sendMsg({ t: 'join', code, name, avatar: meuPersonagem });
 };
+
+// ---------------- Escolha do personagem ----------------
+
+// A escolha fica no aparelho e vai junto no `create`/`join`; o servidor valida
+// e repassa aos outros, senão só você veria o seu personagem.
+const guardado = localStorage.getItem('cacamba-personagem');
+let meuPersonagem = personagemValido(guardado) ? guardado : SLUGS[0];
+let noPalco = SLUGS.indexOf(meuPersonagem);
+
+const figuraDe = (slug) => `/assets/personagens/${slug}-corpo-inteiro.svg`;
+const caraDe = (slug) => `/assets/personagens/${slug}-avatar.svg`;
+
+function pintaEscolha() {
+  const p = ELENCO[noPalco];
+  $('avatar-figura').src = figuraDe(p.slug);
+  $('avatar-figura').alt = p.nome;
+  $('avatar-nome').textContent = p.nome;
+  $('avatar-traco').textContent = p.traco;
+  for (const b of $('avatar-miniaturas').children) {
+    b.classList.toggle('escolhida', Number(b.dataset.i) === noPalco);
+  }
+}
+
+function montaMiniaturas() {
+  const box = $('avatar-miniaturas');
+  box.innerHTML = '';
+  ELENCO.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'miniatura';
+    b.dataset.i = i;
+    b.setAttribute('aria-label', p.nome);
+    const img = document.createElement('img');
+    img.src = caraDe(p.slug);
+    img.alt = '';
+    b.appendChild(img);
+    b.onclick = () => { noPalco = i; pintaEscolha(); };
+    box.appendChild(b);
+  });
+}
+
+function pintaBotaoPersonagem() {
+  const p = ELENCO[SLUGS.indexOf(meuPersonagem)] || ELENCO[0];
+  $('persona-cara').src = caraDe(p.slug);
+  $('persona-nome').textContent = p.nome;
+}
+
+function passaPersonagem(passo) {
+  noPalco = (noPalco + passo + ELENCO.length) % ELENCO.length;
+  pintaEscolha();
+}
+
+$('btn-personagem').onclick = () => {
+  noPalco = Math.max(0, SLUGS.indexOf(meuPersonagem));
+  pintaEscolha();
+  showScreen('avatar');
+};
+$('btn-avatar-ant').onclick = () => passaPersonagem(-1);
+$('btn-avatar-prox').onclick = () => passaPersonagem(1);
+$('btn-avatar-voltar').onclick = () => showScreen('home');
+$('btn-avatar-ok').onclick = () => {
+  meuPersonagem = SLUGS[noPalco];
+  try { localStorage.setItem('cacamba-personagem', meuPersonagem); } catch { /* ok */ }
+  pintaBotaoPersonagem();
+  showScreen('home');
+};
+
+montaMiniaturas();
+pintaBotaoPersonagem();
 $('btn-rules-home').onclick = () => showRules();
 
 // ---------------- Lobby ----------------
@@ -181,6 +256,7 @@ function renderLobby() {
 $('btn-add-bot').onclick = () => sendMsg({ t: 'addBot' });
 $('btn-start').onclick = () => sendMsg({ t: 'start' });
 $('btn-leave-lobby').onclick = () => {
+  sendMsg({ t: 'leave' });   // avisa a sala, senão fica assento fantasma nela
   saveSession(null);
   history.replaceState(null, '', location.pathname);
   location.reload();
@@ -188,9 +264,9 @@ $('btn-leave-lobby').onclick = () => {
 
 // ---------------- Avatares ----------------
 
-// O elenco atual. Com mais jogadores que personagens o rosto repete, e é o
-// anel de cor do assento que continua distinguindo — até o elenco crescer.
-const AVATARES = ['gabizinsky', 'dri', 'esterex', 'matheus'];
+// A lista de personagens vive em shared/elenco.js: o servidor precisa dela
+// para validar a escolha antes de repassá-la, então não pode ser só do
+// cliente. Para acrescentar alguém, é lá.
 // Uma cor por assento, na paleta do jogo. Oito, que é o tamanho máximo da mesa.
 const CORES_DE_ASSENTO = [
   '#F2C14E', '#3A7D6E', '#E4572E', '#8C6A45',
@@ -204,15 +280,35 @@ function assentoDe(playerId, lista) {
   return i < 0 ? 0 : i;
 }
 
+// Quem o jogador escolheu ser. Sem escolha, o rosto sai do assento — que é
+// determinístico, então todos veem o mesmo rosto para a mesma pessoa (é o caso
+// dos robôs, que não escolhem).
+function personagemDe(playerId, lista) {
+  const i = (lista || []).findIndex((p) => p.id === playerId);
+  const escolhido = i >= 0 ? lista[i].avatar : null;
+  return personagemValido(escolhido) ? escolhido : personagemDoAssento(Math.max(0, i));
+}
+
 function avatarEl(playerId, lista, tamanho = 24) {
   const assento = assentoDe(playerId, lista);
   const el = document.createElement('img');
   el.className = 'avatar';
-  el.src = `/assets/personagens/${AVATARES[assento % AVATARES.length]}-avatar.svg`;
+  el.src = caraDe(personagemDe(playerId, lista));
   el.alt = '';
   el.width = tamanho;
   el.height = tamanho;
   el.style.setProperty('--anel', CORES_DE_ASSENTO[assento % CORES_DE_ASSENTO.length]);
+  return el;
+}
+
+// A figura inteira do personagem, para o assento. O corte fica com o CSS: a
+// caixa mostra só a metade de cima, então a pessoa aparece sentada atrás da
+// mesa em vez de flutuando inteira sobre o feltro.
+function figuraEl(playerId, lista) {
+  const el = document.createElement('img');
+  el.className = 'personagem';
+  el.src = figuraDe(personagemDe(playerId, lista));
+  el.alt = '';
   return el;
 }
 
@@ -382,10 +478,6 @@ function render() {
   renderPhaseModal();
 }
 
-// A partir de quantos adversários a faixa vira grade compacta. Até 3 (mesa de
-// 4) o cartão largo cabe e mostra os jogos baixados; acima disso ele não cabe
-// mais na largura de um celular, e esconder gente é pior do que resumir.
-const COMPACTO_A_PARTIR_DE = 4;
 
 function naVez(p) {
   return view.turnId === p.id && view.phase !== 'roundEnd';
@@ -400,112 +492,193 @@ function progressoDoContrato(p) {
   return null;
 }
 
+// A mesa é desenhada uma vez e depois atualizada no lugar. Recriar os assentos
+// a cada estado reiniciaria as animações — o respiro voltaria ao começo a cada
+// jogada de robô, e a mesa piscaria inteira.
+const assentos = new Map();
+
 function renderOpponents() {
   const box = $('opponents');
-  box.innerHTML = '';
   const adversarios = view.players.filter((p) => p.id !== me());
-  const compacto = adversarios.length >= COMPACTO_A_PARTIR_DE;
-  box.classList.toggle('compacto', compacto);
-  for (const p of adversarios) {
-    box.appendChild(compacto ? oponenteCompacto(p) : oponenteCartao(p));
+  const lugares = posicoesDeAssento(adversarios.length);
+  box.style.height = `${alturaDaMesa(adversarios.length)}px`;
+
+  for (const [id, el] of assentos) {
+    if (!adversarios.some((p) => p.id === id)) { el.remove(); assentos.delete(id); }
   }
-  avisaAdversariosForaDaVista(box);
+  adversarios.forEach((p, i) => {
+    let el = assentos.get(p.id);
+    if (!el) {
+      el = criaAssento(p);
+      assentos.set(p.id, el);
+      box.appendChild(el);
+      el.classList.add('entra');
+      el.style.setProperty('--i', i);
+    }
+    atualizaAssento(el, p, lugares[i]);
+  });
+
+  renderMeuAssento();
+  avisaAssentosApertados(box);
 }
 
-// Mesa pequena: cartão largo, com os jogos baixados à vista.
-function oponenteCartao(p) {
-  const el = document.createElement('div');
-  el.className = 'opponent' + (naVez(p) ? ' turn' : '');
+// Onde cada um senta. Até 4 adversários cabem numa fileira só, em arco: quem
+// está na ponta senta mais perto de quem olha, como numa mesa redonda vista de
+// frente. Acima disso abre a fileira de trás — e quem está atrás aparece menor
+// e menos iluminado, que é o que a lâmpada faria de verdade.
+const ASSENTOS_POR_FILEIRA = 4;
 
-  const head = document.createElement('div');
-  head.className = 'opp-head';
-  const name = document.createElement('span');
-  name.className = 'opp-name';
-  name.textContent = p.name;
-  const count = document.createElement('span');
-  count.className = 'opp-count';
-  count.textContent = `🂠${p.handCount}`;
-  head.append(avatarEl(p.id, view.players, 22), name, count);
-  el.appendChild(head);
+function posicoesDeAssento(n) {
+  const arco = (x, amp) => amp * ((x - 50) / 38) ** 2;
+  const espalha = (qtd, de, ate) => (qtd === 1
+    ? [50]
+    : Array.from({ length: qtd }, (_, i) => de + (i * (ate - de)) / (qtd - 1)));
 
-  const badges = document.createElement('div');
-  badges.className = 'opp-badges';
-  const prog = progressoDoContrato(p);
-  if (prog) badges.appendChild(badge(prog.completo ? 'baixou' : `baixou ${prog.texto}`, 'gold'));
-  if (view.claims.includes(p.id)) badges.appendChild(badge('🛒 quer a carta', 'cart'));
-  if (!p.isBot && !p.connected) badges.appendChild(badge('fora', 'off'));
-  el.appendChild(badges);
-
-  if (p.melds.length) {
-    const melds = document.createElement('div');
-    melds.className = 'opp-melds';
-    for (const m of p.melds) melds.appendChild(meldEl(m, true));
-    el.appendChild(melds);
+  if (n <= ASSENTOS_POR_FILEIRA) {
+    return espalha(n, 12, 88).map((x) => ({ x, y: arco(x, 20), escala: 1, fundo: false }));
   }
-  if (naVez(p)) el.dataset.daVez = '1';
-  return el;
+  const atras = Math.ceil(n / 2);
+  return [
+    ...espalha(atras, 11, 89).map((x) => ({ x, y: arco(x, 12), escala: 0.8, fundo: true })),
+    ...espalha(n - atras, 24, 76).map((x) => ({ x, y: 104 + arco(x, 8), escala: 1, fundo: false })),
+  ];
 }
 
-// Mesa grande: um bloco por adversário numa grade, todos visíveis ao mesmo
-// tempo. Os jogos baixados saem daqui (não cabem) e vão para o toque — o que
-// não custa jogabilidade, porque para encaixar carta os jogos dos outros já
-// aparecem na fileira de baixo, junto com os seus.
-function oponenteCompacto(p) {
+function alturaDaMesa(n) {
+  return n <= ASSENTOS_POR_FILEIRA ? 108 : 196;
+}
+
+// O esqueleto de um assento. Só é montado uma vez por jogador.
+function criaAssento(p) {
   const el = document.createElement('button');
   el.type = 'button';
-  el.className = 'opponent compacto' + (naVez(p) ? ' turn' : '');
-  el.setAttribute('aria-label', `Ver a situação de ${p.name}`);
+  el.className = 'assento';
 
-  const head = document.createElement('div');
-  head.className = 'opp-head';
-  const name = document.createElement('span');
-  name.className = 'opp-name';
-  name.textContent = p.name;
-  head.append(avatarEl(p.id, view.players, 20), name);
-  el.appendChild(head);
-
-  // A contagem de cartas desce para o resumo: no cabeçalho ela disputava
-  // largura com o nome e quebrava linha, desalinhando os blocos da grade.
-  const linha = document.createElement('div');
-  linha.className = 'opp-resumo';
+  const figura = document.createElement('span');
+  figura.className = 'figura';
+  figura.appendChild(figuraEl(p.id, view.players));
+  const leque = document.createElement('span');
+  leque.className = 'leque';
   const cartas = document.createElement('span');
-  cartas.className = 'm-cartas';
-  cartas.textContent = `🂠${p.handCount}`;
-  linha.appendChild(cartas);
-  const prog = progressoDoContrato(p);
-  if (prog) {
-    const m = document.createElement('span');
-    m.className = 'm-gold';
-    m.textContent = prog.completo ? '✔ baixou' : prog.texto;
-    linha.appendChild(m);
-  }
-  if (view.claims.includes(p.id)) {
-    const m = document.createElement('span');
-    m.className = 'm-cart';
-    m.textContent = '🛒';
-    linha.appendChild(m);
-  }
-  if (!p.isBot && !p.connected) {
-    const m = document.createElement('span');
-    m.className = 'm-off';
-    m.textContent = 'fora';
-    linha.appendChild(m);
-  }
-  if (p.melds.length) {
-    const m = document.createElement('span');
-    m.className = 'm-jogos';
-    m.textContent = `${p.melds.length} jogo${p.melds.length > 1 ? 's' : ''}`;
-    linha.appendChild(m);
-  }
-  el.appendChild(linha);
+  cartas.className = 'cartas';
+  figura.append(leque, cartas);
+  el.append(figura, cadeiraEl(), nomeEl(p.name), marcasEl());
 
   el.onclick = () => mostraOponente(p.id);
-  if (naVez(p)) el.dataset.daVez = '1';
   return el;
 }
 
-// Detalhe de um adversário: é aqui que os jogos baixados dele aparecem quando
-// a mesa está em modo compacto.
+function cadeiraEl() {
+  const el = document.createElement('span');
+  el.className = 'cadeira';
+  return el;
+}
+
+function nomeEl(nome) {
+  const el = document.createElement('span');
+  el.className = 'nome';
+  el.textContent = nome;
+  return el;
+}
+
+function marcasEl() {
+  const el = document.createElement('span');
+  el.className = 'marcas';
+  return el;
+}
+
+// Estado anterior de cada jogador, só para saber o que MUDOU: pedir carta e
+// baixar merecem um gesto de uma vez só, e sem isso a animação se repetiria a
+// cada estado que o servidor manda.
+const antes = { pedidos: new Set(), baixados: new Map(), topo: null };
+
+function atualizaAssento(el, p, lugar) {
+  el.style.setProperty('--x', `${lugar.x}%`);
+  el.style.setProperty('--y', `${lugar.y}px`);
+  el.style.setProperty('--escala', lugar.escala);
+  el.style.setProperty('--anel', CORES_DE_ASSENTO[assentoDe(p.id, view.players) % CORES_DE_ASSENTO.length]);
+  el.classList.toggle('fundo', lugar.fundo);
+  el.classList.toggle('vez', naVez(p));
+  el.classList.toggle('fora', !p.isBot && !p.connected);
+  el.classList.toggle('saiu', !!p.desistiu);
+  el.setAttribute('aria-label', `${p.name}, ${p.handCount} cartas. Toque para ver os jogos dele.`);
+
+  el.querySelector('.cartas').textContent = p.handCount;
+  el.querySelector('.nome').textContent = p.name;
+  desenhaLeque(el.querySelector('.leque'), p.handCount);
+
+  const marcas = el.querySelector('.marcas');
+  marcas.innerHTML = '';
+  const prog = progressoDoContrato(p);
+  if (prog) marcas.appendChild(marca(prog.completo ? '✔' : prog.texto, 'm-gold'));
+  if (view.claims.includes(p.id)) marcas.appendChild(marca('🛒', 'm-cart'));
+  if (p.desistiu) marcas.appendChild(marca('saiu', 'm-off'));
+  else if (!p.isBot && !p.connected) marcas.appendChild(marca('fora', 'm-off'));
+
+  // Gestos de uma vez só, disparados pela mudança e não pelo estado
+  const feitos = p.baixados ? p.baixados.t + p.baixados.s : 0;
+  if (view.claims.includes(p.id) && !antes.pedidos.has(p.id)) repete(el, 'pediu');
+  if (feitos > (antes.baixados.get(p.id) || 0)) repete(el, 'baixou-agora');
+  antes.baixados.set(p.id, feitos);
+  if (naVez(p)) el.dataset.daVez = '1'; else delete el.dataset.daVez;
+}
+
+// O leque na mão do adversário: as cartas dele, viradas para baixo. Não é a
+// contagem — para isso existe o selo, que dá o número exato. É presença: dá
+// para ver de relance quem está carregando mão grande.
+const LEQUE_MAXIMO = 5;
+
+function desenhaLeque(el, quantas) {
+  const mostrar = Math.max(0, Math.min(LEQUE_MAXIMO, quantas));
+  while (el.children.length > mostrar) el.lastChild.remove();
+  while (el.children.length < mostrar) {
+    const c = document.createElement('span');
+    c.className = 'carta-virada';
+    el.appendChild(c);
+  }
+  [...el.children].forEach((c, i) => {
+    const meio = (mostrar - 1) / 2;
+    c.style.setProperty('--giro', `${(i - meio) * 9}deg`);
+    c.style.setProperty('--sobe', `${Math.abs(i - meio) * 1.6}px`);
+  });
+}
+
+function marca(texto, cls) {
+  const el = document.createElement('span');
+  el.className = cls;
+  el.textContent = texto;
+  return el;
+}
+
+// Reinicia uma animação de uma vez só: sem o reflow no meio, o navegador não
+// vê mudança de classe nenhuma e não toca a animação de novo.
+function repete(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+// Você também senta à mesa. Antes o seu personagem não aparecia em lugar
+// nenhum durante a partida — só o dos outros.
+function renderMeuAssento() {
+  const caixa = $('meu-assento');
+  if (!caixa) return;
+  const eu = view.players.find((p) => p.id === me());
+  if (!eu) { caixa.hidden = true; return; }
+  caixa.hidden = false;
+  if (!caixa.firstChild) {
+    const figura = document.createElement('span');
+    figura.className = 'figura';
+    figura.appendChild(figuraEl(eu.id, view.players));
+    caixa.append(figura, cadeiraEl(), nomeEl('você'));
+  }
+  caixa.style.setProperty('--anel', CORES_DE_ASSENTO[assentoDe(eu.id, view.players) % CORES_DE_ASSENTO.length]);
+  caixa.classList.toggle('vez', naVez(eu));
+}
+
+// Detalhe de um adversário: é aqui que os jogos baixados dele aparecem. Eles
+// não cabem no assento — com 7 adversários numa tela de 375 não há largura — e
+// para encaixar carta os jogos dos outros já aparecem na fileira de baixo.
 function mostraOponente(playerId) {
   const p = view.players.find((x) => x.id === playerId);
   if (!p) return;
@@ -519,7 +692,8 @@ function mostraOponente(playerId) {
     `<p>${p.handCount} carta${p.handCount === 1 ? '' : 's'} na mão · ${situacao}</p>`,
   ];
   if (view.claims.includes(p.id)) linhas.push('<p>🛒 Pediu a carta do meio.</p>');
-  if (!p.isBot && !p.connected) linhas.push('<p class="modal-hint">Está fora no momento — se demorar, o jogo segue por ele.</p>');
+  if (p.desistiu) linhas.push('<p class="modal-hint">Saiu da partida — o robô joga o resto por ele.</p>');
+  else if (!p.isBot && !p.connected) linhas.push('<p class="modal-hint">Está fora no momento — se demorar, o jogo segue por ele.</p>');
   showModal(
     `${linhas.join('')}<div id="oponente-jogos" class="oponente-jogos"></div>`,
     [{ label: 'Fechar', fn: closeModal }],
@@ -535,44 +709,38 @@ function mostraOponente(playerId) {
   }
 }
 
-// Rede de segurança. Com a grade compacta todos cabem, mas nome muito longo ou
-// tela muito estreita ainda podem estourar a largura — e ninguém pode sumir em
-// silêncio: avisa quantos ficaram fora e rola até quem está na vez.
-function avisaAdversariosForaDaVista(box) {
+// Rede de segurança: ninguém pode sumir em silêncio. Os assentos são
+// posicionados dentro da caixa, então o caso de hoje não é mais alguém fora da
+// tela, e sim assento espremido ou cortado na borda — nome muito longo, tela
+// muito estreita. Fica dormente quando tudo cabe.
+function avisaAssentosApertados(box) {
   const hint = $('opponents-hint');
   if (!hint) return;
-  const sobra = box.scrollWidth - box.clientWidth;
-  if (sobra <= 4 || box.children.length === 0) {
-    hint.hidden = true;
-    return;
+  const caixa = box.getBoundingClientRect();
+  if (!caixa.width || !box.children.length) { hint.hidden = true; return; }
+  let cortados = 0;
+  for (const el of box.children) {
+    const r = el.getBoundingClientRect();
+    if (r.left < caixa.left - 1 || r.right > caixa.right + 1) cortados++;
   }
-  const larguraMedia = box.scrollWidth / box.children.length;
-  const cabem = Math.max(1, Math.floor(box.clientWidth / larguraMedia));
-  const fora = Math.max(0, box.children.length - cabem);
-  hint.textContent = `⇄ ${box.children.length} adversários · ${fora} fora da tela — arraste para o lado`;
+  if (!cortados) { hint.hidden = true; return; }
+  hint.textContent = `${cortados} assento${cortados > 1 ? 's' : ''} apertado${cortados > 1 ? 's' : ''} na borda — toque para ver quem é`;
   hint.hidden = false;
-  // Traz quem está na vez para o centro: sem isso o aviso "Vez de Fulano"
-  // aponta para alguém invisível.
-  const daVez = box.querySelector('[data-da-vez="1"]');
-  if (daVez) {
-    box.scrollLeft = Math.max(0, daVez.offsetLeft - (box.clientWidth - daVez.offsetWidth) / 2);
-  }
-}
-
-function badge(text, cls) {
-  const b = document.createElement('span');
-  b.className = 'badge' + (cls ? ` ${cls}` : '');
-  b.textContent = text;
-  return b;
 }
 
 function renderCenter() {
   $('deck-count').textContent = view.deckCount;
   const dc = $('discard-card');
-  dc.replaceWith(Object.assign(
+  const nova = Object.assign(
     view.discardTop ? cardEl(view.discardTop) : emptyCard(),
     { id: 'discard-card' },
-  ));
+  );
+  // Carta nova no topo cai na pilha. Só quando MUDA: sem isso ela recairia a
+  // cada estado que o servidor manda, inclusive nos que não mexem no meio.
+  const topo = view.discardTop ? view.discardTop.id : null;
+  if (topo !== antes.topo) nova.classList.add('cai');
+  antes.topo = topo;
+  dc.replaceWith(nova);
 
   const canDraw = myTurn() && view.phase === 'draw';
   const trancado = !!view.discardTop && !view.discardBuyable;
@@ -662,6 +830,22 @@ function decorateMeld(el, meld) {
     return;
   }
 
+  // Carta sobrando neste jogo que fecha um jogo meu agora: vira alvo de toque.
+  // Ela nunca vem para a mão — ou desce na hora, ou fica onde está.
+  if (selected.size > 0) {
+    for (const sobra of removableCards(meld)) {
+      if (!sobraAcende(sobra)) continue;
+      const ce = [...el.children].find((x) => Number(x.dataset.cardId) === sobra.id);
+      if (!ce) continue;
+      ce.classList.add('puxavel');
+      ce.onclick = (e) => {
+        e.stopPropagation();
+        sendAction({ a: 'baixar', cardIds: [...selected], sobra: { meldId: meld.id, cardId: sobra.id } });
+        selected.clear();
+      };
+    }
+  }
+
   if (view.you.baixou && selected.size === 1) {
     const card = view.you.hand.find((c) => c.id === [...selected][0]);
     if (card && layoffOption(card, meld)) {
@@ -701,51 +885,136 @@ function escolherPonta(card, meld, ends) {
   );
 }
 
+// Tudo o que já foi baixado na mesa, agrupado por dono: o seu primeiro, os
+// outros na ordem dos assentos. Antes só os seus ficavam à vista e os dos
+// outros apareciam por um instante, quando davam encaixe — dava para jogar,
+// mas não para PLANEJAR, que é metade do jogo. Cada jogo continua acionável
+// pelo decorateMeld quando a jogada é possível agora (encaixe, troca de
+// coringa, descarte de jogo seu).
 function renderMyMelds() {
   const box = $('my-melds');
   box.innerHTML = '';
-  const mine = view.players.find((p) => p.id === me());
-  const meldsToShow = [];
-  if (mine) meldsToShow.push(...mine.melds.map((m) => ({ m, own: true })));
-  // No modo de encaixe, mostra também os jogos dos outros aqui (dá para encaixar em todos)
-  if (myTurn() && view.phase === 'play' && view.you?.baixou && selected.size === 1 && !meldDiscardMode) {
-    for (const p of view.players) {
-      if (p.id === me()) continue;
-      const card = view.you.hand.find((c) => c.id === [...selected][0]);
-      for (const m of p.melds) if (card && layoffOption(card, m)) meldsToShow.push({ m, own: false });
-    }
+  const eu = view.players.filter((p) => p.id === me());
+  const outros = view.players.filter((p) => p.id !== me());
+  for (const p of [...eu, ...outros]) {
+    if (!p.melds.length) continue;
+    box.appendChild(grupoDeJogos(p));
   }
-  // Jogo alheio com coringa que eu posso trocar também vem para cá: nos
-  // adversários os jogos são só miniatura, sem gesto.
-  for (const t of trocasDisponiveis()) {
-    if (meldsToShow.some(({ m }) => m.id === t.meld.id)) continue;
-    meldsToShow.push({ m: t.meld, own: false });
-  }
-  for (const { m } of meldsToShow) box.appendChild(meldEl(m, false));
 }
+
+function grupoDeJogos(p) {
+  const el = document.createElement('div');
+  el.className = 'grupo-jogos';
+  el.style.setProperty('--anel', CORES_DE_ASSENTO[assentoDe(p.id, view.players) % CORES_DE_ASSENTO.length]);
+
+  const dono = document.createElement('span');
+  dono.className = 'dono';
+  dono.textContent = p.id === me() ? 'Você' : p.name;
+
+  const jogos = document.createElement('div');
+  jogos.className = 'jogos';
+  for (const m of p.melds) jogos.appendChild(meldEl(m, false));
+
+  el.append(dono, jogos);
+  return el;
+}
+
+// O leque da sua mão. O passo entre as cartas é calculado, não fixo: a rodada
+// 7 dá 12 cartas e um passo fixo estouraria a largura do celular; com poucas
+// cartas, o mesmo passo deixaria o leque frouxo demais.
+const CARTA_LARGURA = 56;
+const PASSO_MAXIMO = 40;
+const PASSO_MINIMO = 20;
+const ABERTURA = 16;          // graus de ponta a ponta
+// Acima disto o leque vira dois. A rodada 7 dá 12 cartas, mas cada compra fora
+// da vez soma carta de castigo — mão de 20 acontece, e num leque só ela vira
+// uma parede de tiras de 13 px que ninguém lê nem acerta com o dedo.
+const CARTAS_POR_FILEIRA = 13;
 
 function renderHand() {
   const box = $('hand');
   box.innerHTML = '';
-  for (const card of sortedHand()) {
+  const cartas = sortedHand();
+  const fileiras = cartas.length > CARTAS_POR_FILEIRA ? 2 : 1;
+  const porFileira = Math.ceil(cartas.length / fileiras);
+
+  for (let f = 0; f < fileiras; f++) {
+    const fila = document.createElement('div');
+    fila.className = 'fila';
+    montaLeque(fila, cartas.slice(f * porFileira, (f + 1) * porFileira), box.clientWidth);
+    box.appendChild(fila);
+  }
+
+  pintaMaos();
+}
+
+function montaLeque(fila, cartas, largura) {
+  const n = cartas.length;
+  // Sobra nas pontas para as mãos aparecerem. Com mão grande a sobra encolhe:
+  // aí o leque precisa da largura, e mão cheia cobrindo as próprias mãos é o
+  // que acontece de verdade.
+  const espaco = Math.max(180, (largura || 355) - (n > 8 ? 44 : 120));
+  const passo = n > 1
+    ? Math.min(PASSO_MAXIMO, Math.max(PASSO_MINIMO, (espaco - CARTA_LARGURA) / (n - 1)))
+    : CARTA_LARGURA;
+  const meio = (n - 1) / 2;
+
+  cartas.forEach((card, i) => {
     const el = cardEl(card);
+    el.style.setProperty('--passo', `${passo - CARTA_LARGURA}px`);
+    el.style.setProperty('--giro', n > 1 ? `${(i - meio) * (ABERTURA / (n - 1))}deg` : '0deg');
     if (selected.has(card.id)) el.classList.add('sel');
     el.onclick = () => {
       if (selected.has(card.id)) selected.delete(card.id);
       else selected.add(card.id);
       render();
     };
-    box.appendChild(el);
-  }
+    fila.appendChild(el);
+  });
 }
 
-// O que dá para baixar agora (um jogo por vez!): devolve os cardIds a enviar,
-// ou null. Usa o mesmo planBaixada do juiz, sobre o que AINDA falta.
+// As suas mãos, atrás do leque, com o tom de pele de quem você escolheu ser.
+function pintaMaos() {
+  const box = $('maos');
+  if (!box) return;
+  box.style.setProperty('--pele', peleDe(personagemDe(me(), view.players)));
+}
+
+// O contrato já está inteiro na mesa? Daí em diante todo jogo é extra — muda
+// só o rótulo do botão, porque baixar a mais já valia antes.
+function contratoCumprido() {
+  const rem = view?.you?.remaining;
+  return !!rem && rem.t === 0 && rem.s === 0;
+}
+
+// O que dá para baixar agora: devolve os cardIds a enviar, ou null. O alvo é
+// sempre o que o contrato ainda pede — o planejador aceita jogo a mais por
+// conta própria, e é ele que decide se dá para esvaziar a mão.
 function contractPlayable() {
-  if (!view.you || view.you.baixou || !view.contract || !view.you.remaining) return null;
+  if (!view?.you || !view.contract || !view.you.remaining) return null;
   const ids = selected.size > 0 ? [...selected] : null;
   const plan = planBaixada(view.you.hand, view.you.remaining, ids);
   return plan ? (ids || []) : null;
+}
+
+// As cartas que estão SOBRANDO nos jogos da mesa (sequência com mais de 4,
+// trinca com mais de 3). Espelha `sobrasNaMesa` do motor, sobre a visão.
+function sobrasDaMesa() {
+  const fora = [];
+  for (const p of view.players || []) {
+    for (const m of p.melds || []) {
+      for (const card of removableCards(m)) fora.push({ meldId: m.id, ownerId: p.id, card });
+    }
+  }
+  return fora;
+}
+
+// Acende o alvo com a MESMA função que o juiz usa para decidir, para realce e
+// regra nunca divergirem.
+function sobraAcende(card) {
+  if (!view.you?.remaining || !selected.size) return false;
+  const daMao = view.you.hand.filter((c) => selected.has(c.id));
+  return sobraFechaJogo(daMao, card, view.you.remaining);
 }
 
 function renderActions() {
@@ -759,7 +1028,8 @@ function renderActions() {
   // O botão fica sempre clicável: sem o contrato pronto, o toque explica o que
   // falta em vez de morrer num botão desabilitado e mudo.
   const playable = playing ? contractPlayable() : null;
-  $('btn-baixar').hidden = !(playing && !view.you.baixou && !meldDiscardMode);
+  $('btn-baixar').hidden = !(playing && !meldDiscardMode);
+  $('btn-baixar').textContent = contratoCumprido() ? 'Baixar jogo extra' : 'Baixar jogo';
   $('btn-baixar').classList.toggle('soft-disabled', playable === null);
 
   $('btn-discard').hidden = !(playing && !meldDiscardMode);
@@ -799,21 +1069,27 @@ function explicaBaixar() {
   const ct = view?.contract;
   const rem = view?.you?.remaining;
   if (!ct || !rem) return;
+  if (contratoCumprido()) {
+    toast(selected.size > 0
+      ? 'Essa seleção não forma uma trinca (3 iguais de naipes diferentes) nem uma sequência (4 seguidas do mesmo naipe).'
+      : 'O contrato já está na mesa. Dá para baixar jogo a mais: monte outra trinca ou sequência completa e ela desce — se a mão esvaziar, você bate.');
+    return;
+  }
   const partes = [];
   if (rem.t > 0) partes.push(`${rem.t} trinca${rem.t > 1 ? 's' : ''}`);
   if (rem.s > 0) partes.push(`${rem.s} sequência${rem.s > 1 ? 's' : ''}`);
   const falta = partes.join(' + ') || 'nada';
-  // Formaria jogo, mas deixaria a mão vazia sem completar o contrato?
+  // Formaria jogo, mas esvaziaria a mão antes de cumprir o contrato?
   const ids = selected.size > 0 ? [...selected] : null;
   const preso = planBaixada(view.you.hand, rem, ids, { permitirMaoVazia: true });
   if (preso) {
-    toast('Baixar isso agora te deixaria sem nenhuma carta sem completar o contrato — guarde pelo menos uma para descartar.');
+    toast(`Isso baixaria a mão inteira, e só dá para bater com o contrato cumprido (falta: ${falta}) — guarde pelo menos uma carta para descartar.`);
     return;
   }
   if (selected.size > 0) {
-    toast(`Essa seleção não forma um jogo que ainda falta (${falta}). Dá para baixar um jogo de cada vez: 3 iguais de naipes diferentes, ou 4 seguidas do mesmo naipe.`);
+    toast('Essa seleção não forma uma trinca (3 iguais de naipes diferentes) nem uma sequência (4 seguidas do mesmo naipe).');
   } else {
-    toast(`Você ainda não tem nenhum jogo completo para baixar (falta: ${falta}). Pode baixar um de cada vez, quando ficar pronto.`);
+    toast(`Você ainda não tem nenhum jogo completo para baixar. Falta do contrato: ${falta} — mas jogo a mais também pode descer antes disso.`);
   }
 }
 $('btn-discard').onclick = () => {
@@ -831,6 +1107,117 @@ $('btn-sort').onclick = () => {
 $('btn-rules').onclick = () => showRules();
 $('btn-score').onclick = () => showScore();
 
+// Sair da partida. Pede confirmação porque é irreversível: o assento não pode
+// sumir no meio da rodada (mão, jogos e pontos são por assento), então quem
+// sai deixa o robô no lugar e não volta — o servidor troca o token.
+$('btn-quit').onclick = () => {
+  const emJogo = view && view.phase !== 'gameEnd';
+  showModal(
+    `<h2>Sair da partida?</h2>
+     <p>${emJogo
+       ? 'O robô assume o seu lugar até o fim, com a sua mão e os seus pontos. <strong>Não dá para voltar</strong> depois.'
+       : 'Você volta para a tela inicial.'}</p>`,
+    [
+      { label: 'Sair da partida', cls: 'btn-danger', fn: () => { closeModal(); sendMsg({ t: 'leave' }); } },
+      { label: 'Continuar jogando', cls: 'btn-ghost', fn: closeModal },
+    ],
+    closeModal,
+    true,
+  );
+};
+
+// ---------------- Movimento ----------------
+
+const semMovimento = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let distribuirPendente = false;
+
+// Distribuir: as cartas saem do monte e voam para cada assento. Não são as 6 a
+// 12 cartas de verdade — com 8 jogadores seriam quase cem elementos na tela.
+// Três por jogador bastam para o gesto ler como "está distribuindo".
+const CARTAS_POR_JOGADOR_NA_ANIMACAO = 3;
+
+function animaDistribuicao() {
+  if (semMovimento() || !view) return;
+  const monte = $('deck-pile');
+  const mao = $('hand');
+  if (!monte || !mao) return;
+  const origem = monte.getBoundingClientRect();
+  if (!origem.width) return;
+
+  const destinos = [];
+  for (const el of assentos.values()) {
+    const r = el.getBoundingClientRect();
+    destinos.push({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  }
+  const rm = mao.getBoundingClientRect();
+  destinos.push({ x: rm.left + rm.width / 2, y: rm.top + 40 });
+  if (!destinos.length) return;
+
+  let i = 0;
+  for (let volta = 0; volta < CARTAS_POR_JOGADOR_NA_ANIMACAO; volta++) {
+    for (const d of destinos) voaCarta(origem, d, (i++) * 52);
+  }
+}
+
+function voaCarta(origem, destino, atraso) {
+  const x0 = origem.left + origem.width / 2;
+  const y0 = origem.top + 22;
+  const el = document.createElement('div');
+  el.className = 'carta-voando';
+  el.style.left = `${x0 - 15}px`;
+  el.style.top = `${y0 - 21}px`;
+  el.style.setProperty('--dx', `${destino.x - x0}px`);
+  el.style.setProperty('--dy', `${destino.y - y0}px`);
+  el.style.animationDelay = `${atraso}ms`;
+  document.body.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+  // Rede: em aba de segundo plano a animação não dispara e o `animationend`
+  // nunca vem — sem isto a carta ficaria parada na tela para sempre.
+  setTimeout(() => el.remove(), atraso + 1600);
+}
+
+// Reações: o assento responde ao que acabou de acontecer com ele. Gesto do
+// corpo + um balão curto. A troca de ROSTO já está ligada, para quando o
+// elenco tiver expressões (ver EXPRESSOES em shared/elenco.js); enquanto não
+// tiver, a figura continua a mesma e quem carrega a reação é o gesto.
+const REACOES = {
+  baixou:  { texto: 'baixei!',    gesto: 'pula',   cara: 'feliz' },
+  bateu:   { texto: 'bati!',      gesto: 'pula',   cara: 'feliz' },
+  pediu:   { texto: 'quero essa', gesto: 'treme',  cara: 'bravo' },
+  levou:   { texto: 'peguei!',    gesto: 'pula',   cara: 'feliz' },
+  perdeu:  { texto: 'ah, não…',   gesto: 'murcha', cara: 'bravo' },
+  coringa: { texto: '🃏 troquei', gesto: 'pula',   cara: 'feliz' },
+  saiu:    { texto: 'fui',        gesto: 'murcha', cara: null },
+};
+
+function reage(playerId, chave) {
+  const r = REACOES[chave];
+  const el = playerId === me() ? $('meu-assento') : assentos.get(playerId);
+  if (!r || !el || semMovimento()) return;
+
+  let balao = el.querySelector('.balao');
+  if (!balao) {
+    balao = document.createElement('span');
+    balao.className = 'balao';
+    el.appendChild(balao);
+  }
+  balao.textContent = r.texto;
+  repete(balao, 'fala');
+  repete(el, r.gesto);
+  trocaCara(el, playerId, r.cara);
+}
+
+// Se o personagem tiver a expressão, o rosto muda enquanto a reação dura.
+function trocaCara(el, playerId, expressao) {
+  const img = el.querySelector('.personagem');
+  const slug = personagemDe(playerId, view.players);
+  if (!img || !expressao || !temExpressao(slug, expressao)) return;
+  img.src = `/assets/personagens/${slug}-corpo-inteiro-${expressao}.svg`;
+  clearTimeout(Number(img.dataset.voltaCara));
+  img.dataset.voltaCara = String(setTimeout(() => { img.src = figuraDe(slug); }, 1900));
+}
+
 // ---------------- Avisos de eventos ----------------
 
 let lastTurnWasMine = false;
@@ -838,6 +1225,7 @@ let lastTurnWasMine = false;
 function announce(ev) {
   switch (ev.e) {
     case 'roundStart':
+      distribuirPendente = true;
       toast(`🎴 Rodada ${ev.round + 1}: ${playerName(ev.first)} começa.`);
       meldDiscardMode = false;
       // Os ids das cartas recomeçam a cada rodada: seleção antiga poderia
@@ -846,26 +1234,46 @@ function announce(ev) {
       selected.clear();
       break;
     case 'draw':
-      if (ev.source === 'discard') toast(`${playerName(ev.p)} pegou ${cardText(ev.card)} do meio.`);
+      if (ev.source === 'discard') {
+        toast(`${playerName(ev.p)} pegou ${cardText(ev.card)} do meio.`);
+        reage(ev.p, 'levou');
+      }
       break;
     case 'claim':
       if (ev.p !== me()) toast(`🛒 ${playerName(ev.p)} quer a carta do meio.`);
+      reage(ev.p, 'pediu');
       break;
     case 'claimVoid':
       if (ev.losers.includes(me())) toast(`😅 ${playerName(ev.by)} estava na vez e ficou com ${cardText(ev.card)}.`);
+      for (const perdedor of ev.losers || []) reage(perdedor, 'perdeu');
       break;
     case 'buy':
-      toast(`🛒 ${playerName(ev.p)} comprou ${cardText(ev.card)} fora da vez (+${ev.penalty} de castigo).`);
+      toast(`🛒 ${playerName(ev.p)} pediu primeiro e levou ${cardText(ev.card)}.`);
+      reage(ev.p, 'levou');
       break;
     case 'baixou': {
-      if (ev.completa || ev.t === undefined) {
-        toast(`🔻 ${playerName(ev.p)} baixou o jogo!`);
+      const conta = (n, um, muitos) => `${n} ${n > 1 ? muitos : um}`;
+      const pedacos = [];
+      if (ev.t) pedacos.push(conta(ev.t, 'trinca', 'trincas'));
+      if (ev.s) pedacos.push(conta(ev.s, 'sequência', 'sequências'));
+      const extras = [];
+      if (ev.extraT) extras.push(conta(ev.extraT, 'trinca', 'trincas'));
+      if (ev.extraS) extras.push(conta(ev.extraS, 'sequência', 'sequências'));
+      const nome = playerName(ev.p);
+      if (ev.completa && !pedacos.length && extras.length) {
+        toast(`🔻 ${nome} baixou ${extras.join(' e ')} a mais.`);
+      } else if (ev.completa) {
+        toast(`🔻 ${nome} baixou o jogo!${extras.length ? ` E ${extras.join(' e ')} a mais.` : ''}`);
+      } else if (pedacos.length || extras.length) {
+        const tudo = [...pedacos, ...(extras.length ? [`${extras.join(' e ')} a mais`] : [])];
+        toast(`🔻 ${nome} baixou ${tudo.join(' e ')}.`);
       } else {
-        const pedacos = [];
-        if (ev.t) pedacos.push(`${ev.t} trinca${ev.t > 1 ? 's' : ''}`);
-        if (ev.s) pedacos.push(`${ev.s} sequência${ev.s > 1 ? 's' : ''}`);
-        toast(`🔻 ${playerName(ev.p)} baixou ${pedacos.join(' e ')}.`);
+        toast(`🔻 ${nome} baixou o jogo!`);
       }
+      if (ev.daMesa) {
+        toast(`🤏 ${playerName(ev.p)} puxou ${cardText(ev.daMesa)} que sobrava ${ev.deQuem === me() ? 'de um jogo seu' : 'da mesa'} e baixou com ela.`);
+      }
+      reage(ev.p, 'baixou');
       break;
     }
     case 'layoff':
@@ -876,6 +1284,11 @@ function announce(ev) {
       break;
     case 'swapJoker':
       toast(`${JOKER_LABEL} ${playerName(ev.p)} pôs ${cardText(ev.card)} no lugar do coringa.`);
+      reage(ev.p, 'coringa');
+      break;
+    case 'desistiu':
+      toast(`🚪 ${playerName(ev.p)} saiu da partida — o robô assume o lugar.`);
+      reage(ev.p, 'saiu');
       break;
     case 'away':
       toast(`📴 ${playerName(ev.p)} caiu — o jogo joga por ${ev.p === me() ? 'você' : 'ele'} até voltar.`);
@@ -884,7 +1297,7 @@ function announce(ev) {
       toast('🔄 O monte acabou — o meio foi embaralhado de volta.');
       break;
     case 'roundEnd':
-      if (ev.reason === 'bateu') toast(`🏆 ${playerName(ev.winnerId)} bateu!`);
+      if (ev.reason === 'bateu') { toast(`🏆 ${playerName(ev.winnerId)} bateu!`); reage(ev.winnerId, 'bateu'); }
       else toast('🪦 O monte esgotou — a rodada terminou sem vencedor.');
       break;
   }
@@ -1052,7 +1465,7 @@ function showRules() {
        <li><strong>Descarte uma carta</strong> (obrigatório). Se não quiser descartar da mão, pode tirar de um jogo seu com sobra: sequência com mais de 4 cartas (pelas pontas) ou trinca com mais de 3.</li>
      </ol>
      <h3>Compra fora da vez</h3>
-     <p>Quando alguém descarta, outro jogador pode pedir a carta — mas <strong>quem está na vez tem preferência</strong>. Quem compra fora da vez leva a carta <strong>+ 1 carta de castigo</strong> do monte e não descarta.</p>
+     <p>Quando alguém descarta, qualquer outro jogador pode pedir a carta: leva <strong>quem apertar primeiro</strong>, e ele fica só com a carta pedida (não puxa nem descarta). Mas <strong>quem está na vez tem preferência</strong> sobre todos — se ele também quiser a carta, ela é dele.</p>
      <h3>Pontos</h3>
      <p>Cartas que sobram na mão contam pelo <strong>valor de face</strong>: o 5 vale 5, o 10 vale 10, e assim por diante. <strong>J = 11</strong> · <strong>Q = 12</strong> · <strong>K = 13</strong> · <strong>Ás = 15</strong> (mesmo tendo jogado como 1) · <strong>coringa = 20</strong>. Se o monte esgotar 3 vezes na mesma rodada, a rodada acaba sem vencedor e todos contam a mão.</p>`,
     [{ label: 'Fechar', fn: closeModal }],

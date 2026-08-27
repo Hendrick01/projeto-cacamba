@@ -3,18 +3,39 @@
    ============================================================ */
 
 :root {
+  /* Uma lâmpada só, a pino sobre o descarte. Tudo aqui é consequência dela:
+     o meio é o mais claro, a borda cai na penumbra, e quem fica no escuro
+     ganha o halo quente por fora — a mesma técnica do elenco. */
+
+  /* Feltro: o centro da mesa, onde a luz bate */
   --felt: #0e3b2c;
-  --felt-deep: #092a1f;
+  --felt-luz: #1a5b44;   /* o clarão, no alto do gradiente */
+  --felt-deep: #06201a;  /* a penumbra da borda; era #092a1f, claro demais para contrastar com o foco */
   --felt-line: #1c5440;
-  --cream: #fbf8f1;
-  --cream-dim: #e9e2d2;
+
+  /* Madeira: o aro em volta do feltro, onde os jogadores moram. É a mesma cor
+     do contorno do elenco (ver public/assets/personagens/README.md), então
+     avatar e aro são o mesmo material e o anel do assento é o que recorta. */
+  --nogueira: #2a1b12;
+  --nogueira-luz: #3e2717;
+  --nogueira-noite: #1b110b;
+
+  /* Luz */
+  --gold: #f2c14e;       /* o âmbar exato do elenco; era #e9b94e */
+  --gold-soft: #c9a24e;
+  --halo: #8c6a45;       /* luz de borda: a aresta virada para a lâmpada */
+
+  /* Tinta */
+  --cream: #f5f1e6;      /* o creme do elenco, um grau mais quente */
+  --cream-dim: #e4dcc8;
   --ink: #232a33;
   --red: #c93a3a;
-  --gold: #e9b94e;
-  --gold-soft: #caa348;
   --sage: #9dbbad;
-  --danger: #d96c50;
-  --shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --danger: #e4572e;     /* o laranja-telha do elenco */
+
+  /* Sombra numa direção só, para baixo — é o que uma lâmpada só faz */
+  --shadow: 0 6px 14px -4px rgba(0, 0, 0, 0.75);
+  --shadow-bloco: 0 22px 44px -22px rgba(0, 0, 0, 0.9);
   --radius: 12px;
   --font-display: 'Paytone One', 'Arial Black', sans-serif;
   --font-body: 'Nunito', 'Avenir Next', system-ui, sans-serif;
@@ -31,7 +52,8 @@ body {
   font-weight: 600;
   color: var(--cream);
   background:
-    radial-gradient(120% 90% at 50% 0%, var(--felt) 0%, var(--felt-deep) 100%);
+    radial-gradient(96% 34% at 50% 14%, rgba(242, 193, 78, 0.1) 0%, rgba(242, 193, 78, 0) 68%),
+    radial-gradient(122% 82% at 50% 16%, var(--felt) 0%, var(--felt-deep) 100%);
   background-attachment: fixed;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -41,6 +63,7 @@ body {
 button { font-family: inherit; }
 
 .screen {
+  position: relative;   /* âncora das suas mãos, que ficam absolutas no rodapé */
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -78,7 +101,7 @@ input {
   font-weight: 700;
   padding: 13px 14px;
   border-radius: var(--radius);
-  border: 2px solid var(--felt-line);
+  border: 2px solid rgba(140, 106, 69, 0.4);
   background: rgba(0, 0, 0, 0.25);
   color: var(--cream);
   width: 100%;
@@ -92,10 +115,11 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   font-weight: 800;
   padding: 13px 18px;
   border-radius: var(--radius);
-  border: 2px solid var(--felt-line);
-  background: rgba(255, 255, 255, 0.07);
+  border: 2px solid rgba(140, 106, 69, 0.42);
+  background: rgba(245, 241, 230, 0.07);
   color: var(--cream);
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(245, 241, 230, 0.1);
   transition: transform 0.06s ease, background 0.15s ease;
 }
 .btn:active { transform: scale(0.97); }
@@ -104,7 +128,10 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .btn.soft-disabled { opacity: 0.45; }
 .btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
-.btn-primary { background: var(--gold); border-color: var(--gold); color: #3d2c07; }
+.btn-primary {
+  background: linear-gradient(180deg, #ffd473 0%, var(--gold) 100%);
+  border-color: var(--gold); color: #3d2c07;
+}
 .btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
 .btn-ghost { background: transparent; border-color: transparent; color: var(--sage); }
 
@@ -128,7 +155,9 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .lobby-players { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
 .lobby-players li {
   display: flex; align-items: center; gap: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, var(--nogueira-luz) 0%, var(--nogueira) 100%);
+  border: 1px solid rgba(140, 106, 69, 0.3);
+  border-top-color: rgba(242, 193, 78, 0.28);
   padding: 10px 14px; border-radius: var(--radius);
   font-size: 1.05rem; font-weight: 800; text-align: left;
 }
@@ -140,6 +169,121 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .lobby-actions { display: flex; gap: 10px; justify-content: center; }
 .lobby-actions .btn { flex: 1; }
 .lobby-wait { color: var(--sage); font-size: 0.95rem; }
+
+/* Tela grande: a mesa não estica até a borda. O jogo vira uma coluna do
+   tamanho de quem joga, e o salão fica em volta. */
+@media (min-width: 760px) {
+  #screen-game > .topbar,
+  #screen-game > .mesa,
+  #screen-game > .my-melds,
+  #screen-game > .action-bar,
+  #screen-game > .opponents-hint,
+  #screen-game > .hand {
+    width: 100%; max-width: 620px; margin-inline: auto;
+  }
+  #screen-game > .maos {
+    left: 50%; right: auto; width: 620px;
+    transform: translateX(-50%);
+  }
+}
+
+/* ---------------- Escolha do personagem ---------------- */
+
+/* O botão que abre a escolha, na tela inicial: mostra quem você é hoje. */
+.btn-persona {
+  display: flex; align-items: center; gap: 10px;
+  text-align: left; padding: 8px 12px;
+}
+.persona-cara {
+  width: 40px; height: 40px; flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--nogueira);
+  box-shadow: 0 0 0 2px var(--gold-soft);
+}
+.persona-txt { display: flex; flex-direction: column; line-height: 1.2; }
+.persona-txt small {
+  color: var(--sage); font-size: 0.68rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.persona-txt strong { font-size: 1.02rem; font-weight: 900; }
+.persona-seta {
+  margin-left: auto; color: var(--gold);
+  font-size: 0.72rem; font-weight: 900;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+
+.escolha {
+  margin: auto; width: min(94vw, 430px);
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: max(14px, env(safe-area-inset-top)) 0 24px;
+}
+.escolha-topo {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+}
+.escolha-topo h2 {
+  font-family: var(--font-display); font-weight: 400;
+  color: var(--gold); font-size: 1.5rem;
+}
+
+/* A figura no tamanho grande é o ponto da tela: 400×800 de viewBox, então a
+   altura manda e a largura acompanha. */
+.palco {
+  display: flex; align-items: center; gap: 4px;
+  width: 100%;
+  min-height: 46vh;
+}
+.avatar-figura {
+  flex: 1; min-width: 0;
+  height: 46vh; max-height: 420px;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 22px rgba(0, 0, 0, 0.55));
+  animation: entraEmCena 0.45s ease-out;
+}
+.seta {
+  flex-shrink: 0;
+  width: 42px; height: 42px; border-radius: 50%;
+  border: 2px solid rgba(140, 106, 69, 0.45);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--cream); font-size: 1.5rem; font-weight: 900; line-height: 1;
+  cursor: pointer;
+}
+.seta:active { transform: scale(0.94); }
+
+.escolha-nome { text-align: center; }
+.escolha-nome strong {
+  font-family: var(--font-display); font-weight: 400;
+  font-size: 1.7rem; color: var(--cream);
+}
+.escolha-traco {
+  margin-top: 4px; color: var(--sage);
+  font-size: 0.9rem; line-height: 1.4;
+  min-height: 2.5em;
+}
+
+.miniaturas { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.miniatura {
+  width: 52px; height: 52px; padding: 0;
+  border: none; border-radius: 50%;
+  background: var(--nogueira);
+  box-shadow: 0 0 0 2px rgba(140, 106, 69, 0.5);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+.miniatura img { width: 100%; height: 100%; border-radius: 50%; display: block; }
+.miniatura.escolhida {
+  opacity: 1;
+  box-shadow: 0 0 0 3px var(--gold), 0 0 14px rgba(242, 193, 78, 0.45);
+  transform: translateY(-2px);
+}
+.escolha .btn-primary { width: 100%; }
+
+@keyframes entraEmCena {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar-figura { animation: none; }
+}
 
 /* ---------------- Mesa ---------------- */
 
@@ -155,91 +299,281 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .round-pill strong { color: var(--gold); font-size: 1.02rem; font-weight: 900; }
 
 .topbar-btns { display: flex; gap: 8px; }
+.icon-btn-sair { color: var(--danger); border-color: rgba(228, 87, 46, 0.5); }
 .icon-btn {
   width: 38px; height: 38px; border-radius: 50%;
-  border: 2px solid var(--felt-line); background: rgba(255, 255, 255, 0.07);
+  border: 2px solid rgba(140, 106, 69, 0.45); background: rgba(0, 0, 0, 0.3);
   color: var(--cream); font-size: 1.05rem; font-weight: 900; cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(245, 241, 230, 0.1);
 }
 
-/* Oponentes */
+/* ---------------- O lugar ---------------- */
 
+/* A tela do jogo é o SALÃO, não a mesa: o feltro existe só no tampo. Enquanto
+   o fundo aqui era verde, tela grande virava um mar de feltro em volta de uma
+   mesa espremida. */
+#screen-game {
+  background:
+    radial-gradient(78% 38% at 50% 4%, rgba(242, 193, 78, 0.1) 0%, rgba(242, 193, 78, 0) 70%),
+    linear-gradient(180deg, var(--nogueira) 0%, var(--nogueira-noite) 56%, #120b06 100%);
+}
+
+/* Fica atrás de tudo, colado no topo. A mesa vem por cima e a penumbra do
+   rodapé engole o resto — não é papel de parede, é o fundo de onde a luz vem. */
+.cenario {
+  position: fixed; top: 0; left: 50%;
+  transform: translateX(-50%);
+  /* SVG é elemento substituído: com só a altura definida, a largura vinha da
+     proporção do desenho e o cenário parava no meio da tela grande. E o teto
+     de largura evita o contrário — porta e engradados do tamanho de um móvel
+     de verdade num monitor. */
+  width: 100%; max-width: 860px;
+  height: 42%;
+  z-index: 0;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 62%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 62%, transparent 100%);
+}
+#screen-game > .topbar,
+#screen-game > .mesa,
+#screen-game > .my-melds,
+#screen-game > .action-bar,
+#screen-game > .opponents-hint { position: relative; z-index: 1; }
+
+/* ---------------- A mesa e quem senta nela ---------------- */
+
+/* O feltro visto de frente. A luz é a mesma do resto: clarão no meio, onde
+   ficam monte e descarte, e penumbra na borda. */
+.mesa {
+  position: relative;
+  margin: 6px 10px 0;
+  padding: 10px 8px 6px;
+}
+
+/* O tampo, inclinado: a borda de trás recua e a mesa passa a ser vista da sua
+   cadeira. Só ele inclina — o conteúdo fica em pé, senão o texto borra. */
+.feltro {
+  position: absolute;
+  left: 0; right: 0; top: -6%; bottom: 0;
+  z-index: -1;
+  border-radius: 46% 46% 22% 22% / 30% 30% 12% 12%;
+  transform: perspective(660px) rotateX(26deg);
+  transform-origin: 50% 100%;
+  background:
+    radial-gradient(56% 44% at 50% 66%, rgba(242, 193, 78, 0.14) 0%, rgba(242, 193, 78, 0) 72%),
+    radial-gradient(120% 96% at 50% 22%, var(--felt-luz) 0%, var(--felt) 44%, var(--felt-deep) 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(242, 193, 78, 0.18),
+    inset 0 -26px 40px -24px rgba(0, 0, 0, 0.9),
+    0 14px 30px -14px rgba(0, 0, 0, 0.95);
+}
+
+/* Assentos são posicionados, não empilhados: a altura da caixa vem do JS, que
+   sabe se a mesa cabe numa fileira ou precisa da de trás. A margem negativa faz
+   a figura passar por cima da borda do feltro — gente ATRÁS da mesa. */
 .opponents {
-  display: flex; gap: 8px; padding: 4px 12px 8px;
-  overflow-x: auto;
+  position: relative;
+  margin-top: -14px;
 }
-.opponent {
-  flex: 1; min-width: 96px;
-  background: rgba(0, 0, 0, 0.22);
-  border: 2px solid transparent;
-  border-radius: var(--radius);
-  padding: 7px 8px;
-}
-.opponent.turn { border-color: var(--gold); box-shadow: 0 0 12px rgba(233, 185, 78, 0.35); }
-.opponent .opp-head { display: flex; align-items: center; gap: 6px; }
 
-/* Avatar do elenco. O anel de cor é do assento, não da personagem: com mais
-   jogadores que personagens o rosto repete, e é o anel que segue distinguindo. */
-.avatar {
+.assento {
+  position: absolute;
+  left: var(--x, 50%);
+  top: var(--y, 0px);
+  width: 62px;
+  transform: translateX(-50%) scale(var(--escala, 1));
+  /* Encolhe a partir do topo: com a origem embaixo, a fileira de trás mantinha
+     a mesma base e o nome dela caía em cima da fileira da frente. */
+  transform-origin: 50% 0;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0; border: none; background: none;
+  color: var(--cream); font: inherit; cursor: pointer;
   --anel: var(--gold-soft);
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: #2A1B12;
-  box-shadow: 0 0 0 2px var(--anel);
-  display: block;
 }
-.oponente-topo { display: flex; justify-content: center; margin-bottom: 6px; }
-.lobby-players .avatar { margin-right: 2px; }
-.opponent .opp-name { font-weight: 900; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.opponent .opp-count { color: var(--sage); font-size: 0.8rem; font-variant-numeric: tabular-nums; margin-left: auto; white-space: nowrap; }
-.opponent .opp-badges { display: flex; gap: 4px; margin-top: 3px; min-height: 16px; flex-wrap: wrap; }
-.badge {
-  font-size: 0.62rem; font-weight: 800; padding: 1px 7px; border-radius: 20px;
-  background: var(--felt-line); color: var(--cream); text-transform: uppercase; letter-spacing: 0.04em;
-}
-.badge.gold { background: var(--gold); color: #3d2c07; }
-.badge.cart { background: var(--danger); color: #fff; }
-.badge.off { background: #444; color: #bbb; }
-.opp-melds { display: flex; gap: 5px; margin-top: 5px; overflow-x: auto; }
 
-/* Mesa grande: a partir de 4 adversários o cartão largo não cabe mais (7 deles
-   pedem ~744px numa tela de 375), então a faixa vira grade e todos ficam
-   visíveis ao mesmo tempo. Os jogos baixados saem do bloco e vão para o
-   toque — cabe nome, cartas na mão, progresso do contrato e quem pediu carta,
-   que é o que se precisa saber de relance. */
-.opponents.compacto {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: 6px;
-  overflow-x: visible;
+/* A figura mostra só a metade de cima da personagem (viewBox 400×800, imagem
+   com o dobro da altura da caixa): quem está na mesa aparece sentado, não
+   inteiro flutuando sobre o feltro. */
+.assento .figura { position: relative; width: 56px; height: 58px; overflow: hidden; }
+.assento .personagem {
+  display: block; width: 56px; height: 112px;
+  animation: respiro 4.2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -0.7s);
 }
-.opponent.compacto {
-  min-width: 0;
-  padding: 6px 8px;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
+
+.assento .cartas {
+  position: absolute; right: 0; top: 1px;
+  min-width: 19px; padding: 0 4px;
+  border-radius: 20px;
+  background: rgba(27, 17, 11, 0.92);
+  border: 1px solid var(--anel);
+  color: var(--cream);
+  font-size: 0.66rem; font-weight: 900; line-height: 1.55;
+  font-variant-numeric: tabular-nums;
 }
-.opponent.compacto { min-height: 46px; }
-.opponent.compacto .opp-name { font-size: 0.86rem; min-width: 0; }
-.opp-resumo .m-cartas { color: var(--cream-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.opp-resumo {
-  display: flex; flex-wrap: wrap; gap: 5px;
-  margin-top: 3px; min-height: 14px;
-  font-size: 0.68rem; font-weight: 800; color: var(--sage);
+
+/* As cartas na mão do adversário, viradas para baixo, na altura do peito da
+   figura. Quem dá o número exato é o selo; o leque é presença — dá para ver de
+   relance quem está segurando mão grande. */
+.assento .leque {
+  position: absolute; left: 50%; bottom: 3px;
+  display: flex; align-items: flex-end;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
-.opp-resumo .m-gold { color: var(--gold); }
-.opp-resumo .m-cart { color: var(--danger); }
-.opp-resumo .m-off { color: #999; }
+.carta-virada {
+  width: 13px; height: 18px;
+  margin: 0 -3px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(45deg, #274d92 0 3px, #1d3c74 3px 6px);
+  border: 1px solid var(--cream);
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.8);
+  transform: rotate(var(--giro, 0deg)) translateY(calc(var(--sobe, 0px) * -1));
+}
+.assento.fora .leque { opacity: 0.45; }
+
+/* A cadeira é o anel de cor do assento em outra forma. É ela que distingue
+   quando o rosto repete — o elenco é menor que a mesa de oito. */
+.assento .cadeira {
+  width: 40px; height: 4px; border-radius: 3px; margin-top: 2px;
+  background: var(--anel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.assento .nome {
+  margin-top: 3px; max-width: 62px;
+  font-size: 0.68rem; font-weight: 900; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.assento .marcas {
+  display: flex; gap: 4px; min-height: 12px;
+  font-size: 0.62rem; font-weight: 800; color: var(--sage);
+  font-variant-numeric: tabular-nums;
+}
+.marcas .m-gold { color: var(--gold); }
+.marcas .m-cart { color: var(--danger); }
+.marcas .m-off { color: #9c9088; }
+
+/* Quem está na vez recebe a lâmpada em cima. */
+.assento.vez::before {
+  content: '';
+  position: absolute; inset: -12px -10px 10px;
+  border-radius: 50%;
+  background: radial-gradient(50% 50% at 50% 42%, rgba(242, 193, 78, 0.34) 0%, rgba(242, 193, 78, 0) 70%);
+  animation: focoPulsa 2.4s ease-in-out infinite;
+}
+.assento.vez .personagem { animation: respiroVez 2.2s ease-in-out infinite; }
+.assento.vez .nome { color: var(--gold); }
+.assento.vez .cadeira { box-shadow: 0 0 10px rgba(242, 193, 78, 0.75); }
+
+/* Fileira de trás: mais longe da lâmpada, então menor e mais apagada. */
+.assento.fundo .personagem { filter: brightness(0.82) saturate(0.9); }
+
+/* Fora: continua no lugar — o assento é dele —, mas sem luz e sem respiro. */
+.assento.fora .personagem { filter: grayscale(0.85) brightness(0.55); animation: none; }
+.assento.fora .cadeira { background: #5a5148; }
+/* Quem saiu não é quem caiu: cair é reversível, sair não. A cadeira fica
+   vazia por dentro — o assento continua ocupado pelo robô que assumiu. */
+.assento.saiu .personagem { filter: grayscale(1) brightness(0.45); animation: none; }
+.assento.saiu .cadeira { background: none; box-shadow: inset 0 0 0 2px #5a5148; }
+.assento.saiu .leque { opacity: 0.35; }
+
+/* Você também senta à mesa, no canto de quem olha. */
+.meu-assento {
+  left: 2px; top: auto; bottom: 2px;
+  width: 54px;
+  transform: none;
+  pointer-events: none;
+}
+.meu-assento .nome {
+  color: var(--gold);
+  text-transform: uppercase; letter-spacing: 0.07em; font-size: 0.6rem;
+}
+
+/* O balão da reação: aparece em cima do assento e sai sozinho. */
+.assento .balao {
+  position: absolute; bottom: 100%; left: 50%;
+  margin-bottom: 5px;
+  padding: 2px 8px; border-radius: 10px;
+  background: var(--cream); color: var(--ink);
+  font-size: 0.62rem; font-weight: 900; white-space: nowrap;
+  box-shadow: var(--shadow);
+  opacity: 0; pointer-events: none;
+  transform: translateX(-50%);
+}
+.assento .balao.fala { animation: fala 1.9s ease-out; }
+
+/* Cartas voando do monte para os assentos, no começo da rodada. */
+.carta-voando {
+  position: fixed; z-index: 60; pointer-events: none;
+  width: 30px; height: 42px; border-radius: 5px;
+  background: repeating-linear-gradient(45deg, #274d92 0 4px, #1d3c74 4px 8px);
+  border: 2px solid var(--cream);
+  box-shadow: 0 5px 12px -4px rgba(0, 0, 0, 0.85);
+  animation: voa 540ms cubic-bezier(0.25, 0.8, 0.35, 1) backwards;
+}
+
+/* Animações. Uma lâmpada só e gente respirando: nada pisca, nada corre. */
+@keyframes respiro     { 0%, 100% { transform: translateY(0); }  50% { transform: translateY(-2px); } }
+@keyframes respiroVez  { 0%, 100% { transform: translateY(0); }  50% { transform: translateY(-5px); } }
+@keyframes focoPulsa   { 0%, 100% { opacity: 0.72; }             50% { opacity: 1; } }
+@keyframes aparece     { from { opacity: 0; } }
+@keyframes pediu       { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@keyframes fala {
+  0%        { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.85); }
+  12%, 72%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100%      { opacity: 0; transform: translateX(-50%) translateY(-7px) scale(1); }
+}
+@keyframes voa {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(0.72); opacity: 0; }
+  14%  { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(340deg) scale(1); opacity: 0; }
+}
+@keyframes pula {
+  0%, 100% { transform: translateY(0); }
+  32%      { transform: translateY(-11px); }
+  62%      { transform: translateY(2px); }
+}
+@keyframes murcha {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  40%      { transform: translateY(5px) rotate(-4deg); }
+}
+@keyframes cadeiraPop {
+  0%   { transform: scaleX(1);    box-shadow: 0 0 0 0 rgba(242, 193, 78, 0.8); }
+  40%  { transform: scaleX(1.35); }
+  100% { transform: scaleX(1);    box-shadow: 0 0 0 12px rgba(242, 193, 78, 0); }
+}
+
+.assento.entra { animation: aparece 0.5s ease-out backwards; animation-delay: calc(var(--i, 0) * 70ms); }
+.assento.pediu .figura,
+.assento.treme .figura { animation: pediu 0.42s ease-in-out 2; }
+.assento.pula .figura { animation: pula 0.52s ease-out; }
+.assento.murcha .figura { animation: murcha 0.6s ease-out; }
+.assento.baixou-agora .cadeira { animation: cadeiraPop 0.55s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .assento .personagem,
+  .assento.vez .personagem,
+  .assento.vez::before,
+  .assento.entra,
+  .assento.pediu .figura,
+  .assento.treme .figura,
+  .assento.pula .figura,
+  .assento.murcha .figura,
+  .assento .balao.fala,
+  .carta-voando,
+  .assento.baixou-agora .cadeira { animation: none; }
+  .carta-voando { display: none; }
+}
 
 /* Jogos do adversário, no detalhe sob toque */
 .oponente-jogos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .oponente-jogos.vazio { color: var(--sage); font-size: 0.9rem; }
 
-/* Rede de segurança: se ainda assim algo estourar a largura, ninguém some sem
-   aviso. Fica escondida quando tudo cabe. */
+/* Rede de segurança: ninguém pode sumir em silêncio. Fica escondida quando
+   todos os assentos cabem. */
 .opponents-hint {
-  margin: -4px 12px 6px;
+  margin: 4px 12px 0;
   font-size: 0.76rem;
   color: var(--sage);
   text-align: center;
@@ -247,11 +581,25 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 
 /* Centro: monte e descarte */
 
-.table-center { text-align: center; padding: 2px 0 4px; }
+/* O foco da lâmpada cai exatamente aqui: monte e descarte, que é onde a
+   jogada obrigatória do turno acontece. */
+.table-center {
+  text-align: center; padding: 6px 0 4px;
+  background: radial-gradient(58% 100% at 50% 42%, rgba(242, 193, 78, 0.1) 0%, rgba(242, 193, 78, 0) 72%);
+}
 .piles { display: flex; justify-content: center; gap: 26px; }
 .pile { background: none; border: none; cursor: pointer; position: relative; padding: 0; }
 .pile-count { display: block; margin-top: 3px; color: var(--sage); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 .pile.glow .card { box-shadow: 0 0 0 3px var(--gold), var(--shadow); }
+/* Carta nova no topo do descarte cai na pilha, vinda de cima e de lado */
+.pile .card.cai { animation: cartaCai 0.28s cubic-bezier(0.2, 0.8, 0.3, 1); }
+@keyframes cartaCai {
+  from { transform: translate(-16px, -26px) rotate(-11deg) scale(1.08); opacity: 0.25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pile .card.cai { animation: none; }
+}
+
 /* Coringa descartado tranca o meio: a pilha fica apagada e sem convite ao toque */
 .pile.trancado .card { filter: grayscale(0.35) brightness(0.8); box-shadow: var(--shadow); }
 .pile.trancado .pile-count { color: var(--danger); }
@@ -268,16 +616,22 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   .btn-claim { animation: none; }
 }
 
-.turn-banner { margin-top: 7px; color: var(--sage); font-size: 0.9rem; min-height: 1.2em; }
+/* Padding dos dois lados para o texto continuar centrado no que sobra: o seu
+   assento ocupa o canto de baixo à esquerda. */
+.turn-banner {
+  margin-top: 7px; padding: 0 58px;
+  color: var(--sage); font-size: 0.9rem; min-height: 1.2em;
+}
 .turn-banner.me { color: var(--gold); font-weight: 900; }
 
 /* Cartas */
 
 .card {
   width: 52px; height: 72px;
-  background: var(--cream);
+  /* Gradiente de cima para baixo: é papel sob a lâmpada, não um retângulo chapado */
+  background: linear-gradient(168deg, #fffdf6 0%, var(--cream) 46%, #ded6c3 100%);
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   position: relative;
   color: var(--ink);
   flex-shrink: 0;
@@ -287,8 +641,8 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .card.red { color: var(--red); }
 /* Coringa: fundo dourado para se distinguir de relance no meio da mão */
 .card.joker {
-  color: var(--ink);
-  background: linear-gradient(150deg, var(--gold) 0%, var(--gold-soft) 100%);
+  color: #33240a;
+  background: linear-gradient(150deg, #ffdc85 0%, var(--gold) 42%, var(--gold-soft) 100%);
 }
 .card .idx {
   position: absolute; top: 4px; left: 5px;
@@ -304,18 +658,38 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
     repeating-linear-gradient(45deg, #274d92 0 6px, #1d3c74 6px 12px);
   border: 4px solid var(--cream);
 }
-.card.empty { background: rgba(255, 255, 255, 0.07); border: 2px dashed var(--felt-line); box-shadow: none; }
+.card.empty { background: rgba(245, 241, 230, 0.06); border: 2px dashed var(--felt-line); box-shadow: none; }
 
-.card.mini { width: 30px; height: 42px; border-radius: 5px; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+.card.mini { width: 30px; height: 42px; border-radius: 5px; box-shadow: 0 3px 7px -2px rgba(0, 0, 0, 0.7); }
 .card.mini .idx { font-size: 0.62rem; top: 2px; left: 3px; }
 .card.mini .pip { font-size: 0.85rem; bottom: 2px; right: 3px; }
 
 /* Meus jogos na mesa */
 
-.my-melds { display: flex; gap: 8px; padding: 6px 12px; overflow-x: auto; min-height: 10px; }
+/* O que já está na mesa, de todo mundo. Rola para o lado quando não cabe: com
+   8 jogadores baixados não existe largura de celular que segure. */
+.my-melds {
+  display: flex; gap: 14px; padding: 8px 12px;
+  overflow-x: auto; min-height: 10px;
+  scroll-snap-type: x proximity;
+}
+.grupo-jogos {
+  display: flex; flex-direction: column; gap: 3px;
+  flex-shrink: 0; scroll-snap-align: start;
+}
+.grupo-jogos .dono {
+  font-size: 0.62rem; font-weight: 900;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--anel, var(--sage));
+  padding-left: 2px;
+  white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis;
+}
+.grupo-jogos .jogos { display: flex; gap: 6px; }
 .meld {
   display: flex; padding: 5px 6px; border-radius: 10px;
-  background: rgba(0, 0, 0, 0.22); border: 2px solid transparent;
+  background: rgba(0, 0, 0, 0.28);
+  border: 2px solid rgba(140, 106, 69, 0.28);
+  border-top-color: rgba(242, 193, 78, 0.22);
   flex-shrink: 0;
 }
 .meld .card.mini { margin-left: -12px; }
@@ -340,7 +714,19 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   .card.mini.swappable { animation: none; }
 }
 .meld .card.mini.removable { outline: 3px solid var(--danger); outline-offset: -2px; cursor: pointer; }
-.opp-melds .meld { padding: 3px 4px; }
+
+/* Carta sobrando num jogo da mesa que fecha um jogo meu agora. Sai da fileira
+   e pisca: é um alvo de toque, e ela só se move se for para baixar na hora. */
+.meld .card.mini.puxavel {
+  cursor: pointer;
+  transform: translateY(-7px);
+  outline: 3px dashed var(--gold);
+  outline-offset: 1px;
+  animation: pulsaCoringa 1.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .meld .card.mini.puxavel { animation: none; }
+}
 
 /* Barra de ações e mão */
 
@@ -351,14 +737,38 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 }
 .action-bar .btn { font-size: 0.92rem; padding: 10px 14px; }
 
+/* Leque, não fileira: as cartas se sobrepõem e giram em torno de um pivô lá
+   embaixo, como quem segura a mão. O passo entre elas vem do JS, porque
+   depende de quantas cartas a rodada deu — 12 na sétima. */
 .hand {
-  display: flex; flex-wrap: wrap; justify-content: center;
-  gap: 6px; row-gap: 10px;
-  padding: 4px 10px calc(14px + env(safe-area-inset-bottom));
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 38px 10px calc(14px + env(safe-area-inset-bottom));
   margin-top: auto;
+  /* A borda da mesa cai na penumbra até virar madeira — é isso que faz a mão
+     ler como primeiro plano sem precisar de moldura. */
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(6, 32, 26, 0.55) 38%,
+    rgba(27, 17, 11, 0.92) 100%);
 }
-.hand .card { width: 56px; height: 78px; cursor: pointer; transition: transform 0.1s ease; }
-.hand .card.sel { transform: translateY(-12px); box-shadow: 0 0 0 3px var(--gold), var(--shadow); }
+.hand .card {
+  width: 56px; height: 78px; cursor: pointer;
+  flex-shrink: 0;
+  margin-left: var(--passo, -20px);
+  transform-origin: 50% 190%;
+  transform: rotate(var(--giro, 0deg));
+  transition: transform 0.12s ease, margin 0.12s ease;
+}
+.fila { display: flex; flex-wrap: nowrap; justify-content: center; align-items: flex-end; }
+.fila .card:first-child { margin-left: 0; }
+/* A escolhida sai do leque e sobe: fica inteira à vista e vira alvo de toque
+   confortável, que é o que a sobreposição tira. */
+.hand .card.sel {
+  transform: rotate(var(--giro, 0deg)) translateY(-18px) scale(1.06);
+  box-shadow: 0 0 0 3px var(--gold), var(--shadow);
+  z-index: 3;
+}
 .hand .card .idx { font-size: 0.95rem; }
 .hand .card .pip { font-size: 1.7rem; }
 
@@ -366,6 +776,48 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   .hand .card { width: 64px; height: 90px; }
   .card { width: 58px; height: 80px; }
 }
+
+/* ---------------- As suas mãos ---------------- */
+
+/* Ficam absolutas nos cantos de baixo: não ocupam altura nenhuma do layout,
+   porque embaixo é o espaço mais disputado da tela. O leque passa por cima. */
+.maos {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 0; z-index: 0;
+  pointer-events: none;
+}
+/* Sobem dos cantos e entram POR TRÁS do leque: o que fica à vista é o
+   antebraço e a lateral da mão, e os dedos somem atrás das cartas — que é como
+   se segura um leque de verdade. Deixá-las inteiras à vista, acima das cartas,
+   lia como garra. */
+.mao {
+  position: absolute; bottom: -24px;
+  width: 96px; height: 160px;
+  transform-origin: 50% 100%;
+  --pele: #f4cfaa;
+}
+/* Giram em torno do cotovelo, lá embaixo: o antebraço fica no canto, à vista,
+   e a mão sobe girando para trás do leque. Só as pontas dos dedos aparecem
+   entre as cartas — que é o que se vê de verdade quando se segura um leque. */
+.mao-esq { left: -26px; transform: rotate(30deg); }
+.mao-dir { right: -26px; transform: scaleX(-1) rotate(30deg); }
+
+/* Mesma construção dos geradores do elenco: contorno uniforme de 5 na cor do
+   fundo, dedos em duas camadas (tinta por baixo, pele por cima) e o halo
+   quente por fora — sem ele a mão some contra a madeira da borda. */
+.mao .halo {
+  fill: none; stroke: var(--halo); stroke-width: 9; opacity: 0.8;
+  stroke-linejoin: round; stroke-linecap: round;
+}
+.mao .corpo {
+  fill: var(--pele);
+  stroke: var(--nogueira); stroke-width: 5;
+  stroke-linejoin: round; stroke-linecap: round;
+}
+.mao .dedo-tinta { fill: none; stroke: var(--nogueira); stroke-width: 12; stroke-linecap: round; }
+.mao .dedo-pele { fill: none; stroke: var(--pele); stroke-width: 8; stroke-linecap: round; }
+.mao .dedo-tinta.polegar { stroke-width: 14; }
+.mao .dedo-pele.polegar { stroke-width: 10; }
 
 /* Avisos (toasts) */
 
@@ -401,7 +853,7 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   max-width: 430px; width: 100%;
   max-height: 82dvh; overflow-y: auto;
   padding: 20px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-bloco);
 }
 .modal h2 { font-family: var(--font-display); color: var(--gold); font-size: 1.5rem; margin-bottom: 12px; }
 .modal h3 { color: var(--gold-soft); font-size: 1.02rem; margin: 14px 0 6px; }

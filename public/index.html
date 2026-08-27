@@ -28,6 +28,15 @@
       <input id="name-input" maxlength="16" placeholder="ex.: Matheus" autocomplete="nickname">
     </label>
 
+    <button id="btn-personagem" class="btn btn-persona">
+      <img id="persona-cara" class="persona-cara" alt="">
+      <span class="persona-txt">
+        <small>Seu personagem</small>
+        <strong id="persona-nome">Gabizinsky</strong>
+      </span>
+      <span class="persona-seta">trocar</span>
+    </button>
+
     <button id="btn-create" class="btn btn-primary">Criar sala</button>
 
     <div class="join-row">
@@ -37,6 +46,31 @@
 
     <button id="btn-rules-home" class="btn btn-ghost">Como se joga?</button>
     <p id="home-error" class="error" hidden></p>
+  </div>
+</section>
+
+<!-- ======================= ESCOLHA DO PERSONAGEM ======================= -->
+<section id="screen-avatar" class="screen" hidden>
+  <div class="escolha">
+    <header class="escolha-topo">
+      <button id="btn-avatar-voltar" class="icon-btn" aria-label="Voltar">‹</button>
+      <h2>Quem vai jogar</h2>
+    </header>
+
+    <div class="palco">
+      <button id="btn-avatar-ant" class="seta" aria-label="Personagem anterior">‹</button>
+      <img id="avatar-figura" class="avatar-figura" alt="">
+      <button id="btn-avatar-prox" class="seta" aria-label="Próximo personagem">›</button>
+    </div>
+
+    <div class="escolha-nome">
+      <strong id="avatar-nome">Gabizinsky</strong>
+      <p id="avatar-traco" class="escolha-traco"></p>
+    </div>
+
+    <div id="avatar-miniaturas" class="miniaturas"></div>
+
+    <button id="btn-avatar-ok" class="btn btn-primary">Jogar com este</button>
   </div>
 </section>
 
@@ -61,31 +95,124 @@
 
 <!-- ======================= MESA DE JOGO ======================= -->
 <section id="screen-game" class="screen" hidden>
+
+  <!-- O lugar onde a mesa está: parede, porta com a luz da rua, engradados e a
+       lâmpada pendurada — que é a mesma lâmpada de que todo o resto da tela
+       fala (foco no meio, penumbra na borda, halo em quem está no escuro). -->
+  <svg class="cenario" viewBox="0 0 375 330" preserveAspectRatio="xMidYMin slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="cParede" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#48301A"/>
+        <stop offset="58%" stop-color="#31200F"/>
+        <stop offset="100%" stop-color="#20140A"/>
+      </linearGradient>
+      <linearGradient id="cRua" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#F7DFA6"/>
+        <stop offset="100%" stop-color="#DFA458"/>
+      </linearGradient>
+      <linearGradient id="cLadoE" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#2A1B12"/>
+        <stop offset="100%" stop-color="#2A1B12" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="cLadoD" x1="1" y1="0" x2="0" y2="0">
+        <stop offset="0%" stop-color="#2A1B12"/>
+        <stop offset="100%" stop-color="#2A1B12" stop-opacity="0"/>
+      </linearGradient>
+      <radialGradient id="cLuz" cx="50%" cy="0%" r="70%">
+        <stop offset="0%" stop-color="#F2C14E" stop-opacity="0.42"/>
+        <stop offset="55%" stop-color="#F2C14E" stop-opacity="0.12"/>
+        <stop offset="100%" stop-color="#F2C14E" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+
+    <rect width="375" height="330" fill="url(#cParede)"/>
+
+    <!-- azulejo de meia parede, atrás de todo mundo -->
+    <g stroke="#5C3D22" stroke-opacity="0.42" stroke-width="1.2">
+      <path d="M0 176h375M0 196h375M0 216h375"/>
+      <path d="M20 176v40M60 176v40M100 176v40M140 176v40M180 176v40M220 176v40M260 176v40M300 176v40M340 176v40"/>
+    </g>
+
+    <!-- porta aberta para a rua: a luz fria de fora contra a quente de dentro
+         é o que dá hora do dia à cena -->
+    <g transform="translate(-4 30) scale(0.62)">
+      <rect x="16" y="34" width="86" height="176" rx="4" fill="#241609"/>
+      <rect x="22" y="40" width="74" height="164" rx="3" fill="url(#cRua)"/>
+      <path d="M22 150h74v54H22z" fill="#C98F4E" opacity="0.5"/>
+      <g fill="#B9803F" opacity="0.65">
+        <rect x="30" y="60" width="24" height="34" rx="2"/>
+        <rect x="64" y="72" width="22" height="22" rx="2"/>
+      </g>
+      <rect x="16" y="34" width="86" height="176" rx="4" fill="none" stroke="#8C6A45" stroke-opacity="0.5" stroke-width="4"/>
+    </g>
+
+    <!-- engradados empilhados, à direita -->
+    <g transform="translate(116 44) scale(0.62)" stroke="#2A1B12" stroke-width="4" stroke-linejoin="round">
+      <rect x="286" y="126" width="72" height="46" rx="4" fill="#B0402A"/>
+      <rect x="286" y="172" width="72" height="46" rx="4" fill="#C08F28"/>
+      <rect x="296" y="80" width="62" height="46" rx="4" fill="#9C3622"/>
+      <g stroke="#2A1B12" stroke-opacity="0.4" stroke-width="3">
+        <path d="M298 138h48M298 152h48M298 184h48M298 198h48M306 92h42M306 108h42"/>
+      </g>
+    </g>
+
+    <!-- cadeira de plástico vazia, encostada na parede -->
+    <g transform="translate(44 62) scale(0.6)" stroke="#2A1B12" stroke-width="4" fill="#A8862F" stroke-linejoin="round">
+      <rect x="196" y="128" width="60" height="12" rx="5"/>
+      <rect x="200" y="72" width="52" height="52" rx="8" fill="#97772A"/>
+      <path d="M204 140v46M248 140v46" stroke-linecap="round"/>
+    </g>
+
+    <!-- a lâmpada, a pino sobre a mesa: é ela que explica a luz de toda a tela -->
+    <g transform="translate(56.25 -4) scale(0.7)">
+      <path d="M187.5 0v40" stroke="#8C6A45" stroke-width="4"/>
+      <path d="M164 80 L211 80 L200 44 L175 44 Z" fill="#2A1B12" stroke="#8C6A45" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M164 80 L211 80" stroke="#F2C14E" stroke-width="5"/>
+      <circle cx="187.5" cy="88" r="9" fill="#FFF3D0"/>
+    </g>
+    <ellipse cx="187.5" cy="58" rx="170" ry="130" fill="url(#cLuz)"/>
+
+    <!-- Costura com o salão: em tela grande o cenário para antes da borda, e
+         sem estes esmaecimentos a parede terminaria numa linha reta. -->
+    <rect width="52" height="330" fill="url(#cLadoE)"/>
+    <rect x="323" width="52" height="330" fill="url(#cLadoD)"/>
+  </svg>
+
   <header class="topbar">
     <div class="round-pill"><span id="round-label">Rodada 1/7</span><strong id="contract-label">2 trincas</strong></div>
     <div class="topbar-btns">
       <button id="btn-score" class="icon-btn" title="Placar">Σ</button>
       <button id="btn-rules" class="icon-btn" title="Regras">?</button>
+      <button id="btn-quit" class="icon-btn icon-btn-sair" title="Sair da partida" aria-label="Sair da partida">⏻</button>
     </div>
   </header>
 
-  <div id="opponents" class="opponents"></div>
-  <p id="opponents-hint" class="opponents-hint" hidden></p>
+  <!-- A mesa: o elenco sentado em volta do feltro, e o meio embaixo da luz -->
+  <div class="mesa">
+    <!-- O feltro é uma camada só dele, inclinada em perspectiva: assim a mesa
+         some no fundo como mesa, e o conteúdo (assentos, monte, avisos) fica
+         em pé e legível. Inclinar tudo junto borraria o texto. -->
+    <div class="feltro" aria-hidden="true"></div>
+    <div id="opponents" class="opponents"></div>
 
-  <div class="table-center">
-    <div class="piles">
-      <button id="deck-pile" class="pile deck-pile">
-        <div class="card back"></div>
-        <span id="deck-count" class="pile-count">55</span>
-      </button>
-      <button id="discard-pile" class="pile discard-pile">
-        <div id="discard-card" class="card empty"></div>
-        <span class="pile-count">meio</span>
-      </button>
+    <div class="table-center">
+      <div class="piles">
+        <button id="deck-pile" class="pile deck-pile">
+          <div class="card back"></div>
+          <span id="deck-count" class="pile-count">55</span>
+        </button>
+        <button id="discard-pile" class="pile discard-pile">
+          <div id="discard-card" class="card empty"></div>
+          <span class="pile-count">meio</span>
+        </button>
+      </div>
+      <button id="btn-claim" class="btn btn-claim" hidden>🛒 Quero essa carta!</button>
+      <p id="turn-banner" class="turn-banner">…</p>
     </div>
-    <button id="btn-claim" class="btn btn-claim" hidden>🛒 Quero essa carta!</button>
-    <p id="turn-banner" class="turn-banner">…</p>
+
+    <div id="meu-assento" class="assento meu-assento" hidden></div>
   </div>
+  <p id="opponents-hint" class="opponents-hint" hidden></p>
 
   <div id="my-melds" class="my-melds"></div>
 
@@ -97,6 +224,46 @@
     <button id="btn-meld-discard" class="btn" hidden>Descartar de jogo</button>
     <button id="btn-cancel-mode" class="btn btn-ghost" hidden>Cancelar</button>
     <button id="btn-sort" class="btn btn-ghost">A↔♠</button>
+  </div>
+
+  <!-- As suas mãos, atrás das cartas. Desenhadas aqui e não geradas em arquivo
+       porque a única coisa que muda entre personagens é o tom de pele; a
+       construção (contorno 5, dedos em duas camadas, halo por fora) é a mesma
+       dos geradores do elenco. Ficam absolutas: não ocupam altura nenhuma do
+       layout, que embaixo é o espaço mais disputado da tela. -->
+  <div id="maos" class="maos" aria-hidden="true">
+    <svg class="mao mao-esq" viewBox="0 0 120 200">
+      <g class="halo">
+        <path d="M 43 84 C 40 120, 38 160, 36 200 L 84 200 C 82 160, 80 120, 77 84 Z"/>
+        <path d="M 42 86 L 78 86 C 82 74, 82 62, 79 54 C 71 49, 49 49, 42 54 C 39 62, 38 74, 42 86 Z"/>
+      </g>
+      <path class="corpo" d="M 43 84 C 40 120, 38 160, 36 200 L 84 200 C 82 160, 80 120, 77 84 Z"/>
+      <g>
+        <path class="dedo-tinta" d="M 46 60 L 46 34"/><path class="dedo-pele" d="M 46 60 L 46 34"/>
+        <path class="dedo-tinta" d="M 56 60 L 56 25"/><path class="dedo-pele" d="M 56 60 L 56 25"/>
+        <path class="dedo-tinta" d="M 66 60 L 66 21"/><path class="dedo-pele" d="M 66 60 L 66 21"/>
+        <path class="dedo-tinta" d="M 76 60 L 76 29"/><path class="dedo-pele" d="M 76 60 L 76 29"/>
+        <path class="dedo-tinta polegar" d="M 81 70 C 87 62, 88 54, 85 48"/>
+        <path class="dedo-pele polegar" d="M 81 70 C 87 62, 88 54, 85 48"/>
+      </g>
+      <path class="corpo" d="M 42 86 L 78 86 C 82 74, 82 62, 79 54 C 71 49, 49 49, 42 54 C 39 62, 38 74, 42 86 Z"/>
+    </svg>
+    <svg class="mao mao-dir" viewBox="0 0 120 200">
+      <g class="halo">
+        <path d="M 43 84 C 40 120, 38 160, 36 200 L 84 200 C 82 160, 80 120, 77 84 Z"/>
+        <path d="M 42 86 L 78 86 C 82 74, 82 62, 79 54 C 71 49, 49 49, 42 54 C 39 62, 38 74, 42 86 Z"/>
+      </g>
+      <path class="corpo" d="M 43 84 C 40 120, 38 160, 36 200 L 84 200 C 82 160, 80 120, 77 84 Z"/>
+      <g>
+        <path class="dedo-tinta" d="M 46 60 L 46 34"/><path class="dedo-pele" d="M 46 60 L 46 34"/>
+        <path class="dedo-tinta" d="M 56 60 L 56 25"/><path class="dedo-pele" d="M 56 60 L 56 25"/>
+        <path class="dedo-tinta" d="M 66 60 L 66 21"/><path class="dedo-pele" d="M 66 60 L 66 21"/>
+        <path class="dedo-tinta" d="M 76 60 L 76 29"/><path class="dedo-pele" d="M 76 60 L 76 29"/>
+        <path class="dedo-tinta polegar" d="M 81 70 C 87 62, 88 54, 85 48"/>
+        <path class="dedo-pele polegar" d="M 81 70 C 87 62, 88 54, 85 48"/>
+      </g>
+      <path class="corpo" d="M 42 86 L 78 86 C 82 74, 82 62, 79 54 C 71 49, 49 49, 42 54 C 39 62, 38 74, 42 86 Z"/>
+    </svg>
   </div>
 
   <div id="hand" class="hand"></div>
