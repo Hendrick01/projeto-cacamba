@@ -8,11 +8,11 @@ export const SUIT_NAMES = ['espadas', 'copas', 'ouros', 'paus'];
 export const SUIT_RED = [false, true, true, false];
 export const RANK_LABELS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-// Coringa. Quantidade por baralho fica aqui para ser fácil de ajustar.
+// Coringa. Quatro por baralho (52 cartas + 4 coringas = 56).
 // O coringa é representado com rank 0 e suit -1 justamente para nunca casar
 // com as buscas por valor (1..13) ou naipe (0..3): ele só entra onde houver
 // tratamento explícito. Vale APENAS em sequência — trinca exige cartas reais.
-export const JOKERS_PER_DECK = 2;
+export const JOKERS_PER_DECK = 4;
 export const JOKER_LABEL = '🃏';
 // Quantos coringas uma mesma sequência pode conter. A sequência tem exatamente
 // 4 cartas: com 2 coringas metade do jogo seria curinga, o que esvazia a
@@ -47,7 +47,7 @@ export const TOTAL_ROUNDS = CONTRACTS.length;
 // Regras da casa ajustáveis (o dono da sala poderá mudar no futuro)
 export const DEFAULT_OPTS = {
   decks: 2,          // 2 baralhos
-  jokersPerDeck: JOKERS_PER_DECK, // coringas por baralho (padrão físico: 2)
+  jokersPerDeck: JOKERS_PER_DECK, // coringas por baralho
   buyPenalty: 1,     // quem compra fora da vez leva +1 carta do monte
   maxReshuffles: 3,  // monte esgotado 3x na rodada → rodada termina sem vencedor
   // Rede de segurança: se todo mundo só pegar do descarte, o monte nunca
