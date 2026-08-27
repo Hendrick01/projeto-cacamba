@@ -18,7 +18,8 @@ SKIN       = "#F4CFAA"
 SKIN_SH    = "#E0B189"
 BLUSH      = "#E08A6A"
 
-HAIR       = "#C6335A"   # vermelho vivo, cereja (foto). Unico cabelo claro do elenco
+HAIR       = "#C6335A"   # vermelho vivo, cereja (foto). O mais ESCURO dos dois
+                         # vermelhos do elenco: o rosa da Lyly esta 22 pontos de L* acima
 HAIR_LIT   = "#DE5C7C"
 BROW       = "#7A2438"   # sobrancelha fica escura, nao acompanha o cereja
 

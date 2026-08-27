@@ -3,11 +3,14 @@
 Mesma construcao do elenco. Adaptacoes masculinas: mandibula mais larga e
 reta, pescoco e ombros mais largos, sobrancelhas mais baixas e grossas,
 olhos ligeiramente menores. Camisa tricolor (listras verticais) SEM escudo,
-nome, numero ou patrocinador.
+nome, numero ou patrocinador. Prata no rosto: piercing na sobrancelha direita
+DELE e brinco ponto de luz na orelha direita — os dois do mesmo lado, que na
+imagem e o lado esquerdo.
 """
 import os
 
-OUT = os.path.dirname(os.path.abspath(__file__))
+# Os SVGs ficam um nivel acima: este diretorio guarda so os geradores.
+OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 INK        = "#2A1B12"
 WOOD       = "#7A4A2B"
@@ -176,9 +179,36 @@ def head(sw):
       <path d="M 112 76 C 124 58, 144 47, 164 46 C 146 53, 128 64, 117 80 Z"/>
     </g>
 
+    <!-- BRINCO ponto de luz: um so, no lobo da orelha DIREITA dele — que e a
+         esquerda da imagem. Entra depois do cabelo porque a costeleta escura
+         desce ate y=112 desse lado e cobriria o lobo. Mesma receita da perola:
+         circulo chapado de prata com UM ponto claro seco fora de centro — nao
+         e pedra, a pedra do elenco e a do cordao do Junior. O raio e o centro
+         sao medidos: da orelha so fica visivel uma folha de pele de 6,3 x 10,6
+         unidades, e o maior circulo que cabe inteiro nela tem raio 2,58. -->
+    <g>
+      <circle cx="79.7" cy="116.4" r="1.95" fill="{SILVER}" stroke="{INK}" stroke-width="{sw*0.22:.2f}"/>
+      <circle cx="79.1" cy="115.8" r="0.68" fill="{CREAM}" stroke="none"/>
+    </g>
+
+    <!-- PIERCING de prata na sobrancelha DIREITA dele — mesmo lado do brinco,
+         terco externo da sobrancelha. A haste vem ANTES da sobrancelha, para o
+         pelo cobrir o meio dela; as esferas vem DEPOIS, por cima. Desenhado
+         tudo junto, a barra atravessaria o pelo e leria como risco. -->
+    <path fill="none" stroke="{SILVER_MID}" stroke-width="{sw*0.58:.2f}"
+      stroke-linecap="round" d="M 99.3 86.4 L 100.5 100.2"/>
+
     <!-- sobrancelhas mais grossas e mais baixas -->
     <path fill="none" stroke="{HAIR_SH}" stroke-width="{sw*1.55:.2f}" d="M 94 96 C 103 90, 116 90, 123 94"/>
     <path fill="none" stroke="{HAIR_SH}" stroke-width="{sw*1.55:.2f}" d="M 133 94 C 140 90, 153 90, 162 96"/>
+
+    <!-- esferas do piercing: a de cima na testa, a de baixo no vao entre a
+         sobrancelha e a palpebra -->
+    <g>
+      <circle cx="99.3" cy="85.7" r="2.7" fill="{SILVER}" stroke="{INK}" stroke-width="{sw*0.4:.2f}"/>
+      <circle cx="98.4" cy="84.8" r="0.9" fill="{CREAM}" stroke="none"/>
+      <circle cx="100.5" cy="100.6" r="2.3" fill="{SILVER}" stroke="{INK}" stroke-width="{sw*0.4:.2f}"/>
+    </g>
 
     <!-- olhos (um pouco menores) -->
     <g>
