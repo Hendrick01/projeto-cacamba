@@ -8,6 +8,19 @@ export const SUIT_NAMES = ['espadas', 'copas', 'ouros', 'paus'];
 export const SUIT_RED = [false, true, true, false];
 export const RANK_LABELS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+// Coringa. Quantidade por baralho fica aqui para ser fácil de ajustar.
+// O coringa é representado com rank 0 e suit -1 justamente para nunca casar
+// com as buscas por valor (1..13) ou naipe (0..3): ele só entra onde houver
+// tratamento explícito. Vale APENAS em sequência — trinca exige cartas reais.
+export const JOKERS_PER_DECK = 2;
+export const JOKER_LABEL = '🃏';
+// Quantos coringas uma mesma sequência pode conter. A sequência tem exatamente
+// 4 cartas: com 2 coringas metade do jogo seria curinga, o que esvazia a
+// dificuldade do contrato. Regra da casa, fácil de afrouxar aqui.
+export const MAX_JOKERS_PER_SEQ = 1;
+
+export function isJoker(card) { return !!card && card.joker === true; }
+
 // Contratos das 7 rodadas: t = trincas, s = sequências. Cartas da rodada = 6 + índice.
 export const CONTRACTS = [
   { t: 2, s: 0, label: '2 trincas' },
@@ -23,30 +36,41 @@ export const TOTAL_ROUNDS = CONTRACTS.length;
 
 // Regras da casa ajustáveis (o dono da sala poderá mudar no futuro)
 export const DEFAULT_OPTS = {
-  decks: 2,          // 2 baralhos, sem coringa
+  decks: 2,          // 2 baralhos
+  jokersPerDeck: JOKERS_PER_DECK, // coringas por baralho (padrão físico: 2)
   buyPenalty: 1,     // quem compra fora da vez leva +1 carta do monte
   maxReshuffles: 3,  // monte esgotado 3x na rodada → rodada termina sem vencedor
+  // Rede de segurança: se todo mundo só pegar do descarte, o monte nunca
+  // esgota e maxReshuffles nunca é atingido. Rodadas normais ficam bem abaixo
+  // de 60 turnos; este teto só existe para a rodada não poder ficar eterna.
+  maxTurnsPerRound: 300,
   minPlayers: 2,
   maxPlayers: 4,
 };
 
-export function rankLabel(rank) { return RANK_LABELS[rank - 1]; }
-export function suitLabel(suit) { return SUITS[suit]; }
-export function cardLabel(card) { return rankLabel(card.rank) + SUITS[card.suit]; }
+export function rankLabel(rank) { return RANK_LABELS[rank - 1] || ''; }
+export function suitLabel(suit) { return SUITS[suit] || ''; }
+export function cardLabel(card) {
+  return isJoker(card) ? JOKER_LABEL : rankLabel(card.rank) + SUITS[card.suit];
+}
 
-// Pontos das cartas que sobram na mão: A=15, 10/J/Q/K=10, demais=5
+// Pontos das cartas que sobram na mão: coringa=20, A=15, 10/J/Q/K=10, demais=5
 export function cardPoints(card) {
+  if (isJoker(card)) return 20;
   if (card.rank === 1) return 15;
   if (card.rank >= 10) return 10;
   return 5;
 }
 
-// Ás vale 1 (A-2-3-4) ou 14 (J-Q-K-A); nunca "vira a esquina" (K-A-2 não vale)
+// Ás vale 1 (A-2-3-4) ou 14 (J-Q-K-A); nunca "vira a esquina" (K-A-2 não vale).
+// O coringa não tem valor próprio: quem decide o que ele representa é a
+// sequência em que ele entra, então aqui ele não casa com nada.
 export function cardValues(card) {
+  if (isJoker(card)) return [];
   return card.rank === 1 ? [1, 14] : [card.rank];
 }
 
-export function buildDecks(numDecks) {
+export function buildDecks(numDecks, jokersPerDeck = JOKERS_PER_DECK) {
   const cards = [];
   let id = 1;
   for (let d = 0; d < numDecks; d++) {
@@ -54,6 +78,9 @@ export function buildDecks(numDecks) {
       for (let rank = 1; rank <= 13; rank++) {
         cards.push({ id: id++, rank, suit });
       }
+    }
+    for (let j = 0; j < jokersPerDeck; j++) {
+      cards.push({ id: id++, rank: 0, suit: -1, joker: true });
     }
   }
   return cards;
@@ -107,27 +134,43 @@ export function findContractMelds(cards, needT, needS) {
     return out;
   }
 
-  function seqCandidates(minKey) {
+  // Coringas livres no momento. Só servem para sequência: a trinca acima
+  // percorre ranks 1..13 e o coringa tem rank 0, então nunca casa lá.
+  function freeJokers() {
     const out = [];
+    for (const c of cards) if (isJoker(c) && !used.has(c.id)) out.push(c);
+    return out;
+  }
+
+  function seqCandidates(minKey) {
+    const puras = [];   // sequências só com cartas reais
+    const comJoker = []; // sequências que gastam coringa
+    const jokers = freeJokers();
+    const maxJokers = Math.min(jokers.length, MAX_JOKERS_PER_SEQ);
     for (let s = 0; s < 4; s++) {
       const byVal = {};
       for (const c of cards) {
-        if (c.suit !== s || used.has(c.id)) continue;
+        if (isJoker(c) || c.suit !== s || used.has(c.id)) continue;
         for (const v of cardValues(c)) if (!byVal[v]) byVal[v] = c;
       }
       for (let start = 1; start <= 11; start++) {
         const key = s * 16 + start;
         if (key < minKey) continue;
         const run = [];
+        let usados = 0;
         let ok = true;
         for (let v = start; v < start + 4; v++) {
-          if (byVal[v]) run.push(byVal[v]);
-          else { ok = false; break; }
+          if (byVal[v]) { run.push(byVal[v]); continue; }
+          if (usados < maxJokers) { run.push(jokers[usados]); usados++; continue; }
+          ok = false;
+          break;
         }
-        if (ok) out.push({ key, suit: s, start, cards: run });
+        if (!ok) continue;
+        (usados === 0 ? puras : comJoker).push({ key, suit: s, start, cards: run });
       }
     }
-    return out;
+    // Primeiro as puras: assim o solver só queima coringa quando precisa.
+    return puras.concat(comJoker);
   }
 
   function solve(tLeft, sLeft, minRank, minKey) {
@@ -167,21 +210,33 @@ function makeTrincaMeld(cards, ownerId) {
 
 function makeSeqMeld(cards, start, ownerId) {
   const values = cards.map((_, i) => start + i);
-  return { id: meldSeq++, type: 's', suit: cards[0].suit, cards: cards.slice(), values, ownerId };
+  // O naipe vem da primeira carta REAL: se o coringa abrir a sequência,
+  // cards[0].suit seria -1 e nenhuma carta conseguiria mais encaixar aqui.
+  const real = cards.find((c) => !isJoker(c));
+  return { id: meldSeq++, type: 's', suit: real ? real.suit : -1, cards: cards.slice(), values, ownerId };
 }
 
 // Uma carta encaixa neste jogo? Retorna descrição do encaixe ou null.
 export function layoffOption(card, meld) {
   if (meld.type === 't') {
-    if (card.rank !== meld.rank) return null;
+    // Trinca é só com carta real: o coringa vale apenas para sequência.
+    if (isJoker(card) || card.rank !== meld.rank) return null;
     const suits = new Set(meld.cards.map((c) => c.suit));
     // Mantém naipes diferentes até completar os 4; depois libera repetição
     if (suits.has(card.suit) && suits.size < 4) return null;
     return { kind: 't' };
   }
-  if (card.suit !== meld.suit) return null;
   const lo = meld.values[0];
   const hi = meld.values[meld.values.length - 1];
+  // Coringa da mão estica a sequência pela ponta, respeitando o limite do jogo.
+  // Vem antes da checagem de naipe porque o coringa não tem naipe próprio.
+  if (isJoker(card)) {
+    if (meld.cards.filter(isJoker).length >= MAX_JOKERS_PER_SEQ) return null;
+    if (hi + 1 <= 14) return { kind: 's', end: 'hi', v: hi + 1 };
+    if (lo - 1 >= 1) return { kind: 's', end: 'lo', v: lo - 1 };
+    return null;
+  }
+  if (card.suit !== meld.suit) return null;
   for (const v of cardValues(card)) {
     if (v === lo - 1 && v >= 1) return { kind: 's', end: 'lo', v };
     if (v === hi + 1 && v <= 14) return { kind: 's', end: 'hi', v };
@@ -248,6 +303,7 @@ export function createGame(players, opts = {}) {
     deck: [],
     discard: [],
     turn: 0,
+    turnNo: 0,          // turnos já jogados na rodada; sobe a cada passagem de vez
     phase: 'lobby',
     discardFresh: false, // o topo do descarte acabou de ser descartado (comprável)
     claims: [],          // ids de quem pediu para comprar fora da vez
@@ -286,7 +342,7 @@ export function startRound(state) {
     return [{ e: 'gameEnd', ranking: finalRanking(state) }];
   }
   const cardsEach = 6 + state.round;
-  state.deck = shuffle(buildDecks(state.opts.decks), state.rnd);
+  state.deck = shuffle(buildDecks(state.opts.decks, state.opts.jokersPerDeck), state.rnd);
   for (const p of state.players) {
     p.hand = [];
     p.melds = [];
@@ -297,6 +353,7 @@ export function startRound(state) {
   }
   state.discard = [state.deck.pop()];
   state.turn = state.round % state.players.length;
+  state.turnNo = 0;
   state.phase = 'draw';
   state.discardFresh = false; // carta virada do monte não é "comprável" fora da vez
   state.claims = [];
@@ -485,6 +542,7 @@ export function actDiscard(state, playerId, cardId) {
   const events = [{ e: 'discard', p: playerId, card: { ...card } }];
   if (player.hand.length === 0) return endRound(state, playerId, 'bateu', events);
   advanceTurn(state);
+  if (state.turnNo > state.opts.maxTurnsPerRound) return endRoundDead(state, events);
   return events;
 }
 
@@ -503,11 +561,13 @@ export function actMeldDiscard(state, playerId, meldId, cardId) {
   state.discard.push(card);
   const events = [{ e: 'meldDiscard', p: playerId, card: { ...card }, meldId }];
   advanceTurn(state);
+  if (state.turnNo > state.opts.maxTurnsPerRound) return endRoundDead(state, events);
   return events;
 }
 
 function advanceTurn(state) {
   state.turn = (state.turn + 1) % state.players.length;
+  state.turnNo++;
   state.phase = 'draw';
   state.discardFresh = true;
   state.claims = [];
@@ -555,17 +615,27 @@ export function viewFor(state, playerId) {
 // Bot: heurística simples
 // ============================================================================
 
-// Melhor cobertura do contrato que estas cartas alcançam (nº de cartas casadas)
-function bestCover(cards, ct) {
-  let best = 0;
+// Melhor cobertura do contrato que estas cartas alcançam: devolve quantas
+// cartas ela casa E quais são elas. Medir o progresso e proteger as cartas
+// tem que sair da MESMA decomposição — se divergirem, o bot descarta uma carta
+// que ele mesmo conta como progresso e volta a querê-la na jogada seguinte,
+// o que trava a rodada num ciclo de pega-e-devolve com o descarte.
+function melhorCobertura(cards, ct) {
+  const combinacoes = [];
   for (let a = ct.t; a >= 0; a--) {
-    for (let b = ct.s; b >= 0; b--) {
-      const score = a * 3 + b * 4;
-      if (score <= best) continue;
-      if (findContractMelds(cards, a, b)) best = score;
-    }
+    for (let b = ct.s; b >= 0; b--) combinacoes.push({ a, b, score: a * 3 + b * 4 });
   }
-  return best;
+  combinacoes.sort((x, y) => y.score - x.score); // da melhor para a pior
+  for (const { a, b, score } of combinacoes) {
+    if (a === 0 && b === 0) break;
+    const res = findContractMelds(cards, a, b);
+    if (res) return { score, res };
+  }
+  return { score: 0, res: null };
+}
+
+function bestCover(cards, ct) {
+  return melhorCobertura(cards, ct).score;
 }
 
 // A carta avança o contrato de verdade, ou encaixa em algum jogo da mesa?
@@ -576,14 +646,30 @@ export function botWantsCard(state, player, card) {
   const ct = currentContract(state);
   const before = bestCover(player.hand, ct);
   if (before >= ct.t * 3 + ct.s * 4) return false; // contrato já fechado
+  // Vale para o coringa também: só pega se a cobertura melhorar de verdade.
+  // Querer uma carta que a heurística de descarte depois larga é o que criava
+  // o pega-e-devolve infinito com o descarte.
   return bestCover([...player.hand, card], ct) > before;
 }
 
-// Utilidade de manter uma carta na mão (para escolher descarte)
-function cardUsefulness(state, player, card) {
-  const ct = currentContract(state);
-  const tW = ct.t > 0 ? 1 : 0.15;
-  const sW = ct.s > 0 ? 1 : 0.15;
+// Utilidade de manter uma carta na mão (para escolher descarte).
+// `faltam` = quantas trincas e sequências o contrato ainda pede depois do que
+// a mão já forma. Os pesos olham o que FALTA, não o contrato inteiro: sem
+// isso, um bot que já tem a sequência pronta continua achando ótimas as
+// cartas do mesmo naipe (que não servem mais para nada) e descarta na hora as
+// de outro naipe, que valeriam 0 — e assim nunca começa a trinca que falta.
+function cardUsefulness(state, player, card, faltam) {
+  const tW = faltam.t > 0 ? 1 : 0.15;
+  const sW = faltam.s > 0 ? 1 : 0.15;
+  // Coringa: tapa qualquer buraco de sequência, então vale muito — mas só até
+  // a cota que ainda dá para aproveitar (cada sequência aceita no máximo
+  // MAX_JOKERS_PER_SEQ). Coringa excedente é 20 pontos mortos; sem esta cota o
+  // bot acumulava os quatro coringas do baralho e nunca fechava o contrato.
+  if (isJoker(card)) {
+    const cota = faltam.s * MAX_JOKERS_PER_SEQ;
+    const posicao = player.hand.filter(isJoker).findIndex((c) => c.id === card.id);
+    return posicao >= 0 && posicao < cota ? 7 : 0;
+  }
   let score = 0;
   const mates = new Set(
     player.hand.filter((c) => c.id !== card.id && c.rank === card.rank && c.suit !== card.suit).map((c) => c.suit)
@@ -598,36 +684,53 @@ function cardUsefulness(state, player, card) {
   return score;
 }
 
-// Protege cartas que já formam jogos completos exigidos pelo contrato
+// Protege exatamente as cartas da melhor cobertura — a mesma que bestCover
+// mede. Assim a cobertura nunca regride: o bot só pega carta do descarte que
+// a aumenta e nunca descarta carta que a sustenta, então ele converge para o
+// contrato em vez de ficar rodando em círculo com o monte de descarte.
 function protectedIds(state, player) {
   const ct = currentContract(state);
-  const res = findContractMelds(player.hand, ct.t, ct.s);
   const ids = new Set();
-  if (res) {
+  const guarda = (res) => {
+    if (!res) return;
     for (const cards of res.trincas) cards.forEach((c) => ids.add(c.id));
     for (const { cards } of res.seqs) cards.forEach((c) => ids.add(c.id));
-    return ids;
-  }
-  // Contrato incompleto: protege ao menos os jogos completos avulsos
+  };
+  // 1) A melhor cobertura — obrigatória, é a que bestCover mede.
+  guarda(melhorCobertura(player.hand, ct).res);
+  // 2) Mais os jogos completos avulsos. Uma trinca e uma sequência podem
+  //    disputar a mesma carta e não caber na mesma cobertura; ainda assim as
+  //    duas são progresso e nenhuma delas deve virar descarte. Proteger a
+  //    união é sempre seguro: continua contendo tudo que a cobertura conta.
   for (let k = Math.min(ct.t, 3); k >= 1; k--) {
-    const partial = findContractMelds(player.hand, k, 0);
-    if (partial) { partial.trincas.forEach((cs) => cs.forEach((c) => ids.add(c.id))); break; }
+    const parcial = findContractMelds(player.hand, k, 0);
+    if (parcial) { guarda(parcial); break; }
   }
   for (let k = Math.min(ct.s, 3); k >= 1; k--) {
-    const partial = findContractMelds(player.hand, 0, k);
-    if (partial) { partial.seqs.forEach(({ cards }) => cards.forEach((c) => ids.add(c.id))); break; }
+    const parcial = findContractMelds(player.hand, 0, k);
+    if (parcial) { guarda(parcial); break; }
   }
   return ids;
 }
 
 export function botPickDiscard(state, player) {
+  const ct = currentContract(state);
+  const cobertura = melhorCobertura(player.hand, ct).res;
+  const faltam = {
+    t: ct.t - (cobertura ? cobertura.trincas.length : 0),
+    s: ct.s - (cobertura ? cobertura.seqs.length : 0),
+  };
   const safe = protectedIds(state, player);
   let candidates = player.hand.filter((c) => !safe.has(c.id));
   if (candidates.length === 0) candidates = player.hand;
+  // O coringa não precisa de regra especial aqui: se ele está sustentando a
+  // melhor cobertura, protectedIds já o tirou dos candidatos; se não está, ele
+  // é 20 pontos parados na mão e largá-lo é jogada legítima — ninguém pega
+  // coringa do meio.
   let worst = candidates[0];
   let worstScore = Infinity;
   for (const c of candidates) {
-    const u = player.baixou ? -cardPoints(c) : cardUsefulness(state, player, c) - cardPoints(c) * 0.01;
+    const u = player.baixou ? -cardPoints(c) : cardUsefulness(state, player, c, faltam) - cardPoints(c) * 0.01;
     if (u < worstScore) { worstScore = u; worst = c; }
   }
   return worst;

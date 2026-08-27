@@ -223,6 +223,11 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   -webkit-user-select: none;
 }
 .card.red { color: var(--red); }
+/* Coringa: fundo dourado para se distinguir de relance no meio da mão */
+.card.joker {
+  color: var(--ink);
+  background: linear-gradient(150deg, var(--gold) 0%, var(--gold-soft) 100%);
+}
 .card .idx {
   position: absolute; top: 4px; left: 5px;
   font-size: 0.82rem; font-weight: 900; line-height: 1;

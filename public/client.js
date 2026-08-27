@@ -4,6 +4,7 @@
 
 import {
   findContractMelds, layoffOption, removableCards, SUITS, SUIT_RED, rankLabel,
+  isJoker, JOKER_LABEL,
 } from '/shared/engine.js';
 
 const $ = (id) => document.getElementById(id);
@@ -181,18 +182,24 @@ $('btn-leave-lobby').onclick = () => {
 
 function cardEl(card, mini = false) {
   const el = document.createElement('div');
-  el.className = 'card' + (SUIT_RED[card.suit] ? ' red' : '') + (mini ? ' mini' : '');
+  const joker = isJoker(card);
+  el.className = 'card'
+    + (joker ? ' joker' : '')
+    + (!joker && SUIT_RED[card.suit] ? ' red' : '')
+    + (mini ? ' mini' : '');
   const idx = document.createElement('span');
   idx.className = 'idx';
-  idx.textContent = rankLabel(card.rank) + SUITS[card.suit];
+  idx.textContent = joker ? 'C' : rankLabel(card.rank) + SUITS[card.suit];
   const pip = document.createElement('span');
   pip.className = 'pip';
-  pip.textContent = SUITS[card.suit];
+  pip.textContent = joker ? JOKER_LABEL : SUITS[card.suit];
   el.append(idx, pip);
   return el;
 }
 
-function cardText(card) { return rankLabel(card.rank) + SUITS[card.suit]; }
+function cardText(card) {
+  return isJoker(card) ? `${JOKER_LABEL} coringa` : rankLabel(card.rank) + SUITS[card.suit];
+}
 
 function sortedHand() {
   const hand = [...(view?.you?.hand || [])];
@@ -606,7 +613,7 @@ function showScore() {
     .join('');
   showModal(
     `<h2>Placar</h2>
-     <p>Menos pontos ganha. A = 15 · K/Q/J/10 = 10 · demais = 5.</p>
+     <p>Menos pontos ganha. A = 15 · K/Q/J/10 = 10 · demais = 5 · coringa = 20.</p>
      <table class="score-table"><tr><th>Jogador</th><th style="text-align:right">Total</th></tr>${rows}</table>`,
     [{ label: 'Fechar', fn: closeModal }],
     closeModal,
@@ -642,7 +649,7 @@ function showRules() {
      <h3>Compra fora da vez</h3>
      <p>Quando alguém descarta, outro jogador pode pedir a carta — mas <strong>quem está na vez tem preferência</strong>. Quem compra fora da vez leva a carta <strong>+ 1 carta de castigo</strong> do monte e não descarta.</p>
      <h3>Pontos</h3>
-     <p>Cartas que sobram na mão: <strong>Ás = 15</strong> · <strong>K, Q, J e 10 = 10</strong> · demais = 5. Se o monte esgotar 3 vezes na mesma rodada, a rodada acaba sem vencedor e todos contam a mão.</p>`,
+     <p>Cartas que sobram na mão: <strong>Ás = 15</strong> · <strong>K, Q, J e 10 = 10</strong> · demais = 5 · <strong>coringa = 20</strong>. Se o monte esgotar 3 vezes na mesma rodada, a rodada acaba sem vencedor e todos contam a mão.</p>`,
     [{ label: 'Fechar', fn: closeModal }],
     closeModal,
   );

@@ -5,6 +5,7 @@ import {
   layoffOption, removableCards, createGame, startRound, actDraw, actBaixar,
   actLayoff, actDiscard, actMeldDiscard, actClaim, actNextRound, applyAction,
   botNextAction, botWantsCard, mulberry32, viewFor, allMelds, playerById,
+  isJoker,
 } from '../shared/engine.js';
 
 // Atalho para criar cartas nos testes: c('A','♠') etc.
@@ -22,7 +23,8 @@ test('contratos batem com a contagem de cartas das rodadas (6 a 12)', () => {
   assert.equal(TOTAL_ROUNDS, 7);
 });
 
-test('pontos: A=15, figuras e 10 = 10, resto = 5', () => {
+test('pontos: coringa=20, A=15, figuras e 10 = 10, resto = 5', () => {
+  assert.equal(cardPoints({ id: 1, rank: 0, suit: -1, joker: true }), 20);
   assert.equal(cardPoints(c('A', '♠')), 15);
   assert.equal(cardPoints(c('K', '♠')), 10);
   assert.equal(cardPoints(c('10', '♥')), 10);
@@ -276,7 +278,7 @@ function simulateGame(seed, numPlayers = 4) {
   const players = Array.from({ length: numPlayers }, (_, i) => ({ id: `b${i}`, name: `Bot ${i}`, isBot: true }));
   const state = createGame(players, { rnd: mulberry32(seed) });
   startRound(state);
-  const expected = state.opts.decks * 52;
+  const expected = state.opts.decks * (52 + state.opts.jokersPerDeck);
   let rounds = 0;
 
   while (state.phase !== 'gameEnd') {
@@ -307,6 +309,33 @@ function simulateGame(seed, numPlayers = 4) {
   for (let i = 1; i < ranking.length; i++) assert.ok(ranking[i - 1].score <= ranking[i].score);
   return state;
 }
+
+test('cada rodada recomeça com o baralho inteiro de volta, coringas inclusive', () => {
+  const players = [0, 1, 2, 3].map((i) => ({ id: `b${i}`, name: `Bot ${i}`, isBot: true }));
+  const state = createGame(players, { rnd: mulberry32(7) });
+  const esperado = state.opts.decks * (52 + state.opts.jokersPerDeck);
+  const coringasEsperados = state.opts.decks * state.opts.jokersPerDeck;
+
+  for (let rodada = 0; rodada < TOTAL_ROUNDS; rodada++) {
+    startRound(state);
+    assert.equal(state.round, rodada);
+    // Nada some entre rodadas: mãos, jogos baixados, descarte e monte somados
+    // têm que dar o baralho inteiro no começo de cada uma das 7 rodadas.
+    assert.equal(totalCards(state), esperado, `rodada ${rodada + 1}`);
+    const todas = [
+      ...state.deck, ...state.discard,
+      ...state.players.flatMap((p) => p.hand),
+      ...allMelds(state).flatMap((m) => m.cards),
+    ];
+    assert.equal(todas.filter(isJoker).length, coringasEsperados, `coringas na rodada ${rodada + 1}`);
+    assert.equal(new Set(todas.map((c) => c.id)).size, esperado, `ids repetidos na rodada ${rodada + 1}`);
+    // Suja o estado de propósito antes da próxima: cartas espalhadas em mãos,
+    // jogos baixados e descarte precisam voltar todas ao baralho.
+    const p0 = state.players[0];
+    p0.melds.push({ id: 9000 + rodada, type: 't', rank: 5, ownerId: p0.id, cards: p0.hand.splice(0, 3) });
+    state.discard.push(...state.players[1].hand.splice(0, 2));
+  }
+});
 
 test('30 partidas completas: terminam, conservam as cartas e pontuam', () => {
   for (let seed = 1; seed <= 30; seed++) {
