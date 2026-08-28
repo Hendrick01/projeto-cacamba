@@ -114,10 +114,54 @@ def flower(cx, cy, r, petal=BLOOM, core=BLOOM_WARM, rot=0.0, n=5):
     return "".join(p)
 
 
+# ------------------------------------------------- a flor como forma reusavel
+#
+# A estampa carimbava a flor inteira em cada posicao: sao ~158 flores so na
+# saia do corpo inteiro, seis elementos cada, e davam 948 <ellipse> num arquivo
+# de 128 KB — seis vezes o de qualquer outra pessoa do elenco. E estampa: o
+# proprio comentario de `floral` diz que ela some cedo, que e textura e nao
+# sinal. Ninguem ve uma flor de 1 px na mesa, mas o navegador desenha as 948.
+#
+# Aqui a forma e escrita UMA vez, no tamanho 10 e na origem, e cada carimbo
+# vira um <use> com translate/rotate/scale. O desenho e o mesmo: girar a flor
+# inteira em torno do centro dela da exatamente o mesmo resultado que somar o
+# angulo a cada petala (era `a = rot + i*72`, e a petala girava do mesmo `a`),
+# e a escala e uniforme porque todo raio ali e linear em r.
+
+def flor_def(uid, petal, core):
+    """A flor de `flower()` normalizada: r=10, centro na origem, sem giro."""
+    p = []
+    for i in range(5):
+        a = i * 72.0
+        rad = math.radians(a - 90)
+        px, py = 5.8 * math.cos(rad), 5.8 * math.sin(rad)
+        p.append(f'<ellipse cx="{px:.2f}" cy="{py:.2f}" rx="4.40" ry="5.60" '
+                 f'transform="rotate({a:.0f} {px:.2f} {py:.2f})" fill="{petal}"/>')
+    p.append(f'<circle cx="0" cy="0" r="2.80" fill="{core}"/>')
+    # `stroke="none"` explicito: <use> herda o stroke de onde e usado, e o
+    # grupo da estampa nem sempre e o mesmo.
+    return f'<g id="{uid}" stroke="none">{"".join(p)}</g>'
+
+
+def botao_def(uid):
+    """O botao da estampa — dois pontinhos e uma folha —, tambem normalizado."""
+    return (f'<g id="{uid}" stroke="none">'
+            f'<circle cx="0" cy="0" r="3.00" fill="{BLOOM}"/>'
+            f'<ellipse cx="7.00" cy="5.00" rx="5.00" ry="2.40" '
+            f'transform="rotate(28 7.00 5.00)" fill="{LEAF}"/></g>')
+
+
 def floral(x0, y0, x1, y1, step, r, seed):
     """Estampa: grade escalonada com tremida fixa (semente constante, para o
     SVG sair identico a cada rodada). Some cedo - e textura, nao sinal."""
     rnd = random.Random(seed)
+    # Os ids carregam a semente: as cinco estampas de um mesmo SVG (avatar,
+    # saia, corpete, mangas) sao chamadas independentes, e cada uma leva as
+    # proprias definicoes. Sem a semente no id, a segunda sobrescreveria a
+    # primeira.
+    a_id, b_id, c_id = f"fl{seed}a", f"fl{seed}b", f"fl{seed}c"
+    defs = (f'<defs>{flor_def(a_id, BLOOM, BLOOM_WARM)}'
+            f'{flor_def(b_id, BLOOM_ROSE, BLOOM)}{botao_def(c_id)}</defs>')
     out, row, y = [], 0, y0
     while y < y1:
         x = x0 + (step * 0.5 if row % 2 else 0.0)
@@ -126,21 +170,20 @@ def floral(x0, y0, x1, y1, step, r, seed):
             jy = rnd.uniform(-step * 0.18, step * 0.18)
             k = rnd.random()
             if k < 0.58:
-                out.append(flower(x + jx, y + jy, r * rnd.uniform(0.85, 1.15),
-                                  BLOOM, BLOOM_WARM, rot=rnd.uniform(0, 72)))
+                rr = r * rnd.uniform(0.85, 1.15)
+                out.append(f'<use href="#{a_id}" transform="translate({x+jx:.1f} {y+jy:.1f}) '
+                           f'rotate({rnd.uniform(0, 72):.0f}) scale({rr/10:.3f})"/>')
             elif k < 0.82:
-                out.append(flower(x + jx, y + jy, r * 0.82,
-                                  BLOOM_ROSE, BLOOM, rot=rnd.uniform(0, 72)))
+                out.append(f'<use href="#{b_id}" transform="translate({x+jx:.1f} {y+jy:.1f}) '
+                           f'rotate({rnd.uniform(0, 72):.0f}) scale({r*0.82/10:.3f})"/>')
             else:
                 # botao: dois pontinhos e uma folha - quebra a regularidade
-                out.append(f'<circle cx="{x+jx:.1f}" cy="{y+jy:.1f}" r="{r*0.30:.2f}" fill="{BLOOM}"/>'
-                           f'<ellipse cx="{x+jx+r*0.7:.1f}" cy="{y+jy+r*0.5:.1f}" '
-                           f'rx="{r*0.5:.2f}" ry="{r*0.24:.2f}" '
-                           f'transform="rotate(28 {x+jx+r*0.7:.1f} {y+jy+r*0.5:.1f})" fill="{LEAF}"/>')
+                out.append(f'<use href="#{c_id}" transform="translate({x+jx:.1f} {y+jy:.1f}) '
+                           f'scale({r/10:.3f})"/>')
             x += step
         y += step * 0.84
         row += 1
-    return f'<g stroke="none">{"".join(out)}</g>'
+    return f'{defs}<g stroke="none">{"".join(out)}</g>'
 
 
 def silver_flower(cx, cy, r, sw):
