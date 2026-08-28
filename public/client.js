@@ -11,6 +11,7 @@ import {
 import {
   ELENCO, SLUGS, personagemValido, personagemDoAssento, peleDe, temExpressao,
 } from '/shared/elenco.js';
+import { ordenaMao, reordena } from '/shared/mao.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -560,31 +561,19 @@ function confirmarTroca(troca, destino) {
   );
 }
 
+// A mão como ela aparece na tela, e o arrasto que a reordena. As duas regras
+// moram em shared/mao.js, onde dá para testá-las sem navegador — foi ali que
+// morou o bug da carta nova presa no canto do leque.
 function sortedHand() {
-  const hand = [...(view?.you?.hand || [])];
-  if (ordemManual.length) {
-    // Carta que ainda não tem lugar escolhido (acabou de ser puxada) vai para
-    // o fim, sem embaralhar o que o jogador já arrumou.
-    const pos = new Map(ordemManual.map((id, i) => [id, i]));
-    return hand.sort((a, b) => (pos.get(a.id) ?? 1e6) - (pos.get(b.id) ?? 1e6));
-  }
-  if (sortMode === 'suit') hand.sort((a, b) => a.suit - b.suit || a.rank - b.rank);
-  else hand.sort((a, b) => a.rank - b.rank || a.suit - b.suit);
-  return hand;
+  return ordenaMao(view?.you?.hand || [], ordemManual, sortMode);
 }
 
-// Põe a carta numa posição da fila, empurrando o resto. `destino` é o índice
-// na ordem JÁ SEM a carta arrastada — é o que faz "soltar entre a 2ª e a 3ª"
-// significar sempre a mesma coisa, indo para a direita ou para a esquerda.
 function poeNaPosicao(id, destino) {
-  const ordem = ordemManual.length ? [...ordemManual] : sortedHand().map((c) => c.id);
-  const de = ordem.indexOf(id);
-  if (de < 0) return false;
-  ordem.splice(de, 1);
-  const alvo = Math.max(0, Math.min(ordem.length, destino));
-  if (alvo === de) return false;
-  ordem.splice(alvo, 0, id);
-  ordemManual = ordem;
+  // A ordem entra como está NA TELA: é isso que faz a carta recém-puxada, que
+  // a `ordemManual` ainda não conhece, poder ser arrastada como as outras.
+  const nova = reordena(sortedHand(), id, destino);
+  if (!nova) return false;
+  ordemManual = nova;
   return true;
 }
 

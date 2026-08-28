@@ -63,6 +63,7 @@ projeto-caçamba/
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
 | [`public/mesa3d.js`](public/mesa3d.js) | 1358 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
+| [`shared/mao.js`](shared/mao.js) | 53 | A ordem das cartas na sua mão: a ordenação automática e o reordenar do arrasto. Vive em `shared/` para poder ser testada sem navegador — ver `test/mao.test.js`. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
 | [`public/icon.svg`](public/icon.svg) | 37 | Ícone: leque de três cartas sobre o feltro, com moldura dourada. Fundo ocupa o quadro todo, então funciona como ícone *maskable*. |
 | [`.claude/settings.json`](.claude/settings.json) | 34 | Allowlist de comandos de leitura para reduzir aprovações; `sudo` e `rm -rf` bloqueados. |
@@ -655,6 +656,26 @@ Duas decisões que fazem o gesto funcionar num leque de cartas sobrepostas:
 - **A fileira vem da estrutura (`.fila`), não da altura da carta.** No leque
   cada carta tem um topo diferente por causa do giro; agrupar por altura fazia
   cada carta virar uma fileira sozinha, e o destino saía errado.
+
+**As duas regras da ordem moram em [`shared/mao.js`](shared/mao.js)**, e não no
+cliente: `ordenaMao` diz como a mão aparece na tela e `reordena` move uma carta
+de lugar. Estão em `shared/` porque só ali dá para testá-las sem abrir o
+navegador e jogar uma partida — e foi exatamente ali que morou um bug que
+precisou dessas duas coisas para aparecer.
+
+O bug: **a carta recém-puxada não saía do canto do leque.** Ela seguia o dedo e
+voltava para o lugar ao soltar. A causa eram duas fontes de verdade para a
+ordem. A tela usava `ordenaMao`, que põe no fim do leque a carta que a
+arrumação manual ainda não conhece — por isso a carta nova aparece num canto. O
+arrasto, porém, trabalhava sobre a `ordemManual` guardada, que é só a *última*
+arrumação e não tem essa carta: `indexOf` devolvia `-1` e a função desistia
+antes de mover qualquer coisa. Só acontecia depois de o jogador ter arrumado a
+mão à mão pelo menos uma vez, que é quando a `ordemManual` deixa de estar vazia.
+
+Hoje `reordena` recebe a mão **como ela está na tela**, e não a ordem guardada —
+uma fonte de verdade só. De quebra, a lista passa a sair sem os ids de cartas
+que já não estão na mão. `test/mao.test.js` cobre o caso e as pontas
+(soltar no próprio lugar, destino fora da faixa, carta que não está na mão).
 
 Enquanto arrasta, as cartas depois do ponto de queda escorregam 9 px
 (`--desloca`) para abrir o vão — é o que mostra onde ela vai cair antes de
