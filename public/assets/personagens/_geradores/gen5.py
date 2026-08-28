@@ -13,6 +13,11 @@ coleira ambar com guizo, bochechas coradas. Nao reproduz personagem, marca
 nem obra de terceiros.
 """
 import os
+import sys
+
+# A boca das expressoes e compartilhada: ver expressoes.py, ao lado.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from expressoes import boca
 
 # Os SVGs ficam um nivel acima: este diretorio guarda so os geradores.
 OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -168,7 +173,13 @@ HAIR_D = ("M 72 120 "
           "C 74 110, 73 116, 72 120 Z")
 
 
-def head(sw):
+def head(sw, expr=None):
+    # A boca sai de expressoes.py quando ha expressao: a geometria e do JOGO
+    # (o mesmo gesto no rosto de todo mundo) e a tinta continua sendo desta
+    # personagem. Sem expressao, e a de descanso, palavra por palavra.
+    boca_svg = boca(expr, sw, INK) if expr else (
+        f"""<path fill="none" stroke="{INK}" stroke-width="{sw*1.2:.2f}" d="M 115 146 C 122 154, 135 154, 142 145"/>""")
+
     return f'''
   <g stroke="{INK}" stroke-width="{sw:.2f}" stroke-linecap="round" stroke-linejoin="round">
 
@@ -236,7 +247,7 @@ def head(sw):
     <path fill="none" stroke="{INK}" stroke-width="{sw:.2f}" d="M 125 124 C 127 134, 133 137, 138 132"/>
 
     <!-- sorriso fechado, curto: sem barba nem bigode competindo com ele -->
-    <path fill="none" stroke="{INK}" stroke-width="{sw*1.2:.2f}" d="M 115 146 C 122 154, 135 154, 142 145"/>
+    {boca_svg}
   </g>'''
 
 
@@ -321,7 +332,7 @@ def hand(mirror=False, dy=-1):
   </g>'''
 
 
-def body(jeans=None, jeans_sh=None, jeans_lit=None):
+def body(jeans=None, jeans_sh=None, jeans_lit=None, expr=None):
     jeans = jeans or JEANS
     jeans_sh = jeans_sh or JEANS_SH
     jeans_lit = jeans_lit or JEANS_LIT
@@ -401,7 +412,7 @@ def body(jeans=None, jeans_sh=None, jeans_lit=None):
   <g transform="translate(0 {DY})">{hand()}{hand(mirror=True)}</g>
 
   <g transform="translate({TX:.2f} {TY:.2f}) scale({S})">
-{head(sw=SW)}
+{head(sw=SW, expr=expr)}
   </g>
 </svg>
 '''
@@ -448,6 +459,11 @@ files = {
     "mafra-kitty-estampa.svg": print_detail(),
     "mafra-kitty-alt-jeans-clara-corpo-inteiro.svg": body(*LIGHT_JEANS),
 }
+# As expressoes: a mesma figura, outra boca. O cliente troca o arquivo por
+# 1,9 s quando algo acontece com aquele jogador (REACOES, em client.js).
+for _e in ("feliz", "bravo"):
+    files[f"mafra-kitty-corpo-inteiro-{_e}.svg"] = body(expr=_e)
+
 for name, content in files.items():
     with open(os.path.join(OUT, name), "w", encoding="utf-8") as f:
         f.write(content)

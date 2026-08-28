@@ -74,12 +74,22 @@ export function peleDe(slug) {
   return p ? p.pele : ELENCO[0].pele;
 }
 
-// Expressões extras de cada personagem. Vazio hoje de propósito: a arte de
-// rosto sai dos geradores em public/assets/personagens/_geradores/, e enquanto
-// não existir o cliente reage só com gesto e balão, usando a figura única.
-// Quando existir `<slug>-corpo-inteiro-feliz.svg`, basta listar aqui:
-//   EXPRESSOES['dri'] = ['feliz', 'bravo'];
-export const EXPRESSOES = {};
+// Expressões extras de cada personagem. A arte sai dos geradores em
+// public/assets/personagens/_geradores/ — `<slug>-corpo-inteiro-<expr>.svg` —,
+// e o que muda de uma para a outra é só a BOCA: a geometria dela vive em
+// `_geradores/expressoes.py`, uma vez para o elenco inteiro, porque a expressão
+// é do jogo (o mesmo gesto no rosto de todo mundo) e não de cada personagem. A
+// tinta continua sendo de cada um: quem tem batom leva o batom para a boca.
+//
+// São estas duas porque são estas duas que o cliente pede (REACOES, em
+// client.js): quem baixa, bate, pega a carta ou troca o coringa fica `feliz`;
+// quem pede a carta ou perde o pedido fica `bravo`. Acrescentar uma terceira é
+// desenhar a boca em expressoes.py, rodar os oito geradores e listar aqui.
+const TODAS = ['feliz', 'bravo'];
+export const EXPRESSOES = Object.fromEntries(
+  ['gabizinsky', 'dri', 'esterex', 'matheus', 'mafra-kitty', 'junior', 'lyly', 'mufasa']
+    .map((slug) => [slug, TODAS]),
+);
 
 export function temExpressao(slug, expressao) {
   return (EXPRESSOES[slug] || []).includes(expressao);

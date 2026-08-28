@@ -20,6 +20,11 @@ Arte original. Nao reproduz personagem, marca nem obra de terceiros.
 """
 import math
 import os
+import sys
+
+# A boca das expressoes e compartilhada: ver expressoes.py, ao lado.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from expressoes import boca
 import random
 
 # Os SVGs ficam um nivel acima: este diretorio guarda so os geradores.
@@ -262,9 +267,20 @@ def glasses_svg(sw):
     <path fill="{CREAM}" stroke="none" opacity="0.16" d="M 136 126 L 154 104 L 162 104 L 142 128 Z"/>'''
 
 
-def head(sw, pierc_r=2.8, glasses=False):
+def head(sw, pierc_r=2.8, glasses=False, expr=None):
     """Rosto + cortina + laco. Coordenadas locais 256x256, o mesmo oval das
     outras tres mulheres do elenco."""
+    # A boca sai de expressoes.py quando ha expressao: a geometria e do JOGO
+    # (o mesmo gesto no rosto de todo mundo) e a tinta continua sendo desta
+    # personagem. Sem expressao, e a de descanso, palavra por palavra.
+    boca_svg = boca(expr, sw, INK, LIP) if expr else (
+        f"""<path fill="{LIP}" stroke="{INK}" stroke-width="{sw*0.6:.2f}"
+      d="M 111 143 C 117 136, 123 139, 128 142 C 133 139, 139 136, 145 143
+         C 141 154, 134 158, 128 158 C 122 158, 115 154, 111 143 Z"/>
+    <path fill="none" stroke="{INK}" stroke-width="{sw*0.42:.2f}" stroke-linecap="round"
+      d="M 116 145 C 122 148, 134 148, 140 145"/>
+    <ellipse cx="134" cy="151" rx="2.8" ry="1.5" fill="{LIP_LIT}" stroke="none" opacity="0.8"/>""")
+
     return f'''
   <g stroke="{INK}" stroke-width="{sw:.2f}" stroke-linecap="round" stroke-linejoin="round">
 
@@ -339,12 +355,7 @@ def head(sw, pierc_r=2.8, glasses=False):
     <path fill="none" stroke="{INK}" stroke-width="{sw:.2f}" d="M 126 126 C 128 134, 133 136, 137 132"/>
 
     <!-- BOCA fechada, cheia, batom vinho: o mais escuro do elenco -->
-    <path fill="{LIP}" stroke="{INK}" stroke-width="{sw*0.6:.2f}"
-      d="M 111 143 C 117 136, 123 139, 128 142 C 133 139, 139 136, 145 143
-         C 141 154, 134 158, 128 158 C 122 158, 115 154, 111 143 Z"/>
-    <path fill="none" stroke="{INK}" stroke-width="{sw*0.42:.2f}" stroke-linecap="round"
-      d="M 116 145 C 122 148, 134 148, 140 145"/>
-    <ellipse cx="134" cy="151" rx="2.8" ry="1.5" fill="{LIP_LIT}" stroke="none" opacity="0.8"/>
+    {boca_svg}
 
     <!-- PIERCING: bolinha de prata no canto ESQUERDO da boca dela (= direita
          de quem olha). Fica COLADO no canto de proposito: assim, quando some
@@ -487,7 +498,7 @@ def hand(mirror=False):
   </g>'''
 
 
-def body(glasses=False):
+def body(glasses=False, expr=None):
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" width="400" height="800" role="img" aria-label="Lyly - corpo inteiro">
   <defs>
     <clipPath id="ly-saia-clip"><path d="{SAIA_D}"/></clipPath>
@@ -623,7 +634,7 @@ def body(glasses=False):
   <g transform="translate(0 {DY})">{hand()}{hand(mirror=True)}</g>
 
   <g transform="translate({TX:.2f} {TY:.2f}) scale({S})">
-{head(sw=SW, pierc_r=2.8, glasses=glasses)}
+{head(sw=SW, pierc_r=2.8, glasses=glasses, expr=expr)}
   </g>
 </svg>
 '''
@@ -669,6 +680,11 @@ files = {
     "lyly-alt-oculos-avatar.svg": avatar(glasses=True),
     "lyly-alt-oculos-corpo-inteiro.svg": body(glasses=True),
 }
+# As expressoes: a mesma figura, outra boca. O cliente troca o arquivo por
+# 1,9 s quando algo acontece com aquele jogador (REACOES, em client.js).
+for _e in ("feliz", "bravo"):
+    files[f"lyly-corpo-inteiro-{_e}.svg"] = body(expr=_e)
+
 for name, content in files.items():
     with open(os.path.join(OUT, name), "w", encoding="utf-8") as f:
         f.write(content)

@@ -21,6 +21,11 @@ sessoes paralelas na mesma arvore, e os numeros 6 e 7 ficaram com eles. O que
 liga script e personagem e a tabela "Geradores" no README daqui, nao o numero.
 """
 import os
+import sys
+
+# A boca das expressoes e compartilhada: ver expressoes.py, ao lado.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from expressoes import boca
 
 # Os SVGs ficam um nivel acima: este diretorio guarda so os geradores.
 OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -192,7 +197,13 @@ HAIR_D = ("M 86 92 "
           "C 88 85, 87 89, 86 92 Z")
 
 
-def head(sw):
+def head(sw, expr=None):
+    # A boca sai de expressoes.py quando ha expressao: a geometria e do JOGO
+    # (o mesmo gesto no rosto de todo mundo) e a tinta continua sendo desta
+    # personagem. Sem expressao, e a de descanso, palavra por palavra.
+    boca_svg = boca(expr, sw, INK) if expr else (
+        f"""<path fill="none" stroke="{INK}" stroke-width="{sw*1.2:.2f}" d="M 117 147 C 123 152, 134 152, 140 146"/>""")
+
     return f'''
   <g stroke="{INK}" stroke-width="{sw:.2f}" stroke-linecap="round" stroke-linejoin="round">
 
@@ -300,7 +311,7 @@ def head(sw):
 
     <!-- boca: sorriso curto e quase reto. Nas duas fotos ele esta serio; o
          meio-termo mantem o elenco coeso sem inventar um sujeito alegre. -->
-    <path fill="none" stroke="{INK}" stroke-width="{sw*1.2:.2f}" d="M 117 147 C 123 152, 134 152, 140 146"/>
+    {boca_svg}
   </g>'''
 
 
@@ -400,7 +411,7 @@ def shoe(mirror=False):
 
 
 def body(tee=None, tee_sh=None, tee_lit=None, cargo=None, cargo_sh=None,
-         cargo_lit=None, name="Junior"):
+         cargo_lit=None, name="Junior", expr=None):
     tee = tee or TEE
     tee_sh = tee_sh or TEE_SH
     tee_lit = tee_lit or TEE_LIT
@@ -505,7 +516,7 @@ def body(tee=None, tee_sh=None, tee_lit=None, cargo=None, cargo_sh=None,
   </g>
 
   <g transform="translate({TX:.2f} {TY:.2f}) scale({S})">
-{head(sw=SW)}
+{head(sw=SW, expr=expr)}
   </g>
 </svg>
 '''
@@ -563,6 +574,11 @@ files = {
     "junior-alt-preto-lavado-corpo-inteiro.svg": body(
         name="Junior (preto lavado)", **WASHED),
 }
+# As expressoes: a mesma figura, outra boca. O cliente troca o arquivo por
+# 1,9 s quando algo acontece com aquele jogador (REACOES, em client.js).
+for _e in ("feliz", "bravo"):
+    files[f"junior-corpo-inteiro-{_e}.svg"] = body(expr=_e)
+
 for fname, content in files.items():
     with open(os.path.join(OUT, fname), "w", encoding="utf-8") as f:
         f.write(content)

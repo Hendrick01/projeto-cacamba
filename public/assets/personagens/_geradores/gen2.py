@@ -5,6 +5,11 @@ Mesma construcao geometrica da Gabizinsky (busto em viewBox 256, corpo em
 enquadramentos. A identidade dela e preto sobre preto com mechas cor de mel.
 """
 import os
+import sys
+
+# A boca das expressoes e compartilhada: ver expressoes.py, ao lado.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from expressoes import boca
 
 # Os SVGs ficam um nivel acima: este diretorio guarda so os geradores.
 OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -98,9 +103,15 @@ def hair_back(sw, halo=False):
             f'C 204 164, 198 224, 188 274 C 198 270, 206 222, 208 168 Z"/></g>')
 
 
-def head(sw):
+def head(sw, expr=None):
     """Rosto + franja reta + mechas frontais. Coordenadas locais 256x256,
     identicas as da Gabizinsky."""
+    # A boca sai de expressoes.py quando ha expressao: a geometria e do JOGO
+    # (o mesmo gesto no rosto de todo mundo) e a tinta continua sendo desta
+    # personagem. Sem expressao, e a de descanso, palavra por palavra.
+    boca_svg = boca(expr, sw, INK, LIP) if expr else (
+        f"""<path fill="none" stroke="{LIP}" stroke-width="{sw*1.4:.2f}" d="M 113 145 C 121 156, 138 156, 146 144"/>""")
+
     return f'''
   <g stroke="{INK}" stroke-width="{sw:.2f}" stroke-linecap="round" stroke-linejoin="round">
 
@@ -154,7 +165,7 @@ def head(sw):
     <path fill="none" stroke="{INK}" stroke-width="{sw:.2f}" d="M 126 126 C 128 134, 133 136, 137 132"/>
 
     <!-- boca: sorriso, batom ameixa -->
-    <path fill="none" stroke="{LIP}" stroke-width="{sw*1.4:.2f}" d="M 113 145 C 121 156, 138 156, 146 144"/>
+    {boca_svg}
 
     <!-- blush -->
     <ellipse cx="94"  cy="146" rx="11" ry="6" fill="{BLUSH}" opacity="0.24" stroke="none"/>
@@ -332,7 +343,7 @@ def hand(mirror=False):
   </g>'''
 
 
-def body():
+def body(expr=None):
     # manga de couro dobrada no meio do antebraco (curva do braco truncada)
     sl = "M 146 236 C 134.84 270.72, 128.29 308.52, 126.12 347.00"
     sr = "M 254 236 C 265.16 270.72, 271.71 308.52, 273.88 347.00"
@@ -441,7 +452,7 @@ def body():
 {hand(mirror=True)}
 
   <g transform="translate({TX:.2f} {TY:.2f}) scale({S})">
-{head(sw=SW)}
+{head(sw=SW, expr=expr)}
   </g>
   </g>
 </svg>
@@ -452,6 +463,11 @@ files = {
     "dri-avatar.svg": avatar(),
     "dri-corpo-inteiro.svg": body(),
 }
+# As expressoes: a mesma figura, outra boca. O cliente troca o arquivo por
+# 1,9 s quando algo acontece com aquele jogador (REACOES, em client.js).
+for _e in ("feliz", "bravo"):
+    files[f"dri-corpo-inteiro-{_e}.svg"] = body(expr=_e)
+
 for name, content in files.items():
     with open(os.path.join(OUT, name), "w", encoding="utf-8") as f:
         f.write(content)

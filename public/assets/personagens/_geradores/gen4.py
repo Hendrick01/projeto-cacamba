@@ -8,6 +8,11 @@ DELE e brinco ponto de luz na orelha direita — os dois do mesmo lado, que na
 imagem e o lado esquerdo.
 """
 import os
+import sys
+
+# A boca das expressoes e compartilhada: ver expressoes.py, ao lado.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from expressoes import boca
 
 # Os SVGs ficam um nivel acima: este diretorio guarda so os geradores.
 OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -129,7 +134,13 @@ HAIR_D = ("M 78 112 C 73 84, 72 46, 96 30 C 113 18, 149 18, 166 34 "
           "C 85 82, 80 98, 78 112 Z")
 
 
-def head(sw):
+def head(sw, expr=None):
+    # A boca sai de expressoes.py quando ha expressao: a geometria e do JOGO
+    # (o mesmo gesto no rosto de todo mundo) e a tinta continua sendo desta
+    # personagem. Sem expressao, e a de descanso, palavra por palavra.
+    boca_svg = boca(expr, sw, INK) if expr else (
+        f"""<path fill="none" stroke="{INK}" stroke-width="{sw*1.2:.2f}" d="M 114 146 C 121 155, 136 155, 143 145"/>""")
+
     return f'''
   <g stroke="{INK}" stroke-width="{sw:.2f}" stroke-linecap="round" stroke-linejoin="round">
 
@@ -230,7 +241,7 @@ def head(sw):
     <path fill="none" stroke="{INK}" stroke-width="{sw:.2f}" d="M 125 124 C 127 134, 133 137, 138 132"/>
 
     <!-- sorriso -->
-    <path fill="none" stroke="{INK}" stroke-width="{sw*1.2:.2f}" d="M 114 146 C 121 155, 136 155, 143 145"/>
+    {boca_svg}
   </g>'''
 
 
@@ -311,7 +322,7 @@ def hand(mirror=False, dy=-14, ring=False):
   </g>'''
 
 
-def body():
+def body(expr=None):
     sl = "M 146 200 C 140.60 218.60, 136.19 238.10, 132.77 258.18"
     sr = "M 254 200 C 259.40 218.60, 263.81 238.10, 267.23 258.18"
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" width="400" height="800" role="img" aria-label="Matheus - corpo inteiro">
@@ -394,7 +405,7 @@ def body():
 {hand(mirror=True)}
 
   <g transform="translate({TX:.2f} {TY:.2f}) scale({S})">
-{head(sw=SW)}
+{head(sw=SW, expr=expr)}
   </g>
 </svg>
 '''
@@ -479,6 +490,11 @@ files = {
     "matheus-alt-cabelo-claro-avatar.svg": to_light(avatar()),
     "matheus-alt-cabelo-claro-corpo-inteiro.svg": to_light(body()),
 }
+# As expressoes: a mesma figura, outra boca. O cliente troca o arquivo por
+# 1,9 s quando algo acontece com aquele jogador (REACOES, em client.js).
+for _e in ("feliz", "bravo"):
+    files[f"matheus-corpo-inteiro-{_e}.svg"] = body(expr=_e)
+
 for name, content in files.items():
     with open(os.path.join(OUT, name), "w", encoding="utf-8") as f:
         f.write(content)

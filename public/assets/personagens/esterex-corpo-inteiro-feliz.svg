@@ -1,0 +1,206 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" width="400" height="800" role="img" aria-label="EstereX - corpo inteiro">
+
+  <!-- cabelo de tras: volumoso, com halo quente -->
+  <g transform="translate(87.36 -3.40) scale(0.88)"><path fill="none" stroke="#8C6A45" stroke-width="10.23" opacity="0.8" stroke-linejoin="round" d="M 128 31 C 72 31, 57 69, 54 112 C 49 166, 51 220, 58 266 C 53 258, 64 278, 69 298 C 79 303, 90 292, 94 274 C 91 212, 94 152, 78 108 L 178 108 C 162 152, 165 212, 162 274 C 166 292, 177 303, 187 298 C 192 278, 203 258, 198 266 C 205 220, 207 166, 202 112 C 199 69, 184 31, 128 31 Z"/><g stroke="#2A1B12" stroke-width="5.68" stroke-linejoin="round"><path fill="#26242C" d="M 128 31 C 72 31, 57 69, 54 112 C 49 166, 51 220, 58 266 C 53 258, 64 278, 69 298 C 79 303, 90 292, 94 274 C 91 212, 94 152, 78 108 L 178 108 C 162 152, 165 212, 162 274 C 166 292, 177 303, 187 298 C 192 278, 203 258, 198 266 C 205 220, 207 166, 202 112 C 199 69, 184 31, 128 31 Z"/><path fill="#3B3945" stroke="none" opacity="0.85" d="M 64 104 C 68 73, 92 41, 126 35 C 102 53, 80 81, 76 110 C 72 158, 76 208, 84 252 C 76 250, 68 212, 66 168 Z"/><path fill="#3B3945" stroke="none" opacity="0.5" d="M 192 104 C 188 73, 164 41, 130 35 C 154 53, 176 81, 180 110 C 184 158, 180 208, 172 252 C 180 250, 188 212, 190 168 Z"/></g></g>
+
+  <g stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- BRACOS (mais longos: +6% de estatura vai quase todo em membro) -->
+    <g fill="none" stroke-linecap="round">
+      <path stroke="#2A1B12"  stroke-width="41" d="M 146 200 C 128 262, 121 334, 125 404"/>
+      <path stroke="#F0C89A" stroke-width="32" d="M 146 200 C 128 262, 121 334, 125 404"/>
+      <path stroke="#2A1B12"  stroke-width="41" d="M 254 200 C 272 262, 279 334, 275 404"/>
+      <path stroke="#F0C89A" stroke-width="32" d="M 254 200 C 272 262, 279 334, 275 404"/>
+      <path stroke="#2A1B12"    stroke-width="50" d="M 146 200 C 140.60 218.60, 136.19 238.10, 132.77 258.18"/>
+      <path stroke="#C24A3B" stroke-width="41" d="M 146 200 C 140.60 218.60, 136.19 238.10, 132.77 258.18"/>
+      <path stroke="#2A1B12"    stroke-width="50" d="M 254 200 C 259.40 218.60, 263.81 238.10, 267.23 258.18"/>
+      <path stroke="#C24A3B" stroke-width="41" d="M 254 200 C 259.40 218.60, 263.81 238.10, 267.23 258.18"/>
+    </g>
+
+    <!-- TENIS BRANCOS -->
+    <g>
+      <path fill="#E6E4DF" d="M 139 682 L 189 682 L 190 706 C 190 720, 180 728, 162 728 L 122 728 C 112 728, 110 717, 118 712 L 139 700 Z"/>
+      <path fill="#CFCCC5" stroke="none" d="M 139 700 L 118 712 C 110 717, 112 728, 122 728 L 140 728 C 134 720, 134 710, 139 700 Z"/>
+      <path fill="#B0ABA2" stroke="none" d="M 111 720 C 112 727, 119 728, 124 728 L 162 728 C 179 728, 189 721, 190 710 L 190 720 C 189 728, 179 733, 162 733 L 122 733 C 113 733, 109 727, 111 720 Z"/>
+      <path fill="none" stroke="#C9A24E" stroke-width="4.5" d="M 145 694 L 168 700 M 142 706 L 166 712"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="5" d="M 111 721 C 112 728, 119 733, 124 733 L 162 733 C 180 733, 190 727, 190 718"/>
+    </g>
+    <g>
+      <path fill="#E6E4DF" d="M 261 682 L 211 682 L 210 706 C 210 720, 220 728, 238 728 L 278 728 C 288 728, 290 717, 282 712 L 261 700 Z"/>
+      <path fill="#CFCCC5" stroke="none" d="M 261 700 L 282 712 C 290 717, 288 728, 278 728 L 260 728 C 266 720, 266 710, 261 700 Z"/>
+      <path fill="#B0ABA2" stroke="none" d="M 289 720 C 288 727, 281 728, 276 728 L 238 728 C 221 728, 211 721, 210 710 L 210 720 C 211 728, 221 733, 238 733 L 278 733 C 287 733, 291 727, 289 720 Z"/>
+      <path fill="none" stroke="#C9A24E" stroke-width="4.5" d="M 255 694 L 232 700 M 258 706 L 234 712"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="5" d="M 289 721 C 288 728, 281 733, 276 733 L 238 733 C 220 733, 210 727, 210 718"/>
+    </g>
+
+    <!-- barriga (cropped) -->
+    <path fill="#F0C89A" d="M 156 262 L 244 262 C 246 290, 246 316, 245 334 L 155 334 C 154 316, 154 290, 156 262 Z"/>
+
+    <!-- CALCA JEANS BRANCA -->
+    <path fill="#CDD3DC" d="M 146 322 C 140 400, 139 500, 143 604 C 145 650, 147 678, 148 694 L 185 694 C 186 660, 188 604, 191 530 C 194 470, 197 430, 200 408 C 203 430, 206 470, 209 530 C 212 604, 214 660, 215 694 L 252 694 C 253 678, 255 650, 257 604 C 261 500, 260 400, 254 322 Z"/>
+    <path fill="#B2BAC6" stroke="none" d="M 146 322 C 140 400, 139 500, 143 604 C 145 650, 147 678, 148 694 L 160 694 C 157 640, 154 520, 156 420 C 157 380, 159 344, 161 322 Z"/>
+    <path fill="#E3E8EE" stroke="none" opacity="0.7" d="M 240 330 C 245 400, 248 500, 247 604 C 246 650, 245 678, 244 694 L 252 694 C 253 678, 255 650, 257 604 C 261 500, 260 400, 254 322 Z"/>
+    <g fill="none" stroke="#C0A075" stroke-width="2.4" stroke-dasharray="6 4">
+      <path d="M 166 340 C 164 420, 163 540, 165 690"/>
+      <path d="M 234 340 C 236 420, 237 540, 235 690"/>
+      <path d="M 200 330 L 200 366"/>
+    </g>
+    <g fill="none" stroke="#B2BAC6" stroke-width="3">
+      <path d="M 152 336 C 162 356, 176 362, 186 360"/>
+      <path d="M 248 336 C 238 356, 224 362, 214 360"/>
+      <path d="M 148 676 L 185 676 M 215 676 L 252 676"/>
+    </g>
+    <!-- cos -->
+    <path fill="#B2BAC6" stroke="none" d="M 146 322 L 254 322 C 254 330, 255 336, 255 340 L 145 340 C 145 336, 146 330, 146 322 Z"/>
+
+    <!-- pescoco -->
+    <path fill="#F0C89A" d="M 184 132 L 184 176 C 184 186, 216 186, 216 176 L 216 132 Z"/>
+
+    <!-- BLUSA (tee solta) -->
+    <path fill="#C24A3B" d="M 142 210 C 144 190, 158 176, 176 170 L 224 170 C 242 176, 256 190, 258 210 C 260 240, 256 266, 252 286 C 232 296, 168 296, 148 286 C 144 266, 140 240, 142 210 Z"/>
+    <path fill="#A03A2F" stroke="none" d="M 142 210 C 144 192, 156 178, 172 172 C 158 192, 152 240, 155 290 L 148 286 C 144 266, 140 240, 142 210 Z"/>
+    <path fill="#D9664F" stroke="none" opacity="0.55" d="M 244 182 C 252 192, 257 200, 258 212 C 259 240, 256 266, 252 286 L 244 288 C 248 264, 250 236, 248 210 C 247 198, 245 190, 240 184 Z"/>
+    <path fill="none" stroke="#A03A2F" stroke-width="4" d="M 152 280 C 174 290, 226 290, 248 280"/>
+    <!-- decote em V, moderado -->
+    <path fill="#F0C89A" d="M 176 171 C 180 208, 220 208, 224 171 Z"/>
+    <path fill="none" stroke="#D9664F" stroke-width="4" d="M 181 175 C 185 203, 215 203, 219 175"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="4.40" stroke-linecap="round" d="M 180 182 Q 200 190.4 220 182"/><path fill="none" stroke="#9A7A34" stroke-width="2.20" stroke-linecap="round" d="M 180 182 Q 200 190.4 220 182"/><ellipse cx="180.0" cy="182.0" rx="1.24" ry="2.00" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="183.1" cy="183.2" rx="1.84" ry="1.24" fill="#E4C378" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="186.2" cy="184.2" rx="1.24" ry="2.00" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="189.2" cy="185.0" rx="1.84" ry="1.24" fill="#E4C378" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="192.3" cy="185.6" rx="1.24" ry="2.00" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="195.4" cy="186.0" rx="1.84" ry="1.24" fill="#E4C378" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="198.5" cy="186.2" rx="1.24" ry="2.00" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="201.5" cy="186.2" rx="1.84" ry="1.24" fill="#E4C378" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="204.6" cy="186.0" rx="1.24" ry="2.00" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="207.7" cy="185.6" rx="1.84" ry="1.24" fill="#E4C378" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="210.8" cy="185.0" rx="1.24" ry="2.00" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="213.8" cy="184.2" rx="1.84" ry="1.24" fill="#E4C378" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="216.9" cy="183.2" rx="1.24" ry="2.00" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.68"/><ellipse cx="220.0" cy="182.0" rx="1.84" ry="1.24" fill="#E4C378" stroke="#2A1B12" stroke-width="0.68"/>
+  </g>
+
+  <!-- ACESSORIOS DOURADOS: bracelete de serpente no antebraco direito dela,
+       pulseira no outro pulso -->
+  <g transform="translate(129 360) scale(0.62)" stroke="#2A1B12" stroke-width="3.55" stroke-linejoin="round">
+      <path fill="#C9A24E" d="M -16 -12 C -6 -18, 6 -18, 16 -12 C 6 -6, -6 -6, -16 -12 Z"/>
+      <path fill="#9A7A34" stroke="none" d="M -14 -10 C -5 -6, 5 -6, 14 -10 C 5 -5, -5 -5, -14 -10 Z"/>
+      <path fill="#C9A24E" d="M -16 -1 C -6 -7, 6 -7, 16 -1 C 6 5, -6 5, -16 -1 Z"/>
+      <path fill="#9A7A34" stroke="none" d="M -14 1 C -5 5, 5 5, 14 1 C 5 6, -5 6, -14 1 Z"/>
+      <path fill="#C9A24E" d="M -16 10 C -6 4, 6 4, 16 10 C 6 16, -6 16, -16 10 Z"/>
+      <path fill="#C9A24E" d="M 13 8 C 20 8, 24 13, 22 18 C 20 22, 13 22, 11 17 Z"/>
+      <circle cx="18" cy="14" r="1.9" fill="#2A1B12" stroke="none"/>
+      <path fill="#E4C378" stroke="none" d="M -12 -13 C -5 -16, 4 -16, 11 -13 C 4 -14, -5 -14, -12 -13 Z"/>
+    </g>
+  <g stroke-linecap="round"><path fill="none" stroke="#2A1B12" stroke-width="5.20" stroke-linecap="round" d="M 259 384 Q 273 389.9 287 384"/><path fill="none" stroke="#9A7A34" stroke-width="2.60" stroke-linecap="round" d="M 259 384 Q 273 389.9 287 384"/><ellipse cx="259.0" cy="384.0" rx="1.43" ry="2.30" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="261.2" cy="384.8" rx="2.12" ry="1.43" fill="#E4C378" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="263.3" cy="385.5" rx="1.43" ry="2.30" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="265.5" cy="386.1" rx="2.12" ry="1.43" fill="#E4C378" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="267.6" cy="386.5" rx="1.43" ry="2.30" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="269.8" cy="386.8" rx="2.12" ry="1.43" fill="#E4C378" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="271.9" cy="386.9" rx="1.43" ry="2.30" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="274.1" cy="386.9" rx="2.12" ry="1.43" fill="#E4C378" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="276.2" cy="386.8" rx="1.43" ry="2.30" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="278.4" cy="386.5" rx="2.12" ry="1.43" fill="#E4C378" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="280.5" cy="386.1" rx="1.43" ry="2.30" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="282.7" cy="385.5" rx="2.12" ry="1.43" fill="#E4C378" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="284.8" cy="384.8" rx="1.43" ry="2.30" fill="#C9A24E" stroke="#2A1B12" stroke-width="0.78"/><ellipse cx="287.0" cy="384.0" rx="2.12" ry="1.43" fill="#E4C378" stroke="#2A1B12" stroke-width="0.78"/></g>
+
+
+  <g stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <g fill="none"><path stroke="#2A1B12"  stroke-width="12" d="M 113 430 L 113 456"/><path stroke="#F0C89A" stroke-width="8"  d="M 113 430 L 113 456"/><path stroke="#2A1B12"  stroke-width="12" d="M 123 430 L 123 465"/><path stroke="#F0C89A" stroke-width="8"  d="M 123 430 L 123 465"/><path stroke="#2A1B12"  stroke-width="12" d="M 133 430 L 133 469"/><path stroke="#F0C89A" stroke-width="8"  d="M 133 430 L 133 469"/><path stroke="#2A1B12"  stroke-width="12" d="M 143 430 L 143 461"/><path stroke="#F0C89A" stroke-width="8"  d="M 143 430 L 143 461"/></g>
+    <path fill="none" stroke="#2A1B12"  stroke-width="14" d="M 148 420 C 154 428, 155 436, 152 442"/>
+    <path fill="none" stroke="#F0C89A" stroke-width="10" d="M 148 420 C 154 428, 155 436, 152 442"/>
+    <path fill="#F0C89A" d="M 109 404 L 145 404 C 149 416, 149 428, 146 436
+      C 138 441, 116 441, 109 436 C 106 428, 105 416, 109 404 Z"/>
+    <g stroke="#2A1B12" stroke-width="1.6"><rect x="116.5" y="445" width="13" height="8" rx="2" fill="#C9A24E"/><rect x="130.5" y="447" width="11" height="7" rx="2" fill="#C9A24E"/><path fill="#E4C378" stroke="none" d="M 117.5 446.5 L 128.5 446.5 L 128.5 448 L 117.5 448 Z"/></g>
+  </g>
+
+  <g transform="translate(400 0) scale(-1 1)" stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <g fill="none"><path stroke="#2A1B12"  stroke-width="12" d="M 113 430 L 113 456"/><path stroke="#F0C89A" stroke-width="8"  d="M 113 430 L 113 456"/><path stroke="#2A1B12"  stroke-width="12" d="M 123 430 L 123 465"/><path stroke="#F0C89A" stroke-width="8"  d="M 123 430 L 123 465"/><path stroke="#2A1B12"  stroke-width="12" d="M 133 430 L 133 469"/><path stroke="#F0C89A" stroke-width="8"  d="M 133 430 L 133 469"/><path stroke="#2A1B12"  stroke-width="12" d="M 143 430 L 143 461"/><path stroke="#F0C89A" stroke-width="8"  d="M 143 430 L 143 461"/></g>
+    <path fill="none" stroke="#2A1B12"  stroke-width="14" d="M 148 420 C 154 428, 155 436, 152 442"/>
+    <path fill="none" stroke="#F0C89A" stroke-width="10" d="M 148 420 C 154 428, 155 436, 152 442"/>
+    <path fill="#F0C89A" d="M 109 404 L 145 404 C 149 416, 149 428, 146 436
+      C 138 441, 116 441, 109 436 C 106 428, 105 416, 109 404 Z"/>
+    
+  </g>
+
+  <g transform="translate(87.36 -3.40) scale(0.88)">
+
+  <g stroke="#2A1B12" stroke-width="5.68" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- orelhas -->
+    <ellipse cx="76"  cy="114" rx="9" ry="12" fill="#F0C89A"/>
+    <ellipse cx="180" cy="114" rx="9" ry="12" fill="#F0C89A"/>
+
+    <!-- rosto -->
+    <path fill="#F0C89A" d="M 78 98
+      C 78 60, 99 46, 128 46
+      C 157 46, 178 60, 178 98
+      C 178 130, 168 155, 150 162
+      C 143 165, 113 165, 106 162
+      C 88 155, 78 130, 78 98 Z"/>
+
+    <!-- linha do cabelo: RISCA LATERAL (foto) -->
+    <path fill="#26242C" stroke="none" d="M 76 112
+      C 80 82, 94 62, 114 56 L 122 68
+      C 148 60, 172 78, 180 112
+      C 188 50, 158 18, 128 18 C 92 18, 66 50, 76 112 Z"/>
+    <path fill="#3B3945" stroke="none" d="M 96 84 C 102 68, 110 60, 120 57
+      L 122 62 C 112 68, 104 78, 100 90 Z"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="5.68" d="M 76 112
+      C 80 82, 94 62, 114 56 L 122 68
+      C 148 60, 172 78, 180 112"/>
+
+    <!-- sobrancelhas suavemente arqueadas -->
+    <path fill="#231F26" stroke="none" d="M 94 91 C 101 83, 114 82, 123 87
+      C 122.5 89.5, 121 90.5, 119 89.8 C 111 86, 102 87, 96.5 93 Z"/>
+    <path fill="#231F26" stroke="none" d="M 162 91 C 155 83, 142 82, 133 87
+      C 133.5 89.5, 135 90.5, 137 89.8 C 145 86, 154 87, 159.5 93 Z"/>
+
+    <!-- olhos PRETOS (precisam de brilho grande para nao virarem buraco) -->
+    <g>
+      <ellipse cx="108" cy="115" rx="12" ry="12.5" fill="#F5F1E6"/>
+      <circle cx="109" cy="116" r="8.4" fill="#2A2630" stroke="#454050" stroke-width="1.3"/>
+      <circle cx="109" cy="116" r="3.6" fill="#171520" stroke="none"/>
+      <circle cx="105.6" cy="111.8" r="2.9" fill="#F5F1E6" stroke="none"/>
+      <circle cx="112.5" cy="119.5" r="1.4" fill="#F5F1E6" stroke="none" opacity="0.8"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="6.82" d="M 97 109 C 102 102, 115 102, 120 110"/>
+    </g>
+    <g>
+      <ellipse cx="150" cy="115" rx="12" ry="12.5" fill="#F5F1E6"/>
+      <circle cx="149" cy="116" r="8.4" fill="#2A2630" stroke="#454050" stroke-width="1.3"/>
+      <circle cx="149" cy="116" r="3.6" fill="#171520" stroke="none"/>
+      <circle cx="145.6" cy="111.8" r="2.9" fill="#F5F1E6" stroke="none"/>
+      <circle cx="152.5" cy="119.5" r="1.4" fill="#F5F1E6" stroke="none" opacity="0.8"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="6.82" d="M 138 110 C 143 102, 156 102, 161 109"/>
+    </g>
+
+    <!-- nariz -->
+    <path fill="none" stroke="#2A1B12" stroke-width="5.68" d="M 126 126 C 128 134, 133 136, 137 132"/>
+
+    <!-- SORRISO LARGO E ABERTO: a expressao mais calorosa do elenco -->
+    <path fill="#4A241F" stroke="#B0303F" stroke-width="5.68" stroke-linejoin="round" d="M 110 141 C 119 137, 137 137, 146 141 C 144 156, 137 164, 128 164 C 119 164, 112 156, 110 141 Z"/>
+
+    <!-- blush -->
+    <ellipse cx="92"  cy="132" rx="11" ry="5.5" fill="#E08A6A" opacity="0.26" stroke="none"/>
+    <ellipse cx="164" cy="132" rx="11" ry="5.5" fill="#E08A6A" opacity="0.26" stroke="none"/>
+    <!-- MECHAS FRONTAIS: duas massas largas, SEM contorno interno.
+         A separacao e sugerida so por variacao de tom. -->
+    <path fill="#26242C" stroke="none" d="M 66 108 C 62 158, 68 214, 74 254 C 76 264, 79 278, 84 288 C 89 286, 92 278, 91 266 C 88 250, 93 196, 92 150 C 91 128, 90 114, 90 108 Z"/>
+    <path fill="#26242C" stroke="none" d="M 190 108 C 194 158, 188 214, 182 254 C 180 264, 177 278, 172 288 C 167 286, 164 278, 165 266 C 168 250, 163 196, 164 150 C 165 128, 166 114, 166 108 Z"/>
+    <path fill="#3B3945" stroke="none" opacity="0.7" d="M 71 126
+      C 67 178, 73 230, 84 274
+      C 79 262, 82 276, 86 284
+      C 89 280, 90 274, 89 266
+      C 85 248, 79 200, 79 156
+      C 78 136, 77 130, 77 126 Z"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="5.68" stroke-linecap="round" d="M 90 108 C 91 128, 92 150, 92 150 C 93 196, 88 250, 91 266 C 92 278, 89 286, 84 288"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="5.68" stroke-linecap="round" d="M 166 108 C 165 128, 164 150, 164 150 C 163 196, 168 250, 165 266 C 164 278, 167 286, 172 288"/>
+
+    <!-- argolas pequenas douradas -->
+    <path fill="none" stroke="#C9A24E" stroke-width="3.12" d="M 76 124 C 71 126, 71 133, 76 134"/>
+    <path fill="none" stroke="#C9A24E" stroke-width="3.12" d="M 180 124 C 185 126, 185 133, 180 134"/>
+
+    <defs>
+      <clipPath id="ex-bd-ll"><path d="M 82 103 C 82 98, 85 96, 90 96 L 121 96 C 125 96, 127 98, 127 102 L 127 125 C 127 130, 124 132, 119 132 L 88 132 C 84 132, 82 129, 82 124 Z"/></clipPath>
+      <clipPath id="ex-bd-lr"><path d="M 174 103 C 174 98, 171 96, 166 96 L 135 96 C 131 96, 129 98, 129 102 L 129 125 C 129 130, 132 132, 137 132 L 168 132 C 172 132, 174 129, 174 124 Z"/></clipPath>
+    </defs>
+    <path d="M 82 103 C 82 98, 85 96, 90 96 L 121 96 C 125 96, 127 98, 127 102 L 127 125 C 127 130, 124 132, 119 132 L 88 132 C 84 132, 82 129, 82 124 Z" fill="#DCE6EE" opacity="0.09" stroke="none"/>
+    <path d="M 174 103 C 174 98, 171 96, 166 96 L 135 96 C 131 96, 129 98, 129 102 L 129 125 C 129 130, 132 132, 137 132 L 168 132 C 172 132, 174 129, 174 124 Z" fill="#DCE6EE" opacity="0.09" stroke="none"/>
+    <g clip-path="url(#ex-bd-ll)" stroke="#F5F1E6" fill="none" opacity="0.38" stroke-linecap="round">
+      <path stroke-width="5.28" d="M 87 110 L 97 98"/>
+    </g>
+    <g clip-path="url(#ex-bd-lr)" stroke="#F5F1E6" fill="none" opacity="0.38" stroke-linecap="round">
+      <path stroke-width="5.28" d="M 135 110 L 145 98"/>
+    </g>
+    <g fill="none" stroke="#C9A24E" stroke-width="3.52" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 82 103 C 82 98, 85 96, 90 96 L 121 96 C 125 96, 127 98, 127 102 L 127 125 C 127 130, 124 132, 119 132 L 88 132 C 84 132, 82 129, 82 124 Z"/>
+      <path d="M 174 103 C 174 98, 171 96, 166 96 L 135 96 C 131 96, 129 98, 129 102 L 129 125 C 129 130, 132 132, 137 132 L 168 132 C 172 132, 174 129, 174 124 Z"/>
+      <path d="M 127 104 L 129 104"/>
+      <path d="M 82 104 C 78 105, 75 107, 72 110"/>
+      <path d="M 174 104 C 178 105, 181 107, 184 110"/>
+    </g>
+    <g fill="none" stroke="#E4C378" stroke-width="1.59" stroke-linecap="round">
+      <path d="M 86 99 L 118 98"/>
+      <path d="M 170 99 L 138 98"/>
+    </g>
+
+  </g>
+  </g>
+</svg>

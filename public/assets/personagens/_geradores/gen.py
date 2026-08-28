@@ -3,6 +3,11 @@
 Gera: avatar circular (busto), corpo inteiro e close da mao direita com o anel.
 """
 import os
+import sys
+
+# A boca das expressoes e compartilhada: ver expressoes.py, ao lado.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from expressoes import boca
 
 # Os SVGs ficam um nivel acima: este diretorio guarda so os geradores.
 OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -95,12 +100,18 @@ def chain_svg(x0, y0, x1, y1, sag, n):
 
 
 # ------------------------------------------------------- cabeca (partilhada)
-def head(sw, mole_r, mole_ring=False):
+def head(sw, mole_r, mole_ring=False, expr=None):
     """Cabeca+cabelo no sistema de coordenadas do avatar (256x256).
     sw = stroke-width ja compensado pela escala do grupo."""
     ring = ""
     if mole_ring:
         ring = f'<circle cx="100" cy="138" r="{mole_r+1.4:.2f}" fill="{SKIN}" stroke="none"/>'
+    # A boca sai de expressoes.py quando ha expressao: a geometria e do JOGO
+    # (o mesmo gesto no rosto de todo mundo) e a tinta continua sendo desta
+    # personagem. Sem expressao, e a de descanso, palavra por palavra.
+    boca_svg = boca(expr, sw, INK, LIP) if expr else (
+        f"""<path fill="none" stroke="{LIP}" stroke-width="{sw*1.7:.2f}" stroke-linecap="round" d="M 113 145 C 121 157, 138 157, 146 144"/>""")
+
     return f'''
   <g stroke="{INK}" stroke-width="{sw:.2f}" stroke-linecap="round" stroke-linejoin="round">
 
@@ -169,7 +180,7 @@ def head(sw, mole_r, mole_ring=False):
     <path fill="none" stroke="{INK}" stroke-width="{sw:.2f}" d="M 126 126 C 128 134, 133 136, 137 132"/>
 
     <!-- boca sorrindo -->
-    <path fill="none" stroke="{LIP}" stroke-width="{sw*1.7:.2f}" stroke-linecap="round" d="M 113 145 C 121 157, 138 157, 146 144"/>
+    {boca_svg}
 
     <!-- blush -->
     <ellipse cx="92"  cy="145" rx="12" ry="6.5" fill="{BLUSH}" opacity="0.28" stroke="none"/>
@@ -292,7 +303,7 @@ HEM = ("C 130 508, 146 502, 158 508 "
        "C 254 502, 270 508, 282 494")
 
 
-def body(variant, shoe="preto"):
+def body(variant, shoe="preto", expr=None):
     if shoe == "branco":
         sh_f, sh_sole, sh_line, sh_rim = SHOE_W, SHOE_W_SH, INK, None
     else:
@@ -465,7 +476,7 @@ def body(variant, shoe="preto"):
 {hand_left(5)}
 
   <g transform="translate({tx:.2f} {ty:.2f}) scale({s})">
-{head(sw=sw, mole_r=3.2, mole_ring=False)}
+{head(sw=sw, mole_r=3.2, mole_ring=False, expr=expr)}
   </g>
 </svg>
 '''
@@ -562,6 +573,11 @@ def to_wine(svg):
 
 files["gabizinsky-alt-vinho-avatar.svg"] = to_wine(files["gabizinsky-body-avatar.svg"])
 files["gabizinsky-alt-vinho-corpo-inteiro.svg"] = to_wine(files["gabizinsky-body-corpo-inteiro.svg"])
+
+# As expressoes: a mesma figura, outra boca. O cliente troca o arquivo por
+# 1,9 s quando algo acontece com aquele jogador (REACOES, em client.js).
+for _e in ("feliz", "bravo"):
+    files[f"gabizinsky-corpo-inteiro-{_e}.svg"] = body("body", "branco", expr=_e)
 
 for name, content in files.items():
     with open(os.path.join(OUT, name), "w", encoding="utf-8") as f:

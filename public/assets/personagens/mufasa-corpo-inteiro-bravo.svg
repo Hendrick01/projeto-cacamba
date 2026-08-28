@@ -1,0 +1,268 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" width="400" height="800" role="img" aria-label="Mufasa - corpo inteiro">
+  <g stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- BRACOS: manga comprida ate o punho. Segunda pele por baixo, manga da
+         camiseta por cima do ombro. -->
+    <g fill="none" stroke-linecap="round" transform="translate(0 9)">
+      <path stroke="#8C6A45"    stroke-width="46" opacity="0.8" d="M 148 213 C 130 275, 121 347, 124 417"/>
+      <path stroke="#2A1B12"    stroke-width="37" d="M 148 213 C 130 275, 121 347, 124 417"/>
+      <path stroke="#26252D" stroke-width="29" d="M 148 213 C 130 275, 121 347, 124 417"/>
+      <path stroke="#8C6A45"    stroke-width="46" opacity="0.8" d="M 252 213 C 270 275, 279 347, 276 417"/>
+      <path stroke="#2A1B12"    stroke-width="37" d="M 252 213 C 270 275, 279 347, 276 417"/>
+      <path stroke="#26252D" stroke-width="29" d="M 252 213 C 270 275, 279 347, 276 417"/>
+      <!-- realce especular: borda dura, so no lado da luz. E o acabamento que
+           separa a compressao do algodao — nao a cor. -->
+      <path stroke="#4E4D59" stroke-width="6" opacity="0.8" stroke-linecap="butt"
+        d="M 134 272 C 130 312, 129 356, 131 396"/>
+      <path stroke="#4E4D59" stroke-width="7" opacity="0.8" stroke-linecap="butt"
+        d="M 285 272 C 289 312, 290 356, 287 396"/>
+      <!-- punho -->
+      <path stroke="#222129" stroke-width="29" stroke-linecap="butt" d="M 123.4 404 L 124 417"/>
+      <path stroke="#222129" stroke-width="29" stroke-linecap="butt" d="M 276.6 404 L 276 417"/>
+      <!-- mangas curtas da camiseta, por cima -->
+      <path stroke="#2A1B12" stroke-width="50" d="M 146 213 C 140 233, 136 253, 133 271"/>
+      <path stroke="#33323A" stroke-width="42" d="M 146 213 C 140 233, 136 253, 133 271"/>
+      <path stroke="#2A1B12" stroke-width="50" d="M 254 213 C 260 233, 264 253, 267 271"/>
+      <path stroke="#33323A" stroke-width="42" d="M 254 213 C 260 233, 264 253, 267 271"/>
+      <path stroke="#282730" stroke-width="42" stroke-linecap="butt" d="M 133.6 263 L 133 271"/>
+      <path stroke="#282730" stroke-width="42" stroke-linecap="butt" d="M 266.4 263 L 267 271"/>
+    </g>
+
+    <!-- TENIS -->
+    
+  <g stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path fill="#4B4B54" d="M 140 686 L 190 686 L 192 702 C 192 714, 182 720, 163 720 L 122 720 C 112 720, 109 711, 118 706 L 140 694 Z"/>
+    <path fill="#3A3A42" stroke="none" d="M 166 686 L 190 686 L 192 702 C 192 712, 184 718, 171 720 C 175 708, 173 695, 166 686 Z"/>
+    <path fill="#E3DED2" d="M 118 706 C 109 711, 112 720, 122 720 L 163 720 C 182 720, 192 714, 192 702 L 195 702 C 195 721, 183 733, 163 733 L 120 733 C 104 733, 104 713, 114 705 Z"/>
+    <path fill="#C4BEAF" stroke="none" d="M 114 705 C 104 713, 104 733, 120 733 L 132 733 C 121 730, 118 715, 124 706 Z"/>
+    <!-- costura da biqueira: reta, e so uma. Nada de forma curva no
+         lado do tenis — curva ali le como marca de fabricante. -->
+    <path fill="none" stroke="#5F5F6A" stroke-width="3.2" opacity="0.9" d="M 134 704 C 139 698, 145 695, 152 694"/>
+    <g fill="none" stroke="#E3DED2" stroke-width="3.4" stroke-linecap="round" opacity="0.85">
+      <path d="M 161 693 L 180 693"/>
+      <path d="M 161 701 L 181 701"/>
+      <path d="M 162 709 L 182 709"/>
+    </g>
+  </g>
+    
+  <g transform="translate(400 0) scale(-1 1)" stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path fill="#4B4B54" d="M 140 686 L 190 686 L 192 702 C 192 714, 182 720, 163 720 L 122 720 C 112 720, 109 711, 118 706 L 140 694 Z"/>
+    <path fill="#3A3A42" stroke="none" d="M 166 686 L 190 686 L 192 702 C 192 712, 184 718, 171 720 C 175 708, 173 695, 166 686 Z"/>
+    <path fill="#E3DED2" d="M 118 706 C 109 711, 112 720, 122 720 L 163 720 C 182 720, 192 714, 192 702 L 195 702 C 195 721, 183 733, 163 733 L 120 733 C 104 733, 104 713, 114 705 Z"/>
+    <path fill="#C4BEAF" stroke="none" d="M 114 705 C 104 713, 104 733, 120 733 L 132 733 C 121 730, 118 715, 124 706 Z"/>
+    <!-- costura da biqueira: reta, e so uma. Nada de forma curva no
+         lado do tenis — curva ali le como marca de fabricante. -->
+    <path fill="none" stroke="#5F5F6A" stroke-width="3.2" opacity="0.9" d="M 134 704 C 139 698, 145 695, 152 694"/>
+    <g fill="none" stroke="#E3DED2" stroke-width="3.4" stroke-linecap="round" opacity="0.85">
+      <path d="M 161 693 L 180 693"/>
+      <path d="M 161 701 L 181 701"/>
+      <path d="M 162 709 L 182 709"/>
+    </g>
+  </g>
+
+    <!-- LEGGING -->
+    <path fill="none" stroke="#8C6A45" stroke-width="9" opacity="0.8" stroke-linejoin="round" d="M 156 392 C 150 438, 147 492, 152 544 C 156 590, 156 648, 155 700 L 182 700 C 183 646, 185 592, 189 544 C 194 488, 198 444, 200 426 C 202 444, 206 488, 211 544 C 215 592, 217 646, 218 700 L 245 700 C 244 648, 244 590, 248 544 C 253 492, 250 438, 244 392 Z"/>
+    <path fill="#2B2A31" d="M 156 392 C 150 438, 147 492, 152 544 C 156 590, 156 648, 155 700 L 182 700 C 183 646, 185 592, 189 544 C 194 488, 198 444, 200 426 C 202 444, 206 488, 211 544 C 215 592, 217 646, 218 700 L 245 700 C 244 648, 244 590, 248 544 C 253 492, 250 438, 244 392 Z"/>
+    <path fill="#212027" stroke="none" d="M 156 392 C 150 438, 147 492, 152 544
+      C 156 590, 156 648, 155 700 L 164 700 C 164 648, 164 592, 161 546
+      C 158 496, 160 436, 164 392 Z"/>
+    <path fill="#4C4B57" stroke="none" opacity="0.5" d="M 238 398 C 244 442, 247 492, 243 544
+      C 239 592, 239 648, 240 700 L 245 700 C 244 648, 244 590, 248 544
+      C 253 492, 250 438, 244 392 Z"/>
+    <!-- costura de compressao: uma linha por perna, so isso -->
+    <g fill="none" stroke="#4C4B57" stroke-width="2.4" opacity="0.6">
+      <path d="M 168 524 C 170 580, 170 640, 170 692"/>
+      <path d="M 232 524 C 230 580, 230 640, 230 692"/>
+    </g>
+
+    <!-- BERMUDA BEGE -->
+    <path fill="#CFC1A0" stroke="#2A1B12" stroke-width="5" stroke-linejoin="round" d="M 146 366 C 140 404, 138 452, 140 502 L 192 506 C 194 488, 197 472, 200 464 C 203 472, 206 488, 208 506 L 260 502 C 262 452, 260 404, 254 366 Z"/>
+    <path fill="#B3A585" stroke="none" d="M 146 366 C 140 404, 138 452, 140 502 L 154 503
+      C 152 456, 153 404, 158 366 Z"/>
+    <path fill="#E0D5B9" stroke="none" opacity="0.7" d="M 244 366 C 250 404, 252 452, 250 502
+      L 260 502 C 262 452, 260 404, 254 366 Z"/>
+    <!-- vinco central e barras -->
+    <path fill="none" stroke="#B3A585" stroke-width="3.4" d="M 200 436 C 199 462, 198 486, 197 504"/>
+    <g fill="none" stroke="#B3A585" stroke-width="4.5">
+      <path d="M 140 492 C 155 499, 178 500, 191 497"/>
+      <path d="M 260 492 C 245 499, 222 500, 209 497"/>
+    </g>
+    <!-- bolso lateral: uma costura, do lado da luz -->
+    <path fill="none" stroke="#B3A585" stroke-width="3" d="M 249 396 C 243 412, 241 430, 242 446"/>
+
+    <!-- TRONCO: pescoco, camiseta e gola alta descem juntos -->
+    <g transform="translate(0 9)">
+    <path fill="#F4CFAA" d="M 184 141 L 184 187 C 184 197, 216 197, 216 187 L 216 141 Z"/>
+
+    <!-- CAMISETA PRETA. Halo obrigatorio: preto sobre feltro preto some. -->
+    <path fill="none" stroke="#8C6A45" stroke-width="9" opacity="0.8" stroke-linejoin="round" d="M 139 234 C 142 207, 158 189, 178 182 L 222 182 C 242 189, 258 207, 261 234 C 261 282, 259 336, 256 380 C 232 392, 168 392, 144 380 C 141 336, 139 282, 139 234 Z"/>
+    <path fill="#33323A" d="M 139 234 C 142 207, 158 189, 178 182 L 222 182 C 242 189, 258 207, 261 234 C 261 282, 259 336, 256 380 C 232 392, 168 392, 144 380 C 141 336, 139 282, 139 234 Z"/>
+    <path fill="#282730" stroke="none" opacity="0.7" d="M 139 234 C 142 207, 158 189, 178 182
+      C 171 202, 166 250, 165 382 C 156 384, 148 382, 144 380 C 141 336, 139 282, 139 234 Z"/>
+    <path fill="#43424C" stroke="none" opacity="0.7" d="M 222 182 C 242 189, 258 207, 261 234
+      C 261 274, 259 336, 256 380 L 245 383 C 247 308, 244 226, 238 190 Z"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="5" stroke-linejoin="round" d="M 139 234 C 142 207, 158 189, 178 182 L 222 182 C 242 189, 258 207, 261 234 C 261 282, 259 336, 256 380 C 232 392, 168 392, 144 380 C 141 336, 139 282, 139 234 Z"/>
+
+    <!-- GOLA ALTA da segunda pele, saindo por dentro da camiseta -->
+    <path fill="#26252D" stroke="#2A1B12" stroke-width="5" stroke-linejoin="round"
+      d="M 182 178 C 186 172, 214 172, 218 178 L 220 199 C 213 205, 187 205, 180 199 Z"/>
+    <path fill="#4E4D59" stroke="none" opacity="0.45" d="M 210 174 C 215 175, 217 176, 218 178
+      L 220 199 C 217 201, 214 202, 211 203 C 213 192, 212 181, 210 174 Z"/>
+    <g fill="none" stroke="#222129" stroke-width="3" opacity="0.85">
+      <path d="M 181 188 C 188 192, 212 192, 219 188"/>
+      <path d="M 181 195 C 188 199, 212 199, 219 195"/>
+    </g>
+    </g>
+  </g>
+
+  <g transform="translate(-6 9)">
+  <g stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <g fill="none"><path stroke="#2A1B12"  stroke-width="12" d="M 113 444 L 113 470"/><path stroke="#F4CFAA" stroke-width="8"  d="M 113 444 L 113 470"/><path stroke="#2A1B12"  stroke-width="12" d="M 123 444 L 123 479"/><path stroke="#F4CFAA" stroke-width="8"  d="M 123 444 L 123 479"/><path stroke="#2A1B12"  stroke-width="12" d="M 133 444 L 133 483"/><path stroke="#F4CFAA" stroke-width="8"  d="M 133 444 L 133 483"/><path stroke="#2A1B12"  stroke-width="12" d="M 143 444 L 143 475"/><path stroke="#F4CFAA" stroke-width="8"  d="M 143 444 L 143 475"/></g>
+    <path fill="none" stroke="#2A1B12"  stroke-width="14" d="M 148 434 C 154 442, 155 450, 152 456"/>
+    <path fill="none" stroke="#F4CFAA" stroke-width="10" d="M 148 434 C 154 442, 155 450, 152 456"/>
+    <path fill="#F4CFAA" d="M 109 418 L 145 418 C 149 430, 149 442, 146 450
+      C 138 455, 116 455, 109 450 C 106 442, 105 430, 109 418 Z"/>
+  </g></g>
+  <g transform="translate(6 9)">
+  <g transform="translate(400 0) scale(-1 1)" stroke="#2A1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <g fill="none"><path stroke="#2A1B12"  stroke-width="12" d="M 113 444 L 113 470"/><path stroke="#F4CFAA" stroke-width="8"  d="M 113 444 L 113 470"/><path stroke="#2A1B12"  stroke-width="12" d="M 123 444 L 123 479"/><path stroke="#F4CFAA" stroke-width="8"  d="M 123 444 L 123 479"/><path stroke="#2A1B12"  stroke-width="12" d="M 133 444 L 133 483"/><path stroke="#F4CFAA" stroke-width="8"  d="M 133 444 L 133 483"/><path stroke="#2A1B12"  stroke-width="12" d="M 143 444 L 143 475"/><path stroke="#F4CFAA" stroke-width="8"  d="M 143 444 L 143 475"/></g>
+    <path fill="none" stroke="#2A1B12"  stroke-width="14" d="M 148 434 C 154 442, 155 450, 152 456"/>
+    <path fill="none" stroke="#F4CFAA" stroke-width="10" d="M 148 434 C 154 442, 155 450, 152 456"/>
+    <path fill="#F4CFAA" d="M 109 418 L 145 418 C 149 430, 149 442, 146 450
+      C 138 455, 116 455, 109 450 C 106 442, 105 430, 109 418 Z"/>
+  </g></g>
+
+  <g transform="translate(87.36 18.60) scale(0.88)">
+
+  <g stroke="#2A1B12" stroke-width="5.68" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- rosto: mandibula masculina, queixo cheio -->
+    <path fill="#F4CFAA" d="M 85 100
+      C 85 57, 104 43, 128 43
+      C 152 43, 171 57, 171 100
+      C 171 130, 162 152, 149 163
+      C 142 169, 136 171, 128 171
+      C 120 171, 114 169, 107 163
+      C 94 152, 85 130, 85 100 Z"/>
+
+    <!-- LATERAIS AFILADAS. Nao e o fade do Junior, que vai a pele: aqui o pelo
+         continua, so curto. Duas passadas de opacidade baixa e as costeletas,
+         que sao por onde a lateral encontra a barba. -->
+    <g stroke="none" fill="#372A21">
+      <path opacity="0.22" d="M 86 96 C 88 108, 90 118, 95 128
+        C 90 122, 86 112, 85 100 Z"/>
+      <path opacity="0.22" d="M 170 96 C 168 108, 166 118, 161 128
+        C 166 122, 170 112, 171 100 Z"/>
+      <path opacity="0.30" d="M 85 100 C 88 93, 92 89, 97 87
+        C 94 96, 92 106, 91 116 C 88 112, 86 106, 85 100 Z"/>
+      <path opacity="0.30" d="M 171 100 C 168 93, 164 89, 159 87
+        C 162 96, 164 106, 165 116 C 168 112, 170 106, 171 100 Z"/>
+      <path opacity="0.66" d="M 90 108 C 94 110, 97 116, 97 126 L 92 124 Z"/>
+      <path opacity="0.66" d="M 166 108 C 162 110, 159 116, 159 126 L 164 124 Z"/>
+    </g>
+
+    <!-- BARBA CURTA, densa no queixo e RALA NA BOCHECHA. E o contrario da do
+         Junior, que e cheia e com a linha da bochecha marcada. -->
+    <path stroke="none" fill="#372A21" opacity="0.34" d="M 90 112
+      C 94 134, 100 148, 108 157 C 116 162, 140 162, 148 157
+      C 156 148, 162 134, 166 112 C 168 138, 160 158, 146 167
+      C 140 170, 134 172, 128 172 C 122 172, 116 170, 110 167
+      C 96 158, 88 138, 90 112 Z"/>
+    <path stroke="none" fill="#372A21" opacity="0.92" d="M 93 122
+      C 96 140, 101 153, 109 161
+      C 116 152, 140 152, 147 161
+      C 155 153, 160 140, 163 122
+      C 167 142, 162 158, 150 167
+      C 143 170, 136 172, 128 172
+      C 120 172, 113 170, 106 167
+      C 94 158, 89 142, 93 122 Z"/>
+    <path stroke="none" fill="#281E18" opacity="0.50" d="M 110 160
+      C 116 164, 140 164, 146 160 C 144 168, 137 172, 128 172
+      C 119 172, 112 168, 110 160 Z"/>
+    <!-- BIGODE: o traco dominante do rosto. Mais largo que o do Junior e com
+         as pontas caindo abaixo do canto da boca. -->
+    <path stroke="none" fill="#372A21" opacity="0.95" d="M 108 133
+      C 115 128, 122 130, 128 134 C 134 130, 141 128, 148 133
+      C 149 141, 143 146, 137 143 C 133 141, 123 141, 119 143
+      C 113 146, 107 141, 108 133 Z"/>
+
+    <!-- CABELO: cachos. Halo por fora, como toda massa escura do elenco. -->
+    <path fill="none" stroke="#8C6A45" stroke-width="8.238636363636363" opacity="0.8" stroke-linejoin="round" d="M 82 114 C 78 106, 76 100, 75.0 94.0 Q 66.2 82.2 77.1 73.2 Q 64.8 56.5 83.4 54.0 Q 81.6 40.1 93.3 38.1 Q 89.4 16.4 106.0 26.7 Q 109.8 12.2 120.5 20.8 Q 128.0 4.8 135.5 20.8 Q 145.0 16.0 150.0 26.7 Q 166.1 17.2 162.7 38.1 Q 176.0 38.8 172.6 54.0 Q 189.4 57.3 178.9 73.2 Q 188.8 82.3 181.0 94.0 C 179 100, 176 106, 172 114 C 173 106, 170 98, 166 92 C 163 79, 157 87, 151 84 C 147 79, 142 86, 137 83 C 132 77, 126 88, 121 85 C 117 81, 113 86, 108 81 C 104 77, 98 87, 94 85 C 92 83, 91 88, 90 92 C 87 98, 84 106, 82 114 Z"/>
+    <path fill="#372A21" d="M 82 114 C 78 106, 76 100, 75.0 94.0 Q 66.2 82.2 77.1 73.2 Q 64.8 56.5 83.4 54.0 Q 81.6 40.1 93.3 38.1 Q 89.4 16.4 106.0 26.7 Q 109.8 12.2 120.5 20.8 Q 128.0 4.8 135.5 20.8 Q 145.0 16.0 150.0 26.7 Q 166.1 17.2 162.7 38.1 Q 176.0 38.8 172.6 54.0 Q 189.4 57.3 178.9 73.2 Q 188.8 82.3 181.0 94.0 C 179 100, 176 106, 172 114 C 173 106, 170 98, 166 92 C 163 79, 157 87, 151 84 C 147 79, 142 86, 137 83 C 132 77, 126 88, 121 85 C 117 81, 113 86, 108 81 C 104 77, 98 87, 94 85 C 92 83, 91 88, 90 92 C 87 98, 84 106, 82 114 Z"/>
+    <path fill="#281E18" stroke="none" d="M 82 114 C 79 102, 77 88, 78 74
+      C 84 86, 88 100, 90 114 C 86 113, 84 113, 82 114 Z"/>
+    <path fill="#281E18" stroke="none" d="M 172 114 C 175 102, 177 88, 176 74
+      C 170 86, 166 100, 164 114 C 168 113, 170 113, 172 114 Z"/>
+    <path transform="rotate(25 99 62)" fill="none" stroke="#6B4F38" stroke-width="2.84" stroke-linecap="round" opacity="0.45" d="M 90 62 A 9 9 0 1 1 108.0 62.9"/><path transform="rotate(-12 116 46)" fill="none" stroke="#6B4F38" stroke-width="2.84" stroke-linecap="round" opacity="0.45" d="M 108 46 A 8 8 0 1 1 124.0 46.8"/><path transform="rotate(18 136 42)" fill="none" stroke="#6B4F38" stroke-width="2.84" stroke-linecap="round" opacity="0.45" d="M 127 42 A 9 9 0 1 1 145.0 42.9"/><path transform="rotate(32 156 58)" fill="none" stroke="#6B4F38" stroke-width="2.84" stroke-linecap="round" opacity="0.45" d="M 148 58 A 8 8 0 1 1 164.0 58.8"/><path transform="rotate(-18 108 80)" fill="none" stroke="#6B4F38" stroke-width="2.84" stroke-linecap="round" opacity="0.45" d="M 101 80 A 7 7 0 1 1 115.0 80.7"/><path transform="rotate(-34 146 76)" fill="none" stroke="#6B4F38" stroke-width="2.84" stroke-linecap="round" opacity="0.45" d="M 139 76 A 7 7 0 1 1 153.0 76.7"/>
+
+    <!-- ORELHAS depois do cabelo: sao curtas dos lados, a orelha fica na
+         frente. Uma argola em cada uma. -->
+    <ellipse cx="81"  cy="115" rx="7.5" ry="11" fill="#F4CFAA"/>
+    <ellipse cx="175" cy="115" rx="7.5" ry="11" fill="#F4CFAA"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="3.12" d="M 80 111 C 83 113, 83 118, 80 121"/>
+    <path fill="none" stroke="#2A1B12" stroke-width="3.12" d="M 176 111 C 173 113, 173 118, 176 121"/>
+    <circle cx="81" cy="132" r="3.4" fill="none" stroke="#2A1B12" stroke-width="4.55"/><circle cx="81" cy="132" r="3.4" fill="none" stroke="#C9CDD2" stroke-width="2.39"/>
+    <circle cx="175" cy="132" r="3.4" fill="none" stroke="#2A1B12" stroke-width="4.55"/><circle cx="175" cy="132" r="3.4" fill="none" stroke="#C9CDD2" stroke-width="2.39"/>
+
+    <!-- sobrancelhas: grossas e retas -->
+    <path fill="none" stroke="#281E18" stroke-width="10.23" d="M 92 96 C 102 89, 116 89, 124 94"/>
+    <path fill="none" stroke="#281E18" stroke-width="10.23" d="M 132 94 C 140 89, 154 89, 164 96"/>
+
+    <!-- ARGOLA NA SOBRANCELHA DIREITA (= direita dele, esquerda de quem olha,
+         a mesma convencao do sinal da Gabizinsky). Fica na ponta de fora da
+         sobrancelha: e o unico vao livre entre a franja em cima e o aro dos
+         oculos embaixo — 6 unidades de folga para cada lado. -->
+    <circle cx="98" cy="94" r="4.6" fill="none" stroke="#2A1B12" stroke-width="4.55"/><circle cx="98" cy="94" r="4.6" fill="none" stroke="#C9CDD2" stroke-width="2.39"/><circle cx="98" cy="89.4" r="1.93" fill="#C9CDD2" stroke="#2A1B12" stroke-width="1.25"/>
+
+    <!-- olhos -->
+    <g>
+      <ellipse cx="107" cy="117" rx="11" ry="11" fill="#F5F1E6"/>
+      <circle cx="108" cy="118" r="7.6" fill="#4A3526" stroke="none"/>
+      <circle cx="108" cy="118" r="3.4" fill="#2A1B12" stroke="none"/>
+      <circle cx="105" cy="114.5" r="2.5" fill="#F5F1E6" stroke="none"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="7.39" d="M 97 112 C 102 105, 113 105, 118 112"/>
+    </g>
+    <g>
+      <ellipse cx="151" cy="117" rx="11" ry="11" fill="#F5F1E6"/>
+      <circle cx="150" cy="118" r="7.6" fill="#4A3526" stroke="none"/>
+      <circle cx="150" cy="118" r="3.4" fill="#2A1B12" stroke="none"/>
+      <circle cx="147" cy="114.5" r="2.5" fill="#F5F1E6" stroke="none"/>
+      <path fill="none" stroke="#2A1B12" stroke-width="7.39" d="M 140 112 C 145 105, 156 105, 161 112"/>
+    </g>
+
+    <!-- nariz -->
+    <path fill="none" stroke="#2A1B12" stroke-width="5.68" d="M 123 120 C 125 130, 132 133, 137 128"/>
+
+    <!-- boca: o sorriso e dele. Nas tres fotos de referencia ele aparece serio
+         numa e rindo largo nas outras duas; o elenco inteiro e serio ou quase,
+         entao ele fica com a curva mais aberta da mesa sem virar careta. -->
+    <path fill="none" stroke="#2A1B12" stroke-width="8.52" stroke-linecap="round" d="M 112 156 C 120 145, 136 145, 144 155"/>
+
+    
+    <defs>
+      <clipPath id="mf-bd-ll"><path d="M 87 118 C 87 108, 95 103, 106 103 C 117 103, 125 108, 125 118 C 125 128, 117 133, 106 133 C 95 133, 87 128, 87 118 Z"/></clipPath>
+      <clipPath id="mf-bd-lr"><path d="M 171 118 C 171 108, 163 103, 152 103 C 141 103, 133 108, 133 118 C 133 128, 141 133, 152 133 C 163 133, 171 128, 171 118 Z"/></clipPath>
+    </defs>
+    <path d="M 87 118 C 87 108, 95 103, 106 103 C 117 103, 125 108, 125 118 C 125 128, 117 133, 106 133 C 95 133, 87 128, 87 118 Z" fill="#F5F1E6" opacity="0.09" stroke="none"/>
+    <path d="M 171 118 C 171 108, 163 103, 152 103 C 141 103, 133 108, 133 118 C 133 128, 141 133, 152 133 C 163 133, 171 128, 171 118 Z" fill="#F5F1E6" opacity="0.09" stroke="none"/>
+    <g clip-path="url(#mf-bd-ll)" stroke="#F5F1E6" fill="none" opacity="0.36" stroke-linecap="round">
+      <path stroke-width="5.28" d="M 92 124 L 103 110"/>
+    </g>
+    <g clip-path="url(#mf-bd-lr)" stroke="#F5F1E6" fill="none" opacity="0.36" stroke-linecap="round">
+      <path stroke-width="5.28" d="M 138 124 L 149 110"/>
+    </g>
+    <g fill="none" stroke="#A8AEB5" stroke-width="3.52" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 87 118 C 87 108, 95 103, 106 103 C 117 103, 125 108, 125 118 C 125 128, 117 133, 106 133 C 95 133, 87 128, 87 118 Z"/>
+      <path d="M 171 118 C 171 108, 163 103, 152 103 C 141 103, 133 108, 133 118 C 133 128, 141 133, 152 133 C 163 133, 171 128, 171 118 Z"/>
+      <path d="M 125 114 L 133 114"/>
+      <path d="M 87 114 C 83 113, 80 112, 77 113"/>
+      <path d="M 171 114 C 175 113, 178 112, 181 113"/>
+    </g>
+    <g fill="none" stroke="#C9CDD2" stroke-width="1.59" stroke-linecap="round">
+      <path d="M 93 108 C 99 104, 113 104, 119 108"/>
+      <path d="M 165 108 C 159 104, 145 104, 139 108"/>
+    </g>
+
+  </g>
+  </g>
+</svg>

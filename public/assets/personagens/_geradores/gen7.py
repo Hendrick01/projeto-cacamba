@@ -21,6 +21,11 @@ regra que ja vale para escudo de time e para a Hello Kitty no README.
 """
 import math
 import os
+import sys
+
+# A boca das expressoes e compartilhada: ver expressoes.py, ao lado.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from expressoes import boca
 
 # Os SVGs ficam um nivel acima: este diretorio guarda so os geradores.
 OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -232,7 +237,13 @@ def glasses(sw, uid):
 
 
 # ------------------------------------------------- cabeca (coords locais 256)
-def head(sw, uid):
+def head(sw, uid, expr=None):
+    # A boca sai de expressoes.py quando ha expressao: a geometria e do JOGO
+    # (o mesmo gesto no rosto de todo mundo) e a tinta continua sendo desta
+    # personagem. Sem expressao, e a de descanso, palavra por palavra.
+    boca_svg = boca(expr, sw, INK) if expr else (
+        f"""<path fill="none" stroke="{INK}" stroke-width="{sw*1.2:.2f}" d="M 117 147 C 123 153, 134 153, 140 146"/>""")
+
     return f'''
   <g stroke="{INK}" stroke-width="{sw:.2f}" stroke-linecap="round" stroke-linejoin="round">
 
@@ -336,7 +347,7 @@ def head(sw, uid):
     <!-- boca: o sorriso e dele. Nas tres fotos de referencia ele aparece serio
          numa e rindo largo nas outras duas; o elenco inteiro e serio ou quase,
          entao ele fica com a curva mais aberta da mesa sem virar careta. -->
-    <path fill="none" stroke="{INK}" stroke-width="{sw*1.2:.2f}" d="M 117 147 C 123 153, 134 153, 140 146"/>
+    {boca_svg}
 
     {glasses(sw, uid)}
   </g>'''
@@ -458,7 +469,7 @@ def hand(mirror=False, dy=0):
 
 
 def body(top=None, top_sh=None, top_lit=None, sand=None, sand_sh=None,
-         sand_lit=None, name="Mufasa"):
+         sand_lit=None, name="Mufasa", expr=None):
     top = top or TOP
     top_sh = top_sh or TOP_SH
     top_lit = top_lit or TOP_LIT
@@ -562,7 +573,7 @@ def body(top=None, top_sh=None, top_lit=None, sand=None, sand_sh=None,
   <g transform="translate(6 {DY})">{hand(mirror=True)}</g>
 
   <g transform="translate({TX:.2f} {TY:.2f}) scale({S})">
-{head(sw=SW, uid="mf-bd")}
+{head(sw=SW, uid="mf-bd", expr=expr)}
   </g>
 </svg>
 '''
@@ -611,6 +622,11 @@ files = {
     "mufasa-alt-bermuda-preta-corpo-inteiro.svg": body(
         name="Mufasa (bermuda preta)", **BLACK_SHORTS),
 }
+# As expressoes: a mesma figura, outra boca. O cliente troca o arquivo por
+# 1,9 s quando algo acontece com aquele jogador (REACOES, em client.js).
+for _e in ("feliz", "bravo"):
+    files[f"mufasa-corpo-inteiro-{_e}.svg"] = body(expr=_e)
+
 for fname, content in files.items():
     with open(os.path.join(OUT, fname), "w", encoding="utf-8") as f:
         f.write(content)
