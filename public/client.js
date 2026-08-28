@@ -1102,8 +1102,17 @@ function renderActions() {
   const drawing = my && view.phase === 'draw' && !modoOrganizar;
   const playing = my && view.phase === 'play' && !modoOrganizar;
   $('btn-organizar').classList.toggle('ligado', modoOrganizar);
-  $('btn-organizar').textContent = modoOrganizar ? 'Pronto' : '✥';
+  $('btn-organizar').textContent = modoOrganizar ? 'Pronto' : '✥ Arrumar';
   $('btn-sort').hidden = modoOrganizar;
+  // A instrução fica fixa enquanto o modo está ligado, e muda com o passo:
+  // como aviso passageiro ela sumia antes de a pessoa entender o gesto.
+  const dica = $('organizar-dica');
+  dica.hidden = !modoOrganizar;
+  if (modoOrganizar) {
+    dica.textContent = cartaPegada === null
+      ? 'Toque na carta que quer mover.'
+      : 'Agora toque na carta que está no lugar onde ela deve ficar.';
+  }
 
   $('btn-draw-deck').hidden = !drawing;
   $('btn-draw-discard').hidden = !(drawing && view.discardTop && view.discardBuyable);
@@ -1201,7 +1210,6 @@ $('btn-organizar').onclick = () => {
     selected.clear();
     meldDiscardMode = false;
     if (!ordemManual.length) ordemManual = sortedHand().map((c) => c.id);
-    toast('✥ Toque numa carta e depois no lugar dela.');
   }
   render();
 };

@@ -783,6 +783,16 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .fila .card:first-child { margin-left: 0; }
 /* A escolhida sai do leque e sobe: fica inteira à vista e vira alvo de toque
    confortável, que é o que a sobreposição tira. */
+/* A instrução do modo de arrumar: fixa enquanto ele está ligado, e muda
+   conforme o passo. Como aviso passageiro ela sumia antes de a pessoa
+   entender o gesto. */
+.organizar-dica {
+  margin: -2px 12px 4px;
+  text-align: center;
+  font-size: 0.82rem; font-weight: 800;
+  color: var(--gold);
+}
+
 /* Modo de organizar: a carta pegada sobe e fica marcada até o jogador tocar
    no lugar dela. */
 .hand .card.pegando {
