@@ -709,6 +709,17 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   transform: translate(-50%, -50%);
   fill: currentColor;
 }
+/* J, Q e K: o retrato de quem está no elenco, no lugar do naipe do meio. O
+   avatar já vem com o fundo de madeira e o aro âmbar — é a mesma medalha que
+   aparece no assento, e é o que faz a figura do baralho ser deste jogo e não
+   de um baralho comprado. */
+.card .figura {
+  position: absolute; left: 50%; top: 52%;
+  width: 66%;
+  transform: translate(-50%, -50%);
+  display: block;
+}
+.card.mini .figura { width: 62%; }
 /* Costas. Eram listras `#274d92` — o único azul do jogo, e a cor mais saturada
    da tela quando sete adversários abrem o leque. Agora são a madeira do aro
    com a trama âmbar por cima: o verso vira o mesmo material da mesa. */

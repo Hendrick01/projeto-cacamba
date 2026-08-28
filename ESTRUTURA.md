@@ -376,10 +376,41 @@ avisos ficam em pé. Inclinar tudo junto borraria o texto.
 A **mesa cresce para ocupar a folga da tela** (`flex: 1`). Antes ela tinha
 altura de conteúdo e a mão era empurrada para o rodapé por `margin-top: auto`:
 sobrava um vão morto entre as duas. E o tampo começa na altura do peito de quem
-senta — `top: calc(var(--altura-assentos) - 114px)`, com a altura vindo do JS
+senta — `top: calc(var(--altura-assentos) - 129px)`, com a altura vindo do JS
 que posiciona os assentos. O desconto é maior do que parece porque a inclinação
 encurta o tampo: a borda de trás sobe menos do que o CSS pede. Sem ele, o
 feltro descolava e os personagens ficavam flutuando no cenário.
+
+### O aro
+
+O feltro existe **só no meio do tampo**. A volta é madeira (`border: 15px` no
+próprio `.feltro`, cores `--aro` / `--aro-luz` / `--aro-noite`), e é nela que os
+jogadores sentam. Sem o aro, o verde encostava direto no assoalho: a mesa não
+tinha espessura e lia como pastilha, não como móvel.
+
+A cor do aro **não** é `--nogueira`. Foi a primeira tentativa, e ela some — o
+assoalho do salão já é essa cor, então madeira escura sobre madeira escura não
+tem contraste nenhum. O aro sai do `#7A4A2B`/`#8C5733` que é o **fundo dos
+avatares** (ver o [README do elenco](public/assets/personagens/README.md)):
+avatar e aro passam a ser literalmente o mesmo material, que é o que faz o
+jogador e a mesa serem do mesmo mundo.
+
+As três cores são a lâmpada de novo: a aresta de trás mostra o tampo do aro e
+clareia (`--aro-luz`), a da frente mostra a face externa, virada para o chão, e
+escurece (`--aro-noite`). Por fora ainda vai o halo (`0 0 0 2px` do
+`--halo`) — sem ele a madeira encosta no assoalho e some, que é a mesma técnica
+que o elenco usa contra o mesmo fundo.
+
+Como o `box-sizing` é `border-box`, a borda come o feltro **por dentro**: a
+silhueta da mesa não muda e quem estava por cima da beirada continua por cima —
+só que agora da madeira. O que mudou foi o `top`, de `-114px` para `-129px`,
+compensando os 15 px que o verde desceu; sem isso abria um vão entre a beirada e
+quem senta nela.
+
+**O que o aro ainda não resolve:** com 5 a 7 adversários a fileira de trás fica
+acima do tampo, e continua lendo como gente em pé no fundo do salão em vez de
+sentada. Alcançar aquela fileira é mudar o arranjo dos assentos, não o
+acabamento da mesa.
 
 ## A mesa no celular
 
@@ -419,6 +450,48 @@ encaixe: dava para jogar, mas não para *planejar*. Cada jogo continua acionáve
 pelo `decorateMeld` quando a jogada é possível agora (encaixe, troca de coringa,
 descarte de jogo seu).
 
+### A carta
+
+A carta é o objeto mais olhado do jogo, e por muito tempo foi o menos
+desenhado: um retângulo creme com `A♥` num canto e o naipe grande no outro.
+
+**Os naipes são desenhados** (`<symbol>` no topo do
+[`index.html`](public/index.html), `naipeSvg` no cliente). Antes eram os glifos
+`♠♥♦♣` da fonte do sistema — mudavam de desenho a cada aparelho e, no iOS, o
+`♥` e o `♦` podiam chegar como emoji colorido. Eram os únicos elementos da tela
+que não tinham sido desenhados para este jogo. O **coringa** era pior: o emoji
+`🃏`, com moldura, cor e traço de outra obra; hoje é um gorro de bobo, silhueta,
+que é o que sobrevive aos 16 px da carta mini.
+
+Os desenhos não trazem `fill`: herdam `currentColor`. É só por isso que
+`.card.red` continua bastando para virar copas e ouros de vermelho, sem uma
+regra por naipe.
+
+Os glifos **continuam existindo** em `SUITS`, no motor. Lá eles são *texto* —
+avisos, mensagens de erro, leitor de tela —, e texto continua sendo texto. Em
+compensação a carta, que perdeu o naipe escrito, ganhou `role="img"` e um
+`aria-label` em palavras (`5 de copas`): sem isso o leitor de tela passaria a
+ler um retângulo mudo.
+
+**Os cantos são dois**, valor em cima e naipe embaixo, o de baixo girado meia
+volta — como em qualquer baralho. No leque as cartas se sobrepõem pela
+esquerda, então quem carrega a leitura inteira é o canto de cima; o de baixo
+aparece na carta que está sozinha na mesa. Na mini (30×42) o canto espelhado
+sai: não cabem três marcas.
+
+**J, Q e K são gente do elenco** (`figuraDaCarta`). O retrato entra no lugar do
+naipe do meio, e quem diz o naipe da figura é o canto. São doze casas de figura
+para oito personagens, então quatro repetem — e a repetição é uma conta, não uma
+tabela: as doze casas desfilam o elenco na ordem e dão a volta **com um passo de
+duas casas**. Sem esse passo, as quatro últimas cartas caem exatamente nos
+rostos das quatro primeiras, e o mesmo rosto no J e no K do *mesmo naipe* é o
+único caso que confunde de verdade — aí a única diferença entre as duas cartas
+é a letra do canto. O dia em que o elenco crescer, a repetição diminui sozinha.
+
+**As costas** eram listras `#274d92`: o único azul do jogo, e a cor mais
+saturada da tela quando sete adversários abrem o leque. Hoje são a madeira do
+aro com uma trama âmbar por cima — o verso da carta é o mesmo material da mesa.
+
 ### A sua mão
 
 O leque é leque de verdade: as cartas se sobrepõem e giram em torno de um pivô
@@ -437,6 +510,14 @@ dedos em duas camadas (tinta por baixo, pele por cima) e halo quente por fora.
 Ficam **absolutas**: não ocupam altura nenhuma do layout, que embaixo é o
 espaço mais disputado da tela. Com mão grande a sobra nas pontas encolhe e o
 leque cobre as próprias mãos — que é o que acontece de verdade.
+
+E são **cortadas** no eixo Y (`overflow-y: clip` na caixa `.maos`). A mão gira
+30° em torno do cotovelo, e o giro joga a ponta do desenho 24 px abaixo da
+tela; o `bottom: -24px` da mão põe outros 24. Eram 48 px de rolagem vertical
+numa tela que devia ser fixa: a barra de cima saía de quadro assim que alguém
+arrastava o dedo. `clip` corta sem criar caixa de rolagem, e só no Y — no X o
+antebraço precisa continuar vazando pelo canto. A altura de 190 px na `.maos`
+não é layout (a caixa é absoluta), é o alcance do corte.
 
 ### Sair da partida
 
@@ -519,10 +600,9 @@ quase cem elementos na tela. Três por jogador bastam para o gesto ler como
 
 **Reações** (`REACOES`, `reage`) respondem ao que aconteceu com aquele jogador:
 baixou, bateu, pediu a carta, levou a carta, perdeu o pedido, trocou o coringa,
-saiu. A troca de **rosto** já está ligada (`trocaCara`) e espera a arte: quando
-o elenco tiver expressões, basta listá-las em `EXPRESSOES`, no
-[`shared/elenco.js`](shared/elenco.js), e o rosto passa a mudar junto com o
-gesto. Enquanto não tiver, quem carrega a reação é o corpo e o balão.
+saiu. A troca de **rosto** (`trocaCara`) já existe de verdade: quem baixa, bate,
+pega a carta ou troca o coringa fica `feliz`; quem pede a carta ou perde o
+pedido fica `bravo`. O rosto volta ao de descanso em 1,9 s.
 
 Os gestos de uma vez só (`pediu`, `baixou`, `carta cai`) são disparados por
 **mudança de estado**, não pelo estado: o objeto `antes` guarda o que já era
@@ -556,6 +636,25 @@ A lista de personagens vive em [`shared/elenco.js`](shared/elenco.js) — e não
 no cliente — justamente porque o servidor precisa dela para validar. Para
 acrescentar alguém: gere a arte, documente no README do elenco, e ponha o slug
 lá.
+
+**As expressões** são `<slug>-corpo-inteiro-<expr>.svg`, e o que muda de uma
+para a outra é **só a boca**. A geometria dela vive num lugar só,
+[`_geradores/expressoes.py`](public/assets/personagens/_geradores/expressoes.py),
+porque a expressão é do *jogo* — o mesmo gesto no rosto de todo mundo — e não de
+cada personagem. O que continua sendo de cada um é a **tinta**: quem tem batom
+leva o batom para o contorno da boca, quem não tem usa o próprio contorno.
+
+A `feliz` é uma boca **aberta**, não uma curva mais funda. A boca de descanso já
+é um sorriso nos oito: uma curva um pouco mais funda sumiria nos ~28 px que a
+cara tem na mesa. Aberta muda a *mancha*, e mancha se enxerga.
+
+Ficaram de fora as **sobrancelhas**, que seriam o outro sinal óbvio. Redesenhar
+a sobrancelha exige apagar a de baixo, e a caixa dela é testa — onde a franja de
+metade do elenco passa. Apagar ali é apagar cabelo. A boca não tem esse
+problema: naquela caixa não há mais nada desenhado em nenhum dos oito.
+
+Acrescentar uma terceira expressão é desenhar a boca em `expressoes.py`, rodar
+os oito geradores e listar o nome em `EXPRESSOES`.
 
 Cada personagem sai de um script Python em
 [`public/assets/personagens/_geradores/`](public/assets/personagens/_geradores/) —

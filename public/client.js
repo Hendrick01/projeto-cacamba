@@ -353,6 +353,21 @@ function cantoEl(card) {
   return canto;
 }
 
+// A figura de J, Q e K é gente do elenco. São doze cartas de figura para oito
+// personagens, então quatro repetem — e a regra é uma conta, não uma tabela:
+// as doze casas (J♠ J♥ J♦ J♣ Q♠ … K♣) desfilam o elenco na ordem e dão a volta.
+// Assim o dia em que o elenco crescer, a repetição diminui sozinha.
+function figuraDaCarta(card) {
+  if (isJoker(card) || card.rank < 11) return null;
+  const n = SLUGS.length;
+  const casa = (card.rank - 11) * 4 + card.suit;  // 0..11: J♠ J♥ J♦ J♣ Q♠ … K♣
+  // A volta é dada com um passo de duas casas. Sem ele, as quatro últimas
+  // cartas caem exatamente nos rostos das quatro primeiras — e o MESMO rosto
+  // no J e no K do MESMO naipe é o único caso que confunde de verdade, porque
+  // aí a única diferença entre as duas cartas é a letra do canto.
+  return SLUGS[(casa + Math.floor(casa / n) * 2) % n];
+}
+
 function cardEl(card, mini = false) {
   const el = document.createElement('div');
   const joker = isJoker(card);
@@ -369,7 +384,18 @@ function cardEl(card, mini = false) {
   // Os dois cantos são o mesmo desenho; o de baixo é o de cima girado meia
   // volta, como em qualquer baralho — é o que faz a carta ler como carta e
   // não como etiqueta.
-  el.append(cantoEl(card), naipeSvg(card, 'pip'), cantoEl(card));
+  const figura = figuraDaCarta(card);
+  if (figura) {
+    // O retrato entra NO LUGAR do naipe do meio: quem diz o naipe da figura é
+    // o canto, como em qualquer baralho.
+    const img = document.createElement('img');
+    img.className = 'figura';
+    img.src = caraDe(figura);
+    img.alt = '';
+    el.append(cantoEl(card), img, cantoEl(card));
+  } else {
+    el.append(cantoEl(card), naipeSvg(card, 'pip'), cantoEl(card));
+  }
   return el;
 }
 
@@ -1439,7 +1465,7 @@ const REACOES = {
   pediu:   { texto: 'quero essa', gesto: 'treme',  cara: 'bravo' },
   levou:   { texto: 'peguei!',    gesto: 'pula',   cara: 'feliz' },
   perdeu:  { texto: 'ah, não…',   gesto: 'murcha', cara: 'bravo' },
-  coringa: { texto: '🃏 troquei', gesto: 'pula',   cara: 'feliz' },
+  coringa: { texto: 'coringa!',  gesto: 'pula',   cara: 'feliz' },
   saiu:    { texto: 'fui',        gesto: 'murcha', cara: null },
 };
 
