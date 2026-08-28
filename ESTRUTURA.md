@@ -8,9 +8,9 @@ pontos ganha.
 (WebSocket) e `qrcode`. O front-end é HTML/CSS/JS vanilla servido estaticamente e
 importa o motor de regras direto do servidor, em `/shared/engine.js`.
 
-**Rodar:** `npm start`. **Testar:** `npm test` (46 testes do motor). O teste de
+**Rodar:** `npm start`. **Testar:** `npm test` (49 testes do motor). O teste de
 integração são separados e exigem o servidor no ar: `node test/e2e.mjs` e
-`node test/sair.mjs`.
+`node test/sair.mjs` e `node test/convite.mjs`.
 
 > As regras vêm de quem joga o jogo, e ainda estão evoluindo. Tudo que é decisão de
 > regra está em constantes no topo do [`shared/engine.js`](shared/engine.js) —
@@ -40,23 +40,25 @@ projeto-caçamba/
 │   ├── icon.svg             # ícone do app (também serve de favicon)
 │   └── manifest.json        # manifesto PWA
 └── test/
-    ├── engine.test.js       # 46 testes unitários do motor
+    ├── engine.test.js       # 49 testes unitários do motor
     ├── e2e.mjs              # integração: 2 jogadores contra o servidor real
-    └── sair.mjs             # integração: sair da partida no meio e o robô assumir
+    ├── sair.mjs             # integração: sair da partida no meio e o robô assumir
+    └── convite.mjs          # integração: o link da sala atrás de proxy
 ```
 
 ## O que faz cada arquivo
 
 | Arquivo | Linhas | O que faz |
 |---|---:|---|
-| [`shared/engine.js`](shared/engine.js) | 1246 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
-| [`public/client.js`](public/client.js) | 1487 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
-| [`server.js`](server.js) | 521 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
-| [`public/style.css`](public/style.css) | 896 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
-| [`test/engine.test.js`](test/engine.test.js) | 759 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
+| [`shared/engine.js`](shared/engine.js) | 1292 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
+| [`public/client.js`](public/client.js) | 1585 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
+| [`server.js`](server.js) | 526 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
+| [`public/style.css`](public/style.css) | 905 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
+| [`test/engine.test.js`](test/engine.test.js) | 849 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 122 | Dois jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket, exercitando compra fora da vez. |
+| [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
-| [`public/index.html`](public/index.html) | 284 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
+| [`public/index.html`](public/index.html) | 285 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
 | [`public/icon.svg`](public/icon.svg) | 37 | Ícone: leque de três cartas sobre o feltro, com moldura dourada. Fundo ocupa o quadro todo, então funciona como ícone *maskable*. |
 | [`.claude/settings.json`](.claude/settings.json) | 34 | Allowlist de comandos de leitura para reduzir aprovações; `sudo` e `rm -rf` bloqueados. |
@@ -148,19 +150,40 @@ O bot também joga assim: como o automático não desce extra, ele escolhe as
 cartas com `melhorJogoExtra(hand)` depois de cumprir o contrato — vem antes do
 encaixe, porque tira 3 ou 4 cartas de uma vez.
 
-**O que o contrato governa é bater.** Só esvazia a mão quem já cumpriu o
-contrato. É a única trava, e vive num lugar só — a flag `completa` do
-`planBaixada`:
+**O que o contrato governa é bater.** Só sai da rodada de mão vazia quem já o
+cumpriu — e a mão pode zerar por **três portas**, então a trava está nas três:
+`actBaixar`, `actLayoff` e `actDiscard`.
 
-```js
-const completa = a >= remaining.t && b >= remaining.s;
-if (!completa && !permitirMaoVazia && size === hand.length) continue;
+Havia um furo aqui: baixando uma trinca das duas da rodada 1 e descartando a
+última carta, dava para bater com o contrato pela metade. A trava de então
+olhava só a baixada, e só o caso de esvaziar de uma vez.
+
+A consequência é uma regra a mais, que não é arbitrária: **sem o contrato
+cumprido, a mão não pode ficar com menos de duas cartas**. Com uma só, o
+descarte obrigatório zeraria a mão — e isso é bater sem contrato, que a regra
+proíbe. Vale para baixar (`size > hand.length - 2`) e para encaixar.
+
+**Encaixar não exige mais ter baixado.** Antes o encaixe só valia depois do
+contrato inteiro; agora vale a qualquer momento, com a trava acima no lugar.
+
+**Resgatar o coringa que sobra.** Uma sequência de 5 cartas com coringa numa
+ponta continua válida sem ele — sobram 4. Então quem **estica a sequência pela
+ponta oposta** pode levar esse coringa para a mão:
+
+```
+J♦ Q♦ K♦ 🃏(=A♦)   +  10♦ pela ponta baixa
+10♦ J♦ Q♦ K♦       →  o coringa vem para a sua mão
 ```
 
-Ou seja: um plano que usaria a mão inteira só é aceito se cobrir o que o
-contrato ainda pede. Quem tem uma trinca e uma sequência na rodada 1 baixa a
-sequência como extra, mas não as duas de uma vez — isso o deixaria sem cartas
-faltando ainda uma trinca do contrato.
+A ponta importa: encaixar por cima de um coringa de ponta o empurraria para o
+meio, onde tirar quebraria a sequência — `coringaLiberadoPeloEncaixe` só
+devolve o coringa da ponta **oposta** à do encaixe. A conferência é feita
+**antes** de mexer no estado: falhar no meio deixaria a carta encaixada e o
+coringa onde estava, sem o jogador ter pedido isso.
+
+É a segunda porta de saída do coringa, ao lado da troca pela carta real. As
+duas cobram um preço: a troca exige a carta exata; o resgate exige esticar a
+sequência de outra pessoa — o que dá a ela uma carta a mais na mesa.
 
 **Carta que está sobrando na mesa.** Uma carta que sobra num jogo já baixado —
 sequência com mais de 4, trinca com mais de 3, as mesmas de `removableCards` —
@@ -413,6 +436,19 @@ Coberto por [`test/sair.mjs`](test/sair.mjs), que põe dois humanos numa sala,
 faz um sair no meio da partida e confere as sete consequências — inclusive que
 a vez **passa** pelo assento vago em vez de travar nele.
 
+### Arrumar a mão
+
+O leque sai ordenado por naipe ou por valor (`A↔♠`), mas o jogador pode
+arrumá-lo como quiser: o botão `✥` entra no modo de organizar, onde se toca
+numa carta e depois no lugar dela. **Dois toques em vez de arrastar** porque as
+cartas se sobrepõem no leque — arrastar acertaria a carta errada o tempo todo
+num celular.
+
+A ordem escolhida vive em `ordemManual` e só nesta rodada: os ids das cartas
+recomeçam a cada uma. Carta puxada depois vai para o fim, sem embaralhar o que
+já estava arrumado; e pedir ordenação automática de novo (`A↔♠`) descarta a
+arrumação à mão.
+
 ### Animações
 
 Todas em CSS, todas desligadas em `prefers-reduced-motion`.
@@ -518,8 +554,17 @@ mais apertada. `BOT_NAMES` tem oito nomes distintos, escolhidos pelo primeiro
 livre, para não haver dois robôs homônimos numa mesa de 8.
 
 `originFrom(req)` decide o endereço que vai no convite e no QR, nesta ordem:
-`PUBLIC_URL` → cabeçalhos `x-forwarded-host` / `x-forwarded-proto` → IP da rede local.
-Cada sala guarda por onde quem a criou chegou.
+`PUBLIC_URL` → cabeçalho `x-forwarded-host` (só com `TRUST_PROXY`) → `host` da
+requisição → IP da rede local. Cada sala guarda por onde quem a criou chegou.
+
+O **esquema** (http/https) é o único que vem do proxy mesmo sem `TRUST_PROXY`.
+O risco que a flag guarda é o **host** forjado, que mandaria o convite para
+outro domínio; o esquema não muda de destino — no máximo erra entre http e
+https no mesmo endereço. Era exatamente o que acontecia no Render: site em
+https, convite e QR saindo em http, porque o TLS termina no proxy e
+`socket.encrypted` é falso do lado de cá. Coberto por
+[`test/convite.mjs`](test/convite.mjs), que também confere que host forjado
+continua ignorado.
 
 `scheduleBots` agenda a próxima jogada de bot. Na vez deles a espera é de ~0,7 s — ou
 **2,2 s quando há carta comprável**, para dar tempo do humano pedir. O timer tem uma
