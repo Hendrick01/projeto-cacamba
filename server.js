@@ -113,7 +113,12 @@ function originFrom(req) {
   const host = fwdHost || (req && req.headers.host);
   if (!hostValido(host)) return LAN_HOST;
   if (ALLOWED_HOSTS.length && !ALLOWED_HOSTS.includes(host.toLowerCase())) return LAN_HOST;
-  const fwdProto = trustProxy ? String(req?.headers['x-forwarded-proto'] || '').split(',')[0].trim() : '';
+  // O esquema pode vir do proxy mesmo sem TRUST_PROXY. O risco que a flag
+  // guarda é o HOST forjado, que mandaria o convite para outro domínio; o
+  // esquema não muda de destino — no máximo erra entre http e https no mesmo
+  // endereço, e é isso que acontecia no Render: site em https, convite e QR
+  // saindo em http porque o TLS termina no proxy e `socket.encrypted` é falso.
+  const fwdProto = String(req?.headers['x-forwarded-proto'] || '').split(',')[0].trim();
   const proto = /^https?$/.test(fwdProto) ? fwdProto : (req.socket && req.socket.encrypted ? 'https' : 'http');
   return `${proto}://${host}`;
 }
