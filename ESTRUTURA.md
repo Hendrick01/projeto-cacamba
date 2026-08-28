@@ -34,7 +34,10 @@ projeto-caçamba/
 │   ├── engine.js            # motor de regras puro (usado por servidor e cliente)
 │   └── elenco.js            # o elenco: lista de personagens, validada no servidor
 ├── public/
-│   ├── index.html           # marcação das 3 telas + modais
+│   ├── index.html           # marcação das telas + modais
+│   ├── 3d.html              # a mesa em 3D (mesma partida, outra janela)
+│   ├── mesa3d.js            # a cena: salão, mesa, elenco sentado, sua mão
+│   ├── vendor/three.module.js  # three.js vendido (só baixa quem abre o 3D)
 │   ├── client.js            # cliente: telas, mesa e conversa com o servidor
 │   ├── style.css            # visual mobile-first, tema feltro escuro
 │   ├── icon.svg             # ícone do app (também serve de favicon)
@@ -51,14 +54,15 @@ projeto-caçamba/
 | Arquivo | Linhas | O que faz |
 |---|---:|---|
 | [`shared/engine.js`](shared/engine.js) | 1314 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
-| [`public/client.js`](public/client.js) | 1875 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
+| [`public/client.js`](public/client.js) | 1879 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
 | [`server.js`](server.js) | 578 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
 | [`public/style.css`](public/style.css) | 1123 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
 | [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 134 | **Três** jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket. Três porque a compra fora da vez precisa de alguém que não seja nem quem está na vez nem quem descartou — e o teste falha se ninguém pedir carta, para essa cobertura não morrer em silêncio. |
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
-| [`public/index.html`](public/index.html) | 333 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
+| [`public/mesa3d.js`](public/mesa3d.js) | 969 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
+| [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
 | [`public/icon.svg`](public/icon.svg) | 37 | Ícone: leque de três cartas sobre o feltro, com moldura dourada. Fundo ocupa o quadro todo, então funciona como ícone *maskable*. |
 | [`.claude/settings.json`](.claude/settings.json) | 34 | Allowlist de comandos de leitura para reduzir aprovações; `sudo` e `rm -rf` bloqueados. |
@@ -424,6 +428,43 @@ quem senta nela.
 acima do tampo, e continua lendo como gente em pé no fundo do salão em vez de
 sentada. Alcançar aquela fileira é mudar o arranjo dos assentos, não o
 acabamento da mesa.
+
+## A mesa em 3D
+
+O botão **3D** na barra da mesa abre `3d.html`: a MESMA partida, vista da sua
+cadeira — o servidor continua sendo o juiz, e a tela 3D é só outra janela para
+o mesmo estado. Ela entra com a sessão do `localStorage`, recebe as mesmas
+visões e manda as mesmas ações; dá para jogar o ciclo inteiro por ela (puxar,
+baixar com o plano do próprio motor, descartar). Jogadas finas — encaixe,
+troca de coringa, arrumar a mão — continuam na mesa normal, e o botão de
+voltar está sempre à vista.
+
+O que ela desenha ([`public/mesa3d.js`](public/mesa3d.js)): o salão em neblina
+(a penumbra por distância de verdade), a mesa redonda sob a lâmpada, o elenco
+sentado em volta **segurando o leque de cartas viradas**, o monte como caixa
+com altura proporcional ao baralho, o descarte deitado no feltro, os jogos
+baixados na frente de quem baixou, a sua mão em leque com **as suas mãos
+segurando** (polegar e palma na frente das cartas, no tom de pele do seu
+personagem — mão de dedos esticados lia como aceno). As figuras vão para
+textura a 512×1024: anéis, pulseiras e correntes são traços de poucas unidades
+num quadro de 400, e a 256 eles derretem. Reações (cara feliz/bravo, pulo)
+respondem aos mesmos eventos da mesa normal.
+
+A biblioteca (`public/vendor/three.module.js`, ~675 KB, 167 KB com gzip) **só é
+baixada quando se abre o 3D** — a mesa normal continua nos 181 KB. Vendida no
+repositório para não depender de CDN (a regra do projeto é: sem build, sem
+dependência de fora no navegador).
+
+Duas armadilhas que custaram e ficam registradas:
+
+- `canvas` é **elemento substituído**: `inset: 0` não o estica como a uma
+  `div` — ele fica no tamanho intrínseco do buffer (2× da tela, pelo
+  `pixelRatio`) e vaza, mostrando só um canto da cena. `width/height: 100%`
+  explícitos resolvem.
+- Em tela **em pé**, um fov vertical fixo vira um túnel (52° verticais numa
+  tela 9:19 dão ~26° de largura). O fov e o recuo da câmera saem da proporção
+  da tela (`encaixaTela`), e o leque é dimensionado pela largura visível
+  calculada da câmera de verdade.
 
 ## A mesa no celular
 

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2a1b12">
+<title>Caçamba em 3D</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap">
+<style>
+  /* A tela 3D não usa o style.css do jogo: aqui quase tudo é desenhado no
+     canvas, e o pouco que é HTML fica por cima dele. */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #1b110b; overflow: hidden; }
+  body {
+    font-family: 'Nunito', system-ui, sans-serif;
+    color: #f5f1e6;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* canvas é elemento substituído: `inset: 0` sozinho NÃO o estica como a uma
+     div — ele fica no tamanho intrínseco do buffer (2x da tela, pelo
+     pixelRatio) e vaza, mostrando só um canto da cena. O width/height explícito
+     é o que o prende à janela. */
+  #cena { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .painel {
+    position: fixed; left: 0; right: 0; top: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+    background: linear-gradient(180deg, rgba(27, 17, 11, 0.9) 0%, rgba(27, 17, 11, 0) 100%);
+    pointer-events: none;
+  }
+  .painel .rodada { line-height: 1.2; }
+  .painel small {
+    display: block; color: #8c6a45; font-size: 0.7rem;
+    font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .painel strong { color: #f2c14e; font-size: 1rem; font-weight: 900; }
+  .voltar {
+    pointer-events: auto;
+    border: 1px solid rgba(140, 106, 69, 0.5);
+    background: rgba(0, 0, 0, 0.4); color: #f5f1e6;
+    font: inherit; font-weight: 900; font-size: 0.82rem;
+    padding: 8px 14px; border-radius: 20px; cursor: pointer;
+  }
+  .aviso {
+    /* No alto, logo abaixo do painel: embaixo ele caía em cima do leque. */
+    position: fixed; left: 50%; top: max(74px, calc(env(safe-area-inset-top) + 62px));
+    transform: translateX(-50%);
+    background: rgba(27, 17, 11, 0.92);
+    border: 1px solid rgba(140, 106, 69, 0.5);
+    padding: 10px 16px; border-radius: 14px;
+    font-size: 0.86rem; font-weight: 700; text-align: center;
+    max-width: 90vw;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="cena"></canvas>
+
+<div class="painel">
+  <div class="rodada"><small id="rot-rodada">carregando</small><strong id="rot-contrato">—</strong></div>
+  <button class="voltar" id="btn-voltar">← mesa normal</button>
+</div>
+
+<p class="aviso" id="aviso">Abrindo a mesa em 3D…</p>
+
+<script type="module" src="mesa3d.js"></script>
+</body>
+</html>

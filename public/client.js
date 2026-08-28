@@ -1437,6 +1437,10 @@ $('btn-sort').onclick = () => {
 
 $('btn-rules').onclick = () => showRules();
 $('btn-score').onclick = () => showScore();
+// A mesa em 3D é outra janela para a MESMA partida: entra com a sessão
+// guardada e conversa com o mesmo servidor. A biblioteca dela (three.js) só é
+// baixada quando se abre — a mesa normal continua leve.
+$('btn-3d').onclick = () => { location.href = '3d.html'; };
 
 // Sair da partida. Pede confirmação porque é irreversível: o assento não pode
 // sumir no meio da rodada (mão, jogos e pontos são por assento), então quem
