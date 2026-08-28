@@ -328,7 +328,7 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
      de largura evita o contrário — porta e engradados do tamanho de um móvel
      de verdade num monitor. */
   width: 100%; max-width: 860px;
-  height: 42%;
+  height: 52%;
   z-index: 0;
   pointer-events: none;
   -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 62%, transparent 100%);
@@ -344,20 +344,34 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 
 /* O feltro visto de frente. A luz é a mesma do resto: clarão no meio, onde
    ficam monte e descarte, e penumbra na borda. */
+/* A mesa cresce para ocupar a folga da tela. Antes ela tinha altura de
+   conteúdo e a `.hand` era empurrada para o rodapé por `margin-top: auto` —
+   sobrava um vão morto entre as duas. Agora a folga vira mesa. */
 .mesa {
   position: relative;
+  flex: 1;
+  min-height: 300px;
   margin: 6px 10px 0;
   padding: 10px 8px 6px;
+  display: flex;
+  flex-direction: column;
 }
+/* O meio da mesa fica centrado na folga, embaixo da lâmpada. */
+.mesa .table-center { margin-top: auto; margin-bottom: auto; }
 
 /* O tampo, inclinado: a borda de trás recua e a mesa passa a ser vista da sua
    cadeira. Só ele inclina — o conteúdo fica em pé, senão o texto borra. */
 .feltro {
   position: absolute;
-  left: 0; right: 0; top: -6%; bottom: 0;
+  left: 0; right: 0; bottom: 0;
+  /* Sobe até o peito de quem senta. O desconto é maior do que parece porque a
+     inclinação encurta o tampo: a borda de trás sobe menos do que o CSS pede. */
+  top: calc(var(--altura-assentos, 108px) - 114px);
   z-index: -1;
-  border-radius: 46% 46% 22% 22% / 30% 30% 12% 12%;
-  transform: perspective(660px) rotateX(26deg);
+  border-radius: 46% 46% 20% 20% / 22% 22% 9% 9%;
+  /* Ângulo menor agora que a mesa é alta: a 26° um tampo comprido lia como
+     parede em pé, não como mesa. */
+  transform: perspective(900px) rotateX(17deg);
   transform-origin: 50% 100%;
   background:
     radial-gradient(56% 44% at 50% 66%, rgba(242, 193, 78, 0.14) 0%, rgba(242, 193, 78, 0) 72%),

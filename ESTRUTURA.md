@@ -8,7 +8,7 @@ pontos ganha.
 (WebSocket) e `qrcode`. O front-end é HTML/CSS/JS vanilla servido estaticamente e
 importa o motor de regras direto do servidor, em `/shared/engine.js`.
 
-**Rodar:** `npm start`. **Testar:** `npm test` (45 testes do motor). O teste de
+**Rodar:** `npm start`. **Testar:** `npm test` (46 testes do motor). O teste de
 integração são separados e exigem o servidor no ar: `node test/e2e.mjs` e
 `node test/sair.mjs`.
 
@@ -40,7 +40,7 @@ projeto-caçamba/
 │   ├── icon.svg             # ícone do app (também serve de favicon)
 │   └── manifest.json        # manifesto PWA
 └── test/
-    ├── engine.test.js       # 45 testes unitários do motor
+    ├── engine.test.js       # 46 testes unitários do motor
     ├── e2e.mjs              # integração: 2 jogadores contra o servidor real
     └── sair.mjs             # integração: sair da partida no meio e o robô assumir
 ```
@@ -49,14 +49,14 @@ projeto-caçamba/
 
 | Arquivo | Linhas | O que faz |
 |---|---:|---|
-| [`shared/engine.js`](shared/engine.js) | 1208 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
-| [`public/client.js`](public/client.js) | 1483 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
-| [`server.js`](server.js) | 480 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
-| [`public/style.css`](public/style.css) | 876 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
-| [`test/engine.test.js`](test/engine.test.js) | 735 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
+| [`shared/engine.js`](shared/engine.js) | 1246 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
+| [`public/client.js`](public/client.js) | 1487 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
+| [`server.js`](server.js) | 521 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
+| [`public/style.css`](public/style.css) | 896 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
+| [`test/engine.test.js`](test/engine.test.js) | 759 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 122 | Dois jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket, exercitando compra fora da vez. |
-| [`test/sair.mjs`](test/sair.mjs) | 96 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
-| [`public/index.html`](public/index.html) | 196 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
+| [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
+| [`public/index.html`](public/index.html) | 284 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
 | [`public/icon.svg`](public/icon.svg) | 37 | Ícone: leque de três cartas sobre o feltro, com moldura dourada. Fundo ocupa o quadro todo, então funciona como ícone *maskable*. |
 | [`.claude/settings.json`](.claude/settings.json) | 34 | Allowlist de comandos de leitura para reduzir aprovações; `sudo` e `rm -rf` bloqueados. |
@@ -129,11 +129,24 @@ pontos, com um `TypeError` sem relação aparente com a causa.
 O que o contrato pede vai para `player.baixados`; `player.baixou` só vira
 `true` com o contrato inteiro na mesa — e é ele que libera o encaixe.
 
-**Jogo extra pode descer antes ou depois do contrato.** Trinca ou sequência
-que o contrato não pediu — uma sequência na rodada de trincas, uma terceira
-trinca — desce do mesmo jeito, a qualquer momento. Ela **não conta** em
-`baixados`: o crédito no contrato é `min(baixados, o que ele pede)`, e o que
-passar disso é extra. Sem isso o progresso da rodada apareceria como `4/3`.
+**Jogo extra pode descer antes ou depois do contrato — mas só por escolha.**
+Trinca ou sequência que o contrato não pediu — uma sequência na rodada de
+trincas, uma terceira trinca — desce do mesmo jeito, a qualquer momento, desde
+que o jogador **selecione as cartas**. Sem seleção, o automático desce só o que
+o contrato pede: baixar a mais expõe jogo para os outros encaixarem carta, e
+essa conta é de quem joga, não do botão. É o que decide o teto do planejador:
+
+```js
+const tetoT = temSelecao ? Math.floor(pool.length / 3) : remaining.t;
+const tetoS = temSelecao ? Math.floor(pool.length / 4) : remaining.s;
+```
+
+O extra **não conta** em `baixados`: o crédito no contrato é `min(o que desceu,
+o que ele pede)`, e o resto é extra. Sem isso o progresso apareceria como `4/3`.
+
+O bot também joga assim: como o automático não desce extra, ele escolhe as
+cartas com `melhorJogoExtra(hand)` depois de cumprir o contrato — vem antes do
+encaixe, porque tira 3 ou 4 cartas de uma vez.
 
 **O que o contrato governa é bater.** Só esvazia a mão quem já cumpriu o
 contrato. É a única trava, e vive num lugar só — a flag `completa` do
@@ -314,9 +327,17 @@ meio, penumbra na borda, halo em quem está no escuro). Fica atrás de tudo,
 esmaecendo para baixo por máscara, para não competir com as cartas.
 
 O **tampo** é uma camada só dele (`.feltro`), inclinada em perspectiva
-(`rotateX(26deg)` com a origem na borda de baixo): a borda de trás recua e a
+(`rotateX(17deg)` com a origem na borda de baixo): a borda de trás recua e a
 mesa passa a ser vista da sua cadeira. Só ele inclina — assentos, monte e
 avisos ficam em pé. Inclinar tudo junto borraria o texto.
+
+A **mesa cresce para ocupar a folga da tela** (`flex: 1`). Antes ela tinha
+altura de conteúdo e a mão era empurrada para o rodapé por `margin-top: auto`:
+sobrava um vão morto entre as duas. E o tampo começa na altura do peito de quem
+senta — `top: calc(var(--altura-assentos) - 114px)`, com a altura vindo do JS
+que posiciona os assentos. O desconto é maior do que parece porque a inclinação
+encurta o tampo: a borda de trás sobe menos do que o CSS pede. Sem ele, o
+feltro descolava e os personagens ficavam flutuando no cenário.
 
 ## A mesa no celular
 

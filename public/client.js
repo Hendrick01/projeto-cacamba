@@ -501,7 +501,11 @@ function renderOpponents() {
   const box = $('opponents');
   const adversarios = view.players.filter((p) => p.id !== me());
   const lugares = posicoesDeAssento(adversarios.length);
-  box.style.height = `${alturaDaMesa(adversarios.length)}px`;
+  const alturaAssentos = alturaDaMesa(adversarios.length);
+  box.style.height = `${alturaAssentos}px`;
+  // O tampo precisa começar logo abaixo de quem senta, senão o feltro descola
+  // dos assentos e eles ficam flutuando no cenário.
+  box.parentElement?.style.setProperty('--altura-assentos', `${alturaAssentos}px`);
 
   for (const [id, el] of assentos) {
     if (!adversarios.some((p) => p.id === id)) { el.remove(); assentos.delete(id); }
