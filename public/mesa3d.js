@@ -551,7 +551,8 @@ function materialDeDedos(pele) {
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false });
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+  mat.color.setScalar(0.94);
   texturasDeDedos.set(pele, mat);
   return mat;
 }
@@ -565,9 +566,45 @@ async function criaAssento(p) {
     texturaDaFigura(slug, 'feliz'),
     texturaDaFigura(slug, 'bravo'),
   ]);
-  const mat = new THREE.MeshLambertMaterial({ map: normal, transparent: true, alphaTest: 0.06 });
-  const plano = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 2.1), mat);
-  plano.position.y = 1.05;
+  // A figura é desenho chapado: iluminar como objeto 3D lava as cores dela e
+  // é o que a fazia destoar do resto. Sem luz, com um escurecimento fixo leve
+  // para sentar na cena — as cores ficam as mesmas da mesa normal.
+  //
+  // O corpo no espaço vem de três truques de recorte, não de remodelagem:
+  // o plano é CURVADO (as bordas recuam e pegam perspectiva), há uma cópia
+  // escura atrás deslocada (a espessura do recorte, como um standee de
+  // madeira) e uma sombra de contato no chão. É o que faz a figura ocupar
+  // lugar na cena em vez de parecer um adesivo colado nela.
+  const geoFigura = new THREE.PlaneGeometry(1.16, 2.32, 12, 1);
+  {
+    const posAttr = geoFigura.attributes.position;
+    for (let i = 0; i < posAttr.count; i++) {
+      const vx = posAttr.getX(i);
+      posAttr.setZ(i, -0.16 * (vx / 0.58) ** 2);
+    }
+    posAttr.needsUpdate = true;
+  }
+  const mat = new THREE.MeshBasicMaterial({ map: normal, transparent: true, alphaTest: 0.06 });
+  mat.color.setScalar(0.94);
+  const plano = new THREE.Mesh(geoFigura, mat);
+  plano.position.y = 1.16;
+
+  // a espessura: a mesma silhueta, escura, um dedo atrás e deslocada para o
+  // lado oposto ao da lâmpada
+  const matVerso = new THREE.MeshBasicMaterial({ map: normal, transparent: true, alphaTest: 0.06 });
+  matVerso.color.setScalar(0.16);
+  const espessura = new THREE.Mesh(geoFigura, matVerso);
+  espessura.position.set(0.028, 1.14, -0.035);
+  espessura.renderOrder = -1;
+
+  // sombra de contato: é ela que cola o recorte no chão
+  const sombra = new THREE.Mesh(
+    new THREE.CircleGeometry(0.44, 22),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false }),
+  );
+  sombra.rotation.x = -Math.PI / 2;
+  sombra.scale.y = 0.42;
+  sombra.position.y = 0.014;
   grupo.add(plano);
 
   // a cadeira é o anel do assento em outra forma, como na mesa normal
@@ -577,7 +614,7 @@ async function criaAssento(p) {
     new THREE.MeshLambertMaterial({ color: cor }),
   );
   cadeira.position.y = 0.03;
-  grupo.add(cadeira);
+  grupo.add(espessura, sombra, cadeira);
 
   // O leque de cartas viradas NAS MÃOS: na altura em que as mãos da figura
   // estão (a arte tem os braços ao longo do corpo, mãos à altura da cintura),
@@ -606,12 +643,12 @@ async function criaAssento(p) {
   leque.add(contagem);
 
   // acima do tampo (0.92): abaixo disso a borda da mesa engole o leque
-  leque.position.set(0, 1.08, 0.12);
+  leque.position.set(0, 1.1, 0.14);
   leque.rotation.x = -0.12;   // levemente inclinado para trás, como se segura
   grupo.add(leque);
 
   const nome = rotulo(p.name);
-  nome.position.y = 1.96;
+  nome.position.y = 2.2;
   nome.scale.set(0.78, 0.21, 1);
   grupo.add(nome);
 
@@ -625,14 +662,17 @@ async function criaAssento(p) {
   grupo.add(focoVez);
 
   scene.add(grupo);
-  return { grupo, plano, leque, contagem, mat, texturas: { normal, feliz, bravo }, nome, focoVez, pulo: 0, caraAte: 0 };
+  return {
+    grupo, plano, espessura, leque, contagem, mat, matVerso,
+    texturas: { normal, feliz, bravo }, nome, focoVez, pulo: 0, caraAte: 0,
+  };
 }
 
 // os adversários sentam no arco do outro lado; você fica na câmera
 function posicaoDoAssento(indice, total) {
   const meio = (total - 1) / 2;
   const ang = total === 1 ? 0 : ((indice - meio) / Math.max(1, meio)) * 1.05; // ±60°
-  const r = 2.8;
+  const r = 2.66;
   return { x: Math.sin(ang) * r, z: -Math.cos(ang) * r, ang };
 }
 
@@ -675,6 +715,18 @@ scene.add(camera);
 
 const cartasDaMao = new Map();  // cardId → mesh
 let selecionadas = new Set();
+// Arrumação à mão, como na mesa 2D: vazia = ordenação automática. Vale só na
+// rodada — os ids das cartas recomeçam a cada uma.
+let ordemManual = [];
+
+function maoOrdenada() {
+  const hand = [...(view.you?.hand || [])];
+  if (ordemManual.length) {
+    const pos = new Map(ordemManual.map((id, i) => [id, i]));
+    return hand.sort((a, b) => (pos.get(a.id) ?? 1e6) - (pos.get(b.id) ?? 1e6));
+  }
+  return hand.sort((a, b) => a.suit - b.suit || a.rank - b.rank);
+}
 
 // As suas mãos segurando o leque: mesma construção da mesa normal (contorno
 // escuro, pele por cima, halo por fora), com o tom de pele de quem você
@@ -695,99 +747,81 @@ function capsulaDupla(ctx, x0, y0, x1, y1, w, pele) {
   capsula(ctx, x0, y0, x1, y1, w - 10, pele);
 }
 
-// A mão que segura o leque, vista de quem joga: o polegar cruza a frente das
-// cartas, a palma aparece por baixo e o indicador espia na lateral. Os outros
-// dedos ficam atrás das cartas — é o que uma pegada de leque mostra.
-function texturaMaoDoLeque(pele) {
+// A mão da mesa 2D, traço por traço: são os MESMOS caminhos SVG do
+// index.html, rasterizados com o tom de pele do personagem. Inventar outra mão
+// aqui era o que a deixava incompatível com o resto — o jogo já tem uma.
+const CAMINHOS_MAO_2D = {
+  antebraco: 'M 43 84 C 40 120, 38 160, 36 200 L 84 200 C 82 160, 80 120, 77 84 Z',
+  dorso: 'M 42 86 L 78 86 C 82 74, 82 62, 79 54 C 71 49, 49 49, 42 54 C 39 62, 38 74, 42 86 Z',
+  dedos: [
+    ['M 46 60 L 46 34', 12, 8],
+    ['M 56 60 L 56 25', 12, 8],
+    ['M 66 60 L 66 21', 12, 8],
+    ['M 76 60 L 76 29', 12, 8],
+  ],
+  polegar: ['M 81 70 C 87 62, 88 54, 85 48', 14, 10],
+};
+
+function texturaMao2D(pele) {
   const c = document.createElement('canvas');
-  c.width = 512; c.height = 512;
+  c.width = 384; c.height = 640;               // proporção do viewBox 120x200
   const ctx = c.getContext('2d');
+  ctx.scale(384 / 120, 640 / 200);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
-  // halo quente
-  ctx.save();
-  ctx.filter = 'blur(7px)';
-  capsula(ctx, 268, 512, 258, 300, 190, 'rgba(140,106,69,0.8)');
-  ctx.restore();
+  const antebraco = new Path2D(CAMINHOS_MAO_2D.antebraco);
+  const dorso = new Path2D(CAMINHOS_MAO_2D.dorso);
 
-  // punho e palma subindo da borda de baixo
-  capsulaDupla(ctx, 268, 540, 262, 350, 168, pele);
-  ctx.fillStyle = '#2a1b12';
-  ctx.beginPath(); ctx.ellipse(262, 330, 104, 86, -0.18, 0, Math.PI * 2); ctx.fill();
+  // halo quente por fora, como no elenco e na mesa 2D
+  ctx.strokeStyle = 'rgba(140,106,69,0.8)'; ctx.lineWidth = 9;
+  ctx.stroke(antebraco); ctx.stroke(dorso);
+
   ctx.fillStyle = pele;
-  ctx.beginPath(); ctx.ellipse(262, 330, 94, 76, -0.18, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#2a1b12'; ctx.lineWidth = 5;
+  ctx.fill(antebraco); ctx.stroke(antebraco);
 
-  // o indicador espia na lateral esquerda do leque
-  capsulaDupla(ctx, 186, 322, 158, 236, 56, pele);
+  for (const [d, tinta, peleW] of CAMINHOS_MAO_2D.dedos) {
+    const p2 = new Path2D(d);
+    ctx.strokeStyle = '#2a1b12'; ctx.lineWidth = tinta; ctx.stroke(p2);
+    ctx.strokeStyle = pele; ctx.lineWidth = peleW; ctx.stroke(p2);
+  }
+  const [dPol, tintaPol, pelePol] = CAMINHOS_MAO_2D.polegar;
+  const pol = new Path2D(dPol);
+  ctx.strokeStyle = '#2a1b12'; ctx.lineWidth = tintaPol; ctx.stroke(pol);
+  ctx.strokeStyle = pele; ctx.lineWidth = pelePol; ctx.stroke(pol);
 
-  // polegar em dois segmentos, com dobra de verdade
-  capsulaDupla(ctx, 250, 320, 316, 220, 74, pele);
-  capsulaDupla(ctx, 316, 220, 352, 142, 62, pele);
-  // vinco da dobra e unha: os dois detalhes que fazem ler como polegar
-  ctx.strokeStyle = 'rgba(42,27,18,0.5)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(300, 232); ctx.quadraticCurveTo(316, 222, 330, 226); ctx.stroke();
-  ctx.fillStyle = 'rgba(255,255,255,0.28)';
-  ctx.beginPath(); ctx.ellipse(348, 152, 12, 17, 0.45, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = pele;
+  ctx.fill(dorso); ctx.strokeStyle = '#2a1b12'; ctx.lineWidth = 5; ctx.stroke(dorso);
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
-// O outro braço descansa na beirada da mesa, como em qualquer roda de carta:
-// antebraço na diagonal e a mão relaxada, meio fechada.
-function texturaBracoNaMesa(pele) {
-  const c = document.createElement('canvas');
-  c.width = 512; c.height = 512;
-  const ctx = c.getContext('2d');
-
-  ctx.save();
-  ctx.filter = 'blur(7px)';
-  capsula(ctx, 470, 470, 240, 280, 200, 'rgba(140,106,69,0.8)');
-  ctx.restore();
-
-  capsulaDupla(ctx, 500, 500, 250, 290, 176, pele);
-  // dorso da mão
-  ctx.fillStyle = '#2a1b12';
-  ctx.beginPath(); ctx.ellipse(226, 268, 108, 84, -0.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = pele;
-  ctx.beginPath(); ctx.ellipse(228, 270, 98, 74, -0.5, 0, Math.PI * 2); ctx.fill();
-  // dedos meio fechados, juntos — mão em repouso não abre os dedos
-  capsulaDupla(ctx, 172, 216, 118, 264, 52, pele);
-  capsulaDupla(ctx, 208, 194, 142, 232, 52, pele);
-  capsulaDupla(ctx, 248, 184, 182, 210, 50, pele);
-  capsulaDupla(ctx, 288, 186, 234, 200, 46, pele);
-  // nós dos dedos
-  ctx.strokeStyle = 'rgba(42,27,18,0.45)'; ctx.lineWidth = 5;
-  ctx.beginPath(); ctx.moveTo(180, 226); ctx.quadraticCurveTo(230, 196, 284, 194); ctx.stroke();
-
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-const maos = { leque: null, mesa: null, pele: null };
+const maos = { esq: null, dir: null, pele: null };
 function sincronizaMaos() {
   const eu = view.players.find((p) => p.id === me());
   if (!eu) return;
   const pele = peleDe(personagemDe(eu));
   if (pele === maos.pele) return;
   maos.pele = pele;
-  for (const [chave, textura] of [['leque', texturaMaoDoLeque], ['mesa', texturaBracoNaMesa]]) {
-    if (maos[chave]) maoGrupo.remove(maos[chave]);
-    const mat = new THREE.MeshLambertMaterial({
-      map: textura(pele), transparent: true, depthWrite: false,
+  for (const lado of ['esq', 'dir']) {
+    if (maos[lado]) maoGrupo.remove(maos[lado]);
+    // desenho, como o elenco: sem sombreamento, só o escurecimento fixo
+    const mat = new THREE.MeshBasicMaterial({
+      map: texturaMao2D(pele), transparent: true, depthWrite: false,
     });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), mat);
-    maos[chave] = m;
+    mat.color.setScalar(0.94);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.6), mat);
+    maos[lado] = m;
     maoGrupo.add(m);
   }
 }
 
 function sincronizaMao() {
-  const hand = [...(view.you?.hand || [])].sort(
-    (a, b) => a.suit - b.suit || a.rank - b.rank,
-  );
+  const hand = maoOrdenada();
   selecionadas = new Set([...selecionadas].filter((id) => hand.some((c) => c.id === id)));
+  ordemManual = ordemManual.filter((id) => hand.some((c) => c.id === id));
 
   for (const [id, mesh] of cartasDaMao) {
     if (!hand.some((c) => c.id === id)) { maoGrupo.remove(mesh); cartasDaMao.delete(id); }
@@ -805,6 +839,7 @@ function sincronizaMao() {
   // O leque é CORTADO pela borda de baixo, como no Capote: carta inteira com
   // um vão de cenário embaixo é o que fazia a mão parecer flutuar.
   const baseY = -alturaVisivel * 0.43;
+  layoutDaMao = { passo, escala, baseY, dist, meio: (n - 1) / 2, alturaVisivel, larguraVisivel };
   hand.forEach((card, i) => {
     let mesh = cartasDaMao.get(card.id);
     if (!mesh) {
@@ -825,38 +860,89 @@ function sincronizaMao() {
     mesh.rotation.x = -0.12;
   });
 
-  // uma mão segura o leque; a outra descansa na beirada da mesa
+  // as duas mãos sobem por trás das pontas do leque, viradas para dentro —
+  // é a composição da mesa 2D, que já era a aprovada
   sincronizaMaos();
   const larguraLeque = (n - 1) * passo + CARTA_L * escala;
-  if (maos.leque && maos.mesa) {
-    maos.leque.visible = n > 0;
-    const zFrente = -dist + n * 0.004 + 0.02;
-    maos.leque.position.set(-larguraLeque * 0.14, baseY - 0.08 * escala, zFrente);
-    maos.leque.rotation.z = -0.1;
-    maos.leque.scale.setScalar(1.05 * escala);
-    // o braço apoiado entra pelo canto de baixo, cortado pela borda da tela
-    maos.mesa.position.set(larguraVisivel * 0.4, baseY - 0.3 * escala, zFrente - 0.05);
-    maos.mesa.rotation.z = 0.3;
-    maos.mesa.scale.setScalar(1.4 * escala);
+  if (maos.esq && maos.dir) {
+    maos.esq.visible = n > 0; maos.dir.visible = n > 0;
+    const yMao = baseY - 0.24 * escala;
+    const zTras = -dist - 0.03;   // atrás das cartas, como na mesa 2D
+    maos.esq.position.set(-larguraLeque * 0.5 - 0.03, yMao, zTras);
+    maos.dir.position.set(larguraLeque * 0.5 + 0.03, yMao, zTras);
+    maos.esq.rotation.z = -0.42;
+    maos.dir.rotation.z = 0.42;
+    maos.esq.scale.set(-escala, escala, 1);   // a esquerda é a direita espelhada
+    maos.dir.scale.set(escala, escala, 1);
   }
 }
 
-// toque na mão: seleciona; os demais alvos são os botões HTML
+// Toque na mão seleciona; ARRASTO arruma — o mesmo par de gestos da mesa 2D,
+// com o mesmo limiar para o dedo que escorrega não reordenar sem querer.
 const raycaster = new THREE.Raycaster();
 const ponteiro = new THREE.Vector2();
+let layoutDaMao = null;
+let arrasto3d = null;
+const LIMIAR_ARRASTO = 10;
+
+// converte o X do dedo para o X do espaço da câmera, na distância do leque —
+// é o que deixa comparar o dedo com as posições das cartas sem projeção
+function dedoParaXDoLeque(clientX) {
+  const ndc = (clientX / innerWidth) * 2 - 1;
+  const metadeV = Math.tan((camera.fov * Math.PI) / 360);
+  return ndc * metadeV * camera.aspect * layoutDaMao.dist;
+}
+
 canvas.addEventListener('pointerdown', (e) => {
   ponteiro.x = (e.clientX / innerWidth) * 2 - 1;
   ponteiro.y = -(e.clientY / innerHeight) * 2 + 1;
   raycaster.setFromCamera(ponteiro, camera);
   const hits = raycaster.intersectObjects([...cartasDaMao.values()], false);
   if (hits.length) {
-    const id = hits[0].object.userData.cardId;
+    arrasto3d = { id: hits[0].object.userData.cardId, x0: e.clientX, y0: e.clientY, ativo: false };
+  }
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (!arrasto3d || !layoutDaMao) return;
+  if (!arrasto3d.ativo) {
+    if (Math.hypot(e.clientX - arrasto3d.x0, e.clientY - arrasto3d.y0) < LIMIAR_ARRASTO) return;
+    arrasto3d.ativo = true;
+  }
+  const mesh = cartasDaMao.get(arrasto3d.id);
+  if (!mesh) return;
+  mesh.position.x = dedoParaXDoLeque(e.clientX);
+  mesh.position.y = layoutDaMao.baseY + 0.14 * layoutDaMao.escala;
+  mesh.position.z = -layoutDaMao.dist + 0.06;
+  mesh.rotation.z = 0;
+});
+
+window.addEventListener('pointerup', (e) => {
+  if (!arrasto3d) return;
+  const { id, ativo } = arrasto3d;
+  arrasto3d = null;
+  if (!ativo) {
+    // foi toque: seleciona/desseleciona
     if (selecionadas.has(id)) selecionadas.delete(id);
     else selecionadas.add(id);
     sincronizaMao();
     montaBotoes();
+    return;
   }
+  // foi arrasto: a carta cai onde o dedo soltou — conta quantas ficaram à
+  // esquerda dele, que é a mesma régua da mesa 2D
+  const x = dedoParaXDoLeque(e.clientX);
+  const semEla = maoOrdenada().filter((c) => c.id !== id);
+  const antes = semEla.filter((c, i) => {
+    const meshC = cartasDaMao.get(c.id);
+    return meshC && meshC.position.x < x;
+  }).length;
+  const ordem = semEla.map((c) => c.id);
+  ordem.splice(antes, 0, id);
+  ordemManual = ordem;
+  sincronizaMao();
 });
+window.addEventListener('pointercancel', () => { arrasto3d = null; sincronizaMao(); });
 
 // leve paralaxe: a cabeça mexe um pouco com o dedo/mouse, como quem se inclina
 let olharX = 0;
@@ -943,7 +1029,11 @@ async function sincroniza(primeira) {
       const a = assentos.get(p.id);
       const pos = posicaoDoAssento(i, outros.length);
       a.grupo.position.set(pos.x, 0, pos.z);
-      a.grupo.rotation.y = pos.ang;       // de frente para a mesa (e para você)
+      // Meio caminho entre encarar a câmera e encarar o centro: virado por
+      // inteiro para o centro, o assento da ponta (±60°) virava uma lasca —
+      // pior ainda com a curvatura do recorte.
+      a.grupo.rotation.y = pos.ang * 0.45;
+      a.espessura.position.x = 0.03 * (pos.x >= 0 ? 1 : -1);
       trocaRotulo(a.contagem, `${p.handCount}`);
       // os cinco primeiros filhos são as cartas; dedos e selo ficam sempre
       a.leque.children.forEach((c, i) => {
@@ -952,7 +1042,7 @@ async function sincroniza(primeira) {
       a.leque.visible = p.handCount > 0;
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
       a.apagado = (p.desistiu || (!p.isBot && !p.connected));
-      a.mat.color.setScalar(a.apagado ? 0.45 : 1);
+      a.mat.color.setScalar(a.apagado ? 0.4 : 0.94);
     }
 
     trocaRotulo(monte.num, String(view.deckCount));
@@ -962,52 +1052,66 @@ async function sincroniza(primeira) {
     // o número senta na caixa; solto no ar ele era mais uma coisa flutuando
     monte.num.position.set(-0.4, MESA_TOPO + alturaMonte + 0.09, -0.42);
 
-    // descarte: refeito quando o topo muda
+    // Descarte: a pilha fica deitada, mas a carta do topo fica DE PÉ, apoiada
+    // nela e inclinada para a câmera — deitada, deste ângulo raso, ela virava
+    // uma lasca branca ilegível. E é a carta mais importante da mesa: decide a
+    // compra a cada turno.
     const topo = view.discardTop;
     const topoId = topo ? topo.id : null;
     if (topoId !== descarte.topoId) {
       descarte.topoId = topoId;
       descarte.grupo.clear();
       if (topo) {
+        const alturaPilha = 0.02 + view.discardCount * 0.0016;
         const base = new THREE.Mesh(
-          new THREE.BoxGeometry(CARTA_L, 0.02 + view.discardCount * 0.0016, CARTA_A),
+          new THREE.BoxGeometry(CARTA_L, alturaPilha, CARTA_A),
           materialBorda,
         );
-        base.position.y = MESA_TOPO + base.geometry.parameters.height / 2;
-        const face = cartaDeitada(topo);
-        face.position.y = base.position.y + base.geometry.parameters.height / 2 + 0.002;
-        face.rotation.z = 0.06;
+        base.position.y = MESA_TOPO + alturaPilha / 2;
+        const face = new THREE.Mesh(geoCarta, materialDaCarta(topo));
+        face.scale.setScalar(0.9);
+        face.rotation.x = -0.42;
+        face.position.set(0, MESA_TOPO + alturaPilha + (CARTA_A / 2) * 0.82, 0.1);
+        face.userData.alvo = face.position.clone();
         if (!semMovimento) { face.userData.cai = performance.now(); }
         descarte.grupo.add(base, face);
       }
     }
 
-    // jogos baixados: deitados na frente de quem baixou
+    // Jogos baixados: fileira de cartas DE PÉ na frente de quem baixou, todas
+    // viradas para a câmera — deitadas no feltro, deste ângulo, eram lascas
+    // que ninguém lia, e ver os jogos da mesa é metade do planejamento.
     jogosNaMesa.clear();
     const todos = [view.players.find((p) => p.id === me()), ...outros].filter(Boolean);
     for (const p of todos) {
       if (!p.melds?.length) continue;
       const meu = p.id === me();
       const idx = outros.indexOf(p);
-      const pos = meu
-        ? { x: 0, z: 1.35, ang: Math.PI }
-        : posicaoDoAssento(idx, outros.length);
+      const pos = meu ? { x: 0, z: 1.05 } : posicaoDoAssento(idx, outros.length);
       const frente = new THREE.Group();
-      // entre o assento e o centro, já sobre o feltro
-      frente.position.set(pos.x * 0.55, MESA_TOPO + 0.004, pos.z * 0.55);
-      frente.rotation.y = meu ? 0 : pos.ang;
+      frente.position.set(pos.x * 0.52, 0, pos.z * 0.52 + (meu ? 0 : 0.3));
+
+      const passoCarta = 0.115;
+      const vaoEntreJogos = 0.1;
+      const larguras = p.melds.map((m) => (m.cards.length - 1) * passoCarta + CARTA_L * 0.6);
+      const total = larguras.reduce((a, b) => a + b + vaoEntreJogos, -vaoEntreJogos);
+      let x = -total / 2;
       p.melds.forEach((meld, mi) => {
         meld.cards.forEach((card, ci) => {
-          const carta = cartaDeitada(card);
-          carta.scale.setScalar(0.62);
+          const carta = new THREE.Mesh(geoCarta, materialDaCarta(card));
+          carta.scale.setScalar(0.6);
+          carta.rotation.x = -0.3;
           carta.position.set(
-            (ci - (meld.cards.length - 1) / 2) * 0.13,
-            0.002 * (mi + 1),
-            (mi - (p.melds.length - 1) / 2) * 0.42,
+            x + CARTA_L * 0.3 + ci * passoCarta,
+            MESA_TOPO + (CARTA_A / 2) * 0.57,
+            ci * 0.004,
           );
           frente.add(carta);
         });
+        x += larguras[mi] + vaoEntreJogos;
       });
+      // mesa cheia de jogos: encolhe o conjunto em vez de estourar o feltro
+      if (total > 2.1) frente.scale.setScalar(2.1 / total);
       jogosNaMesa.add(frente);
     }
 
@@ -1042,6 +1146,7 @@ function trocaRotulo(sprite, texto) {
 
 // reações: cara e pulo, como na mesa normal
 function reageAoEvento(ev) {
+  if (ev.e === 'roundStart') { ordemManual = []; selecionadas.clear(); }
   const alvo = ev.p || ev.winnerId;
   const a = alvo ? assentos.get(alvo) : null;
   if (!a) return;
@@ -1050,7 +1155,8 @@ function reageAoEvento(ev) {
   const bravo = ev.e === 'claimVoid';
   if (feliz || bravo) {
     a.mat.map = feliz ? a.texturas.feliz : a.texturas.bravo;
-    a.mat.needsUpdate = true;
+    a.matVerso.map = a.mat.map;
+    a.mat.needsUpdate = true; a.matVerso.needsUpdate = true;
     a.caraAte = performance.now() + 1900;
     a.pulo = performance.now();
   }
@@ -1085,35 +1191,37 @@ function quadro(t) {
   for (const a of assentos.values()) {
     // respiro contínuo, dessincronizado por posição
     if (!semMovimento && !a.apagado) {
-      a.plano.position.y = 0.95 + Math.sin(t / 1300 + a.grupo.position.x * 3) * 0.012;
+      a.plano.position.y = 1.16 + Math.sin(t / 1300 + a.grupo.position.x * 3) * 0.012;
     }
     // pulo de reação
     if (a.pulo) {
       const dt = (t - a.pulo) / 480;
       if (dt >= 1) a.pulo = 0;
-      else a.plano.position.y = 0.95 + Math.sin(dt * Math.PI) * 0.16;
+      else a.plano.position.y = 1.16 + Math.sin(dt * Math.PI) * 0.16;
     }
+    a.espessura.position.y = a.plano.position.y - 0.02;
     // a cara volta ao normal sozinha
     if (a.caraAte && t > a.caraAte) {
       a.caraAte = 0;
       a.mat.map = a.texturas.normal;
-      a.mat.needsUpdate = true;
+      a.matVerso.map = a.texturas.normal;
+      a.mat.needsUpdate = true; a.matVerso.needsUpdate = true;
     }
     // foco da vez
     const alvo = a.naVez ? 0.4 + Math.sin(t / 500) * 0.12 : 0;
     a.focoVez.material.opacity += (alvo - a.focoVez.material.opacity) * 0.1;
   }
 
-  // a carta do meio pousa girando
+  // a carta do meio chega girando e assenta no lugar de pé
   const face = descarte.grupo.children[1];
   if (face && face.userData.cai) {
     const dt = (t - face.userData.cai) / 420;
-    if (dt >= 1) { face.userData.cai = 0; face.rotation.y = 0; face.position.x = 0; }
+    if (dt >= 1) { face.userData.cai = 0; face.position.copy(face.userData.alvo); face.rotation.y = 0; }
     else {
       const e = 1 - Math.pow(1 - dt, 3);
       face.rotation.y = (1 - e) * -Math.PI * 0.55;
-      face.position.x = (1 - e) * -0.3;
-      face.position.y = MESA_TOPO + 0.05 + (1 - e) * 0.35;
+      face.position.x = face.userData.alvo.x + (1 - e) * -0.3;
+      face.position.y = face.userData.alvo.y + (1 - e) * 0.3;
     }
   }
 

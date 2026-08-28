@@ -61,7 +61,7 @@ projeto-caçamba/
 | [`test/e2e.mjs`](test/e2e.mjs) | 134 | **Três** jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket. Três porque a compra fora da vez precisa de alguém que não seja nem quem está na vez nem quem descartou — e o teste falha se ninguém pedir carta, para essa cobertura não morrer em silêncio. |
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
-| [`public/mesa3d.js`](public/mesa3d.js) | 1135 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
+| [`public/mesa3d.js`](public/mesa3d.js) | 1243 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
 | [`public/icon.svg`](public/icon.svg) | 37 | Ícone: leque de três cartas sobre o feltro, com moldura dourada. Fundo ocupa o quadro todo, então funciona como ícone *maskable*. |
@@ -464,6 +464,24 @@ beirada da mesa** — e recebem a mesma luz da cena, senão brilham como neon. O
 adversários seguram o leque deles na altura das mãos da figura, com as pontas
 dos dedos (no tom de pele de cada um) por cima do verso: sem os dedos, o leque
 flutua na frente do peito.
+
+**As figuras acompanham o 3D sem remodelagem**, por três truques de recorte:
+o plano é **curvado** (as bordas recuam e pegam perspectiva), uma cópia escura
+da própria silhueta fica um dedo atrás, deslocada para longe da lâmpada (a
+**espessura** do recorte, como um standee de madeira), e uma **sombra de
+contato** cola cada um no chão. E elas não recebem sombreamento: são desenho —
+iluminá-las como objeto lavava as cores e era o que as fazia destoar. As
+minhas mãos são **os mesmos caminhos SVG da mesa 2D**, rasterizados com o tom
+de pele do personagem: o jogo já tinha uma mão desenhada; inventar outra era o
+que a deixava incompatível.
+
+**Descarte e jogos baixados ficam DE PÉ**, inclinados para a câmera: deitados
+no feltro, do ângulo raso da cadeira, viravam lascas ilegíveis — e o topo do
+descarte decide a compra a cada turno. O assento da ponta vira só **meio
+caminho** para o centro (`ang * 0.45`): virado por inteiro, a ±60° ele também
+era uma lasca. **Arrastar para arrumar a mão** funciona como na mesa 2D, com o
+mesmo limiar de 10px entre toque e arrasto — o destino vem da posição do dedo
+convertida para o espaço da câmera na distância do leque.
 
 Duas armadilhas que custaram e ficam registradas:
 
