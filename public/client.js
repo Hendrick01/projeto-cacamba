@@ -1812,14 +1812,39 @@ function showGameEnd() {
 }
 
 function showScore() {
-  const rows = [...view.players]
-    .sort((a, b) => a.score - b.score)
-    .map((p) => `<tr><td>${escapeHTML(playerName(p.id))}</td><td class="num">${p.score}</td></tr>`)
-    .join('');
+  // Era uma tabela de nomes e números. Numa partida de 7 rodadas o placar é a
+  // tela que se abre entre uma e outra, e ela precisa responder três coisas de
+  // relance: quem está ganhando, onde eu estou, e quanto falta. Nome e total
+  // sozinhos não respondem nenhuma das três.
+  const ord = [...view.players].sort((a, b) => a.score - b.score);
+  const lider = ord.length ? ord[0].score : 0;
+  // A barra é relativa ao PIOR da mesa, não a um teto fixo: no começo todo
+  // mundo tem zero e a régua tem de nascer junto com a partida. O mínimo de 1
+  // evita a divisão por zero da primeira rodada.
+  const pior = Math.max(1, ...ord.map((p) => p.score));
+  // Na primeira rodada todo mundo está zerado: dizer que o primeiro da lista
+  // está "na frente" seria mentira, e é justamente a hora em que o placar é
+  // mais aberto.
+  const empatadoNoTopo = ord.length > 1 && ord[1].score === lider;
+  const linhas = ord.map((p, i) => {
+    const atras = p.score - lider;
+    const classes = ['pl-linha'];
+    if (p.id === me()) classes.push('eu');
+    if (i === 0 && ord.length > 1) classes.push('lider');
+    return `<li class="${classes.join(' ')}" style="--enche: ${Math.round((p.score / pior) * 100)}%">
+      <span class="pl-pos">${i + 1}</span>
+      <img class="pl-cara" src="${caraDe(personagemDe(p.id, view.players))}" alt="" loading="lazy">
+      <span class="pl-quem">
+        <b>${escapeHTML(playerName(p.id))}</b>
+        <small>${atras > 0 ? `+${atras} atrás` : (empatadoNoTopo ? 'empatado' : 'na frente')}</small>
+      </span>
+      <span class="pl-pts">${p.score}</span>
+    </li>`;
+  }).join('');
   showModal(
     `<h2>Placar</h2>
-     <p>Menos pontos ganha. Cada carta vale o número dela · J = 11 · Q = 12 · K = 13 · Ás = 15 · coringa = 20.</p>
-     <table class="score-table"><tr><th>Jogador</th><th style="text-align:right">Total</th></tr>${rows}</table>`,
+     <p class="modal-hint">Menos pontos ganha. Cada carta vale o número dela · J = 11 · Q = 12 · K = 13 · Ás = 15 · coringa = 20.</p>
+     <ol class="placar">${linhas}</ol>`,
     [{ label: 'Fechar', fn: closeModal }],
     closeModal,
   );

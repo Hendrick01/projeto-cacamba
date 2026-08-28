@@ -18,7 +18,7 @@
 
 import * as THREE from './vendor/three.module.js';
 import { planBaixada, isJoker, rankLabel } from '/shared/engine.js';
-import { SLUGS, EXPRESSOES, personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
+import { SLUGS, personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 
 const $ = (id) => document.getElementById(id);
 const semMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -523,103 +523,222 @@ function personagemDe(p) {
 
 const assentos = new Map();   // playerId → { grupo, plano, texturas, nomeSprite, ... }
 
-async function texturaDaFigura(slug, expressao) {
-  const sufixo = expressao && (EXPRESSOES[slug] || []).includes(expressao)
-    ? `-${expressao}` : '';
-  const img = await pegaImagem(`/assets/personagens/${slug}-corpo-inteiro${sufixo}.svg`);
-  const c = document.createElement('canvas');
-  // 512x1024: anéis, pulseiras, correntes e pespontos são traços de poucas
-  // unidades num quadro de 400 — a 256 de largura eles derretem.
-  c.width = 512; c.height = 1024;
-  c.getContext('2d').drawImage(img, 0, 0, 512, 1024);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+// ---------------------------------------------------------------------------
+// O elenco em 3D de verdade: bonecos montados por código, de primitivas.
+//
+// A identidade de cada um vem dos SINAIS que o README do elenco define como
+// dominantes a 48px — cabelo cereja, óculos dourados, listras, cachos — e são
+// exatamente essas coisas que primitivas modelam bem. O rosto é simples e
+// igual para todos (olhos, sobrancelha, boca); quem distingue é o resto,
+// como na mesa 2D. Corpos são objetos: recebem a luz da cena como a mesa.
+// ---------------------------------------------------------------------------
+
+const ESPEC_BONECO = {
+  gabizinsky:    { cabelo: '#C6335A', corte: 'bob', torso: '#93BCD1', boca: '#B03048' },
+  dri:           { cabelo: '#2A2730', corte: 'longo', torso: '#35323C', mechas: '#C08A45' },
+  esterex:       { cabelo: '#26242C', corte: 'longo', torso: '#C24A3B', oculos: '#C9A24E', boca: '#B0303F' },
+  matheus:       { cabelo: '#3A2A20', corte: 'curto', torso: 'listras', colar: '#C8A24E' },
+  'mafra-kitty': { cabelo: '#38281E', corte: 'curto', torso: '#EBE4D5', argola: '#C9CDD1' },
+  junior:        { cabelo: '#31241C', corte: 'flattop', torso: '#403630', pingente: '#C97AB0' },
+  lyly:          { cabelo: '#EF7F8D', corte: 'longo', torso: '#4A3547', flores: '#EFA3B8' },
+  mufasa:        { cabelo: '#372A21', corte: 'cachos', torso: '#33323A', oculos: '#C9CDD1' },
+};
+
+// a camisa do Matheus: só o padrão de listras, como manda o README do elenco
+function texturaListras() {
+  return texturaDeCanvas(64, 64, (ctx) => {
+    const cores = ['#EFEAE0', '#2E6094', '#EFEAE0', '#26232A'];
+    for (let x = 0; x < 8; x++) {
+      ctx.fillStyle = cores[x % 4];
+      ctx.fillRect(x * 8, 0, 8, 64);
+    }
+  });
 }
 
-// Os dedos de quem segura o leque do outro lado: a gente vê o VERSO das
-// cartas e as pontas dos dedos por cima delas, nas laterais. Sem isso o leque
-// flutua na frente do peito.
-const texturasDeDedos = new Map();
-function materialDeDedos(pele) {
-  if (texturasDeDedos.has(pele)) return texturasDeDedos.get(pele);
-  const c = document.createElement('canvas');
-  c.width = 128; c.height = 128;
-  const ctx = c.getContext('2d');
-  for (const [x, y0, y1, w] of [[36, 118, 66, 34], [68, 122, 58, 36], [98, 118, 68, 32]]) {
-    capsulaDupla(ctx, x, y0, x, y1, w, pele);
+// o vestido da Lyly: florzinhas de quatro pétalas sobre o fundo
+function texturaFlores(fundo, flor) {
+  return texturaDeCanvas(64, 64, (ctx) => {
+    ctx.fillStyle = fundo;
+    ctx.fillRect(0, 0, 64, 64);
+    ctx.fillStyle = flor;
+    for (const [cx, cy] of [[12, 12], [40, 20], [22, 40], [52, 48], [8, 54], [56, 8]]) {
+      for (const [dx, dy] of [[-3, 0], [3, 0], [0, -3], [0, 3]]) {
+        ctx.beginPath(); ctx.arc(cx + dx, cy + dy, 2.4, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  });
+}
+
+// um membro (braço, mecha) entre dois pontos: cápsula orientada
+function membro(de, ate, raio, mat) {
+  const a = new THREE.Vector3(...de);
+  const b = new THREE.Vector3(...ate);
+  const direcao = b.clone().sub(a);
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(raio, direcao.length(), 4, 10), mat);
+  m.position.copy(a.clone().add(b).multiplyScalar(0.5));
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direcao.normalize());
+  return m;
+}
+
+function montaBoneco(slug) {
+  const spec = ESPEC_BONECO[slug] || ESPEC_BONECO.gabizinsky;
+  const pele = peleDe(slug);
+  const materiais = [];
+  const mat = (opcoes) => {
+    const m = new THREE.MeshLambertMaterial({ transparent: true, ...opcoes });
+    materiais.push(m);
+    return m;
+  };
+  const mPele = mat({ color: pele });
+  const mCabelo = mat({ color: spec.cabelo });
+  const mTorso = spec.torso === 'listras'
+    ? mat({ map: texturaListras() })
+    : (spec.flores ? mat({ map: texturaFlores(spec.torso, spec.flores) }) : mat({ color: spec.torso }));
+
+  const corpo = new THREE.Group();
+
+  // tronco e ombros
+  const tronco = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.34, 4, 14), mTorso);
+  tronco.position.y = 1.08;
+  tronco.scale.set(1, 1, 0.78);
+  corpo.add(tronco);
+
+  // braços descem dos ombros até as mãos, que seguram o leque
+  for (const lado of [-1, 1]) {
+    corpo.add(membro([lado * 0.2, 1.26, 0.02], [lado * 0.24, 1.0, 0.15], 0.05, mTorso));
+    const maozinha = new THREE.Mesh(new THREE.SphereGeometry(0.058, 10, 10), mPele);
+    maozinha.position.set(lado * 0.24, 0.99, 0.17);
+    corpo.add(maozinha);
+    // o polegar por cima da frente do leque: é o que segura de verdade
+    const dedao = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), mPele);
+    dedao.position.set(lado * 0.19, 1.05, 0.22);
+    corpo.add(dedao);
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
-  mat.color.setScalar(0.94);
-  texturasDeDedos.set(pele, mat);
-  return mat;
+
+  // pescoço e cabeça
+  const pescoco = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.09, 10), mPele);
+  pescoco.position.y = 1.4;
+  corpo.add(pescoco);
+  const cabeca = new THREE.Mesh(new THREE.SphereGeometry(0.17, 18, 16), mPele);
+  cabeca.position.y = 1.58;
+  cabeca.scale.set(1, 1.08, 0.92);
+  corpo.add(cabeca);
+
+  // Rosto: olhos, sobrancelhas e as três bocas (neutra, feliz, brava).
+  // A cabeça achatada em z tem raio ~0.156 na frente: tudo do rosto fica em
+  // z >= 0.16, senão afunda DENTRO da esfera e o rosto sai em branco.
+  const mTinta = mat({ color: 0x2a1b12 });
+  for (const lado of [-1, 1]) {
+    const olho = new THREE.Mesh(new THREE.SphereGeometry(0.021, 8, 8), mTinta);
+    olho.position.set(lado * 0.06, 1.6, 0.155);
+    corpo.add(olho);
+    const sobrancelha = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.013, 0.012), mTinta);
+    sobrancelha.position.set(lado * 0.06, 1.655, 0.152);
+    corpo.add(sobrancelha);
+  }
+  const mBoca = spec.boca ? mat({ color: spec.boca }) : mTinta;
+  const bocaNeutra = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.013, 0.012), mBoca);
+  bocaNeutra.position.set(0, 1.515, 0.152);
+  const bocaFeliz = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.01, 8, 10, Math.PI), mBoca);
+  bocaFeliz.position.set(0, 1.525, 0.152);
+  bocaFeliz.rotation.z = Math.PI;
+  bocaFeliz.visible = false;
+  const bocaBrava = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.01, 8, 10, Math.PI), mBoca);
+  bocaBrava.position.set(0, 1.502, 0.152);
+  bocaBrava.visible = false;
+  corpo.add(bocaNeutra, bocaFeliz, bocaBrava);
+
+  // Cabelo, pelo corte. A capa é GORRO (só a calota de cima) + nuca atrás:
+  // esfera inteira engolia o rosto.
+  if (spec.corte !== 'flattop') {
+    const gorro = new THREE.Mesh(
+      new THREE.SphereGeometry(0.185, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
+      mCabelo,
+    );
+    gorro.position.y = 1.6;
+    const nuca = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), mCabelo);
+    nuca.position.set(0, 1.57, -0.06);
+    nuca.scale.set(0.98, 1, 0.7);
+    corpo.add(gorro, nuca);
+  }
+  if (spec.corte === 'bob') {
+    for (const lado of [-1, 1]) corpo.add(membro([lado * 0.16, 1.62, 0.02], [lado * 0.17, 1.46, 0.04], 0.06, mCabelo));
+  } else if (spec.corte === 'longo') {
+    const costas = new THREE.Mesh(new THREE.CapsuleGeometry(0.14, 0.42, 4, 10), mCabelo);
+    costas.position.set(0, 1.28, -0.1);
+    costas.scale.set(1.25, 1, 0.55);
+    corpo.add(costas);
+    for (const lado of [-1, 1]) corpo.add(membro([lado * 0.15, 1.6, 0.05], [lado * 0.19, 1.08, 0.08], 0.055, mCabelo));
+    if (spec.mechas) {
+      const mMel = mat({ color: spec.mechas });
+      for (const lado of [-1, 1]) corpo.add(membro([lado * 0.11, 1.6, 0.11], [lado * 0.14, 1.2, 0.13], 0.012, mMel));
+    }
+  } else if (spec.corte === 'flattop') {
+    const topo = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.11, 0.26), mCabelo);
+    topo.position.y = 1.73;
+    corpo.add(topo);
+  } else if (spec.corte === 'cachos') {
+    for (let k = -1; k <= 1; k++) {
+      const cacho = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), mCabelo);
+      cacho.position.set(k * 0.085, 1.71, 0.1);
+      corpo.add(cacho);
+    }
+  }
+
+  // acessórios: os detalhes que o README manda carregar
+  if (spec.oculos) {
+    const mAro = mat({ color: spec.oculos });
+    for (const lado of [-1, 1]) {
+      const aro = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.007, 8, 14), mAro);
+      aro.position.set(lado * 0.062, 1.6, 0.162);
+      corpo.add(aro);
+    }
+    const ponte = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.008, 0.008), mAro);
+    ponte.position.set(0, 1.605, 0.165);
+    corpo.add(ponte);
+  }
+  if (spec.colar) {
+    const colar = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.009, 8, 16), mat({ color: spec.colar }));
+    colar.position.set(0, 1.36, 0.07);
+    colar.rotation.x = 1.25;
+    corpo.add(colar);
+  }
+  if (spec.argola) {
+    const argola = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.005, 6, 12), mat({ color: spec.argola }));
+    argola.position.set(0.165, 1.55, 0.02);
+    argola.rotation.y = Math.PI / 2;
+    corpo.add(argola);
+  }
+  if (spec.pingente) {
+    const fio = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.005, 6, 14), mTinta);
+    fio.position.set(0, 1.38, 0.07);
+    fio.rotation.x = 1.3;
+    const pedra = new THREE.Mesh(new THREE.OctahedronGeometry(0.024), mat({ color: spec.pingente }));
+    pedra.position.set(0, 1.32, 0.14);
+    corpo.add(fio, pedra);
+  }
+
+  return { corpo, materiais, bocas: { neutra: bocaNeutra, feliz: bocaFeliz, brava: bocaBrava } };
 }
 
-async function criaAssento(p) {
+function criaAssento(p) {
   const slug = personagemDe(p);
   const grupo = new THREE.Group();
 
-  const [normal, feliz, bravo] = await Promise.all([
-    texturaDaFigura(slug, null),
-    texturaDaFigura(slug, 'feliz'),
-    texturaDaFigura(slug, 'bravo'),
-  ]);
-  // A figura é desenho chapado: iluminar como objeto 3D lava as cores dela e
-  // é o que a fazia destoar do resto. Sem luz, com um escurecimento fixo leve
-  // para sentar na cena — as cores ficam as mesmas da mesa normal.
-  //
-  // O corpo no espaço vem de três truques de recorte, não de remodelagem:
-  // o plano é CURVADO (as bordas recuam e pegam perspectiva), há uma cópia
-  // escura atrás deslocada (a espessura do recorte, como um standee de
-  // madeira) e uma sombra de contato no chão. É o que faz a figura ocupar
-  // lugar na cena em vez de parecer um adesivo colado nela.
-  const geoFigura = new THREE.PlaneGeometry(1.16, 2.32, 12, 1);
-  {
-    const posAttr = geoFigura.attributes.position;
-    for (let i = 0; i < posAttr.count; i++) {
-      const vx = posAttr.getX(i);
-      posAttr.setZ(i, -0.16 * (vx / 0.58) ** 2);
-    }
-    posAttr.needsUpdate = true;
-  }
-  const mat = new THREE.MeshBasicMaterial({ map: normal, transparent: true, alphaTest: 0.06 });
-  mat.color.setScalar(0.94);
-  const plano = new THREE.Mesh(geoFigura, mat);
-  plano.position.y = 1.16;
+  const { corpo, materiais, bocas } = montaBoneco(slug);
+  grupo.add(corpo);
 
-  // a espessura: a mesma silhueta, escura, um dedo atrás e deslocada para o
-  // lado oposto ao da lâmpada
-  const matVerso = new THREE.MeshBasicMaterial({ map: normal, transparent: true, alphaTest: 0.06 });
-  matVerso.color.setScalar(0.16);
-  const espessura = new THREE.Mesh(geoFigura, matVerso);
-  espessura.position.set(0.028, 1.14, -0.035);
-  espessura.renderOrder = -1;
-
-  // sombra de contato: é ela que cola o recorte no chão
+  // sombra de contato: é ela que cola o boneco no chão
   const sombra = new THREE.Mesh(
-    new THREE.CircleGeometry(0.44, 22),
+    new THREE.CircleGeometry(0.4, 22),
     new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false }),
   );
   sombra.rotation.x = -Math.PI / 2;
   sombra.scale.y = 0.42;
   sombra.position.y = 0.014;
-  grupo.add(plano);
+  grupo.add(sombra);
 
-  // a cadeira é o anel do assento em outra forma, como na mesa normal
-  const cor = new THREE.Color(CORES_DE_ASSENTO[assentoDe(p.id) % CORES_DE_ASSENTO.length]);
-  const cadeira = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.3, 0.3, 0.05, 20),
-    new THREE.MeshLambertMaterial({ color: cor }),
-  );
-  cadeira.position.y = 0.03;
-  grupo.add(espessura, sombra, cadeira);
-
-  // O leque de cartas viradas NAS MÃOS: na altura em que as mãos da figura
-  // estão (a arte tem os braços ao longo do corpo, mãos à altura da cintura),
-  // encostado no corpo e com as pontas dos dedos por cima das cartas — sem os
-  // dedos ele flutua na frente do peito.
+  // O leque de cartas viradas entre as mãos do boneco.
   const leque = new THREE.Group();
   for (let i = 0; i < 5; i++) {
     const carta = new THREE.Mesh(geoCarta, materialVerso);
@@ -629,26 +748,26 @@ async function criaAssento(p) {
     carta.rotation.z = -ang;
     leque.add(carta);
   }
-  const dedos = materialDeDedos(peleDe(slug));
-  for (const lado of [-1, 1]) {
-    const d = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.16), dedos);
-    d.position.set(lado * 0.24, -0.1, 0.05);
-    d.rotation.z = lado * 0.25;
-    leque.add(d);
-  }
   // o selo com o número exato mora NO leque, não solto no ar
   const contagem = rotulo('', 'rgba(27,17,11,0.92)', '#f2c14e');
   contagem.position.set(0.36, 0.14, 0.08);
   contagem.scale.set(0.42, 0.13, 1);
   leque.add(contagem);
-
-  // acima do tampo (0.92): abaixo disso a borda da mesa engole o leque
-  leque.position.set(0, 1.1, 0.14);
-  leque.rotation.x = -0.12;   // levemente inclinado para trás, como se segura
+  leque.position.set(0, 1.02, 0.17);
+  leque.rotation.x = -0.14;
   grupo.add(leque);
 
+  // a cadeira é o anel do assento em outra forma, como na mesa normal
+  const cor = new THREE.Color(CORES_DE_ASSENTO[assentoDe(p.id) % CORES_DE_ASSENTO.length]);
+  const cadeira = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 0.3, 0.05, 20),
+    new THREE.MeshLambertMaterial({ color: cor }),
+  );
+  cadeira.position.y = 0.03;
+  grupo.add(cadeira);
+
   const nome = rotulo(p.name);
-  nome.position.y = 2.2;
+  nome.position.y = 2.1;
   nome.scale.set(0.78, 0.21, 1);
   grupo.add(nome);
 
@@ -662,10 +781,7 @@ async function criaAssento(p) {
   grupo.add(focoVez);
 
   scene.add(grupo);
-  return {
-    grupo, plano, espessura, leque, contagem, mat, matVerso,
-    texturas: { normal, feliz, bravo }, nome, focoVez, pulo: 0, caraAte: 0,
-  };
+  return { grupo, corpo, materiais, bocas, leque, contagem, nome, focoVez, pulo: 0, caraAte: 0 };
 }
 
 // os adversários sentam no arco do outro lado; você fica na câmera
@@ -1025,7 +1141,7 @@ async function sincroniza(primeira) {
     }
     for (let i = 0; i < outros.length; i++) {
       const p = outros[i];
-      if (!assentos.has(p.id)) assentos.set(p.id, await criaAssento(p));
+      if (!assentos.has(p.id)) assentos.set(p.id, criaAssento(p));
       const a = assentos.get(p.id);
       const pos = posicaoDoAssento(i, outros.length);
       a.grupo.position.set(pos.x, 0, pos.z);
@@ -1033,7 +1149,7 @@ async function sincroniza(primeira) {
       // inteiro para o centro, o assento da ponta (±60°) virava uma lasca —
       // pior ainda com a curvatura do recorte.
       a.grupo.rotation.y = pos.ang * 0.45;
-      a.espessura.position.x = 0.03 * (pos.x >= 0 ? 1 : -1);
+
       trocaRotulo(a.contagem, `${p.handCount}`);
       // os cinco primeiros filhos são as cartas; dedos e selo ficam sempre
       a.leque.children.forEach((c, i) => {
@@ -1042,7 +1158,7 @@ async function sincroniza(primeira) {
       a.leque.visible = p.handCount > 0;
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
       a.apagado = (p.desistiu || (!p.isBot && !p.connected));
-      a.mat.color.setScalar(a.apagado ? 0.4 : 0.94);
+      for (const m of a.materiais) m.opacity = a.apagado ? 0.4 : 1;
     }
 
     trocaRotulo(monte.num, String(view.deckCount));
@@ -1154,9 +1270,9 @@ function reageAoEvento(ev) {
     || (ev.e === 'roundEnd' && ev.reason === 'bateu');
   const bravo = ev.e === 'claimVoid';
   if (feliz || bravo) {
-    a.mat.map = feliz ? a.texturas.feliz : a.texturas.bravo;
-    a.matVerso.map = a.mat.map;
-    a.mat.needsUpdate = true; a.matVerso.needsUpdate = true;
+    a.bocas.neutra.visible = false;
+    a.bocas.feliz.visible = feliz;
+    a.bocas.brava.visible = bravo;
     a.caraAte = performance.now() + 1900;
     a.pulo = performance.now();
   }
@@ -1191,21 +1307,20 @@ function quadro(t) {
   for (const a of assentos.values()) {
     // respiro contínuo, dessincronizado por posição
     if (!semMovimento && !a.apagado) {
-      a.plano.position.y = 1.16 + Math.sin(t / 1300 + a.grupo.position.x * 3) * 0.012;
+      a.corpo.position.y = Math.sin(t / 1300 + a.grupo.position.x * 3) * 0.012;
     }
     // pulo de reação
     if (a.pulo) {
       const dt = (t - a.pulo) / 480;
       if (dt >= 1) a.pulo = 0;
-      else a.plano.position.y = 1.16 + Math.sin(dt * Math.PI) * 0.16;
+      else a.corpo.position.y = Math.sin(dt * Math.PI) * 0.14;
     }
-    a.espessura.position.y = a.plano.position.y - 0.02;
     // a cara volta ao normal sozinha
     if (a.caraAte && t > a.caraAte) {
       a.caraAte = 0;
-      a.mat.map = a.texturas.normal;
-      a.matVerso.map = a.texturas.normal;
-      a.mat.needsUpdate = true; a.matVerso.needsUpdate = true;
+      a.bocas.neutra.visible = true;
+      a.bocas.feliz.visible = false;
+      a.bocas.brava.visible = false;
     }
     // foco da vez
     const alvo = a.naVez ? 0.4 + Math.sin(t / 500) * 0.12 : 0;

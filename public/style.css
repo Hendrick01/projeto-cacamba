@@ -1118,6 +1118,51 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
 .score-table td.num { text-align: right; }
 .score-table tr.winner td { color: var(--gold); font-weight: 900; }
 
+/* O placar da partida em curso (botão Σ). Cada linha responde de relance às
+   três perguntas que se faz entre uma rodada e outra: quem está ganhando, onde
+   eu estou e quanto falta. O rosto vem junto porque na mesa você reconhece as
+   pessoas pela cara, não pelo nome escrito. */
+.placar {
+  list-style: none; padding: 0 !important;
+  display: flex; flex-direction: column; gap: 5px;
+  margin-top: 12px;
+}
+/* A barra é o próprio fundo da linha, cortada em `--enche`: quem tem mais
+   pontos tem a linha mais cheia, e como aqui MENOS é melhor, a linha mais
+   cheia é a pior — que é a leitura certa, a barra é o peso que se carrega. */
+.pl-linha {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(90deg,
+      rgba(140, 106, 69, 0.42) 0 var(--enche, 0%),
+      rgba(245, 241, 230, 0.05) var(--enche, 0%) 100%);
+}
+.pl-pos {
+  min-width: 15px;
+  color: var(--sage); font-size: 0.82rem; font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.pl-cara { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: block; }
+.pl-quem { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.pl-quem b { font-size: 0.98rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-quem small { color: var(--sage); font-size: 0.72rem; font-weight: 700; }
+.pl-pts {
+  margin-left: auto; padding-left: 8px;
+  font-size: 1.2rem; font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+/* Quem está na frente ganha o âmbar — a mesma cor que marca a vez na mesa. */
+.pl-linha.lider .pl-pos,
+.pl-linha.lider .pl-quem b,
+.pl-linha.lider .pl-pts { color: var(--gold); }
+.pl-linha.lider .pl-quem small { color: var(--gold-soft); }
+/* E você ganha o contorno: numa mesa de oito, achar a própria linha numa lista
+   ordenada por pontos custa uma leitura inteira. */
+.pl-linha.eu { border-color: rgba(140, 106, 69, 0.65); }
+
 .contract-list { list-style: none; padding: 0 !important; }
 .contract-list li { display: flex; gap: 10px; align-items: baseline; }
 .contract-list .rn { color: var(--gold); font-weight: 900; min-width: 68px; }

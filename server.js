@@ -91,14 +91,29 @@ const server = http.createServer((req, res) => {
     if (root === __dirname && !full.startsWith(path.join(__dirname, 'shared'))) continue;
     if (fs.existsSync(full) && fs.statSync(full).isFile()) {
       const ext = path.extname(full);
+      const stat = fs.statSync(full);
+      // ETag de tamanho + mtime. Sem ele, `no-cache` significava baixar tudo de
+      // novo a cada abertura: o elenco sozinho são 32 SVGs e ~850 KB de disco.
+      // Com ele, a segunda visita troca o corpo inteiro por um 304 vazio.
+      const etag = `W/"${stat.size.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}"`;
+      // A arte muda de deploy em deploy, não durante a partida: cinco minutos
+      // sem nem perguntar. O código (html/js/css) continua em `no-cache`, para
+      // um deploy aparecer na próxima abertura e não cinco minutos depois.
+      const arte = file.startsWith('/assets/');
       const cabecalho = {
         'Content-Type': MIME[ext] || 'application/octet-stream',
-        'Cache-Control': 'no-cache',
+        'Cache-Control': arte ? 'public, max-age=300, must-revalidate' : 'no-cache',
+        ETag: etag,
         Vary: 'Accept-Encoding',
       };
+      if (req.headers['if-none-match'] === etag) {
+        res.writeHead(304, cabecalho);
+        res.end();
+        return;
+      }
       const aceitaGzip = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
       if (aceitaGzip && COMPRIMIVEL.has(ext)) {
-        const corpo = corpoComprimido(full, fs.statSync(full), ext);
+        const corpo = corpoComprimido(full, stat, ext);
         res.writeHead(200, { ...cabecalho, 'Content-Encoding': 'gzip', 'Content-Length': corpo.length });
         res.end(req.method === 'HEAD' ? undefined : corpo);
         return;
