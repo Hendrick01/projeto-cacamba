@@ -852,10 +852,18 @@ Cada resposta leva um **ETag** de tamanho + mtime, e um `If-None-Match` que
 bate vira **304 sem corpo**. Sem ele, o `Cache-Control: no-cache` significava
 baixar tudo outra vez a cada abertura — e só o elenco são 32 SVGs.
 
-A **arte** (`/assets/`) vai com `max-age=300`: ela muda de deploy em deploy, não
-durante a partida, e cinco minutos sem nem perguntar cobrem uma sessão inteira.
-O **código** (html, js, css) fica em `no-cache` de propósito, para um deploy
-aparecer na próxima abertura e não cinco minutos depois.
+A **arte** (`/assets/`) vai com `private, max-age=300`: ela muda de deploy em
+deploy, não durante a partida, e cinco minutos sem nem perguntar cobrem uma
+sessão inteira. O **código** (html, js, css) fica em `no-cache` de propósito,
+para um deploy aparecer na próxima abertura e não cinco minutos depois.
+
+O `private` é a parte que custou uma surpresa: o Render tem **CDN na frente**, e
+com `public` ele guardava a arte na borda. Depois de um deploy, a origem já
+servia o arquivo novo e a borda continuava entregando o velho para todo mundo
+por até cinco minutos — dava para ver pedindo a mesma URL com um parâmetro
+qualquer no fim, que fura a borda e chega na origem. Com `private`, quem guarda
+é o navegador de cada um: o ganho de não repetir o download continua, e a janela
+de arte velha depois de um deploy deixa de ser coletiva.
 
 Serve `public/` e, como exceção estreita, apenas `shared/` da raiz — para o cliente
 poder importar o motor. Normaliza o caminho contra travessia de diretório.

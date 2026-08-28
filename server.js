@@ -99,10 +99,18 @@ const server = http.createServer((req, res) => {
       // A arte muda de deploy em deploy, não durante a partida: cinco minutos
       // sem nem perguntar. O código (html/js/css) continua em `no-cache`, para
       // um deploy aparecer na próxima abertura e não cinco minutos depois.
+      //
+      // `private` e não `public`: o Render tem CDN na frente, e com `public` ele
+      // guardava a arte na borda — depois de um deploy, o CDN continuava
+      // servindo o SVG antigo para TODO MUNDO por até cinco minutos (visto
+      // acontecer: a Lyly nova já estava na origem e a borda entregava a
+      // velha). Com `private`, quem guarda é o navegador de cada um: o ganho de
+      // não repetir o download continua, e a janela de arte velha depois de um
+      // deploy deixa de ser coletiva.
       const arte = file.startsWith('/assets/');
       const cabecalho = {
         'Content-Type': MIME[ext] || 'application/octet-stream',
-        'Cache-Control': arte ? 'public, max-age=300, must-revalidate' : 'no-cache',
+        'Cache-Control': arte ? 'private, max-age=300, must-revalidate' : 'no-cache',
         ETag: etag,
         Vary: 'Accept-Encoding',
       };
