@@ -93,11 +93,11 @@ const MESA_TOPO = 0.92;
 // A lâmpada é a mesma decisão de luz do jogo inteiro: uma fonte só, a pino
 // sobre o meio. O foco ilumina o feltro; o ambiente quente e fraco é o que
 // sobra refletido no salão.
-scene.add(new THREE.AmbientLight(0x8c6a45, 0.85));
+scene.add(new THREE.AmbientLight(0x9a7850, 1.05));
 // O reflexo do feltro: uma luz fraca vinda do lado da câmera, para o elenco do
 // outro lado não ficar só silhueta — o foco da lâmpada ilumina a mesa, não os
 // rostos.
-const reflexo = new THREE.DirectionalLight(0xffe2a8, 0.6);
+const reflexo = new THREE.DirectionalLight(0xffe2a8, 0.85);
 reflexo.position.set(0, 2.4, 5);
 scene.add(reflexo);
 const foco = new THREE.SpotLight(0xffe2a8, 140, 14, 0.72, 0.55, 1.6);
@@ -177,6 +177,83 @@ scene.add(foco, foco.target);
   );
   fio.position.set(0, 4.9, 0);
   scene.add(cupula, bulbo, fio);
+}
+
+// O salão em volta: a mesma cena do fundo da mesa normal — parede de azulejo
+// até a meia altura, a porta aberta com a luz da rua, engradados empilhados.
+// A neblina come o que está longe, então tudo aqui é forma simples e cor.
+{
+  // parede circular, vista por dentro
+  const parede = texturaDeCanvas(1024, 256, (ctx) => {
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, '#1b110b');
+    g.addColorStop(0.55, '#31200f');
+    g.addColorStop(1, '#3a2513');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 1024, 256);
+    // azulejo na meia parede de baixo
+    ctx.strokeStyle = 'rgba(92,61,34,0.55)';
+    ctx.lineWidth = 3;
+    for (let y = 150; y <= 250; y += 34) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1024, y); ctx.stroke();
+    }
+    for (let x = 0; x <= 1024; x += 56) {
+      ctx.beginPath(); ctx.moveTo(x, 150); ctx.lineTo(x, 256); ctx.stroke();
+    }
+  });
+  parede.wrapS = THREE.RepeatWrapping;
+  parede.repeat.set(5, 1);
+  const muro = new THREE.Mesh(
+    new THREE.CylinderGeometry(8.5, 8.5, 4.6, 48, 1, true),
+    new THREE.MeshLambertMaterial({ map: parede, side: THREE.BackSide }),
+  );
+  muro.position.y = 2.3;
+  scene.add(muro);
+
+  // a porta aberta para a rua: luz fria de fora contra a quente de dentro
+  const rua = texturaDeCanvas(128, 256, (ctx) => {
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, '#f7dfa6');
+    g.addColorStop(1, '#dfa458');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 256);
+    ctx.fillStyle = 'rgba(185,128,63,0.7)';
+    ctx.fillRect(18, 60, 42, 64);
+    ctx.fillRect(76, 84, 36, 44);
+    ctx.fillStyle = 'rgba(201,143,78,0.55)';
+    ctx.fillRect(0, 178, 128, 78);
+  });
+  const angPorta = -0.44;
+  const porta = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.5, 2.7),
+    new THREE.MeshBasicMaterial({ map: rua }),
+  );
+  porta.position.set(Math.sin(angPorta) * 8.35, 1.55, -Math.cos(angPorta) * 8.35);
+  porta.rotation.y = angPorta;
+  const batente = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.78, 2.95),
+    new THREE.MeshLambertMaterial({ color: 0x241609 }),
+  );
+  batente.position.set(Math.sin(angPorta) * 8.42, 1.55, -Math.cos(angPorta) * 8.42);
+  batente.rotation.y = angPorta;
+  scene.add(batente, porta);
+
+  // engradados empilhados do outro lado
+  const angCaixas = 0.5;
+  const caixas = new THREE.Group();
+  const corCaixa = [0xb0402a, 0xc08f28, 0x9c3622];
+  [[0, 0.28, 0], [0, 0.85, 0.04], [0.12, 1.42, -0.03]].forEach(([dx, y, dz], i) => {
+    const cx = new THREE.Mesh(
+      new THREE.BoxGeometry(1.15, 0.56, 0.8),
+      new THREE.MeshLambertMaterial({ color: corCaixa[i] }),
+    );
+    cx.position.set(dx, y, dz);
+    cx.rotation.y = i * 0.12;
+    caixas.add(cx);
+  });
+  caixas.position.set(Math.sin(angCaixas) * 7.4, 0, -Math.cos(angCaixas) * 7.4);
+  caixas.rotation.y = angCaixas;
+  scene.add(caixas);
 }
 
 // ---------------------------------------------------------------------------
@@ -460,6 +537,25 @@ async function texturaDaFigura(slug, expressao) {
   return tex;
 }
 
+// Os dedos de quem segura o leque do outro lado: a gente vê o VERSO das
+// cartas e as pontas dos dedos por cima delas, nas laterais. Sem isso o leque
+// flutua na frente do peito.
+const texturasDeDedos = new Map();
+function materialDeDedos(pele) {
+  if (texturasDeDedos.has(pele)) return texturasDeDedos.get(pele);
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const ctx = c.getContext('2d');
+  for (const [x, y0, y1, w] of [[36, 118, 66, 34], [68, 122, 58, 36], [98, 118, 68, 32]]) {
+    capsulaDupla(ctx, x, y0, x, y1, w, pele);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false });
+  texturasDeDedos.set(pele, mat);
+  return mat;
+}
+
 async function criaAssento(p) {
   const slug = personagemDe(p);
   const grupo = new THREE.Group();
@@ -483,28 +579,41 @@ async function criaAssento(p) {
   cadeira.position.y = 0.03;
   grupo.add(cadeira);
 
-  // o leque de cartas viradas nas mãos, como na mesa normal: presença, não
-  // contagem — o número exato fica no selo ao lado
+  // O leque de cartas viradas NAS MÃOS: na altura em que as mãos da figura
+  // estão (a arte tem os braços ao longo do corpo, mãos à altura da cintura),
+  // encostado no corpo e com as pontas dos dedos por cima das cartas — sem os
+  // dedos ele flutua na frente do peito.
   const leque = new THREE.Group();
   for (let i = 0; i < 5; i++) {
     const carta = new THREE.Mesh(geoCarta, materialVerso);
     carta.scale.setScalar(0.42);
     const ang = (i - 2) * 0.17;
-    carta.position.set(Math.sin(ang) * 0.3, 0.02 + Math.cos(ang) * 0.02, i * 0.006);
+    carta.position.set(Math.sin(ang) * 0.28, Math.cos(ang) * 0.02, i * 0.006);
     carta.rotation.z = -ang;
     leque.add(carta);
   }
-  leque.position.set(0, 0.98, 0.14);
+  const dedos = materialDeDedos(peleDe(slug));
+  for (const lado of [-1, 1]) {
+    const d = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.16), dedos);
+    d.position.set(lado * 0.24, -0.1, 0.05);
+    d.rotation.z = lado * 0.25;
+    leque.add(d);
+  }
+  // o selo com o número exato mora NO leque, não solto no ar
+  const contagem = rotulo('', 'rgba(27,17,11,0.92)', '#f2c14e');
+  contagem.position.set(0.36, 0.14, 0.08);
+  contagem.scale.set(0.42, 0.13, 1);
+  leque.add(contagem);
+
+  // acima do tampo (0.92): abaixo disso a borda da mesa engole o leque
+  leque.position.set(0, 1.08, 0.12);
+  leque.rotation.x = -0.12;   // levemente inclinado para trás, como se segura
   grupo.add(leque);
 
   const nome = rotulo(p.name);
-  nome.position.y = 2.16;
+  nome.position.y = 1.96;
+  nome.scale.set(0.78, 0.21, 1);
   grupo.add(nome);
-
-  const contagem = rotulo('', 'rgba(27,17,11,0.92)', '#f2c14e');
-  contagem.position.set(0.42, 1.62, 0.06);
-  contagem.scale.set(0.55, 0.16, 1);
-  grupo.add(contagem);
 
   // foco da vez: um disco de luz no chão, que pulsa
   const focoVez = new THREE.Mesh(
@@ -516,7 +625,7 @@ async function criaAssento(p) {
   grupo.add(focoVez);
 
   scene.add(grupo);
-  return { grupo, plano, leque, mat, texturas: { normal, feliz, bravo }, nome, contagem, focoVez, pulo: 0, caraAte: 0 };
+  return { grupo, plano, leque, contagem, mat, texturas: { normal, feliz, bravo }, nome, focoVez, pulo: 0, caraAte: 0 };
 }
 
 // os adversários sentam no arco do outro lado; você fica na câmera
@@ -571,58 +680,105 @@ let selecionadas = new Set();
 // escuro, pele por cima, halo por fora), com o tom de pele de quem você
 // escolheu ser. Desenhadas no canvas — a única coisa que muda por personagem
 // é a cor.
-function texturaDaMao(pele) {
+// Desenho de mão na mesma língua do elenco: silhueta chapada, contorno
+// uniforme escuro, halo quente por fora. Cada forma entra duas vezes — o
+// contorno mais largo por baixo, a pele por cima — que é exatamente como os
+// geradores do elenco desenham dedos.
+function capsula(ctx, x0, y0, x1, y1, w, cor) {
+  ctx.strokeStyle = cor; ctx.lineWidth = w;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+}
+
+function capsulaDupla(ctx, x0, y0, x1, y1, w, pele) {
+  capsula(ctx, x0, y0, x1, y1, w, '#2a1b12');
+  capsula(ctx, x0, y0, x1, y1, w - 10, pele);
+}
+
+// A mão que segura o leque, vista de quem joga: o polegar cruza a frente das
+// cartas, a palma aparece por baixo e o indicador espia na lateral. Os outros
+// dedos ficam atrás das cartas — é o que uma pegada de leque mostra.
+function texturaMaoDoLeque(pele) {
   const c = document.createElement('canvas');
-  c.width = 256; c.height = 256;
+  c.width = 512; c.height = 512;
   const ctx = c.getContext('2d');
-  const traco = (cor, w) => { ctx.strokeStyle = cor; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; };
 
-  // Quem segura um leque mostra o POLEGAR e a beirada da palma na frente das
-  // cartas — os dedos ficam atrás delas. Mão de dedos esticados lê como aceno,
-  // não como pegada.
-
-  // halo quente, para a mão não sumir contra a penumbra
+  // halo quente
   ctx.save();
-  ctx.filter = 'blur(4px)';
-  traco('#8c6a45', 26);
-  ctx.beginPath(); ctx.moveTo(128, 250); ctx.lineTo(146, 120); ctx.stroke();
+  ctx.filter = 'blur(7px)';
+  capsula(ctx, 268, 512, 258, 300, 190, 'rgba(140,106,69,0.8)');
   ctx.restore();
 
-  // beirada da palma, subindo da borda de baixo
-  traco('#2a1b12', 104);
-  ctx.beginPath(); ctx.moveTo(118, 272); ctx.lineTo(124, 202); ctx.stroke();
-  traco(pele, 92);
-  ctx.beginPath(); ctx.moveTo(118, 278); ctx.lineTo(124, 204); ctx.stroke();
+  // punho e palma subindo da borda de baixo
+  capsulaDupla(ctx, 268, 540, 262, 350, 168, pele);
+  ctx.fillStyle = '#2a1b12';
+  ctx.beginPath(); ctx.ellipse(262, 330, 104, 86, -0.18, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = pele;
+  ctx.beginPath(); ctx.ellipse(262, 330, 94, 76, -0.18, 0, Math.PI * 2); ctx.fill();
 
-  // o polegar atravessa na diagonal, por cima da frente das cartas
-  traco('#2a1b12', 52);
-  ctx.beginPath(); ctx.moveTo(108, 212); ctx.quadraticCurveTo(132, 162, 152, 114); ctx.stroke();
-  traco(pele, 42);
-  ctx.beginPath(); ctx.moveTo(110, 216); ctx.quadraticCurveTo(134, 164, 152, 118); ctx.stroke();
-  // unha: um toque de luz seca na ponta, como as pérolas do elenco
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.beginPath(); ctx.ellipse(148, 128, 7, 10, 0.5, 0, Math.PI * 2); ctx.fill();
+  // o indicador espia na lateral esquerda do leque
+  capsulaDupla(ctx, 186, 322, 158, 236, 56, pele);
+
+  // polegar em dois segmentos, com dobra de verdade
+  capsulaDupla(ctx, 250, 320, 316, 220, 74, pele);
+  capsulaDupla(ctx, 316, 220, 352, 142, 62, pele);
+  // vinco da dobra e unha: os dois detalhes que fazem ler como polegar
+  ctx.strokeStyle = 'rgba(42,27,18,0.5)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(300, 232); ctx.quadraticCurveTo(316, 222, 330, 226); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.beginPath(); ctx.ellipse(348, 152, 12, 17, 0.45, 0, Math.PI * 2); ctx.fill();
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
-const maos = { esq: null, dir: null, pele: null };
+// O outro braço descansa na beirada da mesa, como em qualquer roda de carta:
+// antebraço na diagonal e a mão relaxada, meio fechada.
+function texturaBracoNaMesa(pele) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 512;
+  const ctx = c.getContext('2d');
+
+  ctx.save();
+  ctx.filter = 'blur(7px)';
+  capsula(ctx, 470, 470, 240, 280, 200, 'rgba(140,106,69,0.8)');
+  ctx.restore();
+
+  capsulaDupla(ctx, 500, 500, 250, 290, 176, pele);
+  // dorso da mão
+  ctx.fillStyle = '#2a1b12';
+  ctx.beginPath(); ctx.ellipse(226, 268, 108, 84, -0.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = pele;
+  ctx.beginPath(); ctx.ellipse(228, 270, 98, 74, -0.5, 0, Math.PI * 2); ctx.fill();
+  // dedos meio fechados, juntos — mão em repouso não abre os dedos
+  capsulaDupla(ctx, 172, 216, 118, 264, 52, pele);
+  capsulaDupla(ctx, 208, 194, 142, 232, 52, pele);
+  capsulaDupla(ctx, 248, 184, 182, 210, 50, pele);
+  capsulaDupla(ctx, 288, 186, 234, 200, 46, pele);
+  // nós dos dedos
+  ctx.strokeStyle = 'rgba(42,27,18,0.45)'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(180, 226); ctx.quadraticCurveTo(230, 196, 284, 194); ctx.stroke();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const maos = { leque: null, mesa: null, pele: null };
 function sincronizaMaos() {
   const eu = view.players.find((p) => p.id === me());
   if (!eu) return;
   const pele = peleDe(personagemDe(eu));
   if (pele === maos.pele) return;
   maos.pele = pele;
-  for (const lado of ['esq', 'dir']) {
-    if (maos[lado]) maoGrupo.remove(maos[lado]);
-    const mat = new THREE.MeshBasicMaterial({
-      map: texturaDaMao(pele), transparent: true, depthWrite: false,
+  for (const [chave, textura] of [['leque', texturaMaoDoLeque], ['mesa', texturaBracoNaMesa]]) {
+    if (maos[chave]) maoGrupo.remove(maos[chave]);
+    const mat = new THREE.MeshLambertMaterial({
+      map: textura(pele), transparent: true, depthWrite: false,
     });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.46), mat);
-    if (lado === 'esq') m.scale.x = -1;   // a esquerda é a direita espelhada
-    maos[lado] = m;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), mat);
+    maos[chave] = m;
     maoGrupo.add(m);
   }
 }
@@ -646,7 +802,9 @@ function sincronizaMao() {
   const passo = n > 1
     ? Math.min(0.16 * escala, (larguraVisivel * 0.84 - CARTA_L * escala) / (n - 1))
     : 0;
-  const baseY = -alturaVisivel * 0.40;
+  // O leque é CORTADO pela borda de baixo, como no Capote: carta inteira com
+  // um vão de cenário embaixo é o que fazia a mão parecer flutuar.
+  const baseY = -alturaVisivel * 0.43;
   hand.forEach((card, i) => {
     let mesh = cartasDaMao.get(card.id);
     if (!mesh) {
@@ -667,19 +825,19 @@ function sincronizaMao() {
     mesh.rotation.x = -0.12;
   });
 
-  // as mãos seguram o leque por baixo, com o polegar na frente das cartas
+  // uma mão segura o leque; a outra descansa na beirada da mesa
   sincronizaMaos();
   const larguraLeque = (n - 1) * passo + CARTA_L * escala;
-  if (maos.esq && maos.dir) {
-    const mostrar = n > 0;
-    maos.esq.visible = mostrar; maos.dir.visible = mostrar;
-    const yMao = baseY - 0.13 * escala;
+  if (maos.leque && maos.mesa) {
+    maos.leque.visible = n > 0;
     const zFrente = -dist + n * 0.004 + 0.02;
-    maos.esq.position.set(-larguraLeque * 0.28, yMao, zFrente);
-    maos.dir.position.set(larguraLeque * 0.28, yMao, zFrente);
-    maos.esq.rotation.z = -0.18; maos.dir.rotation.z = 0.18;
-    maos.esq.scale.set(-0.9 * escala, 0.9 * escala, 1);
-    maos.dir.scale.set(0.9 * escala, 0.9 * escala, 1);
+    maos.leque.position.set(-larguraLeque * 0.14, baseY - 0.08 * escala, zFrente);
+    maos.leque.rotation.z = -0.1;
+    maos.leque.scale.setScalar(1.05 * escala);
+    // o braço apoiado entra pelo canto de baixo, cortado pela borda da tela
+    maos.mesa.position.set(larguraVisivel * 0.4, baseY - 0.3 * escala, zFrente - 0.05);
+    maos.mesa.rotation.z = 0.3;
+    maos.mesa.scale.setScalar(1.4 * escala);
   }
 }
 
@@ -711,14 +869,16 @@ window.addEventListener('pointermove', (e) => {
 // ---------------------------------------------------------------------------
 
 const barra = document.createElement('div');
-barra.style.cssText = `position:fixed;left:50%;bottom:max(200px, 27vh);
-  transform:translateX(-50%);display:flex;gap:8px;z-index:5;flex-wrap:wrap;justify-content:center;max-width:94vw;`;
+// `left: 0; right: 0` e centrar pelo flex: com `left: 50%`, o shrink-to-fit
+// de elemento fixo só enxerga metade da tela e empilhava os botões.
+barra.style.cssText = `position:fixed;left:0;right:0;bottom:max(200px, 27vh);
+  display:flex;gap:8px;z-index:5;justify-content:center;flex-wrap:wrap;pointer-events:none;padding:0 10px;`;
 document.body.appendChild(barra);
 
 function botao(txt, cor, fn) {
   const b = document.createElement('button');
   b.textContent = txt;
-  b.style.cssText = `white-space:nowrap;border:1px solid rgba(140,106,69,.5);border-radius:14px;padding:9px 13px;
+  b.style.cssText = `pointer-events:auto;white-space:nowrap;border:1px solid rgba(140,106,69,.5);border-radius:14px;padding:9px 13px;
     font:900 0.84rem Nunito,sans-serif;color:${cor === 'primario' ? '#3d2c07' : '#f5f1e6'};
     background:${cor === 'primario' ? 'linear-gradient(180deg,#ffd473,#f2c14e)' : cor === 'perigo' ? '#e4572e' : 'rgba(0,0,0,.45)'};cursor:pointer;`;
   b.onclick = fn;
@@ -785,7 +945,11 @@ async function sincroniza(primeira) {
       a.grupo.position.set(pos.x, 0, pos.z);
       a.grupo.rotation.y = pos.ang;       // de frente para a mesa (e para você)
       trocaRotulo(a.contagem, `${p.handCount}`);
-      a.leque.children.forEach((c, i) => { c.visible = i < Math.min(5, p.handCount); });
+      // os cinco primeiros filhos são as cartas; dedos e selo ficam sempre
+      a.leque.children.forEach((c, i) => {
+        if (i < 5) c.visible = i < Math.min(5, p.handCount);
+      });
+      a.leque.visible = p.handCount > 0;
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
       a.apagado = (p.desistiu || (!p.isBot && !p.connected));
       a.mat.color.setScalar(a.apagado ? 0.45 : 1);
@@ -795,6 +959,8 @@ async function sincroniza(primeira) {
     const alturaMonte = Math.max(0.03, Math.min(0.2, view.deckCount * 0.0022));
     monte.caixa.scale.y = alturaMonte / 0.2;
     monte.caixa.position.y = MESA_TOPO + alturaMonte / 2;
+    // o número senta na caixa; solto no ar ele era mais uma coisa flutuando
+    monte.num.position.set(-0.4, MESA_TOPO + alturaMonte + 0.09, -0.42);
 
     // descarte: refeito quando o topo muda
     const topo = view.discardTop;

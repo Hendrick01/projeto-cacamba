@@ -61,7 +61,7 @@ projeto-caçamba/
 | [`test/e2e.mjs`](test/e2e.mjs) | 134 | **Três** jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket. Três porque a compra fora da vez precisa de alguém que não seja nem quem está na vez nem quem descartou — e o teste falha se ninguém pedir carta, para essa cobertura não morrer em silêncio. |
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
-| [`public/mesa3d.js`](public/mesa3d.js) | 969 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
+| [`public/mesa3d.js`](public/mesa3d.js) | 1135 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
 | [`public/icon.svg`](public/icon.svg) | 37 | Ícone: leque de três cartas sobre o feltro, com moldura dourada. Fundo ocupa o quadro todo, então funciona como ícone *maskable*. |
@@ -454,6 +454,16 @@ A biblioteca (`public/vendor/three.module.js`, ~675 KB, 167 KB com gzip) **só �
 baixada quando se abre o 3D** — a mesa normal continua nos 181 KB. Vendida no
 repositório para não depender de CDN (a regra do projeto é: sem build, sem
 dependência de fora no navegador).
+
+O salão existe em volta da mesa — parede circular de azulejo, a porta aberta
+com a luz da rua, engradados —, tudo forma simples: a neblina come o detalhe
+que estiver longe. As **mãos** seguem a construção do elenco (silhueta chapada,
+contorno uniforme, halo): uma **segura o leque** (polegar cruzando a frente das
+cartas, palma embaixo, indicador espiando na lateral), a outra **descansa na
+beirada da mesa** — e recebem a mesma luz da cena, senão brilham como neon. Os
+adversários seguram o leque deles na altura das mãos da figura, com as pontas
+dos dedos (no tom de pele de cada um) por cima do verso: sem os dedos, o leque
+flutua na frente do peito.
 
 Duas armadilhas que custaram e ficam registradas:
 
