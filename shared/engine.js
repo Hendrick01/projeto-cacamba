@@ -343,9 +343,9 @@ export function layoffOption(card, meld, coringasRemovidos = 0, preferredEnd = n
   if (meld.type === 't') {
     // Trinca é só com carta real: o coringa vale apenas para sequência.
     if (isJoker(card) || card.rank !== meld.rank) return null;
-    const suits = new Set(meld.cards.map((c) => c.suit));
-    // Mantém naipes diferentes até completar os 4; depois libera repetição
-    if (suits.has(card.suit) && suits.size < 4) return null;
+    // Naipe repetido vale. Quem exige naipes diferentes é a FORMAÇÃO da trinca
+    // (regra do contrato); dar continuidade a uma que já está na mesa é outra
+    // coisa — numa trinca Q♠ Q♦ Q♣ entra outro Q♣.
     return { kind: 't' };
   }
   const lo = meld.values[0];
@@ -515,6 +515,7 @@ export function startRound(state) {
     for (const p of state.players) p.hand.push(state.deck.pop());
   }
   state.discard = [state.deck.pop()];
+  delete state.discard[0].by;   // carta virada do monte não é descarte de ninguém
   state.turn = state.round % state.players.length;
   state.turnNo = 0;
   state.phase = 'draw';
@@ -580,9 +581,14 @@ export function descarteTravado(state) {
 }
 
 // Vale para os DOIS caminhos de compra: a normal da vez e a fora da vez.
-export function podeComprarDoDescarte(state) {
+// `playerId` opcional: sem ele a pergunta é sobre o monte (dá para comprar de
+// lá?), com ele é sobre a pessoa (ESTE jogador pode comprar?). A diferença é a
+// carta que o próprio jogador descartou: ela fica fora do alcance dele.
+export function podeComprarDoDescarte(state, playerId = null) {
   if (state.discard.length === 0) return false;
-  return !descarteTravado(state);
+  if (descarteTravado(state)) return false;
+  if (playerId && topoDoDescarte(state)?.by === playerId) return false;
+  return true;
 }
 
 // Ordem de prioridade para compra fora da vez: QUEM PEDIU PRIMEIRO leva.
@@ -602,7 +608,7 @@ function claimPriority(state) {
 export function actClaim(state, playerId) {
   if (state.phase !== 'draw' || !state.discardFresh) return [];
   // Monte travado por coringa descoberto: nem vale registrar o pedido.
-  if (!podeComprarDoDescarte(state)) return [];
+  if (!podeComprarDoDescarte(state, playerId)) return [];
   if (state.players[state.turn].id === playerId) return [];
   if (state.claims.includes(playerId)) return [];
   if (!playerById(state, playerId)) fail('Jogador desconhecido.');
@@ -628,7 +634,8 @@ export function actDraw(state, playerId, source) {
 
   if (source === 'discard') {
     if (state.discard.length === 0) fail('O descarte está vazio.');
-    if (!podeComprarDoDescarte(state)) fail('Tem coringa descoberto no meio: o monte está travado até alguém descartar por cima.');
+    if (descarteTravado(state)) fail('Tem coringa descoberto no meio: o monte está travado até alguém descartar por cima.');
+    if (topoDoDescarte(state)?.by === playerId) fail('Essa carta foi você que descartou: ela não volta para a sua mão.');
     const card = state.discard.pop();
     player.hand.push(card);
     if (state.claims.length > 0) {
@@ -640,7 +647,7 @@ export function actDraw(state, playerId, source) {
   } else {
     // Antes de puxar do monte, resolve a compra fora da vez (se houver pedido)
     const buyers = claimPriority(state);
-    if (buyers.length > 0 && state.discardFresh && podeComprarDoDescarte(state)) {
+    if (buyers.length > 0 && state.discardFresh) {
       const buyerId = buyers[0];
       const buyer = playerById(state, buyerId);
       const card = state.discard.pop();
@@ -806,8 +813,11 @@ export function sobrasNaMesa(state) {
 // por quem esticou a sequência. O encaixe entra por uma ponta, e é a ponta
 // OPOSTA que precisa ter o coringa — encaixar por cima de um coringa de ponta
 // o empurraria para o meio, onde tirar quebraria a sequência.
-export function coringaLiberadoPeloEncaixe(meld, opt) {
+export function coringaLiberadoPeloEncaixe(meld, opt, playerId = null) {
   if (!meld || meld.type !== 's' || !opt || opt.kind !== 's') return null;
+  // Só em sequência dos OUTROS: tirar coringa do próprio jogo seria só passar
+  // a carta de um bolso para o outro, sem o preço de esticar o jogo alheio.
+  if (playerId && meld.ownerId === playerId) return null;
   const oposta = opt.end === 'lo' ? meld.cards[meld.cards.length - 1] : meld.cards[0];
   if (!isJoker(oposta)) return null;
   // Depois do encaixe a sequência fica com length+1; tirando o coringa volta
@@ -828,8 +838,12 @@ export function actLayoff(state, playerId, cardId, meldId, end = null, pegarCori
 
   // Confere ANTES de mexer no estado: falhar no meio deixaria a carta encaixada
   // e o coringa onde estava, sem o jogador ter pedido isso.
-  const coringa = pegarCoringa ? coringaLiberadoPeloEncaixe(meld, opt) : null;
-  if (pegarCoringa && !coringa) fail('Esse encaixe não deixa coringa nenhum sobrando neste jogo.');
+  const coringa = pegarCoringa ? coringaLiberadoPeloEncaixe(meld, opt, playerId) : null;
+  if (pegarCoringa && !coringa) {
+    fail(meld.ownerId === playerId
+      ? 'O coringa só pode ser resgatado de sequência de outro jogador.'
+      : 'Esse encaixe não deixa coringa nenhum sobrando neste jogo.');
+  }
 
   // Sem o contrato cumprido, o encaixe não pode encurtar a mão a ponto de o
   // descarte obrigatório zerar ela — isso seria bater sem contrato.
@@ -944,6 +958,9 @@ export function actDiscard(state, playerId, cardId) {
   }
 
   player.hand = player.hand.filter((c) => c.id !== cardId);
+  // Carimbo de quem descartou, na própria carta: assim ele viaja com ela e não
+  // se perde quando alguém leva o topo e descobre uma carta mais antiga.
+  card.by = playerId;
   state.discard.push(card);
   const events = [{ e: 'discard', p: playerId, card: { ...card } }];
   if (player.hand.length === 0) return endRound(state, playerId, 'bateu', events);
@@ -964,6 +981,7 @@ export function actMeldDiscard(state, playerId, meldId, cardId) {
     fail('Só dá para tirar carta de sequência com mais de 4 cartas (pelas pontas) ou trinca com mais de 3.');
   }
   const card = removeFromMeld(meld, cardId);
+  card.by = playerId;
   state.discard.push(card);
   const events = [{ e: 'meldDiscard', p: playerId, card: { ...card }, meldId }];
   advanceTurn(state);
@@ -1003,7 +1021,11 @@ export function viewFor(state, playerId) {
     discardFresh: state.discardFresh,
     // O topo pode ser comprado? Falso quando um coringa tranca o meio — a tela
     // precisa disso para não oferecer um toque que o motor vai recusar.
-    discardBuyable: podeComprarDoDescarte(state),
+    discardBuyable: podeComprarDoDescarte(state, playerId),
+    // Duas razões diferentes para não dar para comprar, e a tela precisa
+    // distinguir: o coringa tranca o meio para TODO MUNDO; a carta que você
+    // descartou está fora do seu alcance, mas os outros pegam normalmente.
+    discardLocked: descarteTravado(state),
     claims: state.claims.slice(),
     lastRound: state.lastRound,
     ranking: state.phase === 'gameEnd' ? finalRanking(state) : null,
@@ -1233,7 +1255,7 @@ export function botNextAction(state, playerId) {
 
   if (state.phase === 'draw') {
     const top = topoDoDescarte(state);
-    if (top && podeComprarDoDescarte(state) && botWantsCard(state, player, top)) {
+    if (top && podeComprarDoDescarte(state, player.id) && botWantsCard(state, player, top)) {
       return { a: 'draw', source: 'discard' };
     }
     return { a: 'draw', source: 'deck' };

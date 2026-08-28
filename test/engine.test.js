@@ -101,12 +101,14 @@ test('encaixe em sequência: só nas pontas, sem passar do ás', () => {
   assert.ok(layoffOption(c('10', '♦'), topMeld));
 });
 
-test('encaixe em trinca: mesmo valor, naipe novo até completar os 4', () => {
+test('encaixe em trinca: mesmo valor, naipe repetido inclusive', () => {
   const meld = { id: 3, type: 't', rank: 9, cards: [c('9', '♠'), c('9', '♥'), c('9', '♦')], ownerId: 'x' };
-  assert.ok(layoffOption(c('9', '♣'), meld));
-  assert.equal(layoffOption(c('9', '♠'), meld), null, 'naipe repetido antes dos 4');
-  meld.cards.push(c('9', '♣'));
-  assert.ok(layoffOption(c('9', '♠'), meld), 'com os 4 naipes, libera repetição');
+  assert.ok(layoffOption(c('9', '♣'), meld), 'naipe que falta');
+  assert.ok(layoffOption(c('9', '♠'), meld), 'naipe repetido também dá continuidade');
+  assert.equal(layoffOption(c('8', '♠'), meld), null, 'valor diferente, não');
+  assert.equal(layoffOption(J(), meld), null, 'coringa não entra em trinca');
+  // Quem exige naipes diferentes é a FORMAÇÃO da trinca, não o encaixe
+  assert.equal(findContractMelds([c('9', '♠'), c('9', '♥'), c('9', '♥')], 1, 0), null);
 });
 
 test('descarte de jogo: sequência >4 só pelas pontas; trinca >3 mantendo validade', () => {
@@ -517,6 +519,68 @@ test('descartar de um jogo com sobra em vez da mão', () => {
   assert.equal(state.phase, 'draw', 'vez passou adiante');
 });
 
+test('a carta que você descartou não volta para a sua mão', () => {
+  const state = freshGame();
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+  const descartada = a.hand[0];
+  actDiscard(state, a.id, descartada.id);
+
+  // Agora é a vez do B: para ele a carta está comprável
+  assert.equal(state.players[state.turn].id, b.id);
+  assert.equal(podeComprarDoDescarte(state, b.id), true);
+  assert.equal(viewFor(state, b.id).discardBuyable, true);
+
+  // Para quem descartou, não — nem pedindo fora da vez
+  assert.equal(podeComprarDoDescarte(state, a.id), false);
+  const vistaDele = viewFor(state, a.id);
+  assert.equal(vistaDele.discardBuyable, false);
+  assert.equal(vistaDele.discardLocked, false, 'não é trava de coringa: é carta dele');
+  assert.deepEqual(actClaim(state, a.id), [], 'o pedido dele nem é registrado');
+  assert.equal(state.claims.length, 0);
+
+  // E se a vez voltasse para ele com a carta dele no topo, também não
+  state.turn = state.players.indexOf(a);
+  state.phase = 'draw';
+  assert.throws(() => actDraw(state, a.id, 'discard'), /foi você que descartou/);
+
+  // A carta virada do monte no começo da rodada não é descarte de ninguém
+  const outra = freshGame();
+  assert.equal(topoDoDescarte(outra).by, undefined);
+  assert.equal(podeComprarDoDescarte(outra, outra.players[0].id), true);
+});
+
+test('o coringa só é resgatado de sequência dos outros', () => {
+  const state = freshGame();
+  const a = state.players[0];
+  state.turn = 0;
+  actDraw(state, a.id, 'deck');
+
+  const jk = J();
+  a.melds = [{
+    id: 8300, type: 's', suit: SU['♦'], ownerId: a.id,
+    cards: [c('J', '♦'), c('Q', '♦'), c('K', '♦'), jk],
+    values: [11, 12, 13, 14],
+  }];
+  a.hand = [c('10', '♦'), c('2', '♥'), c('4', '♣'), c('8', '♠')];
+  const dez = a.hand[0];
+  const opt = layoffOption(dez, a.melds[0]);
+
+  assert.equal(coringaLiberadoPeloEncaixe(a.melds[0], opt, a.id), null, 'jogo próprio não libera');
+  assert.ok(coringaLiberadoPeloEncaixe(a.melds[0], opt), 'sem dono na pergunta, a forma é válida');
+  assert.throws(
+    () => actLayoff(state, a.id, dez.id, 8300, null, true),
+    /só pode ser resgatado de sequência de outro jogador/,
+  );
+  assert.equal(a.melds[0].cards.some(isJoker), true, 'o coringa continua no jogo dele');
+
+  // Sem pedir o coringa, o encaixe no próprio jogo continua valendo
+  const ev = actLayoff(state, a.id, dez.id, 8300);
+  assert.equal(ev[0].e, 'layoff');
+  assert.equal(a.melds[0].cards.length, 5);
+});
+
 test('esticar a sequência pela outra ponta resgata o coringa da ponta', () => {
   const state = freshGame();
   const [a, b] = state.players;
@@ -831,16 +895,22 @@ test('assentos e prioridade de compra funcionam em mesa de 7 e de 8', () => {
     const daVez = state.players[state.turn];
     const ordem = [];
     for (let k = 1; k < n; k++) ordem.push(state.players[(state.turn + k) % n]);
-    const ultimo = ordem[ordem.length - 1];
-    const primeiro = ordem[0];
-    actClaim(state, ultimo.id);   // pediu primeiro
-    actClaim(state, primeiro.id); // assento melhor, pedido depois
-    const antes = ultimo.hand.length;
+    // O último da ordem é quem acabou de descartar: a carta é dele e ele não
+    // pode pedir de volta.
+    const quemDescartou = ordem[ordem.length - 1];
+    assert.deepEqual(actClaim(state, quemDescartou.id), [], `quem descartou não pede de volta (${n})`);
+    assert.equal(state.claims.includes(quemDescartou.id), false);
+
+    const cedo = ordem[ordem.length - 2];  // pediu primeiro, assento distante
+    const tarde = ordem[0];                // assento melhor, pedido depois
+    actClaim(state, cedo.id);
+    actClaim(state, tarde.id);
+    const antes = cedo.hand.length;
     const eventos = actDraw(state, daVez.id, 'deck');
     const buy = eventos.find((ev) => ev.e === 'buy');
     assert.ok(buy, `alguém devia ter comprado (${n})`);
-    assert.equal(buy.p, ultimo.id, `quem apertou primeiro leva (${n})`);
-    assert.equal(ultimo.hand.length, antes + 1, `só a carta comprada (${n})`);
+    assert.equal(buy.p, cedo.id, `quem apertou primeiro leva (${n})`);
+    assert.equal(cedo.hand.length, antes + 1, `só a carta comprada (${n})`);
   }
 });
 
