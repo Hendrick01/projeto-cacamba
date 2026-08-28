@@ -462,7 +462,13 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   width: 13px; height: 18px;
   margin: 0 -3px;
   border-radius: 2px;
-  background: repeating-linear-gradient(45deg, #274d92 0 3px, #1d3c74 3px 6px);
+  /* Mesmo material do verso do baralho, na escala do leque: quando o verso
+     virou madeira, este aqui ficou para trás e os adversários seguravam um
+     azul que não existia em mais lugar nenhum da mesa. */
+  background:
+    repeating-linear-gradient(45deg, rgba(242, 193, 78, 0.18) 0 2px, rgba(242, 193, 78, 0) 2px 4px),
+    repeating-linear-gradient(-45deg, rgba(242, 193, 78, 0.18) 0 2px, rgba(242, 193, 78, 0) 2px 4px),
+    linear-gradient(160deg, #7a4a2b 0%, #4a2c19 58%, #33200f 100%);
   border: 1px solid var(--cream);
   box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.8);
   transform: rotate(var(--giro, 0deg)) translateY(calc(var(--sobe, 0px) * -1));
@@ -544,7 +550,10 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .carta-voando {
   position: fixed; z-index: 60; pointer-events: none;
   width: 30px; height: 42px; border-radius: 5px;
-  background: repeating-linear-gradient(45deg, #274d92 0 4px, #1d3c74 4px 8px);
+  background:
+    repeating-linear-gradient(45deg, rgba(242, 193, 78, 0.18) 0 3px, rgba(242, 193, 78, 0) 3px 6px),
+    repeating-linear-gradient(-45deg, rgba(242, 193, 78, 0.18) 0 3px, rgba(242, 193, 78, 0) 3px 6px),
+    linear-gradient(160deg, #7a4a2b 0%, #4a2c19 58%, #33200f 100%);
   border: 2px solid var(--cream);
   box-shadow: 0 5px 12px -4px rgba(0, 0, 0, 0.85);
   animation: voa 540ms cubic-bezier(0.25, 0.8, 0.35, 1) backwards;
