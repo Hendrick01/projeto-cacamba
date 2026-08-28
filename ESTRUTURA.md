@@ -41,7 +41,7 @@ projeto-caçamba/
 │   └── manifest.json        # manifesto PWA
 └── test/
     ├── engine.test.js       # 51 testes unitários do motor
-    ├── e2e.mjs              # integração: 2 jogadores contra o servidor real
+    ├── e2e.mjs              # integração: 3 jogadores contra o servidor real
     ├── sair.mjs             # integração: sair da partida no meio e o robô assumir
     └── convite.mjs          # integração: o link da sala atrás de proxy
 ```
@@ -51,14 +51,14 @@ projeto-caçamba/
 | Arquivo | Linhas | O que faz |
 |---|---:|---|
 | [`shared/engine.js`](shared/engine.js) | 1314 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
-| [`public/client.js`](public/client.js) | 1591 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
+| [`public/client.js`](public/client.js) | 1685 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
 | [`server.js`](server.js) | 526 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
-| [`public/style.css`](public/style.css) | 910 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
+| [`public/style.css`](public/style.css) | 914 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
 | [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
-| [`test/e2e.mjs`](test/e2e.mjs) | 122 | Dois jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket, exercitando compra fora da vez. |
+| [`test/e2e.mjs`](test/e2e.mjs) | 134 | **Três** jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket. Três porque a compra fora da vez precisa de alguém que não seja nem quem está na vez nem quem descartou — e o teste falha se ninguém pedir carta, para essa cobertura não morrer em silêncio. |
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
-| [`public/index.html`](public/index.html) | 285 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
+| [`public/index.html`](public/index.html) | 284 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
 | [`public/icon.svg`](public/icon.svg) | 37 | Ícone: leque de três cartas sobre o feltro, com moldura dourada. Fundo ocupa o quadro todo, então funciona como ícone *maskable*. |
 | [`.claude/settings.json`](.claude/settings.json) | 34 | Allowlist de comandos de leitura para reduzir aprovações; `sudo` e `rm -rf` bloqueados. |
@@ -450,11 +450,28 @@ a vez **passa** pelo assento vago em vez de travar nele.
 
 ### Arrumar a mão
 
-O leque sai ordenado por naipe ou por valor (`A↔♠`), mas o jogador pode
-arrumá-lo como quiser: o botão `✥` entra no modo de organizar, onde se toca
-numa carta e depois no lugar dela. **Dois toques em vez de arrastar** porque as
-cartas se sobrepõem no leque — arrastar acertaria a carta errada o tempo todo
-num celular.
+O leque sai ordenado por naipe ou por valor (`A↔♠`), e o jogador arruma como
+quiser **arrastando a carta** para onde ela deve ficar. Não há modo para
+entrar: **toque seleciona, arrasto arruma**, separados por um limiar de 10 px —
+sem ele, um dedo que escorrega ao escolher uma carta reordenaria a mão sem
+querer.
+
+Duas decisões que fazem o gesto funcionar num leque de cartas sobrepostas:
+
+- **O destino vem da posição do dedo, não de acertar uma carta.** `destinoDoArrasto`
+  conta quantas cartas têm o centro à esquerda do dedo — soltar entre a 2ª e a
+  3ª quer dizer sempre a mesma coisa, indo para a direita ou para a esquerda.
+  A primeira versão (dois toques, escolhendo a carta de destino) tinha um vício
+  aqui: mover para a direita largava *depois* do alvo e para a esquerda
+  largava *antes*.
+- **A fileira vem da estrutura (`.fila`), não da altura da carta.** No leque
+  cada carta tem um topo diferente por causa do giro; agrupar por altura fazia
+  cada carta virar uma fileira sozinha, e o destino saía errado.
+
+Enquanto arrasta, as cartas depois do ponto de queda escorregam 9 px
+(`--desloca`) para abrir o vão — é o que mostra onde ela vai cair antes de
+soltar. `touch-action: none` nas cartas impede que o arrasto vire rolagem da
+página no celular.
 
 A ordem escolhida vive em `ordemManual` e só nesta rodada: os ids das cartas
 recomeçam a cada uma. Carta puxada depois vai para o fim, sem embaralhar o que

@@ -24,8 +24,9 @@ let sortMode = localStorage.getItem('cacamba-sort') || 'suit';
 // Ordem escolhida à mão pelo jogador. Vazia = ordenação automática. Vive só
 // nesta rodada: os ids das cartas recomeçam a cada uma.
 let ordemManual = [];
-let modoOrganizar = false;
-let cartaPegada = null;
+// Arrasto em curso: { id, x0, y0, el, ativo }. Enquanto não passa do limiar,
+// o gesto ainda pode virar toque (que seleciona a carta).
+let arrasto = null;
 let meldDiscardMode = false;
 let reconnectDelay = 500;
 
@@ -469,16 +470,19 @@ function sortedHand() {
   return hand;
 }
 
-// Move uma carta para o lugar de outra, empurrando o resto. A ordem passa a
-// ser manual a partir daqui — inclusive para as cartas que não foram tocadas.
-function moveCarta(idDe, idPara) {
+// Põe a carta numa posição da fila, empurrando o resto. `destino` é o índice
+// na ordem JÁ SEM a carta arrastada — é o que faz "soltar entre a 2ª e a 3ª"
+// significar sempre a mesma coisa, indo para a direita ou para a esquerda.
+function poeNaPosicao(id, destino) {
   const ordem = ordemManual.length ? [...ordemManual] : sortedHand().map((c) => c.id);
-  const de = ordem.indexOf(idDe);
-  const para = ordem.indexOf(idPara);
-  if (de < 0 || para < 0 || de === para) return;
+  const de = ordem.indexOf(id);
+  if (de < 0) return false;
   ordem.splice(de, 1);
-  ordem.splice(para, 0, idDe);
+  const alvo = Math.max(0, Math.min(ordem.length, destino));
+  if (alvo === de) return false;
+  ordem.splice(alvo, 0, id);
   ordemManual = ordem;
+  return true;
 }
 
 // ---------------- Mesa ----------------
@@ -1031,26 +1035,135 @@ function montaLeque(fila, cartas, largura) {
 
   cartas.forEach((card, i) => {
     const el = cardEl(card);
+    el.dataset.cardId = card.id;
     el.style.setProperty('--passo', `${passo - CARTA_LARGURA}px`);
     el.style.setProperty('--giro', n > 1 ? `${(i - meio) * (ABERTURA / (n - 1))}deg` : '0deg');
-    if (modoOrganizar) {
-      if (cartaPegada === card.id) el.classList.add('pegando');
-      el.onclick = () => {
-        if (cartaPegada === null) cartaPegada = card.id;
-        else if (cartaPegada === card.id) cartaPegada = null;
-        else { moveCarta(cartaPegada, card.id); cartaPegada = null; }
-        render();
-      };
-    } else {
-      if (selected.has(card.id)) el.classList.add('sel');
-      el.onclick = () => {
-        if (selected.has(card.id)) selected.delete(card.id);
-        else selected.add(card.id);
-        render();
-      };
-    }
+    if (selected.has(card.id)) el.classList.add('sel');
+    el.onclick = () => {
+      // Se o dedo arrastou, o gesto foi de arrumar: não seleciona.
+      if (el.dataset.arrastou === '1') { delete el.dataset.arrastou; return; }
+      if (selected.has(card.id)) selected.delete(card.id);
+      else selected.add(card.id);
+      render();
+    };
+    el.addEventListener('pointerdown', (e) => comecaArrasto(e, el, card.id));
     fila.appendChild(el);
   });
+}
+
+// ---------------- Arrastar para arrumar a mão ----------------
+
+// Quanto o dedo precisa andar para o gesto deixar de ser toque e virar
+// arrasto. Sem esse limiar, um dedo que escorrega um pouco ao escolher uma
+// carta arrumaria a mão sem querer.
+const LIMIAR_ARRASTO = 10;
+
+function comecaArrasto(e, el, id) {
+  if (e.button !== undefined && e.button !== 0) return;
+  arrasto = { id, el, x0: e.clientX, y0: e.clientY, ativo: false, destino: null };
+  el.setPointerCapture?.(e.pointerId);
+  el.addEventListener('pointermove', moveArrasto);
+  el.addEventListener('pointerup', soltaArrasto);
+  el.addEventListener('pointercancel', cancelaArrasto);
+}
+
+function moveArrasto(e) {
+  if (!arrasto) return;
+  const dx = e.clientX - arrasto.x0;
+  const dy = e.clientY - arrasto.y0;
+  if (!arrasto.ativo) {
+    if (Math.hypot(dx, dy) < LIMIAR_ARRASTO) return;
+    arrasto.ativo = true;
+    arrasto.el.classList.add('arrastando');
+    arrasto.el.dataset.arrastou = '1';
+  }
+  // A carta segue o dedo; o resto abre espaço no lugar onde ela vai cair.
+  arrasto.el.style.transform = `translate(${dx}px, ${dy - 18}px) scale(1.06)`;
+  arrasto.destino = destinoDoArrasto(e.clientX, e.clientY);
+  mostraEspaco(arrasto.destino);
+}
+
+// Onde a carta cai: conta quantas cartas (fora a arrastada) têm o centro à
+// esquerda do dedo. O alvo vem da POSIÇÃO, não de acertar uma carta com o
+// dedo — que é o que torna o destino difícil num leque de cartas sobrepostas.
+function destinoDoArrasto(x, y) {
+  const outras = cartasDaMao().filter((c) => c.id !== arrasto.id);
+  if (!outras.length) return 0;
+  // Com a mão em duas fileiras, primeiro escolhe a fileira mais perto do dedo.
+  // A fileira vem da estrutura (`.fila`), não da altura de cada carta: no
+  // leque cada carta tem um topo diferente por causa do giro, e agrupar por
+  // altura fazia cada carta virar uma "fileira" sozinha.
+  const fileiras = [...new Set(outras.map((c) => c.fila))];
+  const alvo = fileiras.reduce((a, b) => {
+    const ca = outras.find((c) => c.fila === a).cy;
+    const cb = outras.find((c) => c.fila === b).cy;
+    return Math.abs(cb - y) < Math.abs(ca - y) ? b : a;
+  });
+  const antes = outras.filter((c) => c.fila < alvo).length;
+  const naFila = outras.filter((c) => c.fila === alvo);
+  return antes + naFila.filter((c) => c.cx < x).length;
+}
+
+// Cada carta da mão com centro e fileira, na ordem em que estão na tela.
+function cartasDaMao() {
+  const lista = [];
+  [...$('hand').querySelectorAll('.fila')].forEach((fila, f) => {
+    const rf = fila.getBoundingClientRect();
+    for (const el of fila.querySelectorAll('.card')) {
+      const r = el.getBoundingClientRect();
+      lista.push({
+        el,
+        id: Number(el.dataset.cardId),
+        cx: r.left + r.width / 2,
+        fila: f,
+        cy: rf.top + rf.height / 2,
+      });
+    }
+  });
+  return lista;
+}
+
+// Abre um vão onde a carta vai cair: as que ficam depois do ponto escorregam
+// um pouco para a direita. É o que mostra o destino antes de soltar.
+function mostraEspaco(destino) {
+  const outras = cartasDaMao().filter((c) => c.id !== arrasto.id);
+  outras.forEach((c, i) => {
+    c.el.style.setProperty('--desloca', i >= destino ? '9px' : '-9px');
+  });
+}
+
+function limpaEspaco() {
+  for (const c of cartasDaMao()) c.el.style.removeProperty('--desloca');
+}
+
+function soltaArrasto(e) {
+  if (!arrasto) return;
+  const { el, id, ativo, destino } = arrasto;
+  desmontaArrasto(e);
+  if (!ativo) return;
+  el.classList.remove('arrastando');
+  el.style.transform = '';
+  limpaEspaco();
+  if (destino !== null && poeNaPosicao(id, destino)) render();
+  else render();
+}
+
+function cancelaArrasto(e) {
+  if (!arrasto) return;
+  const { el } = arrasto;
+  desmontaArrasto(e);
+  el.classList.remove('arrastando');
+  el.style.transform = '';
+  limpaEspaco();
+}
+
+function desmontaArrasto(e) {
+  const { el } = arrasto;
+  el.releasePointerCapture?.(e.pointerId);
+  el.removeEventListener('pointermove', moveArrasto);
+  el.removeEventListener('pointerup', soltaArrasto);
+  el.removeEventListener('pointercancel', cancelaArrasto);
+  arrasto = null;
 }
 
 // As suas mãos, atrás do leque, com o tom de pele de quem você escolheu ser.
@@ -1099,20 +1212,8 @@ function sobraAcende(card) {
 
 function renderActions() {
   const my = myTurn();
-  const drawing = my && view.phase === 'draw' && !modoOrganizar;
-  const playing = my && view.phase === 'play' && !modoOrganizar;
-  $('btn-organizar').classList.toggle('ligado', modoOrganizar);
-  $('btn-organizar').textContent = modoOrganizar ? 'Pronto' : '✥ Arrumar';
-  $('btn-sort').hidden = modoOrganizar;
-  // A instrução fica fixa enquanto o modo está ligado, e muda com o passo:
-  // como aviso passageiro ela sumia antes de a pessoa entender o gesto.
-  const dica = $('organizar-dica');
-  dica.hidden = !modoOrganizar;
-  if (modoOrganizar) {
-    dica.textContent = cartaPegada === null
-      ? 'Toque na carta que quer mover.'
-      : 'Agora toque na carta que está no lugar onde ela deve ficar.';
-  }
+  const drawing = my && view.phase === 'draw';
+  const playing = my && view.phase === 'play';
 
   $('btn-draw-deck').hidden = !drawing;
   $('btn-draw-discard').hidden = !(drawing && view.discardTop && view.discardBuyable);
@@ -1200,19 +1301,6 @@ $('btn-sort').onclick = () => {
   render();
 };
 
-// Organizar a mão: toque numa carta e depois no lugar onde ela deve ficar.
-// Dois toques em vez de arrastar porque as cartas se sobrepõem no leque —
-// arrastar acertaria a carta errada o tempo todo num celular.
-$('btn-organizar').onclick = () => {
-  modoOrganizar = !modoOrganizar;
-  cartaPegada = null;
-  if (modoOrganizar) {
-    selected.clear();
-    meldDiscardMode = false;
-    if (!ordemManual.length) ordemManual = sortedHand().map((c) => c.id);
-  }
-  render();
-};
 $('btn-rules').onclick = () => showRules();
 $('btn-score').onclick = () => showScore();
 
@@ -1342,8 +1430,6 @@ function announce(ev) {
       // que o jogador nunca escolheu.
       selected.clear();
       ordemManual = [];
-      modoOrganizar = false;
-      cartaPegada = null;
       break;
     case 'draw':
       if (ev.source === 'discard') {

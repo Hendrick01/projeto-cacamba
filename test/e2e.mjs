@@ -1,4 +1,4 @@
-// Teste de integração: 2 jogadores roteirizados jogam uma partida completa
+// Teste de integração: 3 jogadores roteirizados jogam uma partida
 // contra o servidor real. Rodar com o servidor no ar:
 //   node test/e2e.mjs [porta]
 import WebSocket from 'ws';
@@ -103,7 +103,11 @@ function act(c) {
 function finish(v) {
   clearTimeout(deadline);
   if (roundsSeen < 7) { console.error(`E2E FALHOU: só ${roundsSeen} rodadas`); process.exit(1); }
-  if (!v.ranking || v.ranking.length !== 2) { console.error('E2E FALHOU: ranking inválido'); process.exit(1); }
+  if (!v.ranking || v.ranking.length !== 3) { console.error('E2E FALHOU: ranking inválido'); process.exit(1); }
+  // A mesa é de três de propósito: com dois, a compra fora da vez deixou de
+  // existir — o único que não está na vez é justamente quem descartou, e a
+  // carta que você descartou não volta para a sua mão.
+  if (claimsMade === 0) { console.error('E2E FALHOU: ninguém pediu carta fora da vez'); process.exit(1); }
   console.log(`E2E OK: 7 rodadas completas · pedidos de compra: ${claimsMade} · compras efetivadas: ${buysSeen}`);
   console.log('Ranking:', v.ranking.map((r) => `${r.name}=${r.score}`).join(' · '));
   process.exit(0);
@@ -115,8 +119,16 @@ ana.ws.on('open', () => send(ana, { t: 'create', name: 'Ana E2E' }));
 ana.onLobby = (lobby) => {
   if (!ana.invited) {
     ana.invited = true;
-    const bia = client('Bia');
-    bia.ws.on('open', () => send(bia, { t: 'join', code: ana.code, name: 'Bia E2E' }));
-    bia.onWelcome = () => setTimeout(() => send(ana, { t: 'start' }), 100);
+    for (const nome of ['Bia', 'Caio']) {
+      const outro = client(nome);
+      outro.ws.on('open', () => send(outro, { t: 'join', code: ana.code, name: `${nome} E2E` }));
+    }
+  }
+  // Começa quando os três estiverem na sala. Três porque a compra fora da vez
+  // precisa de alguém que não seja nem quem está na vez nem quem descartou —
+  // com dois, ela não acontece nunca.
+  if (!ana.started && lobby.players.length === 3) {
+    ana.started = true;
+    setTimeout(() => send(ana, { t: 'start' }), 100);
   }
 };
