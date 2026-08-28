@@ -778,6 +778,15 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .fila .card:first-child { margin-left: 0; }
 /* A escolhida sai do leque e sobe: fica inteira à vista e vira alvo de toque
    confortável, que é o que a sobreposição tira. */
+/* Modo de organizar: a carta pegada sobe e fica marcada até o jogador tocar
+   no lugar dela. */
+.hand .card.pegando {
+  transform: rotate(var(--giro, 0deg)) translateY(-20px) scale(1.06);
+  box-shadow: 0 0 0 3px var(--halo), var(--shadow);
+  z-index: 4;
+}
+.btn.ligado { background: var(--gold); border-color: var(--gold); color: #3d2c07; }
+
 .hand .card.sel {
   transform: rotate(var(--giro, 0deg)) translateY(-18px) scale(1.06);
   box-shadow: 0 0 0 3px var(--gold), var(--shadow);

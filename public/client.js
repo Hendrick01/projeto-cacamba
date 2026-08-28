@@ -5,7 +5,7 @@
 import {
   planBaixada, layoffOption, layoffEnds, removableCards, SUITS, SUIT_RED, rankLabel,
   isJoker, JOKER_LABEL, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
-  DEFAULT_OPTS, sobraFechaJogo,
+  DEFAULT_OPTS, sobraFechaJogo, coringaLiberadoPeloEncaixe,
 } from '/shared/engine.js';
 import {
   ELENCO, SLUGS, personagemValido, personagemDoAssento, peleDe, temExpressao,
@@ -21,6 +21,11 @@ let lobby = null;         // última visão da sala
 let session = loadJSON('cacamba-session');
 let selected = new Set(); // cartas da mão selecionadas (ids)
 let sortMode = localStorage.getItem('cacamba-sort') || 'suit';
+// Ordem escolhida à mão pelo jogador. Vazia = ordenação automática. Vive só
+// nesta rodada: os ids das cartas recomeçam a cada uma.
+let ordemManual = [];
+let modoOrganizar = false;
+let cartaPegada = null;
 let meldDiscardMode = false;
 let reconnectDelay = 500;
 
@@ -453,9 +458,27 @@ function confirmarTroca(troca, destino) {
 
 function sortedHand() {
   const hand = [...(view?.you?.hand || [])];
+  if (ordemManual.length) {
+    // Carta que ainda não tem lugar escolhido (acabou de ser puxada) vai para
+    // o fim, sem embaralhar o que o jogador já arrumou.
+    const pos = new Map(ordemManual.map((id, i) => [id, i]));
+    return hand.sort((a, b) => (pos.get(a.id) ?? 1e6) - (pos.get(b.id) ?? 1e6));
+  }
   if (sortMode === 'suit') hand.sort((a, b) => a.suit - b.suit || a.rank - b.rank);
   else hand.sort((a, b) => a.rank - b.rank || a.suit - b.suit);
   return hand;
+}
+
+// Move uma carta para o lugar de outra, empurrando o resto. A ordem passa a
+// ser manual a partir daqui — inclusive para as cartas que não foram tocadas.
+function moveCarta(idDe, idPara) {
+  const ordem = ordemManual.length ? [...ordemManual] : sortedHand().map((c) => c.id);
+  const de = ordem.indexOf(idDe);
+  const para = ordem.indexOf(idPara);
+  if (de < 0 || para < 0 || de === para) return;
+  ordem.splice(de, 1);
+  ordem.splice(para, 0, idDe);
+  ordemManual = ordem;
 }
 
 // ---------------- Mesa ----------------
@@ -850,7 +873,8 @@ function decorateMeld(el, meld) {
     }
   }
 
-  if (view.you.baixou && selected.size === 1) {
+  // Encaixar não exige mais ter baixado o contrato.
+  if (selected.size === 1) {
     const card = view.you.hand.find((c) => c.id === [...selected][0]);
     if (card && layoffOption(card, meld)) {
       el.classList.add('droppable');
@@ -859,11 +883,50 @@ function decorateMeld(el, meld) {
         // quando as duas valem, quem escolhe é o jogador.
         const ends = layoffEnds(card, meld);
         if (ends.length > 1) return escolherPonta(card, meld, ends);
-        selected.clear();
-        sendAction({ a: 'layoff', cardId: card.id, meldId: meld.id });
+        encaixa(card, meld, null);
       };
     }
   }
+}
+
+// Toda saída de encaixe passa por aqui: é onde se descobre se a jogada deixa
+// um coringa sobrando na outra ponta — e aí quem decide é o jogador.
+function encaixa(card, meld, end) {
+  const opt = layoffOption(card, meld, 0, end || null);
+  const coringa = opt ? coringaLiberadoPeloEncaixe(meld, opt) : null;
+  if (!coringa) {
+    selected.clear();
+    sendAction({ a: 'layoff', cardId: card.id, meldId: meld.id, ...(end ? { end } : {}) });
+    return;
+  }
+  showModal(
+    `<h3>Pegar o coringa?</h3>
+     <p>Com <strong>${cardText(card)}</strong> ${noJogoDe(meld)}, a sequência fica com uma carta a mais — e o
+     ${JOKER_LABEL} da outra ponta passa a sobrar. Dá para trazer ele para a sua mão.</p>
+     <p class="modal-hint">Ele vale 20 pontos na mão no fim da rodada: só compensa se você for usar.</p>`,
+    [
+      {
+        label: `${JOKER_LABEL} Encaixar e pegar o coringa`,
+        cls: 'btn-primary',
+        fn: () => {
+          closeModal();
+          selected.clear();
+          sendAction({ a: 'layoff', cardId: card.id, meldId: meld.id, ...(end ? { end } : {}), pegarCoringa: true });
+        },
+      },
+      {
+        label: 'Só encaixar',
+        fn: () => {
+          closeModal();
+          selected.clear();
+          sendAction({ a: 'layoff', cardId: card.id, meldId: meld.id, ...(end ? { end } : {}) });
+        },
+      },
+      { label: 'Cancelar', cls: 'btn-ghost', fn: closeModal },
+    ],
+    closeModal,
+    true,
+  );
 }
 
 // A carta serve nas duas pontas da sequência: pergunta onde ela entra.
@@ -878,8 +941,7 @@ function escolherPonta(card, meld, ends) {
         cls: 'btn-primary',
         fn: () => {
           closeModal();
-          selected.clear();
-          sendAction({ a: 'layoff', cardId: card.id, meldId: meld.id, end });
+          encaixa(card, meld, end);
         },
       })),
       { label: 'Cancelar', fn: closeModal, cls: 'btn-ghost' },
@@ -967,12 +1029,22 @@ function montaLeque(fila, cartas, largura) {
     const el = cardEl(card);
     el.style.setProperty('--passo', `${passo - CARTA_LARGURA}px`);
     el.style.setProperty('--giro', n > 1 ? `${(i - meio) * (ABERTURA / (n - 1))}deg` : '0deg');
-    if (selected.has(card.id)) el.classList.add('sel');
-    el.onclick = () => {
-      if (selected.has(card.id)) selected.delete(card.id);
-      else selected.add(card.id);
-      render();
-    };
+    if (modoOrganizar) {
+      if (cartaPegada === card.id) el.classList.add('pegando');
+      el.onclick = () => {
+        if (cartaPegada === null) cartaPegada = card.id;
+        else if (cartaPegada === card.id) cartaPegada = null;
+        else { moveCarta(cartaPegada, card.id); cartaPegada = null; }
+        render();
+      };
+    } else {
+      if (selected.has(card.id)) el.classList.add('sel');
+      el.onclick = () => {
+        if (selected.has(card.id)) selected.delete(card.id);
+        else selected.add(card.id);
+        render();
+      };
+    }
     fila.appendChild(el);
   });
 }
@@ -1023,8 +1095,11 @@ function sobraAcende(card) {
 
 function renderActions() {
   const my = myTurn();
-  const drawing = my && view.phase === 'draw';
-  const playing = my && view.phase === 'play';
+  const drawing = my && view.phase === 'draw' && !modoOrganizar;
+  const playing = my && view.phase === 'play' && !modoOrganizar;
+  $('btn-organizar').classList.toggle('ligado', modoOrganizar);
+  $('btn-organizar').textContent = modoOrganizar ? 'Pronto' : '✥';
+  $('btn-sort').hidden = modoOrganizar;
 
   $('btn-draw-deck').hidden = !drawing;
   $('btn-draw-discard').hidden = !(drawing && view.discardTop && view.discardBuyable);
@@ -1105,7 +1180,23 @@ $('btn-meld-discard').onclick = () => { meldDiscardMode = true; selected.clear()
 $('btn-cancel-mode').onclick = () => { meldDiscardMode = false; render(); };
 $('btn-sort').onclick = () => {
   sortMode = sortMode === 'suit' ? 'rank' : 'suit';
+  ordemManual = [];   // pediu ordenação automática: a arrumação à mão sai de cena
   try { localStorage.setItem('cacamba-sort', sortMode); } catch { /* ok */ }
+  render();
+};
+
+// Organizar a mão: toque numa carta e depois no lugar onde ela deve ficar.
+// Dois toques em vez de arrastar porque as cartas se sobrepõem no leque —
+// arrastar acertaria a carta errada o tempo todo num celular.
+$('btn-organizar').onclick = () => {
+  modoOrganizar = !modoOrganizar;
+  cartaPegada = null;
+  if (modoOrganizar) {
+    selected.clear();
+    meldDiscardMode = false;
+    if (!ordemManual.length) ordemManual = sortedHand().map((c) => c.id);
+    toast('✥ Toque numa carta e depois no lugar dela.');
+  }
   render();
 };
 $('btn-rules').onclick = () => showRules();
@@ -1236,6 +1327,9 @@ function announce(ev) {
       // "grudar" numa carta nova por coincidência de id e armar um descarte
       // que o jogador nunca escolheu.
       selected.clear();
+      ordemManual = [];
+      modoOrganizar = false;
+      cartaPegada = null;
       break;
     case 'draw':
       if (ev.source === 'discard') {
@@ -1282,6 +1376,10 @@ function announce(ev) {
     }
     case 'layoff':
       if (ev.p !== me()) toast(`${playerName(ev.p)} encaixou ${cardText(ev.card)}.`);
+      break;
+    case 'pegouCoringa':
+      toast(`${JOKER_LABEL} ${playerName(ev.p)} esticou a sequência e levou o coringa que sobrou.`);
+      reage(ev.p, 'coringa');
       break;
     case 'meldDiscard':
       toast(`${playerName(ev.p)} descartou ${cardText(ev.card)} de um jogo da mesa.`);
