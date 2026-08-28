@@ -57,7 +57,7 @@ html, body { height: 100%; }
 
 body {
   font-family: var(--font-body);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--cream);
   background:
     radial-gradient(96% 34% at 50% 14%, rgba(242, 193, 78, 0.1) 0%, rgba(242, 193, 78, 0) 68%),
@@ -125,7 +125,7 @@ input {
   outline: none;
 }
 input:focus { border-color: var(--gold-soft); }
-input::placeholder { color: #5d7a6c; font-weight: 600; }
+input::placeholder { color: #5d7a6c; font-weight: 700; }
 
 .btn {
   font-size: 1.05rem;

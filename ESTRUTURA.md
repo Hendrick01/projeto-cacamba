@@ -52,7 +52,7 @@ projeto-caçamba/
 |---|---:|---|
 | [`shared/engine.js`](shared/engine.js) | 1314 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
 | [`public/client.js`](public/client.js) | 1875 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
-| [`server.js`](server.js) | 526 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
+| [`server.js`](server.js) | 578 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
 | [`public/style.css`](public/style.css) | 1095 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
 | [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 134 | **Três** jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket. Três porque a compra fora da vez precisa de alguém que não seja nem quem está na vez nem quem descartou — e o teste falha se ninguém pedir carta, para essa cobertura não morrer em silêncio. |
@@ -721,6 +721,42 @@ O processo encerra limpo em `SIGTERM`/`SIGINT`, que é como a hospedagem o para.
 
 Serve `public/` e, como exceção estreita, apenas `shared/` da raiz — para o cliente
 poder importar o motor. Normaliza o caminho contra travessia de diretório.
+
+### Peso do que o celular baixa
+
+O servidor **comprime** (gzip, nível 9) tudo que é texto — HTML, CSS, JS, SVG e
+JSON — com cache em memória chaveado por caminho + `mtime`: o mesmo arquivo é
+pedido por todos da sala, e comprimir a cada pedido seria pagar o mesmo
+trabalho várias vezes. O cache invalida sozinho quando o arquivo muda no disco.
+PNG e WebP ficam de fora: já vêm comprimidos.
+
+O **SVG é enxugado antes de comprimir** (`svgEnxuto`): saem comentários, o
+espaço entre tags e a terceira casa decimal das coordenadas — num quadro de 400
+unidades exibido a 56 px, 0,01 unidade é 1/700 de pixel. A limpeza é
+conservadora de propósito: só corta entre `>` e `<`, porque espaço dentro de um
+atributo `d` quebra o caminho.
+
+Medido numa mesa de 8 jogadores, com todo o elenco na tela:
+
+| | antes | depois |
+|---|---:|---:|
+| SVG do elenco | 341 KB | **65 KB** |
+| JS | 182 KB | **43 KB** |
+| CSS | 42 KB | **13 KB** |
+| Fontes (Google) | 54 KB | 54 KB |
+| **Total** | **~620 KB** | **181 KB** |
+
+**O que foi medido e NÃO compensou**, para ninguém refazer a conta:
+
+- **Converter o elenco para raster no tamanho de uso.** A figura a 112×224 em
+  WebP dá 5,0 KB; a mesma em SVG enxuto e comprimido dá 3,2 KB — e continua
+  nítida em qualquer tamanho. Para arte vetorial chapada, o vetor comprimido
+  ganha do raster nesses tamanhos. O avatar repete o resultado.
+- **Tirar pesos de fonte.** O Nunito do Google vem como **fonte variável**: um
+  arquivo só de 38 KB serve todos os pesos, então pedir menos pesos não economiza
+  nada. O que valia corrigir era outra coisa: o CSS usava `600`, que não estava
+  na lista pedida, e o navegador caía no `700` — agora o CSS pede `700` direto, e
+  o `500`, que era baixado sem uso, saiu.
 
 ### Salas
 

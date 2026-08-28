@@ -4,6 +4,7 @@
 // ============================================================================
 
 import http from 'node:http';
+import zlib from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -35,7 +36,48 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
+  '.webp': 'image/webp',
 };
+
+// O que vale comprimir: texto. SVG é texto, e é o grosso do peso do jogo — as
+// figuras do elenco somam centenas de KB de caminhos vetoriais, e gzip corta
+// isso para perto de um quinto. PNG e WebP já vêm comprimidos: passar zlib
+// neles gasta CPU e às vezes cresce.
+const COMPRIMIVEL = new Set(['.html', '.js', '.css', '.svg', '.json']);
+
+// Cache do comprimido em memória, chaveado por caminho + mtime: o mesmo
+// arquivo é pedido por todos os jogadores da sala, e comprimir a cada pedido
+// seria pagar o mesmo trabalho várias vezes. Invalida sozinho quando o arquivo
+// muda no disco, então não atrapalha o desenvolvimento.
+const cacheGzip = new Map();
+
+// SVG sai dos geradores identado e comentado, para ser lido por gente. O
+// navegador não precisa disso: comentários, espaço entre tags e a terceira
+// casa decimal de cada coordenada são peso puro. Num quadro de 400 unidades
+// exibido a 56 px, 0,01 unidade é 1/700 de pixel.
+//
+// A minificação é conservadora de propósito: NÃO mexe em espaço dentro de
+// atributo (um `d="M 10 20"` sem espaço vira caminho inválido) nem em texto
+// entre tags. É por isso que só se corta entre `>` e `<`.
+function svgEnxuto(texto) {
+  return texto
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/>\s+</g, '><')
+    .replace(/(\d+\.\d{3,})/g, (n) => String(Math.round(Number(n) * 100) / 100))
+    .trim();
+}
+
+function corpoComprimido(full, stat, ext) {
+  const chave = `${full}:${stat.mtimeMs}`;
+  const guardado = cacheGzip.get(chave);
+  if (guardado) return guardado;
+  const cru = fs.readFileSync(full);
+  const fonte = ext === '.svg' ? Buffer.from(svgEnxuto(cru.toString('utf8'))) : cru;
+  const buf = zlib.gzipSync(fonte, { level: 9 });
+  cacheGzip.set(chave, buf);
+  if (cacheGzip.size > 200) cacheGzip.delete(cacheGzip.keys().next().value);
+  return buf;
+}
 
 const STATIC_ROOTS = [path.join(__dirname, 'public'), __dirname];
 
@@ -48,10 +90,20 @@ const server = http.createServer((req, res) => {
     if (!full.startsWith(root)) continue;
     if (root === __dirname && !full.startsWith(path.join(__dirname, 'shared'))) continue;
     if (fs.existsSync(full) && fs.statSync(full).isFile()) {
-      res.writeHead(200, {
-        'Content-Type': MIME[path.extname(full)] || 'application/octet-stream',
+      const ext = path.extname(full);
+      const cabecalho = {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
         'Cache-Control': 'no-cache',
-      });
+        Vary: 'Accept-Encoding',
+      };
+      const aceitaGzip = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+      if (aceitaGzip && COMPRIMIVEL.has(ext)) {
+        const corpo = corpoComprimido(full, fs.statSync(full), ext);
+        res.writeHead(200, { ...cabecalho, 'Content-Encoding': 'gzip', 'Content-Length': corpo.length });
+        res.end(req.method === 'HEAD' ? undefined : corpo);
+        return;
+      }
+      res.writeHead(200, cabecalho);
       fs.createReadStream(full).pipe(res);
       return;
     }
