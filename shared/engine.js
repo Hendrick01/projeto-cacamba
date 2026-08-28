@@ -274,16 +274,22 @@ export function findContractMelds(cards, needT, needS) {
 // ficaria preso (a menos que `permitirMaoVazia` seja ligado, usado pela tela
 // só para explicar o porquê ao jogador).
 // Devolve { trincas, seqs, a, b, completa } ou null.
-// Quantos jogos cabem no bolo. O teto NÃO vem do contrato: jogo a mais pode
-// descer antes ou depois dele. O que o contrato decide é outra coisa — se dá
+// Jogo a mais pode descer antes ou depois do contrato — mas só por ESCOLHA,
+// com as cartas selecionadas. O que o contrato decide é outra coisa: se dá
 // para BATER (ver `completa` abaixo).
 export function planBaixada(hand, remaining, cardIds = null, { permitirMaoVazia = false } = {}) {
   const temSelecao = !!(cardIds && cardIds.length);
   const pool = temSelecao ? hand.filter((c) => cardIds.includes(c.id)) : hand;
   if (temSelecao && pool.length !== cardIds.length) return null; // carta fora da mão
+  // Sem seleção, o automático desce SÓ o que o contrato pede: jogo extra é
+  // escolha, nunca surpresa — baixar a mais também expõe jogo para os outros
+  // encaixarem carta, e essa conta é de quem joga. Com seleção, vale tudo o
+  // que as cartas escolhidas formarem, extra inclusive.
+  const tetoT = temSelecao ? Math.floor(pool.length / 3) : remaining.t;
+  const tetoS = temSelecao ? Math.floor(pool.length / 4) : remaining.s;
   const planos = [];
-  for (let a = Math.floor(pool.length / 3); a >= 0; a--) {
-    for (let b = Math.floor(pool.length / 4); b >= 0; b--) {
+  for (let a = tetoT; a >= 0; a--) {
+    for (let b = tetoS; b >= 0; b--) {
       if (a === 0 && b === 0) continue;
       const size = a * 3 + b * 4;
       if (temSelecao ? size !== pool.length : size > pool.length) continue;
@@ -734,6 +740,31 @@ export function actBaixar(state, playerId, cardIds = null, sobra = null) {
   return events;
 }
 
+// Um jogo extra que caiba na mão, do maior para o menor. O automático do
+// `baixar` desce só o contrato, então quem quer o extra precisa dizer quais
+// cartas são — é por aqui que o bot escolhe.
+export function melhorJogoExtra(hand) {
+  const combos = [];
+  for (let a = Math.floor(hand.length / 3); a >= 0; a--) {
+    for (let b = Math.floor(hand.length / 4); b >= 0; b--) {
+      if (a === 0 && b === 0) continue;
+      const size = a * 3 + b * 4;
+      if (size > hand.length) continue;
+      combos.push({ a, b, size });
+    }
+  }
+  combos.sort((x, y) => y.size - x.size);
+  for (const { a, b } of combos) {
+    const res = findContractMelds(hand, a, b);
+    if (!res) continue;
+    const ids = [];
+    for (const cards of res.trincas) ids.push(...cards.map((c) => c.id));
+    for (const { cards } of res.seqs) ids.push(...cards.map((c) => c.id));
+    return ids;
+  }
+  return null;
+}
+
 // Esta carta que está sobrando na mesa fecha um jogo junto com as cartas que
 // eu escolhi na mão? Mesma pergunta que `actBaixar` vai fazer — vive aqui, e
 // não no cliente, para o realce da tela e a decisão do juiz nunca divergirem.
@@ -1168,6 +1199,13 @@ export function botNextAction(state, playerId) {
     // vazia sem completar o contrato, então a ação nunca é recusada.
     if (!player.baixou && planBaixada(player.hand, contractRemaining(state, player))) {
       return { a: 'baixar' };
+    }
+    // Com o contrato na mesa, jogo extra também desce — e é o que permite
+    // bater. Vem antes do encaixe porque tira 3 ou 4 cartas de uma vez, e
+    // menos carta na mão é menos ponto se alguém bater.
+    if (player.baixou) {
+      const extra = melhorJogoExtra(player.hand);
+      if (extra) return { a: 'baixar', cardIds: extra };
     }
     if (player.baixou) {
       for (const card of player.hand) {

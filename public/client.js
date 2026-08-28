@@ -1072,7 +1072,7 @@ function explicaBaixar() {
   if (contratoCumprido()) {
     toast(selected.size > 0
       ? 'Essa seleção não forma uma trinca (3 iguais de naipes diferentes) nem uma sequência (4 seguidas do mesmo naipe).'
-      : 'O contrato já está na mesa. Dá para baixar jogo a mais: monte outra trinca ou sequência completa e ela desce — se a mão esvaziar, você bate.');
+      : 'O contrato já está na mesa. Para baixar jogo a mais, toque nas cartas dele na sua mão e depois aqui — se a mão esvaziar, você bate.');
     return;
   }
   const partes = [];
@@ -1089,7 +1089,7 @@ function explicaBaixar() {
   if (selected.size > 0) {
     toast('Essa seleção não forma uma trinca (3 iguais de naipes diferentes) nem uma sequência (4 seguidas do mesmo naipe).');
   } else {
-    toast(`Você ainda não tem nenhum jogo completo para baixar. Falta do contrato: ${falta} — mas jogo a mais também pode descer antes disso.`);
+    toast(`Você ainda não tem nenhum jogo completo do contrato para baixar (falta: ${falta}). Jogo a mais também desce antes disso — mas aí escolha as cartas dele na mão primeiro.`);
   }
 }
 $('btn-discard').onclick = () => {

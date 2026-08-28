@@ -386,6 +386,30 @@ test('carta que NÃO está sobrando não sai do jogo alheio', () => {
   assert.equal(b.melds[0].cards.length, 3);
 });
 
+test('o automático desce só o contrato: jogo extra é escolha', () => {
+  const state = freshGame(); // rodada 1: 2 trincas
+  const p = state.players[state.turn];
+  actDraw(state, p.id, 'deck');
+  // Duas trincas (o contrato) e uma sequência (extra) na mesma mão
+  p.hand = [
+    c('7', '♠'), c('7', '♥'), c('7', '♦'),
+    c('Q', '♠'), c('Q', '♥'), c('Q', '♣'),
+    c('3', '♥'), c('4', '♥'), c('5', '♥'), c('6', '♥'),
+    c('2', '♣'),
+  ];
+  const ev = actBaixar(state, p.id); // sem seleção: automático
+  assert.equal(ev[0].t, 2, 'desceram as duas trincas do contrato');
+  assert.equal(ev[0].extra, false, 'a sequência ficou na mão');
+  assert.equal(p.melds.length, 2);
+  assert.equal(p.hand.length, 5, 'sequência + carta solta continuam na mão');
+
+  // Ela desce quando o jogador escolhe as cartas dela
+  const seq = p.hand.filter((x) => x.suit === SU['♥']).map((x) => x.id);
+  const ev2 = actBaixar(state, p.id, seq);
+  assert.equal(ev2[0].extraS, 1);
+  assert.equal(p.melds.length, 3);
+});
+
 test('jogo extra desce ANTES do contrato, e não conta nele', () => {
   const state = freshGame(); // rodada 1: 2 trincas
   const p = state.players[state.turn];
