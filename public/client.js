@@ -1667,7 +1667,8 @@ function showRules() {
        <li><strong>Descarte uma carta</strong> (obrigatório). Se não quiser descartar da mão, pode tirar de um jogo seu com sobra: sequência com mais de 4 cartas (pelas pontas) ou trinca com mais de 3.</li>
      </ol>
      <h3>Compra fora da vez</h3>
-     <p>Quando alguém descarta, qualquer outro jogador pode pedir a carta: leva <strong>quem apertar primeiro</strong>, e ele fica só com a carta pedida (não puxa nem descarta). Mas <strong>quem está na vez tem preferência</strong> sobre todos — se ele também quiser a carta, ela é dele.</p>
+     <p>Quando alguém descarta, os outros jogadores podem pedir a carta: leva <strong>quem apertar primeiro</strong>, e ele fica só com a carta pedida (não puxa nem descarta). Mas <strong>quem está na vez tem preferência</strong> sobre todos — se ele também quiser a carta, ela é dele.</p>
+     <p><strong>Quem descartou não pede de volta:</strong> a carta que saiu da sua mão não volta para ela, nem pela compra da vez nem pelo pedido. Numa mesa de dois isso quer dizer que a compra fora da vez não acontece — o único que não está na vez é justamente quem acabou de descartar.</p>
      <h3>Pontos</h3>
      <p>Cartas que sobram na mão contam pelo <strong>valor de face</strong>: o 5 vale 5, o 10 vale 10, e assim por diante. <strong>J = 11</strong> · <strong>Q = 12</strong> · <strong>K = 13</strong> · <strong>Ás = 15</strong> (mesmo tendo jogado como 1) · <strong>coringa = 20</strong>. Se o monte esgotar 3 vezes na mesma rodada, a rodada acaba sem vencedor e todos contam a mão.</p>`,
     [{ label: 'Fechar', fn: closeModal }],

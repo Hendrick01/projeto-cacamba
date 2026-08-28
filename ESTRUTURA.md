@@ -51,7 +51,7 @@ projeto-caçamba/
 | Arquivo | Linhas | O que faz |
 |---|---:|---|
 | [`shared/engine.js`](shared/engine.js) | 1314 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
-| [`public/client.js`](public/client.js) | 1685 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
+| [`public/client.js`](public/client.js) | 1686 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
 | [`server.js`](server.js) | 526 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
 | [`public/style.css`](public/style.css) | 914 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
 | [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
@@ -232,6 +232,13 @@ não se perde quando alguém leva o topo e descobre uma carta mais antiga. Vale
 para os dois caminhos — a compra da vez e o pedido fora da vez, que nem chega a
 ser registrado. A carta virada do monte no começo da rodada não é descarte de
 ninguém, então está livre para todos.
+
+**Consequência em mesa de dois: a compra fora da vez deixa de existir.** O
+único jogador que não está na vez é justamente quem acabou de descartar, e a
+carta dele não volta. Isso foi levado ao dono do jogo com a alternativa de
+abrir exceção para duplas, e ele decidiu **manter a regra como está** — não é
+descuido, e não deve ser "consertado". De três jogadores em diante a compra
+fora da vez funciona normalmente.
 
 São **duas travas diferentes**, e a tela precisa distinguir: o coringa tranca o
 meio para todo mundo (`discardLocked`), enquanto a sua própria carta só está
