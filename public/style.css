@@ -642,8 +642,25 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
   text-align: center; padding: 6px 0 4px;
   background: radial-gradient(58% 100% at 50% 42%, rgba(242, 193, 78, 0.1) 0%, rgba(242, 193, 78, 0) 72%);
 }
-.piles { display: flex; justify-content: center; gap: 26px; }
-.pile { background: none; border: none; cursor: pointer; position: relative; padding: 0; }
+/* O monte e o meio DEITAM na mesa. O tampo já está inclinado; enquanto as
+   cartas ficavam em pé sobre ele, elas flutuavam em vez de estar apoiadas.
+   30° é o ponto em que a carta lê como deitada e o valor continua legível —
+   mais que isso, num celular, o número do canto começa a fugir. */
+.piles {
+  display: flex; justify-content: center; gap: 26px;
+  perspective: 700px;
+  perspective-origin: 50% 30%;
+}
+.pile {
+  background: none; border: none; cursor: pointer; position: relative; padding: 0;
+  transform: rotateX(30deg);
+  transform-style: preserve-3d;
+  transition: transform 0.18s ease;
+}
+/* A sombra é o que prova o contato com o feltro: sem ela a carta deitada ainda
+   parece flutuar, só que torta. */
+.pile .card { box-shadow: var(--shadow), 0 14px 18px -10px rgba(0, 0, 0, 0.9); }
+.pile.glow { transform: rotateX(30deg) translateY(-3px); }
 /* Espessura: as bordas das cartas de baixo aparecem atrás da de cima. No monte
    isso é informação de jogo — dá para ver o baralho afinando. */
 .pile::before,
@@ -665,12 +682,23 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
 .pile[data-camadas="1"]::after { display: none; }
 .pile[data-camadas="3"]::before { transform: translate(3px, 4px); }
 .pile[data-camadas="3"]::after { transform: translate(6px, 8px); }
-.pile-count { display: block; margin-top: 3px; color: var(--sage); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+/* A etiqueta fica EM PÉ no espaço 3D: a pilha inclinou 30° e levou o texto
+   junto, que foi parar atrás da carta. A contra-rotação a devolve à vertical,
+   e o empurrão em Z tira ela de trás da carta deitada. */
+.pile-count {
+  display: block; margin-top: 8px;
+  color: var(--sage); font-size: 0.75rem; font-variant-numeric: tabular-nums;
+  transform: rotateX(-30deg) translateZ(14px);
+}
 .pile.glow .card { box-shadow: 0 0 0 3px var(--gold), var(--shadow); }
-/* Carta nova no topo do descarte cai na pilha, vinda de cima e de lado */
-.pile .card.cai { animation: cartaCai 0.28s cubic-bezier(0.2, 0.8, 0.3, 1); }
+/* Carta nova no topo do descarte: vira no ar e pousa. Antes era um
+   deslizamento no plano; agora é giro de verdade no eixo Y, que é o gesto de
+   quem joga uma carta na mesa. */
+.pile .card.cai { animation: cartaCai 0.42s cubic-bezier(0.2, 0.8, 0.3, 1); transform-style: preserve-3d; }
 @keyframes cartaCai {
-  from { transform: translate(-16px, -26px) rotate(-11deg) scale(1.08); opacity: 0.25; }
+  0%   { transform: translate(-14px, -34px) rotateY(-96deg) rotateZ(-10deg) scale(1.1); opacity: 0.2; }
+  55%  { opacity: 1; }
+  100% { transform: translate(0, 0) rotateY(0deg) rotateZ(0deg) scale(1); opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .pile .card.cai { animation: none; }

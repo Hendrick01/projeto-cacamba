@@ -53,7 +53,7 @@ projeto-caçamba/
 | [`shared/engine.js`](shared/engine.js) | 1314 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
 | [`public/client.js`](public/client.js) | 1875 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
 | [`server.js`](server.js) | 578 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
-| [`public/style.css`](public/style.css) | 1095 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
+| [`public/style.css`](public/style.css) | 1123 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
 | [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 134 | **Três** jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket. Três porque a compra fora da vez precisa de alguém que não seja nem quem está na vez nem quem descartou — e o teste falha se ninguém pedir carta, para essa cobertura não morrer em silêncio. |
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
@@ -372,6 +372,19 @@ O **tampo** é uma camada só dele (`.feltro`), inclinada em perspectiva
 (`rotateX(17deg)` com a origem na borda de baixo): a borda de trás recua e a
 mesa passa a ser vista da sua cadeira. Só ele inclina — assentos, monte e
 avisos ficam em pé. Inclinar tudo junto borraria o texto.
+
+**O monte e o meio deitam na mesa.** O tampo já estava inclinado, mas as cartas
+ficavam em pé sobre ele — flutuavam em vez de estar apoiadas. Agora as pilhas
+giram 30° no eixo X, dentro de uma `perspective` própria, e ganham sombra de
+contato: é a sombra que prova o apoio, sem ela a carta deitada continua
+parecendo flutuar, só que torta. **30° é o limite**: mais que isso, num celular,
+o número do canto começa a fugir.
+
+A etiqueta de cada pilha (`107`, `meio`) fica **em pé** no espaço 3D, por
+contra-rotação — ela inclinou junto com a pilha e foi parar atrás da carta.
+
+E a carta que chega ao meio **vira no ar** (`rotateY`) antes de pousar, em vez
+de deslizar no plano: é o gesto de quem joga uma carta na mesa.
 
 A **mesa cresce para ocupar a folga da tela** (`flex: 1`). Antes ela tinha
 altura de conteúdo e a mão era empurrada para o rodapé por `margin-top: auto`:
