@@ -614,6 +614,11 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   .pile .card.cai { animation: none; }
 }
 
+/* Carta que VOCÊ descartou: não volta para a sua mão, então não convida ao
+   toque — mas continua à vista, porque os outros podem pegá-la. */
+.pile.minha .card { filter: brightness(0.82) saturate(0.85); }
+.pile.minha .pile-count { color: var(--halo); }
+
 /* Coringa descartado tranca o meio: a pilha fica apagada e sem convite ao toque */
 .pile.trancado .card { filter: grayscale(0.35) brightness(0.8); box-shadow: var(--shadow); }
 .pile.trancado .pile-count { color: var(--danger); }

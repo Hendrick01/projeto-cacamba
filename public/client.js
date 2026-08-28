@@ -770,11 +770,14 @@ function renderCenter() {
   dc.replaceWith(nova);
 
   const canDraw = myTurn() && view.phase === 'draw';
-  const trancado = !!view.discardTop && !view.discardBuyable;
+  const trancado = !!view.discardTop && view.discardLocked;
   $('deck-pile').classList.toggle('glow', canDraw);
   $('discard-pile').classList.toggle('glow', canDraw && !!view.discardTop && !trancado);
   $('discard-pile').classList.toggle('trancado', trancado);
-  $('discard-pile').querySelector('.pile-count').textContent = trancado ? '🔒 trancado' : 'meio';
+  const minha = !!view.discardTop && view.discardTop.by === me();
+  $('discard-pile').classList.toggle('minha', minha && !trancado);
+  $('discard-pile').querySelector('.pile-count').textContent =
+    trancado ? '🔒 trancado' : (minha ? 'sua' : 'meio');
 
   // Compra fora da vez — coringa no topo não é comprável por ninguém
   const claimable = view.phase === 'draw' && !myTurn() && view.discardFresh && view.discardBuyable
@@ -893,7 +896,8 @@ function decorateMeld(el, meld) {
 // um coringa sobrando na outra ponta — e aí quem decide é o jogador.
 function encaixa(card, meld, end) {
   const opt = layoffOption(card, meld, 0, end || null);
-  const coringa = opt ? coringaLiberadoPeloEncaixe(meld, opt) : null;
+  // Passa o dono: o resgate só vale em sequência dos outros.
+  const coringa = opt ? coringaLiberadoPeloEncaixe(meld, opt, me()) : null;
   if (!coringa) {
     selected.clear();
     sendAction({ a: 'layoff', cardId: card.id, meldId: meld.id, ...(end ? { end } : {}) });
@@ -1125,7 +1129,9 @@ $('deck-pile').onclick = () => { if (myTurn() && view.phase === 'draw') sendActi
 $('discard-pile').onclick = () => {
   if (!myTurn() || view.phase !== 'draw' || !view.discardTop) return;
   if (!view.discardBuyable) {
-    toast('🔒 Coringa descoberto: o meio está travado até alguém descartar por cima.');
+    toast(view.discardTop.by === me()
+      ? '↩️ Essa carta foi você que descartou: ela não volta para a sua mão.'
+      : '🔒 Coringa descoberto: o meio está travado até alguém descartar por cima.');
     return;
   }
   sendAction({ a: 'draw', source: 'discard' });

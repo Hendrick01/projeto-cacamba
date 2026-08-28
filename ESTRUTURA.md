@@ -8,7 +8,7 @@ pontos ganha.
 (WebSocket) e `qrcode`. O front-end é HTML/CSS/JS vanilla servido estaticamente e
 importa o motor de regras direto do servidor, em `/shared/engine.js`.
 
-**Rodar:** `npm start`. **Testar:** `npm test` (49 testes do motor). O teste de
+**Rodar:** `npm start`. **Testar:** `npm test` (51 testes do motor). O teste de
 integração são separados e exigem o servidor no ar: `node test/e2e.mjs` e
 `node test/sair.mjs` e `node test/convite.mjs`.
 
@@ -40,7 +40,7 @@ projeto-caçamba/
 │   ├── icon.svg             # ícone do app (também serve de favicon)
 │   └── manifest.json        # manifesto PWA
 └── test/
-    ├── engine.test.js       # 49 testes unitários do motor
+    ├── engine.test.js       # 51 testes unitários do motor
     ├── e2e.mjs              # integração: 2 jogadores contra o servidor real
     ├── sair.mjs             # integração: sair da partida no meio e o robô assumir
     └── convite.mjs          # integração: o link da sala atrás de proxy
@@ -50,11 +50,11 @@ projeto-caçamba/
 
 | Arquivo | Linhas | O que faz |
 |---|---:|---|
-| [`shared/engine.js`](shared/engine.js) | 1292 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
-| [`public/client.js`](public/client.js) | 1585 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
+| [`shared/engine.js`](shared/engine.js) | 1314 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
+| [`public/client.js`](public/client.js) | 1591 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
 | [`server.js`](server.js) | 526 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
-| [`public/style.css`](public/style.css) | 905 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
-| [`test/engine.test.js`](test/engine.test.js) | 849 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
+| [`public/style.css`](public/style.css) | 910 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
+| [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 122 | Dois jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket, exercitando compra fora da vez. |
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
@@ -226,6 +226,18 @@ baixado** o próprio contrato. A única restrição é **ser a vez do jogador**.
 tem que casar valor *e* naipe do que o coringa representa naquela posição — incluindo
 o Ás alto, quando o coringa vale 14.
 
+**A carta que você descartou não volta.** Quem descartou fica carimbado na
+própria carta (`card.by`), e não no estado: assim a informação viaja com ela e
+não se perde quando alguém leva o topo e descobre uma carta mais antiga. Vale
+para os dois caminhos — a compra da vez e o pedido fora da vez, que nem chega a
+ser registrado. A carta virada do monte no começo da rodada não é descarte de
+ninguém, então está livre para todos.
+
+São **duas travas diferentes**, e a tela precisa distinguir: o coringa tranca o
+meio para todo mundo (`discardLocked`), enquanto a sua própria carta só está
+fora do **seu** alcance (`discardBuyable`, que é por jogador) — os outros pegam
+normalmente, e a pilha mostra "sua" em vez de "travado".
+
 **Descartado, trava o meio.** Enquanto um coringa estiver descoberto no topo do
 descarte, ninguém compra de lá — nem pela compra da vez, nem pela compra fora da vez.
 Assim que alguém descarta por cima, o monte volta ao normal.
@@ -280,7 +292,7 @@ vêm primeiro**, então o solver só queima coringa quando não tem alternativa.
 |---|---|
 | `topoDoDescarte(state)` | A carta de cima, ou `null`. |
 | `descarteTravado(state)` | Há coringa descoberto no topo? |
-| `podeComprarDoDescarte(state)` | Porta única usada pelos **dois** caminhos de compra: a normal da vez e a fora da vez. |
+| `podeComprarDoDescarte(state, playerId?)` | Porta única usada pelos **dois** caminhos de compra: a normal da vez e a fora da vez. Sem `playerId`, a pergunta é sobre o monte; com ele, sobre a pessoa — **ninguém compra a carta que ele mesmo descartou**. |
 
 ### Estado e consultas
 
