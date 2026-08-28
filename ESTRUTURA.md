@@ -51,14 +51,14 @@ projeto-caçamba/
 | Arquivo | Linhas | O que faz |
 |---|---:|---|
 | [`shared/engine.js`](shared/engine.js) | 1314 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
-| [`public/client.js`](public/client.js) | 1743 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
+| [`public/client.js`](public/client.js) | 1875 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
 | [`server.js`](server.js) | 526 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
-| [`public/style.css`](public/style.css) | 961 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
+| [`public/style.css`](public/style.css) | 1095 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
 | [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 134 | **Três** jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket. Três porque a compra fora da vez precisa de alguém que não seja nem quem está na vez nem quem descartou — e o teste falha se ninguém pedir carta, para essa cobertura não morrer em silêncio. |
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
-| [`public/index.html`](public/index.html) | 284 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
+| [`public/index.html`](public/index.html) | 333 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
 | [`public/icon.svg`](public/icon.svg) | 37 | Ícone: leque de três cartas sobre o feltro, com moldura dourada. Fundo ocupa o quadro todo, então funciona como ícone *maskable*. |
 | [`.claude/settings.json`](.claude/settings.json) | 34 | Allowlist de comandos de leitura para reduzir aprovações; `sudo` e `rm -rf` bloqueados. |
@@ -536,6 +536,18 @@ Coberto por [`test/sair.mjs`](test/sair.mjs), que põe dois humanos numa sala,
 faz um sair no meio da partida e confere as sete consequências — inclusive que
 a vez **passa** pelo assento vago em vez de travar nele.
 
+### Começo e fim de rodada
+
+O **anúncio da rodada** passa por cima da mesa quando ela começa: número,
+contrato e quantas cartas. Sai sozinho em 2,4 s e não pede toque. Antes o
+placar fechava e a rodada seguinte começava seca — dava para jogar três turnos
+sem notar que o contrato tinha mudado.
+
+No **fim da rodada**, quem bateu aparece de corpo inteiro com a cara feliz
+(quando o elenco tem a expressão), e cada linha do placar leva o rosto e a cor
+do assento: com o elenco na mesa, reconhecer a cara é mais rápido do que ler o
+nome e lembrar quem era. O mesmo vale para o placar final.
+
 ### Arrumar a mão
 
 O leque sai ordenado por naipe ou por valor (`A↔♠`), e o jogador arruma como
@@ -578,6 +590,30 @@ A ordem escolhida vive em `ordemManual` e só nesta rodada: os ids das cartas
 recomeçam a cada uma. Carta puxada depois vai para o fim, sem embaralhar o que
 já estava arrumado; e pedir ordenação automática de novo (`A↔♠`) descarta a
 arrumação à mão.
+
+### A carta
+
+Cada carta traz os **dois cantos** (valor e naipe, o de baixo de cabeça para
+baixo) e um miolo que depende do que ela é:
+
+| Carta | Miolo |
+|---|---|
+| 2 a 10 | **um naipe por unidade**, no arranjo de baralho (`ARRANJO_PIPS`): duas colunas nas laterais, a do meio entrando conforme o valor sobe, e os de baixo virados. É o que distingue o 3 do 9 de relance, sem ler o canto. |
+| Ás | um naipe grande, centrado |
+| J, Q, K | o **retrato** de alguém do elenco, no lugar do naipe |
+| Coringa | fundo âmbar e o **gorro de bobo** em silhueta |
+
+Nas miniaturas dos jogos baixados (30×42) o arranjo sai e volta o naipe único:
+dez naipes nesse tamanho viram mancha.
+
+O **verso** é a madeira do aro com trama âmbar — o mesmo material da mesa, em
+três escalas: trama de 5 px na carta inteira, 3 px na carta que voa e 2 px no
+leque que os adversários seguram, para a textura ler igual em tamanhos
+diferentes.
+
+As **pilhas têm espessura**: as bordas das cartas de baixo aparecem atrás da de
+cima (`camadasDaPilha`). No monte isso é informação de jogo — dá para ver o
+baralho afinando, e três esgotamentos encerram a rodada.
 
 ### Animações
 

@@ -89,6 +89,15 @@ button { font-family: inherit; }
   text-align: center;
 }
 
+/* O personagem escolhido abre a tela inicial: é ele que vai sentar à mesa, e
+   virar uma miniatura dentro de um botão era pouco para quem você escolheu. */
+.palco-inicio { display: flex; justify-content: center; }
+.palco-inicio img {
+  height: clamp(96px, 22vh, 168px); width: auto;
+  filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.5));
+  animation: entraEmCena 0.5s ease-out;
+}
+
 .logo {
   font-family: var(--font-display);
   font-size: clamp(3rem, 14vw, 4.2rem);
@@ -635,6 +644,27 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 }
 .piles { display: flex; justify-content: center; gap: 26px; }
 .pile { background: none; border: none; cursor: pointer; position: relative; padding: 0; }
+/* Espessura: as bordas das cartas de baixo aparecem atrás da de cima. No monte
+   isso é informação de jogo — dá para ver o baralho afinando. */
+.pile::before,
+.pile::after {
+  content: '';
+  position: absolute; left: 0; top: 0; right: 0;
+  height: 72px;
+  border-radius: 8px;
+  /* O que aparece por baixo é a BORDA das cartas, e borda de carta é papel:
+     creme, não madeira. Com o marrom do verso lia como sombra, não como pilha. */
+  background: linear-gradient(160deg, var(--cream) 0%, #cbc2ae 100%);
+  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.85);
+  z-index: -1;
+}
+.pile::before { transform: translate(2px, 3px); }
+.pile::after { transform: translate(4px, 6px); }
+.pile[data-camadas="0"]::before,
+.pile[data-camadas="0"]::after,
+.pile[data-camadas="1"]::after { display: none; }
+.pile[data-camadas="3"]::before { transform: translate(3px, 4px); }
+.pile[data-camadas="3"]::after { transform: translate(6px, 8px); }
 .pile-count { display: block; margin-top: 3px; color: var(--sage); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 .pile.glow .card { box-shadow: 0 0 0 3px var(--gold), var(--shadow); }
 /* Carta nova no topo do descarte cai na pilha, vinda de cima e de lado */
@@ -718,6 +748,16 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   transform: translate(-50%, -50%);
   fill: currentColor;
 }
+/* O miolo das cartas de número: um naipe por unidade, no arranjo de baralho.
+   A área é menor que a carta para os naipes não encostarem nos cantos. */
+.card .pips { position: absolute; inset: 15% 21%; }
+.card .pips .pip-un {
+  position: absolute;
+  width: 30%; height: 21%;
+  transform: translate(-50%, -50%);
+  fill: currentColor;
+}
+.card .pips .pip-un.virado { transform: translate(-50%, -50%) rotate(180deg); }
 /* J, Q e K: o retrato de quem está no elenco, no lugar do naipe do meio. O
    avatar já vem com o fundo de madeira e o aro âmbar — é a mesma medalha que
    aparece no assento, e é o que faz a figura do baralho ser deste jogo e não
@@ -933,6 +973,40 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 .mao .dedo-tinta.polegar { stroke-width: 14; }
 .mao .dedo-pele.polegar { stroke-width: 10; }
 
+/* O anúncio da rodada nova: o contrato muda a cada uma e decide a mão inteira.
+   Passa por cima da mesa e sai sozinho, sem pedir toque. */
+.anuncio-rodada {
+  position: fixed; left: 50%; top: 34%;
+  transform: translate(-50%, -50%);
+  z-index: 45; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 14px 26px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(62, 39, 23, 0.97) 0%, rgba(27, 17, 11, 0.97) 100%);
+  border: 1px solid rgba(140, 106, 69, 0.5);
+  border-top-color: rgba(242, 193, 78, 0.6);
+  box-shadow: var(--shadow-bloco);
+  text-align: center;
+}
+.anuncio-rodada .rodada {
+  font-size: 0.72rem; font-weight: 900; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--halo);
+}
+.anuncio-rodada strong {
+  font-family: var(--font-display); font-weight: 400;
+  font-size: 1.5rem; color: var(--gold); line-height: 1.15;
+}
+.anuncio-rodada .cartas { font-size: 0.8rem; font-weight: 800; color: var(--sage); }
+.anuncio-rodada.entra { animation: anuncia 2.4s ease-out; }
+@keyframes anuncia {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.86); }
+  10%, 78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -58%) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .anuncio-rodada.entra { animation: none; }
+}
+
 /* Avisos (toasts) */
 
 .toasts {
@@ -987,6 +1061,24 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
    rótulo como "9♠ em cima" quebra em várias linhas se disputar a largura. */
 .modal-actions.empilhado { flex-direction: column; }
 .modal-actions.empilhado .btn { flex: none; width: 100%; }
+
+/* Quem bateu aparece de corpo inteiro em cima do placar, com a cara feliz. É
+   o momento do jogo que mais pede uma cara — e agora o elenco tem uma. */
+.palco-vencedor {
+  display: flex; justify-content: center;
+  margin: -6px 0 2px;
+}
+.palco-vencedor img {
+  height: 120px; width: auto;
+  filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.55));
+  animation: entraEmCena 0.5s ease-out;
+}
+.palco-vencedor.grande img { height: 168px; }
+
+/* Nome com rosto: com o elenco na mesa, reconhecer a cara é mais rápido do que
+   ler o nome e lembrar quem era. */
+.score-table .quem { display: flex; align-items: center; gap: 8px; }
+.score-table .quem .avatar { width: 26px; height: 26px; flex-shrink: 0; }
 
 .score-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
 .score-table th, .score-table td {

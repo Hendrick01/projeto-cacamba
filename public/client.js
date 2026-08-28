@@ -6,6 +6,7 @@ import {
   planBaixada, layoffOption, layoffEnds, removableCards, SUITS, SUIT_NAMES, SUIT_RED, rankLabel,
   isJoker, JOKER_LABEL, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
   DEFAULT_OPTS, sobraFechaJogo, coringaLiberadoPeloEncaixe,
+  CONTRACTS as CONTRATOS, TOTAL_ROUNDS,
 } from '/shared/engine.js';
 import {
   ELENCO, SLUGS, personagemValido, personagemDoAssento, peleDe, temExpressao,
@@ -200,6 +201,10 @@ function pintaBotaoPersonagem() {
   const p = ELENCO[SLUGS.indexOf(meuPersonagem)] || ELENCO[0];
   $('persona-cara').src = caraDe(p.slug);
   $('persona-nome').textContent = p.nome;
+  // O personagem escolhido é a cara da tela inicial, não uma miniatura dentro
+  // de um botão: é ele que vai sentar à mesa.
+  $('persona-figura').src = figuraDe(p.slug);
+  $('persona-figura').alt = p.nome;
 }
 
 function passaPersonagem(passo) {
@@ -330,6 +335,38 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // O naipe desenhado (símbolos no topo do index.html). Sem `fill`: o desenho
 // herda `currentColor`, e é só por isso que `.card.red` continua bastando para
 // virar copas e ouros de vermelho sem uma regra por naipe.
+// Onde os naipes ficam numa carta de número, em % da área do miolo. É o
+// arranjo de baralho de verdade: duas colunas nas laterais, a do meio entrando
+// conforme o valor sobe. O que distingue o 3 do 9 passa a ser a CARA da carta,
+// não só o número no canto.
+const ARRANJO_PIPS = {
+  2: [[50, 8], [50, 92]],
+  3: [[50, 8], [50, 50], [50, 92]],
+  4: [[26, 8], [74, 8], [26, 92], [74, 92]],
+  5: [[26, 8], [74, 8], [50, 50], [26, 92], [74, 92]],
+  6: [[26, 8], [74, 8], [26, 50], [74, 50], [26, 92], [74, 92]],
+  7: [[26, 8], [74, 8], [50, 29], [26, 50], [74, 50], [26, 92], [74, 92]],
+  8: [[26, 8], [74, 8], [50, 29], [26, 50], [74, 50], [50, 71], [26, 92], [74, 92]],
+  9: [[26, 6], [74, 6], [26, 35], [74, 35], [50, 50], [26, 65], [74, 65], [26, 94], [74, 94]],
+  10: [[26, 6], [74, 6], [50, 20], [26, 35], [74, 35], [26, 65], [74, 65], [50, 80], [26, 94], [74, 94]],
+};
+
+// O miolo de uma carta de número: um naipe por unidade, e os de baixo de
+// cabeça para baixo — como em qualquer baralho, porque a carta é lida dos dois
+// lados da mesa.
+function pipsEl(card) {
+  const box = document.createElement('span');
+  box.className = 'pips';
+  for (const [x, y] of ARRANJO_PIPS[card.rank]) {
+    const pip = naipeSvg(card, 'pip-un');
+    pip.style.left = `${x}%`;
+    pip.style.top = `${y}%`;
+    if (y > 50) pip.classList.add('virado');
+    box.append(pip);
+  }
+  return box;
+}
+
 function naipeSvg(card, classe) {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', classe);
@@ -393,6 +430,10 @@ function cardEl(card, mini = false) {
     img.src = caraDe(figura);
     img.alt = '';
     el.append(cantoEl(card), img, cantoEl(card));
+  } else if (!mini && ARRANJO_PIPS[card.rank]) {
+    // Nas miniaturas dos jogos baixados não cabe arranjo nenhum: 30x42 com dez
+    // naipes vira mancha. Lá continua o naipe único do meio.
+    el.append(cantoEl(card), pipsEl(card), cantoEl(card));
   } else {
     el.append(cantoEl(card), naipeSvg(card, 'pip'), cantoEl(card));
   }
@@ -822,8 +863,20 @@ function avisaAssentosApertados(box) {
   hint.hidden = false;
 }
 
+// Espessura das pilhas: quantas bordas aparecem por baixo da carta de cima.
+// No monte ela também é informação de jogo — dá para ver o baralho afinando, e
+// três esgotamentos encerram a rodada.
+function camadasDaPilha(quantas) {
+  if (quantas > 40) return 3;
+  if (quantas > 18) return 2;
+  if (quantas > 6) return 1;
+  return 0;
+}
+
 function renderCenter() {
   $('deck-count').textContent = view.deckCount;
+  $('deck-pile').dataset.camadas = camadasDaPilha(view.deckCount);
+  $('discard-pile').dataset.camadas = camadasDaPilha(view.discardCount * 4);
   const dc = $('discard-card');
   const nova = Object.assign(
     view.discardTop ? cardEl(view.discardTop) : emptyCard(),
@@ -1496,6 +1549,25 @@ function trocaCara(el, playerId, expressao) {
   img.dataset.voltaCara = String(setTimeout(() => { img.src = figuraDe(slug); }, 1900));
 }
 
+// O anúncio da rodada: o contrato muda a cada uma e é o que decide a mão
+// inteira. Antes o placar fechava e a rodada seguinte começava seca — dava
+// para passar três turnos sem notar que o contrato tinha mudado.
+function anunciaRodada(round) {
+  const el = $('anuncio-rodada');
+  const ct = CONTRATOS[round];
+  if (!el || !ct) return;
+  el.innerHTML = `<span class="rodada">Rodada ${round + 1} de ${TOTAL_ROUNDS}</span>
+    <strong>${ct.label}</strong>
+    <span class="cartas">${6 + round} cartas</span>`;
+  el.hidden = false;
+  if (semMovimento()) {
+    setTimeout(() => { el.hidden = true; }, 2200);
+    return;
+  }
+  repete(el, 'entra');
+  setTimeout(() => { el.hidden = true; el.classList.remove('entra'); }, 2400);
+}
+
 // ---------------- Avisos de eventos ----------------
 
 let lastTurnWasMine = false;
@@ -1504,7 +1576,10 @@ function announce(ev) {
   switch (ev.e) {
     case 'roundStart':
       distribuirPendente = true;
-      toast(`🎴 Rodada ${ev.round + 1}: ${playerName(ev.first)} começa.`);
+      // O anúncio já diz a rodada e o contrato; o aviso fica só com o que ele
+      // não diz — de quem é a primeira vez.
+      anunciaRodada(ev.round);
+      toast(`🎴 ${playerName(ev.first)} começa.`);
       meldDiscardMode = false;
       // Os ids das cartas recomeçam a cada rodada: seleção antiga poderia
       // "grudar" numa carta nova por coincidência de id e armar um descarte
@@ -1654,23 +1729,40 @@ function renderPhaseModal() {
   }
 }
 
+// Cada linha do placar leva o rosto e a cor do assento: com o elenco na mesa,
+// ler "Robô Téo" e procurar quem era custa mais do que reconhecer a cara.
+function linhaDoPlacar(p, pts, total, venceu) {
+  const cor = CORES_DE_ASSENTO[assentoDe(p.id, view.players) % CORES_DE_ASSENTO.length];
+  return `<tr class="${venceu ? 'winner' : ''}">
+    <td><span class="quem">
+      <img class="avatar" src="${caraDe(personagemDe(p.id, view.players))}" alt="" width="26" height="26" style="--anel:${cor}">
+      <span>${venceu ? '🏆 ' : ''}${escapeHTML(playerName(p.id))}</span>
+    </span></td>
+    <td class="num">${pts === null ? '' : `+${pts}`}</td>
+    <td class="num">${total}</td>
+  </tr>`;
+}
+
 function showRoundEnd() {
   const lr = view.lastRound;
-  const rows = view.players.map((p) => {
-    const pts = lr.scores[p.id];
-    const win = lr.winnerId === p.id;
-    return `<tr class="${win ? 'winner' : ''}"><td>${win ? '🏆 ' : ''}${escapeHTML(playerName(p.id))}</td>` +
-      `<td class="num">+${pts}</td><td class="num">${p.score}</td></tr>`;
-  }).join('');
-  const title = lr.winnerId
-    ? `${escapeHTML(playerName(lr.winnerId))} bateu!`
+  const rows = view.players
+    .map((p) => linhaDoPlacar(p, lr.scores[p.id], p.score, lr.winnerId === p.id))
+    .join('');
+  const venceu = lr.winnerId ? view.players.find((p) => p.id === lr.winnerId) : null;
+  const title = venceu
+    ? `${escapeHTML(playerName(venceu.id))} bateu!`
     : 'Monte esgotado — ninguém bateu';
   const last = view.round + 1 >= view.totalRounds;
   const actions = isHost()
     ? [{ label: last ? 'Ver resultado final' : 'Próxima rodada', cls: 'btn-primary', fn: () => sendMsg({ t: 'nextRound' }) }]
     : [];
+  // Quem bateu aparece de corpo inteiro, com a cara de quem bateu.
+  const retrato = venceu
+    ? `<div class="palco-vencedor"><img src="${figuraFeliz(venceu.id)}" alt=""></div>`
+    : '';
   showModal(
-    `<h2>${title}</h2>
+    `${retrato}
+     <h2>${title}</h2>
      <p>Rodada ${view.round + 1} de ${view.totalRounds} · ${view.contract.label}</p>
      <table class="score-table">
        <tr><th>Jogador</th><th style="text-align:right">Rodada</th><th style="text-align:right">Total</th></tr>
@@ -1681,17 +1773,31 @@ function showRoundEnd() {
   );
 }
 
+// A figura de quem bateu, com a cara feliz se o elenco tiver essa expressão.
+function figuraFeliz(playerId) {
+  const slug = personagemDe(playerId, view.players);
+  return temExpressao(slug, 'feliz')
+    ? `/assets/personagens/${slug}-corpo-inteiro-feliz.svg`
+    : figuraDe(slug);
+}
+
 function showGameEnd() {
   const medals = ['🥇', '🥈', '🥉', '🏳️'];
-  const rows = view.ranking.map((r, i) =>
-    `<tr class="${i === 0 ? 'winner' : ''}"><td>${medals[i] || ''} ${escapeHTML(r.id === me() ? 'Você' : r.name)}</td>` +
-    `<td class="num">${r.score}</td></tr>`).join('');
+  const rows = view.ranking.map((r, i) => {
+    const cor = CORES_DE_ASSENTO[assentoDe(r.id, view.players) % CORES_DE_ASSENTO.length];
+    return `<tr class="${i === 0 ? 'winner' : ''}"><td><span class="quem">
+      <img class="avatar" src="${caraDe(personagemDe(r.id, view.players))}" alt="" width="26" height="26" style="--anel:${cor}">
+      <span>${medals[i] || ''} ${escapeHTML(r.id === me() ? 'Você' : r.name)}</span>
+    </span></td><td class="num">${r.score}</td></tr>`;
+  }).join('');
+  const campeao = view.ranking[0];
   const actions = isHost()
     ? [{ label: 'Jogar de novo', cls: 'btn-primary', fn: () => sendMsg({ t: 'playAgain' }) }]
     : [];
   actions.push({ label: 'Sair da sala', cls: 'btn-ghost', fn: () => { saveSession(null); location.reload(); } });
   showModal(
-    `<h2>Fim de jogo!</h2>
+    `<div class="palco-vencedor grande"><img src="${figuraFeliz(campeao.id)}" alt=""></div>
+     <h2>Fim de jogo!</h2>
      <p>Menos pontos ganha — cartas na mão contam contra você.</p>
      <table class="score-table">
        <tr><th>Jogador</th><th style="text-align:right">Pontos</th></tr>
