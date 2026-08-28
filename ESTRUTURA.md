@@ -398,6 +398,23 @@ que posiciona os assentos. O desconto é maior do que parece porque a inclinaç�
 encurta o tampo: a borda de trás sobe menos do que o CSS pede. Sem ele, o
 feltro descolava e os personagens ficavam flutuando no cenário.
 
+### A marca no feltro
+
+O terço de cima do tampo era verde vazio — com 8 jogadores são 135 px de nada
+entre a beirada de trás e as pilhas. Numa mesa de verdade é ali que fica a
+impressão da casa, e é ela que faz o feltro parecer feltro de salão em vez de um
+retângulo verde. São o `::before` e o `::after` do próprio `.feltro`: um fio de
+arremate um dedo para dentro da madeira, e o nome do jogo **gravado** — a letra é
+a sombra do baixo-relevo e o brilho vem embaixo dela, que é o que a lâmpada de
+cima faz num sulco. Marca clara sobre feltro lia como adesivo colado.
+
+As duas herdam a perspectiva do tampo, por serem filhas dele: deitam junto com a
+mesa, e é isso que as faz parecer impressas e não coladas por cima. E ficam
+baixíssimas de contraste de propósito — são acabamento, não informação, e não
+podem competir com as cartas. A marca fica em `top: 22%`, a faixa que sobra vazia
+tanto na mesa de dois quanto na de oito: a 9% ela saía atrás dos nomes da fileira
+da frente e virava borrão.
+
 ### O aro
 
 O feltro existe **só no meio do tampo**. A volta é madeira (`border: 15px` no
@@ -543,47 +560,25 @@ encaixe: dava para jogar, mas não para *planejar*. Cada jogo continua acionáve
 pelo `decorateMeld` quando a jogada é possível agora (encaixe, troca de coringa,
 descarte de jogo seu).
 
-### A carta
+### O placar
 
-A carta é o objeto mais olhado do jogo, e por muito tempo foi o menos
-desenhado: um retângulo creme com `A♥` num canto e o naipe grande no outro.
+O botão `Σ` abre o placar da partida em curso. Era uma tabela de nomes e
+números; numa partida de 7 rodadas ele é a tela que se abre entre uma rodada e
+outra, e precisa responder três coisas de relance: **quem está ganhando, onde eu
+estou e quanto falta**. Nome e total sozinhos não respondem nenhuma.
 
-**Os naipes são desenhados** (`<symbol>` no topo do
-[`index.html`](public/index.html), `naipeSvg` no cliente). Antes eram os glifos
-`♠♥♦♣` da fonte do sistema — mudavam de desenho a cada aparelho e, no iOS, o
-`♥` e o `♦` podiam chegar como emoji colorido. Eram os únicos elementos da tela
-que não tinham sido desenhados para este jogo. O **coringa** era pior: o emoji
-`🃏`, com moldura, cor e traço de outra obra; hoje é um gorro de bobo, silhueta,
-que é o que sobrevive aos 16 px da carta mini.
+Hoje cada linha traz posição, **rosto** (na mesa você reconhece as pessoas pela
+cara, não pelo nome escrito), nome, a distância para o primeiro e o total. O
+fundo da linha é uma barra cortada em `--enche`: como aqui **menos é melhor**, a
+linha mais cheia é a pior — a barra é o peso que se carrega. Quem lidera fica
+âmbar, a mesma cor que marca a vez na mesa; a sua linha ganha contorno, porque
+achar a própria linha numa lista de oito ordenada por pontos custa uma leitura
+inteira.
 
-Os desenhos não trazem `fill`: herdam `currentColor`. É só por isso que
-`.card.red` continua bastando para virar copas e ouros de vermelho, sem uma
-regra por naipe.
-
-Os glifos **continuam existindo** em `SUITS`, no motor. Lá eles são *texto* —
-avisos, mensagens de erro, leitor de tela —, e texto continua sendo texto. Em
-compensação a carta, que perdeu o naipe escrito, ganhou `role="img"` e um
-`aria-label` em palavras (`5 de copas`): sem isso o leitor de tela passaria a
-ler um retângulo mudo.
-
-**Os cantos são dois**, valor em cima e naipe embaixo, o de baixo girado meia
-volta — como em qualquer baralho. No leque as cartas se sobrepõem pela
-esquerda, então quem carrega a leitura inteira é o canto de cima; o de baixo
-aparece na carta que está sozinha na mesa. Na mini (30×42) o canto espelhado
-sai: não cabem três marcas.
-
-**J, Q e K são gente do elenco** (`figuraDaCarta`). O retrato entra no lugar do
-naipe do meio, e quem diz o naipe da figura é o canto. São doze casas de figura
-para oito personagens, então quatro repetem — e a repetição é uma conta, não uma
-tabela: as doze casas desfilam o elenco na ordem e dão a volta **com um passo de
-duas casas**. Sem esse passo, as quatro últimas cartas caem exatamente nos
-rostos das quatro primeiras, e o mesmo rosto no J e no K do *mesmo naipe* é o
-único caso que confunde de verdade — aí a única diferença entre as duas cartas
-é a letra do canto. O dia em que o elenco crescer, a repetição diminui sozinha.
-
-**As costas** eram listras `#274d92`: o único azul do jogo, e a cor mais
-saturada da tela quando sete adversários abrem o leque. Hoje são a madeira do
-aro com uma trama âmbar por cima — o verso da carta é o mesmo material da mesa.
+Dois casos aparecem justamente na rodada 1, com a mesa toda zerada, e a primeira
+versão errava os dois: não existe "na frente" quando todo mundo tem os mesmos
+pontos (a linha diz **empatado**), e o primeiro da lista não é pintado de âmbar
+só porque a ordenação o pôs ali.
 
 ### A sua mão
 
@@ -708,6 +703,32 @@ As **pilhas têm espessura**: as bordas das cartas de baixo aparecem atrás da d
 cima (`camadasDaPilha`). No monte isso é informação de jogo — dá para ver o
 baralho afinando, e três esgotamentos encerram a rodada.
 
+**Por que os naipes são desenhados.** Eram os glifos `♠♥♦♣` da fonte do sistema:
+mudavam de desenho a cada aparelho e, no iOS, o `♥` e o `♦` podiam chegar como
+emoji colorido. Eram os únicos elementos da tela que não tinham sido desenhados
+para este jogo — e o coringa era pior, o emoji `🃏`, com moldura, cor e traço de
+outra obra. Hoje são `<symbol>` no topo do [`index.html`](public/index.html), sem
+`fill`: herdam `currentColor`, e é só por isso que `.card.red` continua bastando
+para virar copas e ouros de vermelho sem uma regra por naipe.
+
+Os glifos **continuam existindo** em `SUITS`, no motor. Lá eles são *texto* —
+avisos, mensagens de erro, leitor de tela —, e texto continua sendo texto. Em
+compensação a carta, que perdeu o naipe escrito, ganhou `role="img"` e um
+`aria-label` em palavras (`5 de copas`): sem isso o leitor de tela passaria a ler
+um retângulo mudo.
+
+**Quem é a figura de cada J, Q e K** (`figuraDaCarta`): são doze casas para oito
+personagens, então quatro repetem — e a repetição é uma conta, não uma tabela. As
+doze casas desfilam o elenco na ordem e dão a volta **com um passo de duas
+casas**. Sem esse passo, as quatro últimas cartas caem exatamente nos rostos das
+quatro primeiras, e o mesmo rosto no J e no K do *mesmo* naipe é o único caso que
+confunde de verdade: ali a única diferença entre as duas cartas é a letra do
+canto. O dia em que o elenco crescer, a repetição diminui sozinha.
+
+O verso perdeu as listras `#274d92` que tinha antes — o único azul do jogo, e a
+cor mais saturada da tela quando sete adversários abrem o leque.
+
+
 ### Animações
 
 Todas em CSS, todas desligadas em `prefers-reduced-motion`.
@@ -766,6 +787,21 @@ no cliente — justamente porque o servidor precisa dela para validar. Para
 acrescentar alguém: gere a arte, documente no README do elenco, e ponha o slug
 lá.
 
+**A estampa da Lyly não é carimbada, é referenciada.** A florzinha dela aparece
+~158 vezes só na saia, e cada carimbo custava seis elementos: davam 948
+`<ellipse>` num arquivo de 126 KB — seis vezes o de qualquer outra pessoa do
+elenco, para uma textura que o próprio código diz que "some cedo". Hoje a flor é
+escrita uma vez em `<defs>` e cada carimbo é um `<use>` com
+`translate/rotate/scale`. O desenho é o mesmo: girar a flor inteira em torno do
+próprio centro dá exatamente o que dava somar o ângulo a cada pétala (era
+`a = rot + i*72`, e a pétala girava desse mesmo `a`), e a escala é uniforme
+porque todo raio ali é linear em `r`. **126 KB → 41 KB**, e o elenco inteiro caiu
+de 850 KB para 576 KB.
+
+Conferido rasterizando as duas versões a 400×800 e comparando pixel a pixel:
+1,3% dos pixels diferem, com delta médio de 6/255 — antisserrilhado nas bordas
+das flores. Lado a lado, no tamanho da tela de escolha, são a mesma figura.
+
 **As expressões** são `<slug>-corpo-inteiro-<expr>.svg`, e o que muda de uma
 para a outra é **só a boca**. A geometria dela vive num lugar só,
 [`_geradores/expressoes.py`](public/assets/personagens/_geradores/expressoes.py),
@@ -811,6 +847,15 @@ visão de cada um. Nenhuma regra é confiada ao navegador.
 O processo encerra limpo em `SIGTERM`/`SIGINT`, que é como a hospedagem o para.
 
 ### Estáticos
+
+Cada resposta leva um **ETag** de tamanho + mtime, e um `If-None-Match` que
+bate vira **304 sem corpo**. Sem ele, o `Cache-Control: no-cache` significava
+baixar tudo outra vez a cada abertura — e só o elenco são 32 SVGs.
+
+A **arte** (`/assets/`) vai com `max-age=300`: ela muda de deploy em deploy, não
+durante a partida, e cinco minutos sem nem perguntar cobrem uma sessão inteira.
+O **código** (html, js, css) fica em `no-cache` de propósito, para um deploy
+aparecer na próxima abertura e não cinco minutos depois.
 
 Serve `public/` e, como exceção estreita, apenas `shared/` da raiz — para o cliente
 poder importar o motor. Normaliza o caminho contra travessia de diretório.

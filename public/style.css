@@ -414,6 +414,43 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
     0 14px 30px -14px rgba(0, 0, 0, 0.95);
 }
 
+/* O terço de cima do tampo era verde vazio — com 8 jogadores são 135 px de
+   nada entre a beirada de trás e as pilhas. Numa mesa de verdade é exatamente
+   ali que fica a impressão da casa, e é ela que faz o feltro parecer feltro de
+   salão em vez de um retângulo verde.
+
+   As duas coisas herdam a perspectiva do tampo (são filhas dele), então deitam
+   junto com a mesa: é isso que as faz parecer IMPRESSAS e não coladas por
+   cima. E as duas ficam baixíssimas de contraste de propósito — são
+   acabamento, não informação, e não podem competir com as cartas nem com o
+   texto da vez. */
+.feltro::before {
+  /* o fio de arremate, um dedo para dentro da madeira */
+  content: '';
+  position: absolute; inset: 12px;
+  border-radius: inherit;
+  border: 2px solid rgba(245, 241, 230, 0.05);
+  pointer-events: none;
+}
+.feltro::after {
+  content: 'Caçamba';
+  /* 22%: abaixo de onde os nomes da fileira da frente terminam e acima de onde
+     as pilhas começam — a faixa que sobra vazia tanto na mesa de dois quanto
+     na de oito. A 9% a marca saía atrás dos nomes e virava borrão. */
+  position: absolute; left: 0; right: 0; top: 22%;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 6.5vw, 2.3rem);
+  letter-spacing: 0.16em;
+  line-height: 1;
+  /* Gravada, não escrita: a letra é a sombra do baixo-relevo e o brilho vem
+     embaixo dela, que é o que a lâmpada de cima faz num sulco. Marca clara
+     sobre feltro lia como adesivo colado. */
+  color: rgba(0, 0, 0, 0.17);
+  text-shadow: 0 1px 0 rgba(245, 241, 230, 0.055);
+  pointer-events: none;
+}
+
 /* Assentos são posicionados, não empilhados: a altura da caixa vem do JS, que
    sabe se a mesa cabe numa fileira ou precisa da de trás. A margem negativa faz
    a figura passar por cima da borda do feltro — gente ATRÁS da mesa. */

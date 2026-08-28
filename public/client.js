@@ -1830,7 +1830,10 @@ function showScore() {
     const atras = p.score - lider;
     const classes = ['pl-linha'];
     if (p.id === me()) classes.push('eu');
-    if (i === 0 && ord.length > 1) classes.push('lider');
+    // Só há líder se alguém estiver mesmo na frente: com a mesa toda zerada,
+    // pintar o primeiro da lista de âmbar seria inventar uma liderança que a
+    // ordenação criou sozinha.
+    if (i === 0 && !empatadoNoTopo) classes.push('lider');
     return `<li class="${classes.join(' ')}" style="--enche: ${Math.round((p.score / pior) * 100)}%">
       <span class="pl-pos">${i + 1}</span>
       <img class="pl-cara" src="${caraDe(personagemDe(p.id, view.players))}" alt="" loading="lazy">
