@@ -298,10 +298,13 @@ export function planBaixada(hand, remaining, cardIds = null, { permitirMaoVazia 
   }
   planos.sort((x, y) => y.size - x.size); // baixa o máximo possível primeiro
   for (const { a, b, size } of planos) {
-    // Cobrir o que o contrato ainda pede é o que libera esvaziar a mão. Baixar
-    // A MAIS não atrapalha: o excedente é jogo extra, e continua valendo.
+    // Cobrir o que o contrato ainda pede é o que libera BATER. Baixar a mais
+    // não atrapalha: o excedente é jogo extra, e continua valendo.
     const completa = a >= remaining.t && b >= remaining.s;
-    if (!completa && !permitirMaoVazia && size === hand.length) continue;
+    // Sem o contrato cumprido é preciso sobrar carta para descartar E para
+    // continuar na rodada: com uma só, o descarte obrigatório esvaziaria a mão
+    // e bateria sem contrato — que é justamente o que a regra proíbe.
+    if (!completa && !permitirMaoVazia && size > hand.length - 2) continue;
     const res = findContractMelds(pool, a, b);
     if (!res) continue;
     return { ...res, a, b, completa };
@@ -662,6 +665,13 @@ export function actDraw(state, playerId, source) {
 // pode ser baixada antes da outra). O direito de encaixar nos jogos da mesa
 // só vem quando o contrato INTEIRO estiver baixado (player.baixou).
 // cardIds opcional: baixa exatamente a seleção; sem ele, baixa o máximo.
+// Bater é sair da rodada com a mão vazia, e só quem cumpriu o contrato pode.
+// A trava mora aqui e é conferida nas TRÊS portas por onde a mão pode zerar:
+// baixar, encaixar e descartar.
+function fechaSemContrato(player) {
+  return player.hand.length === 0 && !player.baixou;
+}
+
 // Jogo EXTRA — trinca ou sequência que o contrato não pediu — pode descer
 // **antes ou depois** de o contrato estar cumprido. Regra do usuário. O que o
 // contrato ainda governa é **bater**: só esvazia a mão quem já o cumpriu.
@@ -724,6 +734,8 @@ export function actBaixar(state, playerId, cardIds = null, sobra = null) {
   player.baixou = player.baixados.t >= ct.t && player.baixados.s >= ct.s;
   const extraT = plan.a - creditoT;
   const extraS = plan.b - creditoS;
+
+  if (fechaSemContrato(player)) fail('Isso te deixaria de mão vazia, e só dá para bater com o contrato cumprido.');
 
   const events = [{
     e: 'baixou',
@@ -789,11 +801,24 @@ export function sobrasNaMesa(state) {
 
 // Encaixar uma carta da mão em qualquer jogo da mesa (só depois de baixar).
 // `end` ('lo'/'hi') escolhe a ponta quando a carta serve nas duas.
-export function actLayoff(state, playerId, cardId, meldId, end = null) {
+// O coringa que ESTE encaixe deixaria sobrando. Uma sequência de 5 com coringa
+// numa ponta continua válida sem ele (sobram 4), então ele pode ser resgatado
+// por quem esticou a sequência. O encaixe entra por uma ponta, e é a ponta
+// OPOSTA que precisa ter o coringa — encaixar por cima de um coringa de ponta
+// o empurraria para o meio, onde tirar quebraria a sequência.
+export function coringaLiberadoPeloEncaixe(meld, opt) {
+  if (!meld || meld.type !== 's' || !opt || opt.kind !== 's') return null;
+  const oposta = opt.end === 'lo' ? meld.cards[meld.cards.length - 1] : meld.cards[0];
+  if (!isJoker(oposta)) return null;
+  // Depois do encaixe a sequência fica com length+1; tirando o coringa volta
+  // ao tamanho de agora, que já é válido.
+  return oposta;
+}
+
+export function actLayoff(state, playerId, cardId, meldId, end = null, pegarCoringa = false) {
   if (state.phase !== 'play') fail('Puxe uma carta antes de encaixar.');
   const player = state.players[state.turn];
   if (player.id !== playerId) fail('Não é a sua vez.');
-  if (!player.baixou) fail('Você precisa baixar o jogo antes de encaixar cartas.');
   const card = player.hand.find((c) => c.id === cardId);
   if (!card) fail('Essa carta não está na sua mão.');
   const meld = meldById(state, meldId);
@@ -801,10 +826,27 @@ export function actLayoff(state, playerId, cardId, meldId, end = null) {
   const opt = layoffOption(card, meld, 0, end || null);
   if (!opt) fail(end ? 'Essa carta não encaixa nesse jogo por essa ponta.' : 'Essa carta não encaixa nesse jogo.');
 
+  // Confere ANTES de mexer no estado: falhar no meio deixaria a carta encaixada
+  // e o coringa onde estava, sem o jogador ter pedido isso.
+  const coringa = pegarCoringa ? coringaLiberadoPeloEncaixe(meld, opt) : null;
+  if (pegarCoringa && !coringa) fail('Esse encaixe não deixa coringa nenhum sobrando neste jogo.');
+
+  // Sem o contrato cumprido, o encaixe não pode encurtar a mão a ponto de o
+  // descarte obrigatório zerar ela — isso seria bater sem contrato.
+  if (!player.baixou && !coringa && player.hand.length <= 2) {
+    fail('Guarde pelo menos duas cartas até cumprir o contrato: com uma só, o descarte te faria bater sem ele.');
+  }
+
   applyLayoff(meld, card, opt);
   player.hand = player.hand.filter((c) => c.id !== cardId);
 
   const events = [{ e: 'layoff', p: playerId, card: { ...card }, meldId }];
+  if (coringa) {
+    removeFromMeld(meld, coringa.id);
+    player.hand.push(coringa);
+    events.push({ e: 'pegouCoringa', p: playerId, meldId, deQuem: meld.ownerId });
+  }
+
   if (player.hand.length === 0) return endRound(state, playerId, 'bateu', events);
   return events;
 }
@@ -896,6 +938,10 @@ export function actDiscard(state, playerId, cardId) {
   if (player.id !== playerId) fail('Não é a sua vez.');
   const card = player.hand.find((c) => c.id === cardId);
   if (!card) fail('Essa carta não está na sua mão.');
+
+  if (player.hand.length === 1 && !player.baixou) {
+    fail('Essa é a sua última carta e o contrato ainda não está na mesa — só dá para bater depois de cumpri-lo.');
+  }
 
   player.hand = player.hand.filter((c) => c.id !== cardId);
   state.discard.push(card);
@@ -1237,7 +1283,7 @@ export function applyAction(state, playerId, action) {
     case 'claim': return actClaim(state, playerId);
     case 'unclaim': return actUnclaim(state, playerId);
     case 'baixar': return actBaixar(state, playerId, action.cardIds || null, action.sobra || null);
-    case 'layoff': return actLayoff(state, playerId, action.cardId, action.meldId, action.end || null);
+    case 'layoff': return actLayoff(state, playerId, action.cardId, action.meldId, action.end || null, !!action.pegarCoringa);
     case 'swapJoker': return actSwapJoker(state, playerId, action.meldId, action.cardId, action.destMeldId || null);
     case 'discard': return actDiscard(state, playerId, action.cardId);
     case 'meldDiscard': return actMeldDiscard(state, playerId, action.meldId, action.cardId);

@@ -6,6 +6,7 @@ import {
   actLayoff, actDiscard, actMeldDiscard, actClaim, actUnclaim, actNextRound, applyAction,
   botNextAction, botWantsCard, mulberry32, viewFor, allMelds, playerById,
   podeComprarDoDescarte, isJoker, topoDoDescarte, sobrasNaMesa, sobraFechaJogo,
+  coringaLiberadoPeloEncaixe,
   decksParaJogadores, conferirBaralho, cartasNecessarias, DEFAULT_OPTS,
 } from '../shared/engine.js';
 
@@ -247,8 +248,6 @@ test('baixa um jogo de cada vez: trinca sozinha desce, contrato completa depois'
   assert.deepEqual(p.baixados, { t: 1, s: 0 });
   assert.equal(p.baixou, false);
   assert.equal(p.melds.length, 1);
-  // Sem o contrato inteiro, ainda não pode encaixar
-  assert.throws(() => actLayoff(state, p.id, p.hand[0].id, p.melds[0].id), /baixar o jogo antes/);
   // Segunda trinca chega: baixa e completa
   p.hand.push(c('Q', '♠'), c('Q', '♥'), c('Q', '♣'));
   const ev2 = actBaixar(state, p.id);
@@ -452,11 +451,24 @@ test('não esvazia a mão sem ter cumprido o contrato', () => {
   actDraw(state, p.id, 'deck');
   p.hand = [c('7', '♠'), c('7', '♥'), c('7', '♦')]; // só a trinca, nada mais
   assert.throws(() => actBaixar(state, p.id), /só dá para bater com o contrato cumprido/);
-  // Com uma carta sobrando, a mesma trinca desce numa boa
+  // Nem com UMA carta sobrando: o descarte obrigatório zeraria a mão e isso
+  // seria bater sem contrato.
   p.hand.push(c('2', '♣'));
+  assert.throws(() => actBaixar(state, p.id), /só dá para bater com o contrato cumprido/);
+  // Com duas, desce numa boa: sobra uma para descartar e uma para seguir.
+  p.hand.push(c('9', '♣'));
   const ev = actBaixar(state, p.id);
   assert.equal(ev[0].completa, false);
-  assert.equal(p.hand.length, 1);
+  assert.equal(p.hand.length, 2);
+});
+
+test('descartar a última carta sem contrato é recusado', () => {
+  const state = freshGame(); // rodada 1: 2 trincas
+  const p = state.players[state.turn];
+  actDraw(state, p.id, 'deck');
+  p.hand = [c('2', '♣')];
+  assert.throws(() => actDiscard(state, p.id, p.hand[0].id), /só dá para bater depois de cumpri-lo/);
+  assert.equal(p.hand.length, 1, 'a carta continua na mão');
 });
 
 test('seleção parcial: baixa exatamente a trinca escolhida', () => {
@@ -505,11 +517,89 @@ test('descartar de um jogo com sobra em vez da mão', () => {
   assert.equal(state.phase, 'draw', 'vez passou adiante');
 });
 
-test('não pode encaixar sem ter baixado', () => {
+test('esticar a sequência pela outra ponta resgata o coringa da ponta', () => {
   const state = freshGame();
-  const p = state.players[state.turn];
-  actDraw(state, p.id, 'deck');
-  assert.throws(() => actLayoff(state, p.id, p.hand[0].id, 999), /baixar o jogo antes/);
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+
+  // J♦ Q♦ K♦ 🃏(=A♦) — o coringa está na ponta ALTA
+  const jk = J();
+  b.melds = [{
+    id: 8100, type: 's', suit: SU['♦'], ownerId: b.id,
+    cards: [c('J', '♦'), c('Q', '♦'), c('K', '♦'), jk],
+    values: [11, 12, 13, 14],
+  }];
+  a.hand = [c('10', '♦'), c('2', '♥'), c('4', '♣'), c('8', '♠')];
+  const dez = a.hand[0];
+
+  // O 10♦ entra pela ponta baixa; a alta continua sendo o coringa
+  const opt = layoffOption(dez, b.melds[0]);
+  assert.equal(opt.end, 'lo');
+  assert.equal(coringaLiberadoPeloEncaixe(b.melds[0], opt)?.id, jk.id);
+
+  const ev = actLayoff(state, a.id, dez.id, 8100, null, true);
+  assert.ok(ev.some((e) => e.e === 'pegouCoringa'));
+  assert.equal(b.melds[0].cards.length, 4, '10 J Q K continua sequência válida');
+  assert.equal(b.melds[0].cards.some(isJoker), false, 'o coringa saiu do jogo');
+  assert.equal(a.hand.some(isJoker), true, 'e foi para a mão de quem esticou');
+  assert.equal(a.hand.length, 4, 'entrou uma, saiu uma');
+});
+
+test('não resgata coringa que o encaixe empurraria para o meio', () => {
+  const state = freshGame();
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+
+  // 🃏(=10♦) J♦ Q♦ K♦ — o coringa está na ponta BAIXA, e o encaixe vem por lá
+  const jk = J();
+  b.melds = [{
+    id: 8200, type: 's', suit: SU['♦'], ownerId: b.id,
+    cards: [jk, c('J', '♦'), c('Q', '♦'), c('K', '♦')],
+    values: [10, 11, 12, 13],
+  }];
+  a.hand = [c('A', '♦'), c('2', '♥'), c('4', '♣'), c('8', '♠')];
+
+  // O Ás entra por cima: a ponta oposta é o coringa... que ficaria de ponta
+  // ainda, então ESTE caso resgata. Já o 9♦ entra por baixo, empurrando o
+  // coringa para o meio — e aí não dá.
+  a.hand.push(c('9', '♦'));
+  const nove = a.hand[a.hand.length - 1];
+  const optNove = layoffOption(nove, b.melds[0]);
+  assert.equal(optNove.end, 'lo');
+  assert.equal(coringaLiberadoPeloEncaixe(b.melds[0], optNove), null);
+  assert.throws(() => actLayoff(state, a.id, nove.id, 8200, null, true), /não deixa coringa nenhum sobrando/);
+  assert.equal(b.melds[0].cards.length, 4, 'nada mudou no jogo');
+  assert.equal(a.hand.length, 5, 'nem na mão');
+});
+
+test('encaixe vale antes do contrato, mas não pode encurtar a mão até bater', () => {
+  const state = freshGame(); // rodada 1: 2 trincas
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+  b.melds = [{
+    id: 8001, type: 't', rank: 5, ownerId: b.id,
+    cards: [c('5', '♠'), c('5', '♥'), c('5', '♦')],
+  }];
+
+  // Sem ter baixado nada, o encaixe agora vale
+  a.hand = [c('5', '♣'), c('2', '♥'), c('9', '♦'), c('J', '♠')];
+  assert.equal(a.baixou, false);
+  const ev = actLayoff(state, a.id, a.hand[0].id, 8001);
+  assert.equal(ev[0].e, 'layoff');
+  assert.equal(b.melds[0].cards.length, 4);
+  assert.equal(a.hand.length, 3);
+
+  // Mas encurtar até sobrar uma carta, não: seria bater sem contrato
+  b.melds.push({
+    id: 8002, type: 't', rank: 9, ownerId: b.id,
+    cards: [c('9', '♠'), c('9', '♥'), c('9', '♣')],
+  });
+  a.hand = [c('9', '♦'), c('2', '♥')];
+  assert.throws(() => actLayoff(state, a.id, a.hand[0].id, 8002), /Guarde pelo menos duas cartas/);
+  assert.equal(a.hand.length, 2);
 });
 
 // ---------------------------------------------------------------------------
