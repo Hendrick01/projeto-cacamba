@@ -20,6 +20,14 @@
   --nogueira-luz: #3e2717;
   --nogueira-noite: #1b110b;
 
+  /* O aro do tampo é madeira de verdade, não contorno: o assoalho do salão já
+     é --nogueira, e aro escuro sobre chão escuro simplesmente some. Estes três
+     saem do #7A4A2B / #8C5733 do fundo dos avatares — é literalmente o mesmo
+     material, que é o que faz o jogador e a mesa serem do mesmo mundo. */
+  --aro: #5c3a22;
+  --aro-luz: #7a4a2b;    /* a aresta de trás mostra o tampo e pega a lâmpada */
+  --aro-noite: #33200f;  /* a da frente mostra a face externa, virada do chão */
+
   /* Luz */
   --gold: #f2c14e;       /* o âmbar exato do elenco; era #e9b94e */
   --gold-soft: #c9a24e;
@@ -366,19 +374,34 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   left: 0; right: 0; bottom: 0;
   /* Sobe até o peito de quem senta. O desconto é maior do que parece porque a
      inclinação encurta o tampo: a borda de trás sobe menos do que o CSS pede. */
-  top: calc(var(--altura-assentos, 108px) - 114px);
+  top: calc(var(--altura-assentos, 108px) - 129px);
   z-index: -1;
   border-radius: 46% 46% 20% 20% / 22% 22% 9% 9%;
   /* Ângulo menor agora que a mesa é alta: a 26° um tampo comprido lia como
      parede em pé, não como mesa. */
   transform: perspective(900px) rotateX(17deg);
   transform-origin: 50% 100%;
+  /* O ARO. O feltro existe só no meio do tampo; a volta é madeira, e é nela
+     que os jogadores sentam — avatar e aro são o mesmo material (o contorno do
+     elenco é esta cor). Sem ele o feltro encostava direto no assoalho e a mesa
+     lia como pastilha verde, sem espessura. Como o `box-sizing` é border-box,
+     a borda come o feltro por dentro: a silhueta da mesa não muda, e quem
+     estava por cima da beirada continua por cima — só que agora da madeira.
+     A lâmpada está a pino: a aresta de trás mostra o tampo do aro e clareia, a
+     da frente mostra a face externa e cai na sombra. */
+  border: 15px solid var(--aro);
+  border-top-color: var(--aro-luz);
+  border-bottom-color: var(--aro-noite);
   background:
     radial-gradient(56% 44% at 50% 66%, rgba(242, 193, 78, 0.14) 0%, rgba(242, 193, 78, 0) 72%),
     radial-gradient(120% 96% at 50% 22%, var(--felt-luz) 0%, var(--felt) 44%, var(--felt-deep) 100%);
   box-shadow:
+    /* fio âmbar onde a madeira encontra o feltro: é a marchetaria da mesa */
     inset 0 2px 0 rgba(242, 193, 78, 0.18),
     inset 0 -26px 40px -24px rgba(0, 0, 0, 0.9),
+    /* halo por fora, a mesma técnica do elenco: madeira escura sobre assoalho
+       escuro some, e o que sobrava era o feltro flutuando */
+    0 0 0 2px rgba(140, 106, 69, 0.32),
     0 14px 30px -14px rgba(0, 0, 0, 0.95);
 }
 
@@ -663,25 +686,47 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
   color: #33240a;
   background: linear-gradient(150deg, #ffdc85 0%, var(--gold) 42%, var(--gold-soft) 100%);
 }
+/* O canto: valor em cima, naipe embaixo, um em cada ponta e o de baixo de
+   cabeça para baixo — como em qualquer baralho. No leque as cartas se
+   sobrepõem pela esquerda, então é o canto de cima que carrega a leitura
+   inteira; o de baixo aparece na carta que está sozinha na mesa. */
 .card .idx {
   position: absolute; top: 4px; left: 5px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
   font-size: 0.82rem; font-weight: 900; line-height: 1;
   letter-spacing: -0.03em;
 }
-.card .pip {
-  position: absolute; bottom: 4px; right: 6px;
-  font-size: 1.5rem; line-height: 1;
+.card .idx:last-child {
+  top: auto; left: auto; bottom: 4px; right: 5px;
+  transform: rotate(180deg);
 }
+/* Os naipes seguem a cor da carta por `currentColor`: uma regra só serve os
+   quatro, o coringa e o `.card.red`. */
+.card .naipe-min { width: 0.72em; height: 0.72em; fill: currentColor; display: block; }
+.card .pip {
+  position: absolute; left: 50%; top: 50%;
+  width: 46%; height: 46%;
+  transform: translate(-50%, -50%);
+  fill: currentColor;
+}
+/* Costas. Eram listras `#274d92` — o único azul do jogo, e a cor mais saturada
+   da tela quando sete adversários abrem o leque. Agora são a madeira do aro
+   com a trama âmbar por cima: o verso vira o mesmo material da mesa. */
 .card.back {
   background:
-    repeating-linear-gradient(45deg, #274d92 0 6px, #1d3c74 6px 12px);
+    repeating-linear-gradient(45deg, rgba(242, 193, 78, 0.16) 0 5px, rgba(242, 193, 78, 0) 5px 10px),
+    repeating-linear-gradient(-45deg, rgba(242, 193, 78, 0.16) 0 5px, rgba(242, 193, 78, 0) 5px 10px),
+    linear-gradient(160deg, #7a4a2b 0%, #4a2c19 58%, #33200f 100%);
   border: 4px solid var(--cream);
 }
 .card.empty { background: rgba(245, 241, 230, 0.06); border: 2px dashed var(--felt-line); box-shadow: none; }
 
 .card.mini { width: 30px; height: 42px; border-radius: 5px; box-shadow: 0 3px 7px -2px rgba(0, 0, 0, 0.7); }
 .card.mini .idx { font-size: 0.62rem; top: 2px; left: 3px; }
-.card.mini .pip { font-size: 0.85rem; bottom: 2px; right: 3px; }
+/* 30x42 não comporta três marcas, e nos jogos baixados as minis ainda se
+   sobrepõem: fica o canto de cima e o naipe do meio, e o canto espelhado sai. */
+.card.mini .idx:last-child { display: none; }
+.card.mini .pip { width: 40%; height: 40%; }
 
 /* Meus jogos na mesa */
 
@@ -784,6 +829,15 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 }
 .fila { display: flex; flex-wrap: nowrap; justify-content: center; align-items: flex-end; }
 .fila .card:first-child { margin-left: 0; }
+/* A carta que acabou de chegar fica levantada até você mexer nela: com a mão
+   ordenada ela se enfia no meio do leque e some. Sobe menos que a escolhida e
+   com o halo em vez do âmbar — é aviso, não seleção. */
+.hand .card.nova {
+  transform: rotate(var(--giro, 0deg)) translateX(var(--desloca, 0px)) translateY(-14px);
+  box-shadow: 0 0 0 2px var(--halo), var(--shadow);
+  z-index: 2;
+}
+
 /* A escolhida sai do leque e sobe: fica inteira à vista e vira alvo de toque
    confortável, que é o que a sobreposição tira. */
 /* Arrastar para arrumar: a carta segue o dedo e as outras escorregam para
@@ -813,9 +867,17 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 
 /* Ficam absolutas nos cantos de baixo: não ocupam altura nenhuma do layout,
    porque embaixo é o espaço mais disputado da tela. O leque passa por cima. */
+/* A altura aqui não é layout — a caixa é absoluta —, é o alcance do corte. O
+   giro de 30° em torno do cotovelo joga a ponta do desenho 24 px abaixo da
+   tela, e o `bottom: -24px` da mão põe outros 24: eram 48 px de rolagem
+   vertical numa tela que devia ser fixa. `clip` corta sem criar caixa de
+   rolagem; só no eixo Y, porque no X o antebraço precisa continuar vazando
+   pelo canto. */
 .maos {
   position: absolute; left: 0; right: 0; bottom: 0;
-  height: 0; z-index: 0;
+  height: 190px; z-index: 0;
+  overflow-x: visible;
+  overflow-y: clip;
   pointer-events: none;
 }
 /* Sobem dos cantos e entram POR TRÁS do leque: o que fica à vista é o
@@ -854,16 +916,23 @@ input::placeholder { color: #5d7a6c; font-weight: 600; }
 /* Avisos (toasts) */
 
 .toasts {
-  position: fixed; left: 50%; top: 12%;
+  /* Descia por cima da cara de quem senta atrás — com 5 adversários a caixa
+     atravessava três cabeças. 34% cai na faixa de feltro que fica vazia tanto
+     na mesa de dois quanto na de sete: abaixo dos assentos, acima das pilhas. */
+  position: fixed; left: 50%; top: 34%;
   transform: translateX(-50%);
   display: flex; flex-direction: column; gap: 6px;
   z-index: 40; pointer-events: none;
   width: max-content; max-width: 92vw;
 }
 .toast {
-  background: rgba(0, 0, 0, 0.82);
+  /* Madeira da noite com o halo por fora e o âmbar na lombada: o aviso passa a
+     ser um objeto do salão, não uma lousa preta colada por cima dele. */
+  background: rgba(27, 17, 11, 0.92);
   color: var(--cream);
+  border: 2px solid rgba(140, 106, 69, 0.5);
   border-left: 4px solid var(--gold);
+  box-shadow: var(--shadow);
   padding: 9px 14px; border-radius: 8px;
   font-size: 0.92rem; font-weight: 700;
   animation: toast-in 0.2s ease;

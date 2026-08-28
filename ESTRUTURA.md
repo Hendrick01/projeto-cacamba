@@ -51,9 +51,9 @@ projeto-caçamba/
 | Arquivo | Linhas | O que faz |
 |---|---:|---|
 | [`shared/engine.js`](shared/engine.js) | 1314 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
-| [`public/client.js`](public/client.js) | 1686 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
+| [`public/client.js`](public/client.js) | 1743 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
 | [`server.js`](server.js) | 526 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
-| [`public/style.css`](public/style.css) | 914 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
+| [`public/style.css`](public/style.css) | 961 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
 | [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 134 | **Três** jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket. Três porque a compra fora da vez precisa de alguém que não seja nem quem está na vez nem quem descartou — e o teste falha se ninguém pedir carta, para essa cobertura não morrer em silêncio. |
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
@@ -479,6 +479,19 @@ Enquanto arrasta, as cartas depois do ponto de queda escorregam 9 px
 (`--desloca`) para abrir o vão — é o que mostra onde ela vai cair antes de
 soltar. `touch-action: none` nas cartas impede que o arrasto vire rolagem da
 página no celular.
+
+**A carta que acabou de chegar fica levantada.** Com a mão ordenada, a carta
+nova se enfia no meio do leque e some — e é justamente ela que você precisa
+achar para decidir a jogada. Vale para qualquer carta que ENTRE na mão, venha
+do monte, do meio, da compra fora da vez ou de um coringa resgatado: a marca
+sai da diferença entre a mão de agora e a do estado anterior
+(`marcaCartasNovas`), não do tipo de jogada.
+
+Ela sobe menos que a carta escolhida e usa o halo em vez do âmbar — é aviso,
+não seleção. Some quando você **arrasta** a carta (já achou e pôs no lugar) ou
+quando **chega outra**: só as últimas ficam marcadas, senão a mão inteira
+acabaria levantada ao longo da rodada. No começo da rodada nada é marcado — a
+mão inteira é nova, e marcar tudo não diria nada.
 
 A ordem escolhida vive em `ordemManual` e só nesta rodada: os ids das cartas
 recomeçam a cada uma. Carta puxada depois vai para o fim, sem embaralhar o que

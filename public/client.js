@@ -3,7 +3,7 @@
 // ============================================================================
 
 import {
-  planBaixada, layoffOption, layoffEnds, removableCards, SUITS, SUIT_RED, rankLabel,
+  planBaixada, layoffOption, layoffEnds, removableCards, SUITS, SUIT_NAMES, SUIT_RED, rankLabel,
   isJoker, JOKER_LABEL, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
   DEFAULT_OPTS, sobraFechaJogo, coringaLiberadoPeloEncaixe,
 } from '/shared/engine.js';
@@ -27,6 +27,11 @@ let ordemManual = [];
 // Arrasto em curso: { id, x0, y0, el, ativo }. Enquanto não passa do limiar,
 // o gesto ainda pode virar toque (que seleciona a carta).
 let arrasto = null;
+// Carta que acabou de chegar na mão. Fica levantada no leque até você mexer
+// nela ou até chegar outra: com a mão ordenada, a carta nova se enfia no meio
+// e some — e é justamente ela que você precisa achar para decidir a jogada.
+let cartasNovas = new Set();
+let maoAnterior = null;
 let meldDiscardMode = false;
 let reconnectDelay = 500;
 
@@ -320,6 +325,34 @@ function figuraEl(playerId, lista) {
 
 // ---------------- Cartas (DOM) ----------------
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// O naipe desenhado (símbolos no topo do index.html). Sem `fill`: o desenho
+// herda `currentColor`, e é só por isso que `.card.red` continua bastando para
+// virar copas e ouros de vermelho sem uma regra por naipe.
+function naipeSvg(card, classe) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', classe);
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(SVG_NS, 'use');
+  use.setAttribute('href', isJoker(card) ? '#naipe-coringa' : `#naipe-${card.suit}`);
+  svg.append(use);
+  return svg;
+}
+
+// O canto: valor em cima, naipe embaixo. É o único pedaço da carta que fica à
+// vista quando ela está no meio do leque, então é ele que carrega a leitura —
+// o naipe do meio é para a carta que está sozinha na mesa.
+function cantoEl(card) {
+  const canto = document.createElement('span');
+  canto.className = 'idx';
+  const valor = document.createElement('b');
+  valor.textContent = isJoker(card) ? 'C' : rankLabel(card.rank);
+  canto.append(valor, naipeSvg(card, 'naipe-min'));
+  return canto;
+}
+
 function cardEl(card, mini = false) {
   const el = document.createElement('div');
   const joker = isJoker(card);
@@ -327,13 +360,16 @@ function cardEl(card, mini = false) {
     + (joker ? ' joker' : '')
     + (!joker && SUIT_RED[card.suit] ? ' red' : '')
     + (mini ? ' mini' : '');
-  const idx = document.createElement('span');
-  idx.className = 'idx';
-  idx.textContent = joker ? 'C' : rankLabel(card.rank) + SUITS[card.suit];
-  const pip = document.createElement('span');
-  pip.className = 'pip';
-  pip.textContent = joker ? JOKER_LABEL : SUITS[card.suit];
-  el.append(idx, pip);
+  // O naipe deixou de ser texto, então a carta precisa dizer em palavras o que
+  // é: sem isto o leitor de tela passava a ler um retângulo mudo.
+  el.setAttribute('role', 'img');
+  el.setAttribute('aria-label', joker
+    ? 'coringa'
+    : `${rankLabel(card.rank)} de ${SUIT_NAMES[card.suit]}`);
+  // Os dois cantos são o mesmo desenho; o de baixo é o de cima girado meia
+  // volta, como em qualquer baralho — é o que faz a carta ler como carta e
+  // não como etiqueta.
+  el.append(cantoEl(card), naipeSvg(card, 'pip'), cantoEl(card));
   return el;
 }
 
@@ -491,6 +527,7 @@ function myTurn() { return view && view.turnId === me(); }
 
 function render() {
   if (!view) return;
+  marcaCartasNovas();
   selected = new Set([...selected].filter((id) => (view.you?.hand || []).some((c) => c.id === id)));
 
   // Cabeçalho
@@ -993,6 +1030,22 @@ function grupoDeJogos(p) {
   return el;
 }
 
+// Quem chegou na mão desde o último estado. Só as últimas ficam marcadas: a
+// cada carta nova as anteriores deixam de ser novidade, senão a mão inteira
+// acabaria levantada ao longo da rodada.
+function marcaCartasNovas() {
+  const agora = new Set((view.you?.hand || []).map((c) => c.id));
+  if (maoAnterior) {
+    const chegaram = [...agora].filter((id) => !maoAnterior.has(id));
+    if (chegaram.length) {
+      cartasNovas = new Set(chegaram);
+    } else {
+      for (const id of [...cartasNovas]) if (!agora.has(id)) cartasNovas.delete(id);
+    }
+  }
+  maoAnterior = agora;
+}
+
 // O leque da sua mão. O passo entre as cartas é calculado, não fixo: a rodada
 // 7 dá 12 cartas e um passo fixo estouraria a largura do celular; com poucas
 // cartas, o mesmo passo deixaria o leque frouxo demais.
@@ -1038,6 +1091,7 @@ function montaLeque(fila, cartas, largura) {
     el.dataset.cardId = card.id;
     el.style.setProperty('--passo', `${passo - CARTA_LARGURA}px`);
     el.style.setProperty('--giro', n > 1 ? `${(i - meio) * (ABERTURA / (n - 1))}deg` : '0deg');
+    if (cartasNovas.has(card.id)) el.classList.add('nova');
     if (selected.has(card.id)) el.classList.add('sel');
     el.onclick = () => {
       // Se o dedo arrastou, o gesto foi de arrumar: não seleciona.
@@ -1144,8 +1198,9 @@ function soltaArrasto(e) {
   el.classList.remove('arrastando');
   el.style.transform = '';
   limpaEspaco();
-  if (destino !== null && poeNaPosicao(id, destino)) render();
-  else render();
+  cartasNovas.delete(id);
+  if (destino !== null) poeNaPosicao(id, destino);
+  render();
 }
 
 function cancelaArrasto(e) {
@@ -1430,6 +1485,8 @@ function announce(ev) {
       // que o jogador nunca escolheu.
       selected.clear();
       ordemManual = [];
+      cartasNovas.clear();
+      maoAnterior = null;   // a mão inteira é nova no começo da rodada: não marca nada
       break;
     case 'draw':
       if (ev.source === 'discard') {
