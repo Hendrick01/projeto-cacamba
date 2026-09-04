@@ -18,6 +18,7 @@
 
 import * as THREE from './vendor/three.module.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
+import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage } from './modelo3d.js';
 import { planBaixada, isJoker, rankLabel } from '/shared/engine.js';
 import { SLUGS, personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
@@ -729,34 +730,9 @@ function texturaFlores(fundo, flor) {
   });
 }
 
-// Sombreamento CHAPADO, em três degraus: é o que o elenco tem no 2D (cor
-// lisa + sombra de um tom só), e o que faz o boneco parecer desenhado em vez
-// de plástico. Um gradiente de 3 texels serve todos os materiais.
-const GRADIENTE_TOON = (() => {
-  const t = new THREE.DataTexture(new Uint8Array([90, 170, 255]), 3, 1, THREE.RedFormat);
-  t.minFilter = THREE.NearestFilter; t.magFilter = THREE.NearestFilter;
-  t.needsUpdate = true;
-  return t;
-})();
-
-// O contorno do elenco (5 unidades de #2A1B12) em 3D: uma cópia de cada peça
-// virada do avesso (só as faces de trás), um pouco maior — a "casca invertida".
-// A espessura é absoluta, não proporcional: um braço fino e um tronco largo
-// ganham o mesmo traço, como no desenho.
-const M_CONTORNO = new THREE.MeshBasicMaterial({ color: 0x2a1b12, side: THREE.BackSide });
-function contornoDe(malha) {
-  const geo = malha.geometry;
-  if (!geo.boundingSphere) geo.computeBoundingSphere();
-  const r = geo.boundingSphere.radius;
-  if (r < 0.03) return null;   // olho, guizo, aro: sem contorno
-  const casca = new THREE.Mesh(geo, M_CONTORNO);
-  casca.position.copy(malha.position);
-  casca.quaternion.copy(malha.quaternion);
-  const fator = Math.min(1.35, Math.max(1.04, 1 + 0.014 / r));
-  casca.scale.copy(malha.scale).multiplyScalar(fator);
-  casca.userData.contorno = true;
-  return casca;
-}
+// O sombreamento chapado do elenco, o contorno de casca invertida e o encaixe
+// de modelos externos moram em modelo3d.js — são os mesmos do provador
+// (provador.html), onde o usuário confere um .glb antes de pô-lo na lista.
 
 // um membro (braço, mecha) entre dois pontos: cápsula orientada
 function membro(de, ate, raio, mat) {
@@ -966,7 +942,6 @@ function carasDoElenco(slug) {
 // animações) está em public/models/LEIA-ME.md — decisão do usuário em
 // 2026-09-04: os oito personagens serão modelados fora, no estilo do elenco.
 // ---------------------------------------------------------------------------
-const ALTURA_SENTADO = 1.55;
 const carregadorGLTF = new GLTFLoader();
 // Quem tem modelo está em public/models/lista.json — a mesa lê uma vez e só
 // pede os que existem; tentar `<slug>.glb` às cegas era um 404 no console por
@@ -980,52 +955,6 @@ function carregaModelo(slug) {
   });
 }
 
-// Encaixa o modelo no assento: normaliza a altura (do chão ao topo da cabeça
-// → ALTURA_SENTADO), põe os pés no chão, e liga o que o modelo trouxer —
-// nós `Cabeca`/`MaoEsq`/`MaoDir`, morphs `feliz`/`bravo`/`bocaAberta`, clips
-// `idle`/`feliz`/`bravo`. Devolve o que a mesa precisa para animar.
-function encaixaModelo(gltf, slug) {
-  const raiz = gltf.scene;
-  const caixa = new THREE.Box3().setFromObject(raiz);
-  const alturaOriginal = caixa.max.y - caixa.min.y || 1;
-  const escala = ALTURA_SENTADO / alturaOriginal;
-  raiz.scale.setScalar(escala);
-  raiz.position.y = -caixa.min.y * escala;
-
-  const materiais = [];
-  const morfos = {};
-  raiz.traverse((o) => {
-    if (o.isMesh) {
-      o.castShadow = true;
-      const ms = Array.isArray(o.material) ? o.material : [o.material];
-      for (const m of ms) { m.transparent = true; materiais.push(m); }
-      if (o.morphTargetDictionary) {
-        for (const nome of ['feliz', 'bravo', 'bocaAberta']) {
-          if (nome in o.morphTargetDictionary && !morfos[nome]) morfos[nome] = { malha: o, indice: o.morphTargetDictionary[nome] };
-        }
-      }
-    }
-  });
-  const no = (nome) => raiz.getObjectByName(nome) || null;
-  const cabeca = no('Cabeca');
-  const posDe = (obj, padrao) => {
-    if (!obj) return padrao;
-    const v = new THREE.Vector3(); obj.getWorldPosition(v); raiz.parent?.worldToLocal(v);
-    return v;
-  };
-  const alturaCabeca = cabeca ? posDe(cabeca).y : ALTURA_SENTADO * 0.88;
-  const maoEsq = posDe(no('MaoEsq'), null), maoDir = posDe(no('MaoDir'), null);
-  const posLeque = maoEsq && maoDir ? maoEsq.clone().add(maoDir).multiplyScalar(0.5) : new THREE.Vector3(0, 1.02, 0.17);
-
-  let mixer = null; const acoes = {};
-  if (gltf.animations?.length) {
-    mixer = new THREE.AnimationMixer(raiz);
-    for (const clip of gltf.animations) acoes[clip.name] = mixer.clipAction(clip);
-    if (acoes.idle) acoes.idle.play();
-  }
-  console.info(`modelo: ${slug} carregado (altura ${alturaOriginal.toFixed(2)} → ${ALTURA_SENTADO})`);
-  return { raiz, materiais, morfos, mixer, acoes, alturaCabeca, posLeque };
-}
 
 function criaAssento(p) {
   const slug = personagemDe(p);
@@ -1752,8 +1681,7 @@ function reageAoEvento(ev) {
     const m = a.assento?.modelo;
     if (m) {
       const qual = feliz ? 'feliz' : 'bravo';
-      if (m.morfos[qual]) m.morfos[qual].malha.morphTargetInfluences[m.morfos[qual].indice] = 1;
-      if (m.acoes[qual]) { m.acoes[qual].reset().setLoop(THREE.LoopOnce, 1).play(); m.acoes[qual].clampWhenFinished = false; }
+      reage(m, qual);   // clip e/ou morph, os mesmos do provador
     }
     a.caraAte = performance.now() + 1900;
     a.pulo = performance.now();

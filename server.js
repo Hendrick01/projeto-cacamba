@@ -43,7 +43,9 @@ const MIME = {
 
 // Cabeçalhos de segurança do que sai daqui. A CSP diz ao navegador de onde a
 // página pode carregar cada coisa: só daqui (script, fonte, som), mais `data:`
-// para imagens (o QR da sala e as figuras do elenco entram como data URL) e
+// para imagens (o QR da sala e as figuras do elenco entram como data URL),
+// `blob:` para imagem e conexão (as texturas embutidas num .glb saem do
+// arquivo como blob — sem isso o modelo 3D chega sem textura) e
 // `unsafe-inline` para estilo (a mesa põe `style=` em elementos pelo JS). Sem
 // script inline em lugar nenhum, `script-src 'self'` fecha a porta da XSS que
 // a auditoria não achou mas também não podia descartar. `frame-ancestors
@@ -53,9 +55,9 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
+  "img-src 'self' data: blob:",
   "font-src 'self'",
-  "connect-src 'self' ws: wss:",
+  "connect-src 'self' ws: wss: blob:",
   "media-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",

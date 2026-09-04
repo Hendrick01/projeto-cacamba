@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2a1b12">
+<title>Provador de modelos — Caçamba</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="fonts/fontes.css">
+<style>
+  /* O provador é a oficina do elenco 3D: abre um .glb do seu aparelho (nada
+     sobe para lugar nenhum), senta o personagem na mesa com a luz e o
+     sombreamento da mesa de verdade e confere o contrato de LEIA-ME.md. */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #1b110b; overflow: hidden; }
+  body { font-family: 'Nunito', system-ui, sans-serif; color: #f5f1e6; -webkit-tap-highlight-color: transparent; }
+  #cena { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .painel {
+    position: fixed; left: 0; right: 0; top: 0;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 8px; padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+    background: linear-gradient(180deg, rgba(27, 17, 11, 0.92) 0%, rgba(27, 17, 11, 0) 100%);
+    pointer-events: none;
+  }
+  .painel > * { pointer-events: auto; }
+  .titulo small { display: block; color: #8c6a45; font-size: 0.7rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; }
+  .titulo strong { color: #f2c14e; font-size: 1rem; font-weight: 900; }
+  .botao, select {
+    border: 1px solid rgba(140, 106, 69, 0.5);
+    background: rgba(0, 0, 0, 0.45); color: #f5f1e6;
+    font: inherit; font-weight: 900; font-size: 0.82rem;
+    padding: 8px 14px; border-radius: 20px; cursor: pointer;
+  }
+  .botao.forte { background: #f2c14e; color: #2a1b12; border-color: #f2c14e; }
+  .botao.ligado { color: #58c98a; border-color: rgba(88, 201, 138, 0.7); }
+  .botao:disabled { opacity: 0.45; cursor: default; }
+  .acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+  input[type=file] { display: none; }
+  .folha {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    max-height: 36vh; overflow: auto;
+    background: rgba(27, 17, 11, 0.94);
+    border-top: 1px solid rgba(140, 106, 69, 0.45);
+    padding: 10px 14px max(12px, env(safe-area-inset-bottom));
+    font-size: 0.84rem;
+  }
+  .folha h2 { font-size: 0.72rem; color: #8c6a45; letter-spacing: 0.12em; text-transform: uppercase; margin: 6px 0 6px; }
+  .folha h2.alca { cursor: pointer; user-select: none; }
+  .folha h2.alca::after { content: ' ▾'; }
+  .folha.recolhida { max-height: none; }
+  .folha.recolhida h2.alca::after { content: ' ▸'; }
+  .folha.recolhida .some { display: none; }
+  /* em tela larga, a folha vira uma coluna à direita e o palco fica inteiro */
+  @media (min-width: 820px) {
+    .folha { left: auto; width: 380px; top: 84px; max-height: none; border-top: 0; border-left: 1px solid rgba(140, 106, 69, 0.45); }
+  }
+  .folha .expressoes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .folha .expressoes .botao { padding: 6px 12px; font-size: 0.78rem; }
+  ul.itens { list-style: none; }
+  ul.itens li { padding: 3px 0 3px 22px; position: relative; line-height: 1.3; }
+  ul.itens li::before { content: '◦'; position: absolute; left: 4px; color: #8c6a45; font-weight: 900; }
+  ul.itens li.ok::before { content: '✓'; color: #58c98a; }
+  ul.itens li.nao::before { content: '✗'; color: #e4572e; }
+  ul.itens li.nao { color: #ffd9cc; }
+  .dica { color: #b8a284; font-size: 0.78rem; margin-top: 6px; }
+  .aviso { color: #f2c14e; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<canvas id="cena"></canvas>
+
+<div class="painel">
+  <div class="titulo"><small>Caçamba · elenco 3D</small><strong>Provador de modelos</strong></div>
+  <div class="acoes">
+    <label class="botao forte" for="arquivo">Abrir .glb</label>
+    <input type="file" id="arquivo" accept=".glb,.gltf,model/gltf-binary">
+    <select id="lista" aria-label="modelos já na mesa"><option value="">da mesa…</option></select>
+    <a class="botao" href="3d.html">← mesa 3D</a>
+  </div>
+</div>
+
+<div class="folha" id="folha">
+  <h2>Reações</h2>
+  <div class="expressoes">
+    <button class="botao" id="ex-neutro" disabled>neutro</button>
+    <button class="botao" id="ex-feliz" disabled>feliz</button>
+    <button class="botao" id="ex-bravo" disabled>bravo</button>
+    <button class="botao" id="ex-boca" disabled>segure: fala</button>
+    <button class="botao" id="estilo" disabled>estilo: elenco</button>
+    <button class="botao" id="mesa">mesa: sim</button>
+  </div>
+  <h2 class="alca" id="alca">Conferência</h2>
+  <ul class="itens some" id="itens"><li>Abra um <b>.glb</b> do seu aparelho (ele não sai daqui) ou escolha um da mesa. O contrato está em <b>public/models/LEIA-ME.md</b>.</li></ul>
+  <p class="dica some">Arraste para girar o personagem; a roda (ou dois dedos) aproxima. A linha âmbar marca 1,55 m; a seta, a frente (+Z); as cartas, onde o leque entra.</p>
+</div>
+
+<script type="module" src="provador.js"></script>
+</body>
+</html>

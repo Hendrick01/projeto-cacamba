@@ -36,6 +36,9 @@ projeto-caçamba/
 ├── public/
 │   ├── index.html           # marcação das telas + modais
 │   ├── 3d.html              # a mesa em 3D (mesma partida, outra janela)
+│   ├── provador.html        # o provador de modelos 3D (abre um .glb e confere o contrato)
+│   ├── provador.js
+│   ├── modelo3d.js          # o que mesa e provador têm em comum: estilo do elenco, encaixe, conferência
 │   ├── mesa3d.js            # a cena: salão, mesa, elenco sentado, sua mão
 │   ├── vendor/three.module.js  # three.js vendido (só baixa quem abre o 3D)
 │   ├── client.js            # cliente: telas, mesa e conversa com o servidor
@@ -655,12 +658,58 @@ rótulo) e `MaoEsq`/`MaoDir` (onde o leque entra), os morphs `feliz`/`bravo`
 `idle`/`feliz`/`bravo` (`AnimationMixer`). O respiro, o pulo e o esmaecer de
 quem cai passam a agir sobre o modelo. O contrato completo está em
 [`public/models/LEIA-ME.md`](public/models/LEIA-ME.md);
-`test/modelo-exemplo.mjs` gera `_exemplo.glb`, um modelo mínimo (duas caixas
-com os nós nomeados) que prova o caminho — não é arte. Quem tem modelo está em
+`test/modelo-exemplo.mjs` gera `_exemplo.glb`, um modelo mínimo (três caixas
+com os nós nomeados, uma textura PNG embutida, o morph `bocaAberta` e os clips
+`idle` e `feliz`) que prova cada caminho — não é arte. Quem tem modelo está em
 `public/models/lista.json`: a mesa lê uma vez e só pede os que estão nela
 (tentar `<slug>.glb` às cegas era um 404 no console por assento sem modelo); a
 lista fica fora do cache da arte, para o modelo recém-posto aparecer na
 abertura seguinte.
+
+**O provador e o módulo comum** (2026-09-04). O que mesa e provador têm em
+comum sobre modelos mora em `public/modelo3d.js`: o gradiente toon, o
+contorno de casca invertida, `encaixaModelo`, `reage` e `confereModelo`.
+`encaixaModelo` agora **veste o estilo do elenco** no modelo (`estilo:
+'elenco'`, o padrão): cada material PBR do arquivo vira um `MeshToonMaterial`
+com a mesma cor e textura e o gradiente de três degraus, e cada malha parada
+ganha a casca de contorno — malha com esqueleto ou morph fica sem casca (ela
+não acompanharia os ossos, e com morph a casca não abriria a boca). Metal e
+rugosidade são ignorados: num desenho não dizem nada. A medida do modelo é
+feita vértice a vértice (`Box3.setFromObject(raiz, true)`): a caixa rápida
+usa o `boundingBox` da geometria, que com morph targets sai inflado para os
+dois lados (o exemplo de 1,55 m media 1,60 e o leque descia junto) — e as
+matrizes são atualizadas depois da escala, senão `Cabeca` e as mãos saíam nas
+medidas originais do arquivo. `reage(m, nome)` toca o clip de uma vez só
+apagando o `idle` no meio (antes os dois somavam meio a meio) e o mixer traz o
+`idle` de volta no `finished`; o morph de mesmo nome sobe a 1 e a mesa o zera
+quando a cara passa.
+
+**`provador.html`** é a oficina de quem está modelando: abre um `.glb` do
+aparelho (`File.arrayBuffer` → `GLTFLoader.parse`; o arquivo não sai do
+navegador) ou um da lista, senta o personagem à beira da mesa com a mesma
+lâmpada, o mesmo tone mapping e o mesmo encaixe da mesa, e a folha embaixo
+lista a conferência do contrato (`confereModelo`): altura no arquivo e
+normalização, origem no chão, centro, nós, morphs, clips, triângulos (≤ 15
+mil), texturas (≤ 1024 px), materiais com metal, malhas com esqueleto. Botões
+tocam `feliz`/`bravo` e seguram a boca (`bocaAberta` ou a elipse escura quando
+não há morph), trocam **estilo: elenco/original** e escondem a mesa; arraste
+gira o palco, dois dedos ou a roda aproximam. A câmera olha de viés (azimute
+0,95) porque de frente o tampo tapava tudo abaixo do peito; o alvo é baixo
+(0,6 m) porque a folha toma o pé da tela. Os modelos da lista são pedidos com
+`cache: 'reload'`: são arte, com cache longo, e aqui o arquivo é justamente o
+recém-trocado. Em tela larga a folha vira coluna à direita. `window.provador`
+expõe o modelo atual, o palco e a cena para olhar do console.
+
+**O primeiro trio** (2026-09-04, pacote do usuário `cacamba_trio_patch_jogo_v1`):
+`gabizinsky.glb`, `dri.glb` e `esterex.glb` estão em `public/models` e na
+lista. São malhas procedurais (gerador trimesh), 25–30 mil triângulos cada,
+cor chapada sem textura, sem morphs (a boca da fala é a elipse), com os nós
+`Cabeca`/`MaoEsq`/`MaoDir` no lugar e os clips `idle`/`feliz`/`bravo`
+girando o nó raiz (o corpo inteiro balança e acena). O provador foi o que
+pegou o erro do encaixe: centralizar o modelo pela caixa em x/z empurrava o
+corpo 17 cm para trás (as pernas sentadas adiantam a caixa) e o leque caía no
+peito — a origem em x/z agora é a do arquivo, e a régua de triângulos subiu
+para 30 mil. Os cinco restantes seguem com o boneco de código.
 
 **Os personagens são 3D de verdade** — bonecos montados por código, de
 primitivas iluminadas (`montaBoneco` + `ESPEC_BONECO`): cabeça, tronco, braços
@@ -1107,7 +1156,10 @@ Uma auditoria de 2026-08-28 achou três jeitos de derrubar o processo de fora
   DENY`, `Permissions-Policy` com o microfone liberado só para esta origem (é o
   chat de voz) e câmera e localização fechadas; HSTS quando `PUBLIC_URL` é
   https. E a **CSP** nas páginas: script, fonte e som só daqui; `data:` para
-  imagens (o QR da sala e as figuras do elenco entram como data URL);
+  imagens (o QR da sala e as figuras do elenco entram como data URL); `blob:`
+  para imagem e conexão (as texturas embutidas num `.glb` saem do arquivo como
+  blob — no Chrome via `fetch`, no Safari via `<img>`; sem isso o modelo
+  chegava sem textura, sem erro visível);
   `unsafe-inline` só para estilo (a mesa põe `style=` pelo JS); `frame-ancestors
   'none'`. Não há script inline em lugar nenhum, então `script-src 'self'`
   fecha a porta da XSS que a auditoria não achou mas não podia descartar.

@@ -17,11 +17,11 @@ terceiros com identidade própria — o critério é o mesmo do elenco em SVG.
 | Arquivo | `public/models/<slug>.glb` (glTF binário, um arquivo só, texturas embutidas) |
 | Unidade | metros. A mesa tem o tampo a **0,92 m** do chão |
 | Altura | qualquer: a mesa **normaliza** para ~1,55 m sentado (do chão ao topo da cabeça). Mas mantenha as proporções entre os oito |
-| Origem | no **chão, entre os pés** (y = 0). A mesa põe a origem no assento |
+| Origem | no **chão, no eixo do corpo** (y = 0; x e z = 0 no tronco). A mesa põe a origem no assento e só corrige a altura — não centraliza em x/z, porque num modelo sentado as pernas vão para a frente e a caixa engana |
 | Frente | olhando para **+Z**. A mesa vira o personagem para a mesa |
 | Pose | **sentado**, mãos à frente na altura do peito (é onde o leque de cartas entra: ~1,02 m do chão, 0,17 m à frente) |
-| Polígonos | até ~15 mil triângulos por personagem; texturas até 1024×1024 |
-| Materiais | cor chapada e sombra de um tom, como o elenco. PBR simples (`baseColor`, sem metal) funciona; a mesa aplica o sombreamento dela |
+| Polígonos | até ~30 mil triângulos por personagem (o trio de teste de 2026-09-04 veio com 25–30 mil e roda; o contorno do elenco desenha cada malha duas vezes, então menos é melhor no celular); texturas até 1024×1024 |
+| Materiais | cor chapada, como o elenco. PBR simples (`baseColor`, com ou sem textura, sem metal): a mesa troca pelo sombreamento dela em três degraus, com contorno (veja abaixo) |
 
 ## Nós com nome (opcionais, mas é o que liga as coisas)
 
@@ -55,8 +55,30 @@ modelo).
 
 ## Como conferir
 
-Ponha o arquivo, abra `3d.html` numa partida com esse personagem na mesa e
-olhe o console: a mesa avisa `modelo: <slug> carregado (altura X → 1,55)` ou o
-motivo de ter caído no boneco de código. `public/models/_exemplo.glb` é um
-modelo mínimo (caixas) gerado por `test/modelo-exemplo.mjs`, só para provar o
-caminho — não é arte.
+Abra **`provador.html`** (no site ou local) e toque em **Abrir .glb**: o
+arquivo fica no seu navegador (não sobe para lugar nenhum), o personagem
+senta à mesa com a luz e o sombreamento da mesa de verdade, e a folha embaixo
+confere o contrato item a item — medidas, nós, morphs, clips, triângulos,
+texturas. Os botões tocam `feliz`/`bravo`, seguram a boca da fala e trocam
+entre o estilo do elenco e o material original do arquivo. Arraste para girar
+e confira a frente.
+
+Depois de pôr o arquivo em `public/models` e na lista, o mesmo provador o
+mostra no menu **da mesa…**. Na partida, `3d.html` avisa no console
+`modelo: <slug> carregado (altura X → 1,55)` ou o motivo de ter caído no
+boneco de código.
+
+`public/models/_exemplo.glb` é um modelo mínimo (caixas) gerado por
+`test/modelo-exemplo.mjs`, com tudo o que o contrato prevê — textura
+embutida, morph `bocaAberta`, clips `idle` e `feliz` — só para provar cada
+caminho. Não é arte.
+
+## O que a mesa faz com o material
+
+O material do arquivo (PBR: cor, textura, metal, rugosidade) vira o material
+do elenco: mesma cor e textura, sombreado em **três degraus** e com o contorno
+escuro de casca invertida — é o que faz o modelo parecer desenhado, como o
+elenco em SVG. Metal e rugosidade são ignorados. Numa malha com esqueleto
+(skin) o sombreamento entra, mas o contorno não (a casca não acompanharia os
+ossos). No provador, **estilo: original** mostra o material do arquivo como
+veio, para comparar.
