@@ -558,6 +558,30 @@ neon. Os adversários seguram o leque deles na altura das mãos da figura, com
 as pontas dos dedos (no tom de pele de cada um) por cima do verso: sem os
 dedos, o leque flutua na frente do peito.
 
+**O rosto é o do elenco, o corpo é desenhado** (2026-09-04, pedido do
+usuário: "personagens 3D bem desenhados, no nosso estilo"). Três coisas:
+
+- **Sombreamento chapado** (`MeshToonMaterial` com gradiente de três degraus):
+  cor lisa e sombra de um tom só, como o elenco tem no 2D — Lambert deixava o
+  boneco com cara de plástico.
+- **Contorno escuro** em cada peça do corpo (`contornoDe`): uma cópia virada do
+  avesso, um pouco maior, no `#2A1B12` do elenco. A espessura é absoluta, não
+  proporcional — braço fino e tronco largo ganham o mesmo traço, como no
+  desenho. Peças miúdas (olho, aro, guizo) ficam sem. O material do contorno é
+  de cada boneco e entra em `materiais`, para esmaecer junto quando o jogador
+  cai.
+- **O rosto recortado da própria arte do elenco** (`carasDoElenco`): um plano
+  sem sombreamento na frente da cabeça com a faixa x 60–340, y 0–250 do SVG de
+  corpo inteiro — cabelo, óculos, brinco e o contorno do desenho vêm inteiros,
+  e as versões feliz e brava vêm dos SVGs de expressão que já existiam. O plano
+  se vira para a câmera a cada quadro (de lado viraria fio). Enquanto as
+  texturas carregam, o rosto de primitivas segura a cena; quando chegam, tudo o
+  que é cabeça (acima do pescoço, em 1,4 — regra por altura, não por lista)
+  some, e a boca da fala passa para a frente do desenho.
+
+Ficou de fora, por ora: pernas e cadeira de verdade, e o boneco reagir ao que
+os outros jogam (virar a cabeça). Ver **2D×3D** abaixo.
+
 **Os personagens são 3D de verdade** — bonecos montados por código, de
 primitivas iluminadas (`montaBoneco` + `ESPEC_BONECO`): cabeça, tronco, braços
 que descem até o leque, mãos e polegares segurando as cartas. A identidade de

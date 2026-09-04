@@ -593,6 +593,35 @@ function texturaFlores(fundo, flor) {
   });
 }
 
+// Sombreamento CHAPADO, em três degraus: é o que o elenco tem no 2D (cor
+// lisa + sombra de um tom só), e o que faz o boneco parecer desenhado em vez
+// de plástico. Um gradiente de 3 texels serve todos os materiais.
+const GRADIENTE_TOON = (() => {
+  const t = new THREE.DataTexture(new Uint8Array([90, 170, 255]), 3, 1, THREE.RedFormat);
+  t.minFilter = THREE.NearestFilter; t.magFilter = THREE.NearestFilter;
+  t.needsUpdate = true;
+  return t;
+})();
+
+// O contorno do elenco (5 unidades de #2A1B12) em 3D: uma cópia de cada peça
+// virada do avesso (só as faces de trás), um pouco maior — a "casca invertida".
+// A espessura é absoluta, não proporcional: um braço fino e um tronco largo
+// ganham o mesmo traço, como no desenho.
+const M_CONTORNO = new THREE.MeshBasicMaterial({ color: 0x2a1b12, side: THREE.BackSide });
+function contornoDe(malha) {
+  const geo = malha.geometry;
+  if (!geo.boundingSphere) geo.computeBoundingSphere();
+  const r = geo.boundingSphere.radius;
+  if (r < 0.03) return null;   // olho, guizo, aro: sem contorno
+  const casca = new THREE.Mesh(geo, M_CONTORNO);
+  casca.position.copy(malha.position);
+  casca.quaternion.copy(malha.quaternion);
+  const fator = Math.min(1.35, Math.max(1.04, 1 + 0.014 / r));
+  casca.scale.copy(malha.scale).multiplyScalar(fator);
+  casca.userData.contorno = true;
+  return casca;
+}
+
 // um membro (braço, mecha) entre dois pontos: cápsula orientada
 function membro(de, ate, raio, mat) {
   const a = new THREE.Vector3(...de);
@@ -609,7 +638,7 @@ function montaBoneco(slug) {
   const pele = peleDe(slug);
   const materiais = [];
   const mat = (opcoes) => {
-    const m = new THREE.MeshLambertMaterial({ transparent: true, ...opcoes });
+    const m = new THREE.MeshToonMaterial({ transparent: true, gradientMap: GRADIENTE_TOON, ...opcoes });
     materiais.push(m);
     return m;
   };
@@ -748,15 +777,78 @@ function montaBoneco(slug) {
     corpo.add(fio, pedra);
   }
 
-  return { corpo, materiais, bocas: { neutra: bocaNeutra, feliz: bocaFeliz, brava: bocaBrava, aberta: bocaAberta } };
+  // O que é CABEÇA (acima do pescoço, em 1,4) some quando o rosto do elenco
+  // chega: o recorte do SVG traz cabelo, óculos e brinco desenhados. Regra por
+  // altura, não por lista: a franja do bob (centro em 1,54) entra, a cabeleira
+  // longa das costas (1,28) e as mechas (1,4) ficam, que é o que se quer — elas
+  // emolduram o rosto por trás e por baixo. A boca da fala fica de fora: ela
+  // continua funcionando por cima do rosto desenhado.
+  const daCabeca = [];
+  corpo.traverse((m) => {
+    if (m.isMesh && m !== bocaAberta && m.position.y > 1.44) { m.userData.cabeca = true; daCabeca.push(m); }
+  });
+  // Contorno só no corpo: a cabeça desenhada já traz o dela. O material é
+  // deste boneco (uma cópia), e entra em `materiais` para esmaecer junto com o
+  // resto quando o jogador cai — senão sobrava uma silhueta escura firme.
+  const mContorno = M_CONTORNO.clone(); mContorno.transparent = true;
+  materiais.push(mContorno);
+  for (const m of [...corpo.children]) {
+    if (m.isMesh && !m.userData.cabeca) { const c = contornoDe(m); if (c) { c.material = mContorno; corpo.add(c); } }
+  }
+
+  return { corpo, materiais, daCabeca, bocas: { neutra: bocaNeutra, feliz: bocaFeliz, brava: bocaBrava, aberta: bocaAberta } };
+}
+
+// O rosto de cada personagem, recortado da PRÓPRIA arte do elenco (o SVG de
+// corpo inteiro e as versões feliz e brava, que já existem). A cabeça mora no
+// grupo `translate(87.36 36.96) scale(0.88)` sobre 256×256, com −22 por fora:
+// cabelo e rosto cabem na faixa x 60–340, y 0–250 do quadro de 400×800. É
+// isso que faz o boneco ser ESTE personagem — os sinais que o README define
+// como dominantes a 48 px vêm inteiros, com o contorno do desenho.
+const RECORTE_ROSTO = { x: 40, y: 0, w: 320, h: 260 };
+const carasCache = new Map();
+function carasDoElenco(slug) {
+  if (carasCache.has(slug)) return carasCache.get(slug);
+  const uma = (sufixo) => pegaImagem(`/assets/personagens/${slug}-corpo-inteiro${sufixo}.svg`).then((img) => {
+    const tex = texturaDeCanvas(RECORTE_ROSTO.w * 2, RECORTE_ROSTO.h * 2, (ctx) => {
+      ctx.drawImage(img, RECORTE_ROSTO.x, RECORTE_ROSTO.y, RECORTE_ROSTO.w, RECORTE_ROSTO.h,
+        0, 0, RECORTE_ROSTO.w * 2, RECORTE_ROSTO.h * 2);
+    });
+    return tex;
+  });
+  const prom = Promise.all([uma(''), uma('-feliz'), uma('-bravo')])
+    .then(([neutra, feliz, brava]) => ({ neutra, feliz, brava }));
+  carasCache.set(slug, prom);
+  return prom;
 }
 
 function criaAssento(p) {
   const slug = personagemDe(p);
   const grupo = new THREE.Group();
 
-  const { corpo, materiais, bocas } = montaBoneco(slug);
+  const { corpo, materiais, daCabeca, bocas } = montaBoneco(slug);
   grupo.add(corpo);
+
+  // O rosto desenhado: um plano com o recorte do SVG, na frente da cabeça,
+  // sem sombreamento (é desenho, como as mãos). Nasce invisível e entra quando
+  // as três texturas chegam; até lá o rosto de primitivas segura a cena.
+  const mRosto = new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.5, depthWrite: true });
+  materiais.push(mRosto);
+  const plano = new THREE.Mesh(new THREE.PlaneGeometry(0.49, 0.40), mRosto);
+  plano.position.set(0, 1.585, 0.17);
+  plano.visible = false;
+  corpo.add(plano);
+  const cara = {
+    plano, texturas: null,
+    mostra(nome) { if (this.texturas) { mRosto.map = this.texturas[nome] || this.texturas.neutra; mRosto.needsUpdate = true; } },
+  };
+  carasDoElenco(slug).then((texturas) => {
+    cara.texturas = texturas;
+    cara.mostra('neutra');
+    plano.visible = true;
+    for (const m of daCabeca) m.visible = false;
+    bocas.aberta.position.z = 0.2;   // a boca da fala passa para a frente do desenho
+  }).catch(() => { /* fica o rosto de primitivas */ });
 
   // sombra de contato: é ela que cola o boneco no chão
   const sombra = new THREE.Mesh(
@@ -814,7 +906,7 @@ function criaAssento(p) {
   grupo.add(focoVez);
 
   scene.add(grupo);
-  return { grupo, corpo, materiais, bocas, leque, contagem, nome, focoVez, pulo: 0, caraAte: 0 };
+  return { grupo, corpo, materiais, bocas, cara, leque, contagem, nome, focoVez, pulo: 0, caraAte: 0 };
 }
 
 // os adversários sentam no arco do outro lado; você fica na câmera
@@ -1350,6 +1442,7 @@ function reageAoEvento(ev) {
     a.bocas.neutra.visible = false;
     a.bocas.feliz.visible = feliz;
     a.bocas.brava.visible = bravo;
+    a.cara?.mostra(feliz ? 'feliz' : 'brava');
     a.caraAte = performance.now() + 1900;
     a.pulo = performance.now();
   }
@@ -1408,7 +1501,10 @@ function quadro(t) {
       a.bocas.neutra.visible = !a.falava;
       a.bocas.feliz.visible = false;
       a.bocas.brava.visible = false;
+      a.cara?.mostra('neutra');
     }
+    // o rosto desenhado encara a câmera: é um plano, e de lado viraria fio
+    if (a.cara?.plano.visible) a.cara.plano.lookAt(camera.position);
     // a boca mexe com a voz: abre na proporção do nível de quem fala
     const nv = voz.nivel(id);
     if (nv > 0.08) {
