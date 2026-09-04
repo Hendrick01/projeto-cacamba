@@ -110,5 +110,23 @@ const vivo = async () => (await pedido('/')) === 200;
   ok(fonte.status === 200 && fonte.tipo === 'font/woff2' && /max-age/.test(fonte.cache || ''), `a fonte sai daqui como font/woff2 e com cache (${fonte.status}, ${fonte.tipo})`);
 }
 
-console.log(falhas ? `\nDEFESAS FALHARAM: ${falhas}` : '\nDEFESAS OK: 12/12');
+// 7. Teto de conexões por IP: a 41ª do mesmo endereço é recusada no upgrade.
+{
+  const abertas = [];
+  const abre = () => new Promise((resolve) => {
+    const w = new WebSocket(`ws://localhost:${PORT}`);
+    w.on('open', () => { abertas.push(w); resolve('aberta'); });
+    w.on('error', () => resolve('recusada'));
+    w.on('unexpected-response', () => resolve('recusada'));
+  });
+  const resultados = [];
+  for (let i = 0; i < 41; i++) resultados.push(await abre());
+  const aceitas = resultados.filter((r) => r === 'aberta').length;
+  ok(aceitas === 40 && resultados[40] === 'recusada', `40 conexões do mesmo IP entram, a 41ª é recusada (${aceitas} aceitas)`);
+  for (const w of abertas) w.close();
+  await espera(300);
+  ok(await vivo(), 'o servidor continua de pé depois da enxurrada de conexões');
+}
+
+console.log(falhas ? `\nDEFESAS FALHARAM: ${falhas}` : '\nDEFESAS OK: 14/14');
 process.exit(falhas ? 1 : 0);

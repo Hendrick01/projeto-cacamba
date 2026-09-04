@@ -1105,10 +1105,20 @@ Uma auditoria de 2026-08-28 achou três jeitos de derrubar o processo de fora
 
 `test/defesas.mjs` confere os cabeçalhos e a fonte (12/12).
 
-O que ficou **anotado e não feito**: conferir `Origin` no upgrade do
-WebSocket; código de sala com 5 letras (4 dá 331.776, varrível em ~1 min sem
-freio por IP); limite de conexões por IP e freio só em `claim`/`unclaim`. O
-que já estava certo e vale saber: estáticos presos às raízes, só
+**Terceira leva (2026-09-04):** `Origin` conferido no upgrade do WebSocket
+quando `PUBLIC_URL` existe (o navegador manda o Origin e não dá para forjá-lo
+de outro site — é o que impede um site qualquer de usar este servidor como
+cliente; sem `PUBLIC_URL`, desenvolvimento e rede local, aceita tudo); **teto
+de 40 conexões por IP** (uma família num mesmo NAT cabe folgada; um script
+abrindo centenas, não — a 41ª é recusada no upgrade, `test/defesas.mjs`
+prova); e **freio só em `claim`/`unclaim`**, o par que gera broadcast do estado
+inteiro: mais de 6 num segundo da mesma conexão cai no chão sem erro. É o
+freio que a auditoria pediu e que o contador de todas as mensagens (removido)
+não sabia fazer sem fechar os clientes dos testes.
+
+O que ficou **anotado e não feito**: código de sala com 5 letras (4 dá
+331.776, varrível em ~1 min — o teto por IP agora limita a varredura, mas não a
+impede). O que já estava certo e vale saber: estáticos presos às raízes, só
 `err.gameRule` chega ao cliente, tokens por `crypto.randomUUID`, todo
 `innerHTML` com nome passa por `escapeHTML`, `npm audit` limpo.
 

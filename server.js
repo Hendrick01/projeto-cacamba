@@ -420,11 +420,34 @@ function scheduleBots(room) {
 // `maxPayload`: o padrão do `ws` é 100 MiB por mensagem — e cada mensagem
 // passa por `JSON.parse`. Nada que o jogo manda passa de algumas centenas de
 // bytes; 16 KB é folga de sobra.
-const wss = new WebSocketServer({ server, maxPayload: 16 * 1024 });
+// Quem pode abrir o WebSocket. Com PUBLIC_URL definido, só páginas servidas
+// dele (o navegador manda o Origin, e não dá para forjar de outro site): é o
+// que impede um site qualquer de usar este servidor como cliente. Sem
+// PUBLIC_URL (desenvolvimento, rede local), aceita tudo. E um teto de
+// conexões por IP: uma família num mesmo NAT cabe folgada em 40; um script
+// abrindo centenas, não.
+const MAX_CONEXOES_POR_IP = 40;
+const conexoesPorIp = new Map();
+function ipDe(req) {
+  const fwd = process.env.TRUST_PROXY === '1' ? String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() : '';
+  return fwd || req.socket?.remoteAddress || '?';
+}
+const wss = new WebSocketServer({
+  server,
+  maxPayload: 16 * 1024,
+  verifyClient: ({ req, origin }) => {
+    const publico = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+    if (publico && origin && origin !== publico) return false;
+    if ((conexoesPorIp.get(ipDe(req)) || 0) >= MAX_CONEXOES_POR_IP) return false;
+    return true;
+  },
+});
 
 wss.on('connection', (ws, req) => {
   ws.roomCode = null;
   ws.playerId = null;
+  ws.ip = ipDe(req);
+  conexoesPorIp.set(ws.ip, (conexoesPorIp.get(ws.ip) || 0) + 1);
   ws.origin = originFrom(req); // endereço por onde ESTE jogador chegou
 
   // Sem este ouvinte, um frame malformado (sem máscara, UTF-8 inválido) faz o
@@ -449,6 +472,8 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
+    const n = (conexoesPorIp.get(ws.ip) || 1) - 1;
+    if (n <= 0) conexoesPorIp.delete(ws.ip); else conexoesPorIp.set(ws.ip, n);
     const room = rooms.get(ws.roomCode);
     if (!room) return;
     const player = room.players.find((p) => p.id === ws.playerId);
@@ -624,6 +649,16 @@ function handle(ws, msg) {
       const room = currentRoom(ws);
       const player = currentPlayer(ws, room);
       if (!room.game) { const e = new Error('A partida ainda não começou.'); e.gameRule = true; throw e; }
+      // `claim`/`unclaim` geram broadcast do estado inteiro para a mesa toda:
+      // mais de 6 num segundo, da mesma conexão, é script — e cai no chão sem
+      // erro (o freio por contagem de TODAS as mensagens fechava os clientes
+      // roteirizados dos testes; este só pega o par que amplifica).
+      const a = msg.action && msg.action.a;
+      if (a === 'claim' || a === 'unclaim') {
+        const agora = Date.now();
+        if (agora - (ws.pedidosDesde || 0) > 1000) { ws.pedidosDesde = agora; ws.pedidos = 0; }
+        if (++ws.pedidos > 6) return;
+      }
       const events = applyAction(room.game, player.id, msg.action || {});
       // Ação sem efeito (ex.: pedido de compra atrasado) não gera rebroadcast:
       // junto com a chave do timer em scheduleBots, isso impede que spam de
