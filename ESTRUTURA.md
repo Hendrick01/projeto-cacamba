@@ -906,7 +906,7 @@ Uma auditoria de 2026-08-28 achou três jeitos de derrubar o processo de fora
 | `attach` | `create`/`join`/`resume` no mesmo socket deixavam o assento antigo `connected: true` para sempre — e a limpeza só apaga sala sem humano conectado | `detach` antes de anexar, o mesmo que o `'close'` faz |
 | `resume` | robôs têm token vazio e id público: `resume` com token `""` anexava o socket a um robô — dava para ver a mão dele e jogar por ele | filtro `!isBot && token` |
 | `WebSocketServer` | `maxPayload` padrão de 100 MiB, cada mensagem passando por `JSON.parse` | 16 KB |
-| `'message'` | sem freio; `claim`/`unclaim` geram broadcast do estado inteiro para a mesa toda | mais de 300 mensagens num segundo fecha a conexão (código 1008). Gente não passa de ~5/s; o teto é alto porque os clientes roteirizados dos testes passam de 100/s nas rajadas — com 60/s o e2e estourava o tempo |
+| `'message'` | sem freio; `claim`/`unclaim` geram broadcast do estado inteiro para a mesa toda | **não feito.** Um contador por segundo (60/s, depois 300/s) fechava os clientes roteirizados do e2e e do sobra.mjs, que agem no mesmo tick do estado, e as partidas estouravam o tempo. O certo é limite de conexões por IP e freio só em `claim`/`unclaim` |
 
 O que ficou **anotado e não feito**, por ordem: fixar `PUBLIC_URL` no
 `render.yaml` (hoje o host do convite vem de `x-forwarded-host`); cabeçalhos

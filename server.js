@@ -82,7 +82,15 @@ function corpoComprimido(full, stat, ext) {
 const STATIC_ROOTS = [path.join(__dirname, 'public'), __dirname];
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, 'http://localhost');
+  let url;
+  try { url = new URL(req.url, 'http://localhost'); } catch {
+    // `//[` e afins fazem o construtor lançar (visto em Node 22). Dentro do
+    // listener de `request`, uma exceção derruba o processo inteiro — com todas
+    // as salas. É só um pedido ruim: 400 e segue.
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Pedido inválido');
+    return;
+  }
   let file = url.pathname === '/' ? '/index.html' : url.pathname;
   file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
   for (const root of STATIC_ROOTS) {
@@ -141,6 +149,11 @@ const server = http.createServer((req, res) => {
 
 const rooms = new Map(); // code → room
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // sem I e O (confundem com 1 e 0)
+// Teto de salas vivas ao mesmo tempo. Sem ele, um socket mandando `create` em
+// loop enchia a memória do plano free com salas permanentes (cada uma guarda
+// um QR de alguns KB), e perto dos 331.776 códigos possíveis o sorteio de
+// código virava um `while` infinito que travava o event loop.
+const MAX_SALAS = 500;
 // Oito nomes distintos: a mesa vai até 8 lugares, então nenhum robô repete
 // nome com outro na mesma sala.
 const BOT_NAMES = [
@@ -149,11 +162,13 @@ const BOT_NAMES = [
 ];
 
 function makeCode() {
-  let code;
-  do {
-    code = Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-  } while (rooms.has(code));
-  return code;
+  for (let tentativa = 0; tentativa < 64; tentativa++) {
+    const code = Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+    if (!rooms.has(code)) return code;
+  }
+  // 64 sorteios sem código livre só acontece com a tabela quase cheia — e aí a
+  // resposta certa é dizer que não dá, não insistir para sempre.
+  const e = new Error('O servidor está lotado de salas agora. Tente daqui a pouco.'); e.gameRule = true; throw e;
 }
 
 function lanAddress() {
@@ -364,12 +379,27 @@ function scheduleBots(room) {
 // Protocolo WebSocket
 // ---------------------------------------------------------------------------
 
-const wss = new WebSocketServer({ server });
+// `maxPayload`: o padrão do `ws` é 100 MiB por mensagem — e cada mensagem
+// passa por `JSON.parse`. Nada que o jogo manda passa de algumas centenas de
+// bytes; 16 KB é folga de sobra.
+const wss = new WebSocketServer({ server, maxPayload: 16 * 1024 });
 
 wss.on('connection', (ws, req) => {
   ws.roomCode = null;
   ws.playerId = null;
   ws.origin = originFrom(req); // endereço por onde ESTE jogador chegou
+
+  // Sem este ouvinte, um frame malformado (sem máscara, UTF-8 inválido) faz o
+  // `ws` emitir 'error' sem ninguém escutando — e o EventEmitter transforma
+  // isso numa exceção não tratada que derruba o processo com todas as salas.
+  ws.on('error', (err) => console.error('ws:', err.message));
+
+  // Sem freio de mensagens por conexão, de propósito — por enquanto. Um contador
+  // por segundo (60/s e depois 300/s) fechava os clientes roteirizados dos
+  // testes, que agem no mesmo tick em que o estado chega: e2e e sobra.mjs
+  // estouravam o tempo. O que a auditoria pediu de verdade — limite de
+  // conexões por IP e freio só em `claim`/`unclaim`, que geram broadcast do
+  // estado inteiro — fica anotado no ESTRUTURA.md.
 
   ws.on('message', (raw) => {
     let msg;
@@ -409,7 +439,26 @@ function currentPlayer(ws, room) {
   return p;
 }
 
+// Solta o socket do assento que ele ocupava antes, se ocupava algum. É o mesmo
+// que o 'close' faz — e precisa acontecer também quando o MESMO socket manda
+// outro `create`/`join`/`resume`: sem isto o jogador antigo ficava
+// `connected: true` para sempre numa sala que ninguém mais via, e a limpeza
+// (que só apaga sala sem humano conectado) nunca a apagava.
+function detach(ws) {
+  const antiga = rooms.get(ws.roomCode);
+  if (!antiga) return;
+  const p = antiga.players.find((x) => x.id === ws.playerId);
+  if (p && p.ws === ws) {
+    p.ws = null;
+    p.connected = false;
+    p.lastSeen = Date.now();
+    broadcastLobby(antiga);
+    if (antiga.game) { broadcastState(antiga, [{ e: 'presence' }]); scheduleBots(antiga); }
+  }
+}
+
 function attach(ws, room, player) {
+  if (ws.roomCode && ws.roomCode !== room.code) detach(ws);
   ws.roomCode = room.code;
   ws.playerId = player.id;
   player.ws = ws;
@@ -425,6 +474,7 @@ function attach(ws, room, player) {
 function handle(ws, msg) {
   switch (msg.t) {
     case 'create': {
+      if (rooms.size >= MAX_SALAS) { const e = new Error('O servidor está lotado de salas agora. Tente daqui a pouco.'); e.gameRule = true; throw e; }
       const room = newRoom(ws.origin);
       const player = {
         id: crypto.randomUUID(), name: sanitizeName(msg.name), token: crypto.randomUUID(),
@@ -480,7 +530,10 @@ function handle(ws, msg) {
     case 'resume': {
       const room = rooms.get(String(msg.code || '').toUpperCase().trim());
       if (!room) { send(ws, { t: 'gone' }); return; }
-      const player = room.players.find((p) => p.id === msg.playerId && p.token === msg.token);
+      // Robôs têm token vazio e id público (a visão do lobby mostra os ids):
+      // sem o filtro, um `resume` com token "" anexava o socket a um robô — e
+      // dava para ver a mão dele e jogar por ele.
+      const player = room.players.find((p) => !p.isBot && p.token && p.id === msg.playerId && p.token === msg.token);
       if (!player) { send(ws, { t: 'gone' }); return; }
       attach(ws, room, player);
       break;
