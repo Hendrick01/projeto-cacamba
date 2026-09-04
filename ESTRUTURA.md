@@ -66,6 +66,9 @@ projeto-caçamba/
 | [`test/aliados.mjs`](test/aliados.mjs) | 67 | Ferramenta de QA, não teste: entram numa sala que você criou no navegador e jogam gerando sobras rápido, para conferir a TELA com sobra na mesa. `node test/aliados.mjs CODIGO`. |
 | [`public/mesa3d.js`](public/mesa3d.js) | 1358 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
+| [`public/vendor/GLTFLoader.js`](public/vendor/GLTFLoader.js) · `BufferGeometryUtils.js` | — | O carregador glTF do three (r170, MIT), vendido com os imports apontados para o `three.module.js` local. Só a mesa 3D usa. |
+| [`public/models/`](public/models/LEIA-ME.md) | — | Os personagens externos, `<slug>.glb`, e o contrato do que cada um precisa ter. `_exemplo.glb` é a prova de caminho. |
+| [`test/modelo-exemplo.mjs`](test/modelo-exemplo.mjs) | 60 | Gera o `_exemplo.glb`: GLB válido escrito à mão (JSON + BIN), duas caixas e os nós `Cabeca`, `MaoEsq`, `MaoDir`. |
 | [`public/voz.js`](public/voz.js) | 169 | Chat de voz: microfone, pares WebRTC em malha, sinalização pela mensagem `voz` do WebSocket, e o nível de áudio de cada um (`nivel`/`falando`). Usado pelas duas mesas. |
 | [`shared/mao.js`](shared/mao.js) | 53 | A ordem das cartas na sua mão: a ordenação automática e o reordenar do arrasto. Vive em `shared/` para poder ser testada sem navegador — ver `test/mao.test.js`. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
@@ -581,6 +584,22 @@ usuário: "personagens 3D bem desenhados, no nosso estilo"). Três coisas:
 
 Ficou de fora, por ora: pernas e cadeira de verdade, e o boneco reagir ao que
 os outros jogam (virar a cabeça). Ver **2D×3D** abaixo.
+
+**Personagens vindos de fora** (2026-09-04; decisão do usuário: os oito serão
+modelados fora, no estilo do elenco, e a mesa integra). Quando existe
+`public/models/<slug>.glb`, a mesa carrega o modelo (`carregaModelo`, com o
+`GLTFLoader` vendido em `public/vendor/`, imports apontados para o three
+local) e o põe no assento **no lugar** do boneco de código, que fica
+invisível; quando não existe, o boneco fica — a mesa nunca depende do modelo.
+`encaixaModelo` normaliza a altura (do chão ao topo → 1,55 m sentado), põe os
+pés no chão e liga o que o modelo trouxer: os nós `Cabeca` (boca da fala e
+rótulo) e `MaoEsq`/`MaoDir` (onde o leque entra), os morphs `feliz`/`bravo`
+(reações) e `bocaAberta` (movida pelo nível do microfone), e os clips
+`idle`/`feliz`/`bravo` (`AnimationMixer`). O respiro, o pulo e o esmaecer de
+quem cai passam a agir sobre o modelo. O contrato completo está em
+[`public/models/LEIA-ME.md`](public/models/LEIA-ME.md);
+`test/modelo-exemplo.mjs` gera `_exemplo.glb`, um modelo mínimo (duas caixas
+com os nós nomeados) que prova o caminho — não é arte.
 
 **Os personagens são 3D de verdade** — bonecos montados por código, de
 primitivas iluminadas (`montaBoneco` + `ESPEC_BONECO`): cabeça, tronco, braços

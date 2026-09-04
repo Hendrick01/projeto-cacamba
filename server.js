@@ -38,6 +38,7 @@ const MIME = {
   '.png': 'image/png',
   '.webp': 'image/webp',
   '.woff2': 'font/woff2',
+  '.glb': 'model/gltf-binary',
 };
 
 // Cabeçalhos de segurança do que sai daqui. A CSP diz ao navegador de onde a
@@ -146,7 +147,7 @@ const server = http.createServer((req, res) => {
       // velha). Com `private`, quem guarda é o navegador de cada um: o ganho de
       // não repetir o download continua, e a janela de arte velha depois de um
       // deploy deixa de ser coletiva.
-      const arte = file.startsWith('/assets/') || file.startsWith('/fonts/');
+      const arte = file.startsWith('/assets/') || file.startsWith('/fonts/') || file.startsWith('/models/');
       const cabecalho = {
         'Content-Type': MIME[ext] || 'application/octet-stream',
         'Cache-Control': arte ? 'private, max-age=300, must-revalidate' : 'no-cache',
