@@ -594,6 +594,21 @@ function handle(ws, msg) {
       scheduleBots(room);
       break;
     }
+    // Chat de voz: o servidor só REPASSA a sinalização do WebRTC (oferta,
+    // resposta, candidatos ICE) entre os humanos da mesma sala — o áudio em si
+    // vai direto de um navegador ao outro e nunca passa por aqui. `to` é o id
+    // de um jogador da sala ou '*' (todos os outros humanos). Robô não recebe,
+    // ninguém manda para si mesmo, e nada disso toca o motor.
+    case 'voz': {
+      const room = currentRoom(ws);
+      const player = currentPlayer(ws, room);
+      const dados = msg.dados;
+      if (!dados || typeof dados !== 'object' || Array.isArray(dados)) return;
+      const alvos = room.players.filter((p) => !p.isBot && p.id !== player.id
+        && (msg.to === '*' || p.id === msg.to));
+      for (const p of alvos) send(p.ws, { t: 'voz', from: player.id, dados });
+      break;
+    }
     case 'nextRound': {
       const room = currentRoom(ws);
       currentPlayer(ws, room);

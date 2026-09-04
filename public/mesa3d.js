@@ -19,6 +19,7 @@
 import * as THREE from './vendor/three.module.js';
 import { planBaixada, isJoker, rankLabel } from '/shared/engine.js';
 import { SLUGS, personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
+import { criaVoz } from '/voz.js';
 
 const $ = (id) => document.getElementById(id);
 const semMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -46,6 +47,27 @@ function sendAction(action) {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'action', action }));
 }
 
+// Chat de voz — o mesmo módulo da mesa 2D. Aqui quem fala mexe a boca do boneco.
+const voz = criaVoz({
+  meuId: () => me(),
+  enviar: (to, dados) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'voz', to, dados })); },
+});
+function atualizaBotaoVoz() {
+  const b = document.getElementById('btn-voz');
+  if (!b) return;
+  b.classList.toggle('voz-on', voz.ligado() && !voz.mudo);
+  b.classList.toggle('voz-mudo', voz.ligado() && voz.mudo);
+  b.textContent = !voz.ligado() ? '🎙 voz' : voz.mudo ? '🔇 mudo' : '🎙 falando';
+}
+document.getElementById('btn-voz')?.addEventListener('click', async () => {
+  try {
+    if (!voz.ligado()) await voz.ligar();
+    else if (!voz.mudo) voz.silenciar(true);
+    else voz.desligar();
+  } catch (e) { aviso(`🎙 ${e.message || 'Não deu para ligar o microfone.'}`, true); }
+  atualizaBotaoVoz();
+});
+
 function conecta() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}`);
@@ -61,6 +83,8 @@ function conecta() {
       sincroniza(primeira);
     } else if (msg.t === 'lobby' && !msg.started) {
       aviso('A partida ainda não começou — comece pela mesa normal.', true);
+    } else if (msg.t === 'voz') {
+      voz.receber(msg);
     } else if (msg.t === 'error') {
       aviso(`⚠️ ${msg.msg}`);
     } else if (msg.t === 'gone') {
@@ -646,7 +670,13 @@ function montaBoneco(slug) {
   const bocaBrava = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.01, 8, 10, Math.PI), mBoca);
   bocaBrava.position.set(0, 1.502, 0.152);
   bocaBrava.visible = false;
-  corpo.add(bocaNeutra, bocaFeliz, bocaBrava);
+  // A quarta boca é a da FALA: uma elipse escura que abre e fecha no ritmo do
+  // nível do microfone de quem está falando no chat de voz.
+  const bocaAberta = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), mTinta);
+  bocaAberta.position.set(0, 1.512, 0.156);
+  bocaAberta.scale.set(1.3, 0.6, 0.5);
+  bocaAberta.visible = false;
+  corpo.add(bocaNeutra, bocaFeliz, bocaBrava, bocaAberta);
 
   // Cabelo, pelo corte. A capa é GORRO (só a calota de cima) + nuca atrás:
   // esfera inteira engolia o rosto.
@@ -718,7 +748,7 @@ function montaBoneco(slug) {
     corpo.add(fio, pedra);
   }
 
-  return { corpo, materiais, bocas: { neutra: bocaNeutra, feliz: bocaFeliz, brava: bocaBrava } };
+  return { corpo, materiais, bocas: { neutra: bocaNeutra, feliz: bocaFeliz, brava: bocaBrava, aberta: bocaAberta } };
 }
 
 function criaAssento(p) {
@@ -1349,7 +1379,7 @@ function quadro(t) {
   camera.position.x += ((olharX * 1.4) - camera.position.x) * 0.06;
   camera.lookAt(camera.position.x * 0.25, MESA_TOPO - 0.05, -0.7);
 
-  for (const a of assentos.values()) {
+  for (const [id, a] of assentos) {
     // respiro contínuo, dessincronizado por posição
     if (!semMovimento && !a.apagado) {
       a.corpo.position.y = Math.sin(t / 1300 + a.grupo.position.x * 3) * 0.012;
@@ -1363,9 +1393,19 @@ function quadro(t) {
     // a cara volta ao normal sozinha
     if (a.caraAte && t > a.caraAte) {
       a.caraAte = 0;
-      a.bocas.neutra.visible = true;
+      a.bocas.neutra.visible = !a.falava;
       a.bocas.feliz.visible = false;
       a.bocas.brava.visible = false;
+    }
+    // a boca mexe com a voz: abre na proporção do nível de quem fala
+    const nv = voz.nivel(id);
+    if (nv > 0.08) {
+      if (!a.falava) { a.falava = true; a.bocas.neutra.visible = false; a.bocas.aberta.visible = true; }
+      a.bocas.aberta.scale.y = 0.35 + nv * 1.8;
+    } else if (a.falava) {
+      a.falava = false;
+      a.bocas.aberta.visible = false;
+      if (!a.caraAte) a.bocas.neutra.visible = true;
     }
     // foco da vez
     const alvo = a.naVez ? 0.4 + Math.sin(t / 500) * 0.12 : 0;

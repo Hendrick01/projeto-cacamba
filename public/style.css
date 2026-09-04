@@ -1078,6 +1078,17 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
   .anuncio-rodada.entra { animation: none; }
 }
 
+/* Chat de voz: o botão diz o estado, e quem fala acende no assento. Verde
+   porque o âmbar já é a vez e o laranja já é perigo — a voz precisa de uma
+   cor que não signifique mais nada na mesa. */
+.icon-btn.voz-on { color: #58c98a; border-color: rgba(88, 201, 138, 0.7); box-shadow: 0 0 8px rgba(88, 201, 138, 0.45); }
+.icon-btn.voz-mudo { color: var(--danger); border-color: rgba(228, 87, 46, 0.6); }
+.assento.falando .cadeira, .meu-assento.falando .cadeira {
+  box-shadow: 0 0 0 2px #58c98a, 0 0 12px rgba(88, 201, 138, 0.8);
+}
+.assento.falando .nome { color: #58c98a; }
+.assento.falando .personagem { filter: drop-shadow(0 0 4px rgba(88, 201, 138, 0.9)); }
+
 /* Avisos (toasts) */
 
 .toasts {

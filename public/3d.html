@@ -44,6 +44,9 @@
     font: inherit; font-weight: 900; font-size: 0.82rem;
     padding: 8px 14px; border-radius: 20px; cursor: pointer;
   }
+  .painel .botoes { display: flex; gap: 8px; pointer-events: auto; }
+  .voltar.voz-on { color: #58c98a; border-color: rgba(88, 201, 138, 0.7); box-shadow: 0 0 8px rgba(88, 201, 138, 0.45); }
+  .voltar.voz-mudo { color: #e4572e; border-color: rgba(228, 87, 46, 0.6); }
   .aviso {
     /* No alto, logo abaixo do painel: embaixo ele caía em cima do leque. */
     position: fixed; left: 50%; top: max(74px, calc(env(safe-area-inset-top) + 62px));
@@ -62,7 +65,7 @@
 
 <div class="painel">
   <div class="rodada"><small id="rot-rodada">carregando</small><strong id="rot-contrato">—</strong></div>
-  <button class="voltar" id="btn-voltar">← mesa normal</button>
+  <span class="botoes"><button class="voltar" id="btn-voz">🎙 voz</button><button class="voltar" id="btn-voltar">← mesa normal</button></span>
 </div>
 
 <p class="aviso" id="aviso">Abrindo a mesa em 3D…</p>

@@ -60,11 +60,13 @@ projeto-caçamba/
 | [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 134 | **Três** jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket. Três porque a compra fora da vez precisa de alguém que não seja nem quem está na vez nem quem descartou — e o teste falha se ninguém pedir carta, para essa cobertura não morrer em silêncio. |
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
+| [`test/voz.mjs`](test/voz.mjs) | 56 | O repasse da sinalização de voz: direto, para todos, e o que o servidor ignora (robô, sala alheia, dados fora do formato). |
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
 | [`test/sobra.mjs`](test/sobra.mjs) | 189 | As três portas da sobra pelo fio: **quatro** jogadores roteirizados (com três é um baralho só, e a quarta carta de cada valor é uma), baixando um jogo por vez para abrir a janela dos encaixes — é dos encaixes que as sobras nascem. A Ana leva uma sobra alheia para a mão e descarta outra, conferindo o estado que volta. Sai com código 2 quando o sorteio não gera sobra: rodar de novo. |
 | [`test/aliados.mjs`](test/aliados.mjs) | 67 | Ferramenta de QA, não teste: entram numa sala que você criou no navegador e jogam gerando sobras rápido, para conferir a TELA com sobra na mesa. `node test/aliados.mjs CODIGO`. |
 | [`public/mesa3d.js`](public/mesa3d.js) | 1358 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
+| [`public/voz.js`](public/voz.js) | 169 | Chat de voz: microfone, pares WebRTC em malha, sinalização pela mensagem `voz` do WebSocket, e o nível de áudio de cada um (`nivel`/`falando`). Usado pelas duas mesas. |
 | [`shared/mao.js`](shared/mao.js) | 53 | A ordem das cartas na sua mão: a ordenação automática e o reordenar do arrasto. Vive em `shared/` para poder ser testada sem navegador — ver `test/mao.test.js`. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
 | [`public/icon.svg`](public/icon.svg) | 37 | Ícone: leque de três cartas sobre o feltro, com moldura dourada. Fundo ocupa o quadro todo, então funciona como ícone *maskable*. |
@@ -918,6 +920,48 @@ cada rosto tem de sinal dominante a 48 px) estão documentadas em
 [`public/assets/personagens/README.md`](public/assets/personagens/README.md).
 
 ---
+
+## Chat de voz
+
+Pedido do usuário em 2026-09-04: os jogadores se ouvirem, e no 3D se
+**enxergarem falando** — como no Capote, em que cada um é o próprio boneco. Sem
+câmera, por escolha dele: o boneco do elenco é a presença.
+
+**O áudio vai direto de um navegador ao outro** (WebRTC, em malha: cada humano
+liga com cada humano; oito lugares dão no máximo sete ligações por pessoa, e
+áudio é leve). O servidor não vê áudio nenhum: só **repassa a sinalização** —
+oferta, resposta e candidatos ICE — pela mesma conexão do jogo, na mensagem
+`{ t: 'voz', to, dados }`. `to` é um jogador da sala ou `'*'` (todos os outros
+humanos); robô não recebe, ninguém manda para si, sala alheia não vê. O motor
+não sabe que isso existe.
+
+**Quem oferece é o id menor.** Quando alguém liga o microfone manda `oi` para a
+mesa; quem já está com a voz ligada e tem id menor responde com a oferta, e
+quem tem id maior responde `oi` de volta para o outro oferecer. É o que evita
+os dois oferecerem ao mesmo tempo. Candidatos ICE que chegam antes da descrição
+remota ficam numa fila e entram depois — sem isso os primeiros se perdiam e a
+ligação não fechava.
+
+**O caminho entre os navegadores vem do STUN público do Google. Não há TURN.**
+Dois jogadores atrás de NAT restritivo (algumas operadoras de celular, redes de
+empresa) não vão se ouvir: a ligação fica em `failed` e o resto da mesa segue.
+Corrigir isso é um servidor TURN, que o plano free não tem — é a primeira
+pendência desta parte.
+
+**O microfone só liga num toque**, porque o navegador exige (e o iOS exige que
+o `AudioContext` nasça no toque também). Um botão, três estados: desligado →
+ligado → mudo → desligado. Trocar de mesa (2D ↔ 3D) recarrega a página e
+desliga a voz — liga-se de novo do outro lado.
+
+**Quem fala aparece.** O módulo mede o nível de cada voz (RMS da forma de onda,
+`AnalyserNode`). Na mesa 2D o assento acende em verde — verde porque o âmbar já
+é a vez e o laranja já é perigo. Na 3D o boneco ganha uma **quarta boca**, a
+da fala: uma elipse escura que abre na proporção do nível e fecha quando a
+pessoa para. Feliz e brava continuam sendo as reações do jogo.
+
+Não dá para ouvir dentro do painel de verificação daqui (não há microfone
+nele); o que está provado é o repasse (`test/voz.mjs`) e a montagem dos
+botões. Ouvir de verdade é teste de gente, com dois celulares.
 
 ## `server.js` — salas e juiz
 

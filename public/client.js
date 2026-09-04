@@ -12,6 +12,7 @@ import {
   ELENCO, SLUGS, personagemValido, personagemDoAssento, peleDe, temExpressao,
 } from '/shared/elenco.js';
 import { ordenaMao, reordena } from '/shared/mao.js';
+import { criaVoz } from '/voz.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -73,6 +74,39 @@ function sendMsg(msg) {
 }
 function sendAction(action) { sendMsg({ t: 'action', action }); }
 
+// ---------------- Chat de voz ----------------
+// O módulo mede e conecta; aqui só se decide o botão e quem acende no assento.
+const voz = criaVoz({ meuId: () => me(), enviar: (to, dados) => sendMsg({ t: 'voz', to, dados }) });
+
+function atualizaBotaoVoz() {
+  const b = $('btn-voz');
+  if (!b) return;
+  b.classList.toggle('voz-on', voz.ligado() && !voz.mudo);
+  b.classList.toggle('voz-mudo', voz.ligado() && voz.mudo);
+  b.textContent = voz.ligado() ? (voz.mudo ? '🔇' : '🎙') : '🎙';
+  b.title = !voz.ligado() ? 'Ligar o microfone (chat de voz)'
+    : voz.mudo ? 'Microfone mudo — toque para voltar a falar; segure para desligar'
+    : 'Falando — toque para ficar mudo';
+}
+// Um botão, três estados: desligado → ligado → mudo → desligado. Ligar pede o
+// microfone ao navegador, e isso só pode acontecer num toque de verdade.
+$('btn-voz').onclick = async () => {
+  try {
+    if (!voz.ligado()) await voz.ligar();
+    else if (!voz.mudo) voz.silenciar(true);
+    else voz.desligar();
+  } catch (e) {
+    toast(`🎙 ${e.message || 'Não deu para ligar o microfone.'}`);
+  }
+  atualizaBotaoVoz();
+};
+// Quem está falando acende no assento — inclusive você, no seu.
+setInterval(() => {
+  if (!voz.ligado() && !voz.quantos) return;
+  for (const [id, el] of assentos) el.classList.toggle('falando', voz.falando(id));
+  $('meu-assento')?.classList.toggle('falando', voz.falando(me()));
+}, 120);
+
 function handleMessage(msg) {
   switch (msg.t) {
     case 'welcome':
@@ -97,6 +131,9 @@ function handleMessage(msg) {
       // Depois do render: a distribuição precisa dos assentos já no lugar para
       // saber para onde as cartas voam.
       if (distribuirPendente) { distribuirPendente = false; animaDistribuicao(); }
+      break;
+    case 'voz':
+      voz.receber(msg);
       break;
     case 'error':
       toast(`⚠️ ${msg.msg}`);
@@ -1679,6 +1716,7 @@ function announce(ev) {
       reage(ev.p, 'coringa');
       break;
     case 'desistiu':
+      voz.remover(ev.p);
       toast(`🚪 ${playerName(ev.p)} saiu da partida — o robô assume o lugar.`);
       reage(ev.p, 'saiu');
       break;
