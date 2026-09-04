@@ -1133,9 +1133,20 @@ function marcaCartasNovas() {
 // 7 dá 12 cartas e um passo fixo estouraria a largura do celular; com poucas
 // cartas, o mesmo passo deixaria o leque frouxo demais.
 const CARTA_LARGURA = 56;
+const CARTA_ALTURA = 78;
 const PASSO_MAXIMO = 40;
 const PASSO_MINIMO = 20;
 const ABERTURA = 16;          // graus de ponta a ponta
+// O giro empurra as pontas para FORA do que o layout mede. A carta da ponta
+// gira ABERTURA/2 em torno de um pivô bem abaixo dela (`transform-origin:
+// 50% 190%` — uns 110 px abaixo do centro), e o retângulo girado ainda fica
+// mais largo que o reto. São ~20 px por lado que o passo não descontava: no
+// papel o leque cabia, e na tela as pontas saíam pela borda — com 9 cartas já
+// cortava, e a 7ª rodada dá 12.
+const RAIO_DO_GIRO = CARTA_ALTURA * 1.9 - CARTA_ALTURA / 2;
+const GIRO_DA_PONTA = (ABERTURA / 2) * Math.PI / 180;
+const SOBRA_DO_GIRO = RAIO_DO_GIRO * Math.sin(GIRO_DA_PONTA)
+  + (CARTA_LARGURA * Math.cos(GIRO_DA_PONTA) + CARTA_ALTURA * Math.sin(GIRO_DA_PONTA) - CARTA_LARGURA) / 2;
 // Acima disto o leque vira dois. A rodada 7 dá 12 cartas, mas cada compra fora
 // da vez soma carta de castigo — mão de 20 acontece, e num leque só ela vira
 // uma parede de tiras de 13 px que ninguém lê nem acerta com o dedo.
@@ -1160,10 +1171,13 @@ function renderHand() {
 
 function montaLeque(fila, cartas, largura) {
   const n = cartas.length;
-  // Sobra nas pontas para as mãos aparecerem. Com mão grande a sobra encolhe:
-  // aí o leque precisa da largura, e mão cheia cobrindo as próprias mãos é o
-  // que acontece de verdade.
-  const espaco = Math.max(180, (largura || 355) - (n > 8 ? 44 : 120));
+  // Folga VISUAL entre a ponta do leque e a borda da tela, por lado: 40 px
+  // para as mãos aparecerem. Com mão grande a folga encolhe para 22: aí o
+  // leque precisa da largura, e mão cheia cobrindo as próprias mãos é o que
+  // acontece de verdade. O que o giro empurra para fora entra na conta uma
+  // vez, aqui — é isso que faz a folga ser a da tela e não a do papel.
+  const folga = n > 8 ? 22 : 40;
+  const espaco = Math.max(180, (largura || 355) - 2 * (folga + SOBRA_DO_GIRO));
   const passo = n > 1
     ? Math.min(PASSO_MAXIMO, Math.max(PASSO_MINIMO, (espaco - CARTA_LARGURA) / (n - 1)))
     : CARTA_LARGURA;

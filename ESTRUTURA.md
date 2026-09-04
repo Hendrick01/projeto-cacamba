@@ -623,10 +623,16 @@ só porque a ordenação o pôs ali.
 
 O leque é leque de verdade: as cartas se sobrepõem e giram em torno de um pivô
 abaixo da tela (`transform-origin: 50% 190%`), como quem segura a mão. O passo
-entre elas é **calculado** (`renderHand`), não fixo — a rodada 7 dá 12 cartas e
+entre elas é **calculado** (`montaLeque`), não fixo — a rodada 7 dá 12 cartas e
 um passo fixo estouraria a largura do celular; com poucas cartas, o mesmo passo
 deixaria o leque frouxo. A carta escolhida sai do leque e sobe, que é o que
 devolve o alvo de toque confortável que a sobreposição tira.
+
+O cálculo desconta **o que o giro empurra para fora** (`SOBRA_DO_GIRO`): a
+carta da ponta gira 8° em torno de um pivô uns 110 px abaixo do centro, e o
+retângulo girado é mais largo que o reto — são ~20 px por lado além do que o
+layout mede. Sem o desconto o leque cabia no papel e as pontas saíam pela borda
+da tela a partir de 9 cartas (visto em 2026-09-03).
 
 **As suas mãos** (`#maos`) sobem dos cantos de baixo e entram por trás do leque:
 o que fica à vista é o antebraço e a ponta dos dedos entre as cartas. São
