@@ -139,9 +139,31 @@ if (razao < 1) gt('simplify', '--ratio', String(razao), '--error', String(opc.er
 else fs.copyFileSync(soldado, reduzido);
 gt('resize', '--width', '1024', '--height', '1024', reduzido, pequeno);
 
-// --- 4. os nós do contrato ---
+// --- 3b. só o que a mesa usa: o mapa de metal/rugosidade sai (o estilo do
+// elenco o ignora, e numa escultura assada ele pesa mais que a cor), e a
+// cor vira JPEG quando nenhum material usa transparência ---
+{
+  const q = leGlb(pequeno);
+  let tirou = 0;
+  for (const m of q.json.materials || []) if (m.pbrMetallicRoughness?.metallicRoughnessTexture) { delete m.pbrMetallicRoughness.metallicRoughnessTexture; tirou++; }
+  const opaco = (q.json.materials || []).every((m) => !m.alphaMode || m.alphaMode === 'OPAQUE');
+  const semMetal = path.join(tmp, 'sem-metal.glb'), podado = path.join(tmp, 'podado.glb');
+  escreveGlb(q, semMetal);
+  gt('prune', semMetal, podado);
+  if (opaco) gt('jpeg', '--formats', 'png', '--quality', '85', podado, pequeno); else fs.copyFileSync(podado, pequeno);   // só converte os PNG; JPEG fica como está
+  if (tirou) console.log(`${tirou} mapa(s) de metal/rugosidade removido(s); cor em ${opaco ? 'JPEG' : 'PNG (há transparência)'}`);
+}
+
+// --- 4. os nós do contrato; e os pés no chão (y = 0) ---
 const p = leGlb(pequeno);
-const cx = caixa(p.json); const altura = cx.max[1] - cx.min[1];
+let cx = caixa(p.json);
+if (Math.abs(cx.min[1]) > 0.005) {
+  const desce = -cx.min[1];
+  for (const i of p.json.scenes[p.json.scene || 0].nodes) { const n = p.json.nodes[i]; if (n.matrix) { n.matrix[13] += desce; } else { n.translation = n.translation || [0, 0, 0]; n.translation[1] += desce; } }
+  console.log(`pés levados ao chão (o arquivo tinha o ponto mais baixo em y = ${cx.min[1].toFixed(2)})`);
+  cx = caixa(p.json);
+}
+const altura = cx.max[1] - cx.min[1];
 const cena = p.json.scenes[p.json.scene || 0];
 const acha = (re) => p.json.nodes.findIndex((n) => re.test(n.name || ''));
 const tem = (nome) => p.json.nodes.some((n) => n.name === nome);

@@ -72,8 +72,11 @@ node test/modelo-prepara.mjs frente.glb public/models/<slug>.glb --tri 30000 --c
 ```
 
 solda vértices, reduz para o orçamento (`--tri`), encolhe as texturas para
-1024 px e injeta o nó `Cabeca` na fração da altura dada (`--cabeca 0.91` é a
-cabeça de alguém em pé; sentado, algo como 0.88). Com `--maos x,y,z` injeta
+1024 px, tira o mapa de metal/rugosidade (o estilo do elenco o ignora, e numa
+escultura assada ele pesa mais que a cor), converte a cor PNG em JPEG quando
+não há transparência, leva os pés ao chão se o arquivo veio com a origem no
+meio do corpo, e injeta o nó `Cabeca` na fração da altura dada (`--cabeca
+0.91` é a cabeça de alguém em pé; sentado, algo como 0.88). Com `--maos x,y,z` injeta
 também `MaoDir`/`MaoEsq` (a esquerda espelhada); sem isso o leque fica na
 posição padrão. Depois: abrir no provador e pôr o slug na lista.
 
@@ -108,6 +111,10 @@ Sora) não servem: geram imagens, não malha com esqueleto.
 O que o rig automático não dá: os morphs `feliz`/`bravo`/`bocaAberta` (a
 cara continua a mesma; a reação é do corpo, e a fala usa a elipse escura).
 Isso é escultura de expressão, na ferramenta de modelagem.
+
+A Dri veio diferente: já com uma figura só e 31 mil triângulos, mas 17,5 MB
+de PNG assado (cor 6,7 MB e metal 9,6 MB em 4096 px) e a origem no meio do
+corpo. Saiu com 30 mil triângulos e 1,6 MB.
 
 A Gabizinsky de 2026-09-04 veio assim: ficha de 1,95 milhão de triângulos com
 as quatro vistas numa malha só → figura da frente com 510 mil → 29.995

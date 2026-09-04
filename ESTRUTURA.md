@@ -632,8 +632,12 @@ roda sob Rosetta), funde clips de outros arquivos casando os ossos pelo nome
 (`--clip feliz=arquivo.fbx`), renomeia o clip da fonte para `idle` e pendura
 `Cabeca`/`MaoEsq`/`MaoDir` nos ossos `Head`/`LeftHand`/`RightHand`. A fusão
 de clips foi testada com os `.glb` do trio; a conversão de FBX ainda não
-passou por um arquivo real do Mixamo (2026-09-04). Detalhes em
-`public/models/LEIA-ME.md`.
+passou por um arquivo real do Mixamo (2026-09-04). O preparo também tira o
+mapa de metal/rugosidade, converte a cor PNG em JPEG (`jpeg --formats png`
+do gltf-transform; sem `--formats` ele só recomprime JPEG) e leva os pés ao
+chão quando a origem veio no meio do corpo. **A Dri esculpida** entrou no
+mesmo dia: o arquivo já vinha com uma figura e 31 mil triângulos, mas 17,5 MB
+de PNG em 4096 px; saiu com 1,6 MB. Detalhes em `public/models/LEIA-ME.md`.
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a
