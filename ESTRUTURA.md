@@ -582,13 +582,20 @@ cartas ocupam 84% da largura visível e cada carta gira em torno de si mesma
 2D. O que parece corte nas pontas são as mãos nos cantos e o recorte de baixo,
 que é de propósito.
 
+**A sua vez no tampo** (2026-09-04): o mesmo disco âmbar que pulsa embaixo do
+adversário da vez aparece na sua beirada do feltro (`meuFoco`), mais discreto
+porque está perto da câmera. Antes a sua vez era só o texto do aviso.
+
+**Vazamentos fechados** (2026-09-04): `trocaRotulo` solta a textura de antes
+(cada troca criava um canvas na GPU e nunca liberava — contagem e monte
+trocam a cada jogada), e a caixa da pilha do descarte, que nasce com geometria
+própria a cada carta, é liberada antes de o grupo ser esvaziado.
+
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
-espessura e de face única, o leque dos
-adversários travado em 5 cartas, nenhum sinal 3D da sua própria vez, e nada de
-sobras, troca de coringa, encaixe ou placar — para essas, o botão manda de
-volta à mesa normal. Sem `dispose()` nos rótulos e no descarte recriados a cada
-estado (vazamento lento), e o `requestAnimationFrame` não para com a aba
-escondida.
+espessura e de face única, o leque dos adversários travado em 5 cartas, e nada
+de sobras, troca de coringa, encaixe ou placar — para essas, o botão manda de
+volta à mesa normal. O `requestAnimationFrame` não para com a aba escondida —
+o navegador já o pausa em aba de fundo, então é pouco.
 
 **As cartas da mesa ficam deitadas** — decisão do usuário em 2026-09-04
 ("deitadas, desde que visíveis"). O que as torna legíveis é o conjunto: a

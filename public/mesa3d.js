@@ -1213,6 +1213,19 @@ const descarte = (() => {
 const jogosNaMesa = new THREE.Group();
 scene.add(jogosNaMesa);
 
+// O sinal da SUA vez, no tampo: o mesmo disco âmbar que pulsa embaixo do
+// adversário da vez, aqui na sua beirada do feltro. Antes a sua vez era só o
+// texto do aviso — na 3D, tudo o que importa está na mesa, e a vez também.
+const meuFoco = new THREE.Mesh(
+  new THREE.CircleGeometry(0.75, 28),
+  new THREE.MeshBasicMaterial({ color: 0xf2c14e, transparent: true, opacity: 0, depthWrite: false }),
+);
+meuFoco.rotation.x = -Math.PI / 2;
+meuFoco.position.set(0, MESA_TOPO + 0.005, 1.55);
+meuFoco.scale.y = 0.55;
+scene.add(meuFoco);
+let minhaVez = false;
+
 // ---------------------------------------------------------------------------
 // A sua mão, presa à câmera
 // ---------------------------------------------------------------------------
@@ -1560,6 +1573,7 @@ async function sincroniza(primeira) {
       });
       a.leque.visible = p.handCount > 0;
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
+      minhaVez = view.turnId === me() && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
       a.apagado = (p.desistiu || (!p.isBot && !p.connected));
       for (const m of a.materiais) m.opacity = a.apagado ? 0.4 : 1;
     }
@@ -1581,6 +1595,8 @@ async function sincroniza(primeira) {
     const topoId = topo ? topo.id : null;
     if (topoId !== descarte.topoId) {
       descarte.topoId = topoId;
+      // a caixa da pilha nasce com geometria própria a cada carta: solta antes
+      for (const c of descarte.grupo.children) if (c.geometry && c.geometry !== geoCarta) c.geometry.dispose();
       descarte.grupo.clear();
       if (topo) {
         const alturaPilha = 0.02 + view.discardCount * 0.0016;
@@ -1681,8 +1697,14 @@ function trocaRotulo(sprite, texto) {
   if (sprite.userData.texto === texto) return;
   sprite.userData.texto = texto;
   const novo = rotulo(texto, 'rgba(27,17,11,0.9)', '#f2c14e');
+  // A textura de antes vai embora: cada troca criava um canvas de 256×72 na
+  // GPU e nunca soltava — contagem de cartas e monte trocam a cada jogada, e
+  // numa partida de sete rodadas isso virava um vazamento lento no celular.
+  const velha = sprite.material.map;
   sprite.material.map = novo.material.map;
   sprite.material.needsUpdate = true;
+  velha?.dispose();
+  novo.material.dispose();
 }
 
 // reações: cara e pulo, como na mesa normal
@@ -1875,6 +1897,11 @@ function quadro(t) {
       face.position.y = face.userData.alvo.y + (1 - e) * 0.3;
     }
   }
+
+  // o foco da sua vez pulsa como o dos outros, um pouco mais discreto: ele
+  // está perto da câmera e não precisa gritar
+  const alvoMeu = minhaVez ? 0.22 + Math.sin(t / 500) * 0.07 : 0;
+  meuFoco.material.opacity += (alvoMeu - meuFoco.material.opacity) * 0.1;
 
   quadro.n = (quadro.n || 0) + 1;
   if (quadro.n % 4 === 0) renderer.shadowMap.needsUpdate = true;
