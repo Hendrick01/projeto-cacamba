@@ -44,11 +44,16 @@ export function contornoDe(malha) {
 
 // O material que vem do glTF (PBR: baseColor, metal, rugosidade) vira o
 // material do elenco: mesma cor e mesma textura, mas sombreado em degraus.
-// Metal e rugosidade não têm o que dizer num desenho e são ignorados.
+// Metal e rugosidade não têm o que dizer num desenho e são ignorados; o
+// normal map, se houver, fica.
 function materialDoElenco(m) {
   const toon = new THREE.MeshToonMaterial({
     color: m.color ? m.color.clone() : new THREE.Color(0xffffff),
     map: m.map || null,
+    // o normal map fica: dobras de roupa e mechas assadas de uma escultura
+    // entram nos degraus do sombreamento sem custar triângulos
+    normalMap: m.normalMap || null,
+    normalScale: m.normalScale ? m.normalScale.clone() : undefined,
     gradientMap: GRADIENTE_TOON,
     transparent: true,
     opacity: m.opacity ?? 1,

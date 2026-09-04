@@ -608,6 +608,19 @@ leque e, num modelo externo, a boca da fala moram no grupo do assento, não no
 corpo: giram em volta do mesmo eixo, a partir de uma base guardada
 (`lequeBase`, `bocaBase`). Quem caiu não vira.
 
+**A Gabizinsky esculpida** (2026-09-04): `public/models/gabizinsky.glb`
+passou a ser a redução de uma escultura do usuário (1,95 milhão de
+triângulos, que na verdade eram as quatro vistas da ficha numa malha só, 487
+mil cada) para 29.995 triângulos com cor, normal map e metal/rugosidade em
+1024 px. Dois scripts de bancada fazem esse caminho e ficam em `test/`:
+`modelo-recorta.mjs` (separa as figuras pelos vazios em x, acha a que olha
+para +Z pela ponta dos pés, grava só ela) e `modelo-prepara.mjs` (solda,
+reduz com o `@gltf-transform/cli` via `npx`, encolhe texturas, injeta
+`Cabeca` e, se pedido, as mãos). O estilo do elenco passou a manter o
+**normal map** do material original. A escultura está em pé, sem esqueleto: a
+mesa a mostra em pé, com o leque na posição padrão; sentar é trabalho de rig
+na ferramenta de modelagem. Detalhes em `public/models/LEIA-ME.md`.
+
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a
 sombra é o que dá volume), e nada de sobras, troca de coringa, encaixe ou

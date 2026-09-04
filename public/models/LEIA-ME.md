@@ -21,7 +21,7 @@ terceiros com identidade própria — o critério é o mesmo do elenco em SVG.
 | Frente | olhando para **+Z**. A mesa vira o personagem para a mesa |
 | Pose | **sentado**, mãos à frente na altura do peito (é onde o leque de cartas entra: ~1,02 m do chão, 0,17 m à frente) |
 | Polígonos | até ~30 mil triângulos por personagem (o trio de teste de 2026-09-04 veio com 25–30 mil e roda; o contorno do elenco desenha cada malha duas vezes, então menos é melhor no celular); texturas até 1024×1024 |
-| Materiais | cor chapada, como o elenco. PBR simples (`baseColor`, com ou sem textura, sem metal): a mesa troca pelo sombreamento dela em três degraus, com contorno (veja abaixo) |
+| Materiais | cor chapada, como o elenco. PBR simples (`baseColor`, com ou sem textura, sem metal): a mesa troca pelo sombreamento dela em três degraus, com contorno (veja abaixo). Normal map, se vier, fica: dobras e mechas assadas de uma escultura entram nos degraus sem custar triângulos |
 
 ## Nós com nome (opcionais, mas é o que liga as coisas)
 
@@ -52,6 +52,37 @@ Ponha o arquivo em `public/models/<slug>.glb` **e** acrescente o slug em
 A mesa lê essa lista uma vez e só pede os modelos que estão nela — sem a
 lista, ela não tenta às cegas (era um erro 404 no console por assento sem
 modelo).
+
+## Do arquivo esculpido ao `.glb` da mesa
+
+Uma escultura de milhões de triângulos (ou uma "ficha" com frente, lado e
+costas exportada como malha única) vira modelo de jogo com dois scripts, que
+usam o `@gltf-transform/cli` pelo `npx` (baixa sozinho na primeira vez):
+
+```bash
+node test/modelo-recorta.mjs ficha.glb frente.glb --frente
+```
+
+separa as figuras pelos vazios no eixo x, descobre para onde cada uma olha
+pela ponta dos pés e grava só a que olha para +Z, recentrada, com material e
+texturas. Pule este passo se o arquivo já traz uma figura só.
+
+```bash
+node test/modelo-prepara.mjs frente.glb public/models/<slug>.glb --tri 30000 --cabeca 0.91
+```
+
+solda vértices, reduz para o orçamento (`--tri`), encolhe as texturas para
+1024 px e injeta o nó `Cabeca` na fração da altura dada (`--cabeca 0.91` é a
+cabeça de alguém em pé; sentado, algo como 0.88). Com `--maos x,y,z` injeta
+também `MaoDir`/`MaoEsq` (a esquerda espelhada); sem isso o leque fica na
+posição padrão. Depois: abrir no provador e pôr o slug na lista.
+
+A Gabizinsky de 2026-09-04 veio assim: ficha de 1,95 milhão de triângulos com
+as quatro vistas numa malha só → figura da frente com 510 mil → 29.995
+triângulos e 1,4 MB, com cor, normal map e metal/rugosidade em 1024 px. O que
+o fluxo NÃO faz: pose. A escultura veio em pé, e a mesa a mostra em pé, com o
+leque na posição padrão à frente do peito. Sentar exige esqueleto (rig) e uma
+pose ou clip — é o próximo passo na ferramenta de modelagem.
 
 ## Como conferir
 
