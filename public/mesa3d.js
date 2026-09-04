@@ -277,6 +277,42 @@ function texturaMadeira(repeticoes) {
   scene.add(pe);
 }
 
+// Objetos de escala no tampo: sem eles as cartas flutuam num campo verde —
+// é o copo que diz o tamanho da carta (referência: os copinhos e fichas do
+// Capote). Ficam na beirada de quem olha, fora da área de jogo. Vidro barato:
+// sem passe de transmissão, que pesa em celular; a transparência simples e o
+// dedo de bebida âmbar dentro bastam para ler como copo.
+{
+  const objetos = new THREE.Group();
+  const cortica = new THREE.MeshStandardMaterial({ color: 0xa8865a, roughness: 0.92, metalness: 0 });
+  const portaCopos = (x, z) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.008, 24), cortica);
+    m.position.set(x, MESA_TOPO + 0.004, z);
+    m.castShadow = true; m.receiveShadow = true;
+    objetos.add(m);
+    return m;
+  };
+  portaCopos(1.5, 0.85);
+  portaCopos(-1.45, 0.95);
+  const vidro = new THREE.MeshStandardMaterial({
+    color: 0xdfe8e6, transparent: true, opacity: 0.32, roughness: 0.12, metalness: 0.08, side: THREE.DoubleSide, depthWrite: false,
+  });
+  const copo = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.044, 0.13, 20, 1, true), vidro);
+  copo.position.set(1.5, MESA_TOPO + 0.008 + 0.065, 0.85);
+  copo.castShadow = true;
+  const fundoCopo = new THREE.Mesh(new THREE.CircleGeometry(0.044, 20), vidro);
+  fundoCopo.rotation.x = -Math.PI / 2;
+  fundoCopo.position.set(1.5, MESA_TOPO + 0.009, 0.85);
+  const bebida = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.047, 0.042, 0.045, 20),
+    new THREE.MeshStandardMaterial({ color: 0xc9822a, transparent: true, opacity: 0.9, roughness: 0.25, metalness: 0 }),
+  );
+  bebida.position.set(1.5, MESA_TOPO + 0.009 + 0.0225, 0.85);
+  bebida.castShadow = true;
+  objetos.add(copo, fundoCopo, bebida);
+  scene.add(objetos);
+}
+
 // a cúpula da lâmpada, pendurada sobre o meio
 {
   const cupula = new THREE.Mesh(
