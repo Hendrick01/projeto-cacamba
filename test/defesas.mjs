@@ -94,5 +94,21 @@ const vivo = async () => (await pedido('/')) === 200;
   ws.close(); olheiro.close();
 }
 
-console.log(falhas ? `\nDEFESAS FALHARAM: ${falhas}` : '\nDEFESAS OK: 8/8');
+// 6. Cabeçalhos de segurança e as fontes servidas daqui.
+{
+  const cab = await new Promise((resolve) => {
+    const req = http.request({ host: 'localhost', port: PORT, path: '/', method: 'GET' }, (res) => { res.resume(); resolve(res.headers); });
+    req.on('error', () => resolve({})); req.end();
+  });
+  ok(/script-src 'self'/.test(cab['content-security-policy'] || '') && /frame-ancestors 'none'/.test(cab['content-security-policy'] || ''), 'a página vem com CSP (script só daqui, sem embutir em outro site)');
+  ok(cab['x-content-type-options'] === 'nosniff' && !!cab['referrer-policy'] && cab['x-frame-options'] === 'DENY', 'nosniff, referrer-policy e x-frame-options presentes');
+  ok(/microphone=\(self\)/.test(cab['permissions-policy'] || '') && /camera=\(\)/.test(cab['permissions-policy'] || ''), 'microfone liberado só para esta origem; câmera fechada');
+  const fonte = await new Promise((resolve) => {
+    const req = http.request({ host: 'localhost', port: PORT, path: '/fonts/nunito-latin.woff2', method: 'GET' }, (res) => { res.resume(); resolve({ status: res.statusCode, tipo: res.headers['content-type'], cache: res.headers['cache-control'] }); });
+    req.on('error', () => resolve({})); req.end();
+  });
+  ok(fonte.status === 200 && fonte.tipo === 'font/woff2' && /max-age/.test(fonte.cache || ''), `a fonte sai daqui como font/woff2 e com cache (${fonte.status}, ${fonte.tipo})`);
+}
+
+console.log(falhas ? `\nDEFESAS FALHARAM: ${falhas}` : '\nDEFESAS OK: 12/12');
 process.exit(falhas ? 1 : 0);

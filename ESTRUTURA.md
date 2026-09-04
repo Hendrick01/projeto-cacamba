@@ -1017,15 +1017,35 @@ Uma auditoria de 2026-08-28 achou três jeitos de derrubar o processo de fora
 | `WebSocketServer` | `maxPayload` padrão de 100 MiB, cada mensagem passando por `JSON.parse` | 16 KB |
 | `'message'` | sem freio; `claim`/`unclaim` geram broadcast do estado inteiro para a mesa toda | **não feito.** Um contador por segundo (60/s, depois 300/s) fechava os clientes roteirizados do e2e e do sobra.mjs, que agem no mesmo tick do estado, e as partidas estouravam o tempo. O certo é limite de conexões por IP e freio só em `claim`/`unclaim` |
 
-O que ficou **anotado e não feito**, por ordem: fixar `PUBLIC_URL` no
-`render.yaml` (hoje o host do convite vem de `x-forwarded-host`); cabeçalhos
-de segurança (CSP, `X-Content-Type-Options`, `Referrer-Policy`); servir as
-fontes de `public/` em vez do Google Fonts (a única dependência externa da
-tela, e vaza o IP de quem joga); conferir `Origin` no upgrade quando
-`PUBLIC_URL` existir; código de sala com 5 letras (4 dá 331.776, varrível em
-~1 min sem freio por IP — o freio por conexão de hoje não cobre muitas
-conexões). O que já estava certo e vale saber: estáticos presos às raízes,
-só `err.gameRule` chega ao cliente, tokens por `crypto.randomUUID`, todo
+**Feito em 2026-09-04, a segunda leva:**
+
+- **`PUBLIC_URL` no `render.yaml`.** O link de convite e o QR nunca mais
+  dependem de `x-forwarded-host` — que um cliente forjado podia tentar pôr num
+  clone. E é ele que liga o HSTS no servidor.
+- **Cabeçalhos de segurança** em tudo o que sai (`CABECALHOS_SEGUROS`):
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-Frame-Options:
+  DENY`, `Permissions-Policy` com o microfone liberado só para esta origem (é o
+  chat de voz) e câmera e localização fechadas; HSTS quando `PUBLIC_URL` é
+  https. E a **CSP** nas páginas: script, fonte e som só daqui; `data:` para
+  imagens (o QR da sala e as figuras do elenco entram como data URL);
+  `unsafe-inline` só para estilo (a mesa põe `style=` pelo JS); `frame-ancestors
+  'none'`. Não há script inline em lugar nenhum, então `script-src 'self'`
+  fecha a porta da XSS que a auditoria não achou mas não podia descartar.
+- **As fontes servidas de `public/fonts/`** (`fontes.css` + quatro `.woff2`
+  do próprio Google Fonts, licença OFL ao lado). Era a única dependência
+  externa da tela: vazava o IP de quem joga a cada abertura e deixava a mesa
+  sem tipografia quando a rede falhava. A Nunito é variável — um arquivo serve
+  700, 800 e 900 —, e só entram os subconjuntos latin e latin-ext, que cobrem
+  o português; os `unicode-range` são os do Google. `.woff2` ganhou MIME e o
+  mesmo cache da arte.
+
+`test/defesas.mjs` confere os cabeçalhos e a fonte (12/12).
+
+O que ficou **anotado e não feito**: conferir `Origin` no upgrade do
+WebSocket; código de sala com 5 letras (4 dá 331.776, varrível em ~1 min sem
+freio por IP); limite de conexões por IP e freio só em `claim`/`unclaim`. O
+que já estava certo e vale saber: estáticos presos às raízes, só
+`err.gameRule` chega ao cliente, tokens por `crypto.randomUUID`, todo
 `innerHTML` com nome passa por `escapeHTML`, `npm audit` limpo.
 
 ### Variáveis de ambiente

@@ -21,5 +21,10 @@ services:
       # endereço interno, e ninguém conseguiria entrar na sala pelo celular.
       - key: TRUST_PROXY
         value: "1"
+      # Endereço público fixo. Com ele, o link de convite e o QR nunca dependem
+      # do cabeçalho x-forwarded-host — que é o que um cliente forjado poderia
+      # tentar pôr num clone. E é ele que liga o HSTS no servidor.
+      - key: PUBLIC_URL
+        value: "https://projeto-cacamba.onrender.com"
       - key: NODE_VERSION
         value: "22"

@@ -37,6 +37,37 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.webp': 'image/webp',
+  '.woff2': 'font/woff2',
+};
+
+// Cabeçalhos de segurança do que sai daqui. A CSP diz ao navegador de onde a
+// página pode carregar cada coisa: só daqui (script, fonte, som), mais `data:`
+// para imagens (o QR da sala e as figuras do elenco entram como data URL) e
+// `unsafe-inline` para estilo (a mesa põe `style=` em elementos pelo JS). Sem
+// script inline em lugar nenhum, `script-src 'self'` fecha a porta da XSS que
+// a auditoria não achou mas também não podia descartar. `frame-ancestors
+// 'none'` impede que outro site embuta o jogo. O microfone fica liberado só
+// para esta origem — é o chat de voz; câmera e localização, fechadas.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self' ws: wss:",
+  "media-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+const CABECALHOS_SEGUROS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'DENY',
+  'Permissions-Policy': 'camera=(), geolocation=(), microphone=(self)',
+  // HSTS só faz sentido onde há TLS, e só o deploy sabe que há: PUBLIC_URL.
+  ...(/^https:/.test(process.env.PUBLIC_URL || '') ? { 'Strict-Transport-Security': 'max-age=31536000' } : {}),
 };
 
 // O que vale comprimir: texto. SVG é texto, e é o grosso do peso do jogo — as
@@ -115,12 +146,14 @@ const server = http.createServer((req, res) => {
       // velha). Com `private`, quem guarda é o navegador de cada um: o ganho de
       // não repetir o download continua, e a janela de arte velha depois de um
       // deploy deixa de ser coletiva.
-      const arte = file.startsWith('/assets/');
+      const arte = file.startsWith('/assets/') || file.startsWith('/fonts/');
       const cabecalho = {
         'Content-Type': MIME[ext] || 'application/octet-stream',
         'Cache-Control': arte ? 'private, max-age=300, must-revalidate' : 'no-cache',
         ETag: etag,
         Vary: 'Accept-Encoding',
+        ...CABECALHOS_SEGUROS,
+        ...(ext === '.html' ? { 'Content-Security-Policy': CSP } : {}),
       };
       if (req.headers['if-none-match'] === etag) {
         res.writeHead(304, cabecalho);
