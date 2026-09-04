@@ -390,17 +390,25 @@ function applyLayoff(meld, card, opt) {
   }
 }
 
-// Cartas que podem ser retiradas de um jogo com sobra para descarte:
-// sequência com mais de 4 cartas → só as pontas; trinca com mais de 3 →
-// qualquer uma, desde que sobrem 3+ cartas com 3+ naipes distintos.
+// Cartas que estão SOBRANDO num jogo da mesa — as que podem sair dele sem
+// desmanchá-lo: sequência com mais de 4 cartas → só as pontas; trinca com mais
+// de 3 → qualquer uma, desde que sobrem 3+ cartas com 3+ naipes distintos.
+//
+// O que se faz com a sobra são três portas, todas em cima desta lista:
+// baixar com ela na hora (`actBaixar` com `sobra`), levá-la para a mão
+// (`actTomarSobra`) e descartá-la direto (`actMeldDiscard`). Vale para jogo
+// de qualquer um, seu ou de adversário.
+//
+// Regra da casa confirmada pelo usuário (2026-08-28): o coringa na ponta de
+// uma sequência com carta a mais sobra como qualquer outra — antes ele era
+// filtrado daqui, e a única saída dele era a troca pela carta real. Note o
+// que isso libera: descartar um coringa que sobrava tranca o meio
+// (`CORINGA_DESCARTADO_TRANCA`), então a jogada defensiva de quem tem um
+// coringa caro na mão agora também existe com o coringa da mesa.
 export function removableCards(meld) {
   if (meld.type === 's') {
     if (meld.cards.length <= 4) return [];
-    // O coringa nunca sai por aqui: a única porta de saída dele é a troca pela
-    // carta real. Descartá-lo da ponta jogaria fora uma carta escassa e, pior,
-    // colocaria um coringa no lixo para qualquer um comprar — furando a
-    // exigência de ter exatamente a carta que ele representa.
-    return [meld.cards[0], meld.cards[meld.cards.length - 1]].filter((c) => !isJoker(c));
+    return [meld.cards[0], meld.cards[meld.cards.length - 1]];
   }
   if (meld.cards.length <= 3) return [];
   return meld.cards.filter((card) => {
@@ -969,13 +977,16 @@ export function actDiscard(state, playerId, cardId) {
   return events;
 }
 
-// Descartar tirando carta de um jogo próprio com sobra (em vez da mão)
+// Descartar tirando a carta que sobra num jogo da mesa (em vez da mão). De
+// qualquer jogo, seu ou de adversário — regra da casa confirmada pelo usuário
+// em 2026-08-28; antes valia só para jogo próprio. Tirar do jogo alheio é
+// jogada de verdade: encurta o jogo do outro sem dar nada em troca.
 export function actMeldDiscard(state, playerId, meldId, cardId) {
   if (state.phase !== 'play') fail('Puxe uma carta antes de descartar.');
   const player = state.players[state.turn];
   if (player.id !== playerId) fail('Não é a sua vez.');
-  const meld = player.melds.find((m) => m.id === meldId);
-  if (!meld) fail('Você só pode descartar de um jogo seu.');
+  const meld = meldById(state, meldId);
+  if (!meld) fail('Esse jogo não está na mesa.');
   const allowed = removableCards(meld);
   if (!allowed.some((c) => c.id === cardId)) {
     fail('Só dá para tirar carta de sequência com mais de 4 cartas (pelas pontas) ou trinca com mais de 3.');
@@ -983,10 +994,33 @@ export function actMeldDiscard(state, playerId, meldId, cardId) {
   const card = removeFromMeld(meld, cardId);
   card.by = playerId;
   state.discard.push(card);
-  const events = [{ e: 'meldDiscard', p: playerId, card: { ...card }, meldId }];
+  const events = [{ e: 'meldDiscard', p: playerId, card: { ...card }, meldId, deQuem: meld.ownerId }];
   advanceTurn(state);
   if (state.turnNo > state.opts.maxTurnsPerRound) return endRoundDead(state, events);
   return events;
+}
+
+// Levar para a MÃO a carta que sobra num jogo da mesa, seu ou de adversário.
+// É a terceira porta da sobra, ao lado de baixar com ela na hora e de
+// descartá-la direto. Regra da casa confirmada pelo usuário (2026-08-28):
+// antes a sobra só saía da mesa se fosse para descer num jogo no mesmo gesto.
+//
+// Ação livre da fase de jogo, como o encaixe: não passa a vez, e o descarte
+// continua obrigatório depois. A mão só cresce aqui, então a trava de "não
+// ficar com menos de duas cartas sem contrato" não se aplica.
+export function actTomarSobra(state, playerId, meldId, cardId) {
+  if (state.phase !== 'play') fail('Puxe uma carta antes de mexer na mesa.');
+  const player = state.players[state.turn];
+  if (player.id !== playerId) fail('Não é a sua vez.');
+  const meld = meldById(state, meldId);
+  if (!meld) fail('Esse jogo não está na mesa.');
+  const allowed = removableCards(meld);
+  if (!allowed.some((c) => c.id === cardId)) {
+    fail('Essa carta não está sobrando: só dá para tirar de sequência com mais de 4 cartas (pelas pontas) ou trinca com mais de 3.');
+  }
+  const card = removeFromMeld(meld, cardId);
+  player.hand.push(card);
+  return [{ e: 'tomouSobra', p: playerId, card: { ...card }, meldId, deQuem: meld.ownerId }];
 }
 
 function advanceTurn(state) {
@@ -1309,6 +1343,7 @@ export function applyAction(state, playerId, action) {
     case 'swapJoker': return actSwapJoker(state, playerId, action.meldId, action.cardId, action.destMeldId || null);
     case 'discard': return actDiscard(state, playerId, action.cardId);
     case 'meldDiscard': return actMeldDiscard(state, playerId, action.meldId, action.cardId);
+    case 'tomarSobra': return actTomarSobra(state, playerId, action.meldId, action.cardId);
     default: fail('Ação desconhecida.');
   }
 }

@@ -904,14 +904,20 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
 }
 .meld .card.mini.removable { outline: 3px solid var(--danger); outline-offset: -2px; cursor: pointer; }
 
-/* Carta sobrando num jogo da mesa que fecha um jogo meu agora. Sai da fileira
-   e pisca: é um alvo de toque, e ela só se move se for para baixar na hora. */
+/* Carta sobrando num jogo da mesa. Sai da fileira e pisca: é um alvo de toque.
+   Em âmbar, com cartas escolhidas na mão, ela desce num jogo seu na hora; em
+   sálvia, sem nada escolhido, ela vem para a mão (`.para-mao`). A cor é o que
+   diz qual dos dois o toque vai fazer — o gesto é o mesmo. */
 .meld .card.mini.puxavel {
   cursor: pointer;
   transform: translateY(-7px);
   outline: 3px dashed var(--gold);
   outline-offset: 1px;
   animation: pulsaCoringa 1.5s ease-in-out infinite;
+}
+.meld .card.mini.puxavel.para-mao {
+  outline-color: var(--sage);
+  animation-duration: 2.4s;   /* mais calma: é opção, não oportunidade */
 }
 @media (prefers-reduced-motion: reduce) {
   .meld .card.mini.puxavel { animation: none; }

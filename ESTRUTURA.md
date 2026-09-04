@@ -55,12 +55,14 @@ projeto-caçamba/
 |---|---:|---|
 | [`shared/engine.js`](shared/engine.js) | 1314 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
 | [`public/client.js`](public/client.js) | 1879 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
-| [`server.js`](server.js) | 578 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
+| [`server.js`](server.js) | 656 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
 | [`public/style.css`](public/style.css) | 1123 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
 | [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
 | [`test/e2e.mjs`](test/e2e.mjs) | 134 | **Três** jogadores roteirizados jogam 7 rodadas contra o servidor real por WebSocket. Três porque a compra fora da vez precisa de alguém que não seja nem quem está na vez nem quem descartou — e o teste falha se ninguém pedir carta, para essa cobertura não morrer em silêncio. |
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
+| [`test/sobra.mjs`](test/sobra.mjs) | 189 | As três portas da sobra pelo fio: **quatro** jogadores roteirizados (com três é um baralho só, e a quarta carta de cada valor é uma), baixando um jogo por vez para abrir a janela dos encaixes — é dos encaixes que as sobras nascem. A Ana leva uma sobra alheia para a mão e descarta outra, conferindo o estado que volta. Sai com código 2 quando o sorteio não gera sobra: rodar de novo. |
+| [`test/aliados.mjs`](test/aliados.mjs) | 67 | Ferramenta de QA, não teste: entram numa sala que você criou no navegador e jogam gerando sobras rápido, para conferir a TELA com sobra na mesa. `node test/aliados.mjs CODIGO`. |
 | [`public/mesa3d.js`](public/mesa3d.js) | 1358 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`shared/mao.js`](shared/mao.js) | 53 | A ordem das cartas na sua mão: a ordenação automática e o reordenar do arrasto. Vive em `shared/` para poder ser testada sem navegador — ver `test/mao.test.js`. |
@@ -190,11 +192,40 @@ coringa onde estava, sem o jogador ter pedido isso.
 duas cobram um preço: a troca exige a carta exata; o resgate exige esticar a
 sequência de outra pessoa — o que dá a ela uma carta a mais na mesa.
 
+Desde 2026-08-28 existe uma terceira, mais barata: se a sequência já tem carta
+a mais e o coringa está **na ponta**, ele é sobra como qualquer outra carta —
+pode vir para a mão ou ir para o meio (ver "Carta que está sobrando na mesa").
+
 **Carta que está sobrando na mesa.** Uma carta que sobra num jogo já baixado —
 sequência com mais de 4, trinca com mais de 3, as mesmas de `removableCards` —
-pode ser puxada para **fechar um jogo que desce na hora**, seu ou de qualquer
-um. A regra do usuário é a condição: **só se for para baixar**, nunca para
-ficar na mão. Vai no mesmo `actBaixar`, no argumento `sobra: { meldId, cardId }`:
+pode sair dele, **seja o jogo seu ou de qualquer adversário**, por **três
+portas**. Foram confirmadas pelo usuário em 2026-08-28; até então só a
+primeira existia, e com a condição "só se for para baixar, nunca para ficar na
+mão", que caiu:
+
+1. **Baixar com ela na hora** — `actBaixar` com `sobra: { meldId, cardId }`, abaixo.
+2. **Trazê-la para a mão** — `actTomarSobra`. Ação livre da fase de jogo, como o
+   encaixe: não passa a vez e o descarte continua obrigatório depois. A mão só
+   cresce, então a trava das duas cartas não se aplica.
+3. **Descartá-la direto** — `actMeldDiscard`, que passa a vez como qualquer
+   descarte. Tirar do jogo alheio é jogada de verdade: encurta o jogo do outro
+   sem dar nada em troca.
+
+Na tela, o toque numa carta que sobra faz uma das três coisas conforme o que
+está escolhido na mão: com cartas escolhidas que fechem um jogo junto com ela,
+desce na hora; sem nada escolhido, vem para a mão; no modo "descartar de jogo",
+vai para o meio. O botão desse modo aparece se **qualquer** jogo da mesa tem
+sobra, não só os seus.
+
+**O coringa da ponta sobra como qualquer carta.** Numa sequência com carta a
+mais, o coringa que está na ponta entra na lista — e por isso pode ser trazido
+para a mão ou descartado. Descartá-lo põe um coringa no topo do meio, que
+**tranca** (`CORINGA_DESCARTADO_TRANCA`): a jogada defensiva de quem tem um
+coringa caro na mão passa a existir também com o coringa da mesa. Antes ele era
+filtrado de `removableCards` justamente para isso não acontecer; a decisão foi
+revista pelo usuário.
+
+A primeira porta vai no mesmo `actBaixar`, no argumento `sobra: { meldId, cardId }`:
 
 ```jsonc
 { "t": "action", "action": { "a": "baixar", "cardIds": [12, 34], "sobra": { "meldId": 7, "cardId": 55 } } }
@@ -295,7 +326,7 @@ vêm primeiro**, então o solver só queima coringa quando não tem alternativa.
 |---|---|
 | `layoffOption(card, meld, coringasRemovidos = 0, preferredEnd = null)` | A carta encaixa neste jogo? Coringa da mão estica sequência por **qualquer ponta** (respeitando o limite) e é recusado em trinca. `coringasRemovidos` pergunta "e se eu tirasse N coringas daqui antes?" — é o que a troca usa para validar sem mexer no estado. `preferredEnd` (`'lo'`/`'hi'`) escolhe a ponta quando as duas servem; sem ele, coringa vai para a alta. |
 | `layoffEnds(card, meld, coringasRemovidos = 0)` | Em quais pontas a carta encaixa (`['lo','hi']`…). A tela usa para perguntar a ponta ao jogador quando as duas valem (coringa, ou o Ás numa sequência de 2 a K). |
-| `removableCards(meld)` | Cartas que dá para tirar de um jogo com sobra: para descartar, ou para puxar e baixar na hora. **Nunca devolve coringa.** |
+| `removableCards(meld)` | As cartas que estão **sobrando** num jogo da mesa (sequência com mais de 4: só as pontas; trinca com mais de 3: qualquer uma que deixe 3 naipes). É a lista em cima da qual as três portas da sobra funcionam. **Devolve o coringa da ponta** desde 2026-08-28 — antes ele era filtrado. |
 | `sobrasNaMesa(state)` · `sobraFechaJogo(mão, sobra, alvo, opts)` | O que está sobrando na mesa, e se uma carta dessas fecha jogo com o que está escolhido na mão. A tela acende o alvo com a segunda — mesma função que o juiz usa. |
 
 ### Descarte
@@ -340,7 +371,8 @@ descartar) → `roundEnd` → próxima rodada → … → `gameEnd`.
 | `planBaixada(hand, remaining, cardIds?, opts?)` | O plano do `actBaixar`, compartilhado com a tela e o bot: quais jogos descem agora, maximizando cartas usadas. O teto de jogos vem do tamanho do bolo, não do contrato — quem usa `remaining` é a flag `completa`, que decide se dá para esvaziar a mão. |
 | `actLayoff(state, playerId, cardId, meldId, end?)` | Encaixa uma carta em qualquer jogo da mesa — seu ou dos outros. Só depois de ter baixado. `end` escolhe a ponta quando a carta serve nas duas. |
 | `actSwapJoker(state, playerId, meldId, cardId, destMeldId?)` | **Troca o coringa pela carta real.** Só na vez do jogador; não exige ter baixado. `destMeldId` só é usado quando `SWAP_JOKER_SAME_TURN` está ligado. |
-| `actDiscard` / `actMeldDiscard` | Descarta da mão, ou de um jogo seu com sobra, e passa a vez. |
+| `actDiscard` / `actMeldDiscard` | Descarta da mão, ou a carta que sobra num jogo **de qualquer um** (seu ou de adversário), e passa a vez. |
+| `actTomarSobra` | Leva para a mão a carta que sobra num jogo da mesa, de qualquer um. Ação livre da fase de jogo, como o encaixe: não passa a vez. |
 | `actNextRound` | Avança do placar para a rodada seguinte. |
 | `applyAction(state, playerId, action)` | Despachante genérico que o servidor usa para humanos e bots. |
 
@@ -460,13 +492,21 @@ voltar está sempre à vista.
 O que ela desenha ([`public/mesa3d.js`](public/mesa3d.js)): o salão em neblina
 (a penumbra por distância de verdade), a mesa redonda sob a lâmpada, o elenco
 sentado em volta **segurando o leque de cartas viradas**, o monte como caixa
-com altura proporcional ao baralho, o descarte deitado no feltro, os jogos
-baixados na frente de quem baixou, a sua mão em leque com **as suas mãos
-segurando** (polegar e palma na frente das cartas, no tom de pele do seu
-personagem — mão de dedos esticados lia como aceno). As figuras vão para
-textura a 512×1024: anéis, pulseiras e correntes são traços de poucas unidades
-num quadro de 400, e a 256 eles derretem. Reações (cara feliz/bravo, pulo)
-respondem aos mesmos eventos da mesa normal.
+com altura proporcional ao baralho, o descarte e os jogos baixados **em pé**
+sobre o feltro (a carta que cai gira no ar), a sua mão em leque com **as suas
+mãos segurando** — uma textura só, desenhada com os mesmos traços das mãos da
+mesa 2D e espelhada para o outro lado (`texturaMao2D`), no tom de pele do seu
+personagem. Reações (boca feliz/brava, pulo) respondem aos mesmos eventos da
+mesa normal.
+
+O que ela **ainda não tem**, conferido no código em 2026-08-28: nenhuma sombra
+projetada (`shadowMap` nunca é ligado; a única sombra é um disco escuro sob
+cada assento), materiais chapados sem trama nem veio, cartas sem espessura e
+de face única, o leque dos adversários travado em 5 cartas, nenhum sinal 3D da
+sua própria vez, e nada de sobras, troca de coringa, encaixe ou placar — para
+essas, o botão manda de volta à mesa normal. Sem `dispose()` nos rótulos e no
+descarte recriados a cada estado (vazamento lento), e o `requestAnimationFrame`
+não para com a aba escondida. A lista de melhorias parte daí.
 
 A biblioteca (`public/vendor/three.module.js`, ~675 KB, 167 KB com gzip) **só é
 baixada quando se abre o 3D** — a mesa normal continua nos 181 KB. Vendida no
@@ -476,12 +516,10 @@ dependência de fora no navegador).
 O salão existe em volta da mesa — parede circular de azulejo, a porta aberta
 com a luz da rua, engradados —, tudo forma simples: a neblina come o detalhe
 que estiver longe. As **mãos** seguem a construção do elenco (silhueta chapada,
-contorno uniforme, halo): uma **segura o leque** (polegar cruzando a frente das
-cartas, palma embaixo, indicador espiando na lateral), a outra **descansa na
-beirada da mesa** — e recebem a mesma luz da cena, senão brilham como neon. Os
-adversários seguram o leque deles na altura das mãos da figura, com as pontas
-dos dedos (no tom de pele de cada um) por cima do verso: sem os dedos, o leque
-flutua na frente do peito.
+contorno uniforme, halo) e recebem a mesma luz da cena, senão brilham como
+neon. Os adversários seguram o leque deles na altura das mãos da figura, com
+as pontas dos dedos (no tom de pele de cada um) por cima do verso: sem os
+dedos, o leque flutua na frente do peito.
 
 **Os personagens são 3D de verdade** — bonecos montados por código, de
 primitivas iluminadas (`montaBoneco` + `ESPEC_BONECO`): cabeça, tronco, braços
@@ -855,6 +893,32 @@ cada rosto tem de sinal dominante a 48 px) estão documentadas em
 Único dono do estado da partida: o cliente só pede, o servidor decide e reenvia a
 visão de cada um. Nenhuma regra é confiada ao navegador.
 
+### Limites e defesas
+
+Uma auditoria de 2026-08-28 achou três jeitos de derrubar o processo de fora
+(com todas as salas junto) e um de jogar pelos robôs. Todos eram pequenos:
+
+| Onde | O que era | O que ficou |
+|---|---|---|
+| `wss.on('connection')` | o socket não tinha ouvinte de `'error'`: um frame malformado (sem máscara, UTF-8 inválido) virava exceção não tratada e matava o processo | `ws.on('error')` que só registra |
+| `http.createServer` | `new URL(req.url, …)` lança para alvos como `//[`; dentro do listener, derrubava o processo | `try/catch` → 400 |
+| `makeCode` + `create` | `create` em loop criava salas permanentes até acabar a memória; perto dos 331.776 códigos o sorteio virava `while` infinito | `MAX_SALAS` (500) e sorteio que desiste depois de 64 tentativas |
+| `attach` | `create`/`join`/`resume` no mesmo socket deixavam o assento antigo `connected: true` para sempre — e a limpeza só apaga sala sem humano conectado | `detach` antes de anexar, o mesmo que o `'close'` faz |
+| `resume` | robôs têm token vazio e id público: `resume` com token `""` anexava o socket a um robô — dava para ver a mão dele e jogar por ele | filtro `!isBot && token` |
+| `WebSocketServer` | `maxPayload` padrão de 100 MiB, cada mensagem passando por `JSON.parse` | 16 KB |
+| `'message'` | sem freio; `claim`/`unclaim` geram broadcast do estado inteiro para a mesa toda | mais de 300 mensagens num segundo fecha a conexão (código 1008). Gente não passa de ~5/s; o teto é alto porque os clientes roteirizados dos testes passam de 100/s nas rajadas — com 60/s o e2e estourava o tempo |
+
+O que ficou **anotado e não feito**, por ordem: fixar `PUBLIC_URL` no
+`render.yaml` (hoje o host do convite vem de `x-forwarded-host`); cabeçalhos
+de segurança (CSP, `X-Content-Type-Options`, `Referrer-Policy`); servir as
+fontes de `public/` em vez do Google Fonts (a única dependência externa da
+tela, e vaza o IP de quem joga); conferir `Origin` no upgrade quando
+`PUBLIC_URL` existir; código de sala com 5 letras (4 dá 331.776, varrível em
+~1 min sem freio por IP — o freio por conexão de hoje não cobre muitas
+conexões). O que já estava certo e vale saber: estáticos presos às raízes,
+só `err.gameRule` chega ao cliente, tokens por `crypto.randomUUID`, todo
+`innerHTML` com nome passa por `escapeHTML`, `npm audit` limpo.
+
 ### Variáveis de ambiente
 
 | Variável | Padrão | Para que serve |
@@ -977,7 +1041,7 @@ ou `gone`.
 | `nextRound` / `playAgain` | Controles de sala do anfitrião. |
 
 As jogadas dentro de `action` são `draw`, `claim`, `unclaim`, `baixar`, `layoff`,
-**`swapJoker`**, `discard` e `meldDiscard`. A troca do coringa entrou como mais uma
+**`swapJoker`**, `discard`, `meldDiscard` e `tomarSobra`. A troca do coringa entrou como mais uma
 jogada no envelope existente, não como mensagem nova de topo — `nextRound` e
 `playAgain` só são mensagens próprias por serem controles de sala, não lances.
 

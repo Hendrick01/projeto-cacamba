@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   CONTRACTS, TOTAL_ROUNDS, buildDecks, cardPoints, cardValues, findContractMelds,
   layoffOption, layoffEnds, removableCards, createGame, startRound, actDraw, actBaixar,
-  actLayoff, actDiscard, actMeldDiscard, actClaim, actUnclaim, actNextRound, applyAction,
+  actLayoff, actDiscard, actMeldDiscard, actTomarSobra, actClaim, actUnclaim, actNextRound, applyAction,
   botNextAction, botWantsCard, mulberry32, viewFor, allMelds, playerById,
   podeComprarDoDescarte, isJoker, topoDoDescarte, sobrasNaMesa, sobraFechaJogo,
   coringaLiberadoPeloEncaixe,
@@ -916,4 +916,95 @@ test('assentos e prioridade de compra funcionam em mesa de 7 e de 8', () => {
 
 test('partidas completas em mesa grande: 5 a 8 jogadores', () => {
   for (let n = 5; n <= 8; n++) simulateGame(100 + n, n);
+});
+
+
+// ---------------------------------------------------------------------------
+// A sobra da mesa: três portas, jogo de qualquer um, coringa da ponta incluído
+// (regras da casa confirmadas pelo usuário em 2026-08-28)
+// ---------------------------------------------------------------------------
+
+test('coringa na ponta de sequência com carta a mais sobra como qualquer outra', () => {
+  const j = J();
+  const seq = { id: 7101, type: 's', suit: 0, ownerId: 'x',
+    values: [3, 4, 5, 6], cards: [c('3', '♠'), c('4', '♠'), c('5', '♠'), j] };
+  assert.deepEqual(removableCards(seq), [], 'com 4 cartas nada sobra, nem o coringa');
+  seq.cards.push(c('7', '♠')); seq.values.push(7);   // 3 4 5 🃏(=6) 7: coringa no MEIO
+  assert.ok(!removableCards(seq).some(isJoker), 'no meio ele não é ponta, não sobra');
+  const seq2 = { id: 7102, type: 's', suit: 0, ownerId: 'x',
+    values: [3, 4, 5, 6, 7], cards: [c('3', '♠'), c('4', '♠'), c('5', '♠'), c('6', '♠'), J()] };
+  const rem = removableCards(seq2);
+  assert.equal(rem.length, 2);
+  assert.ok(rem.some(isJoker), 'na ponta, com 5 cartas, o coringa sobra');
+});
+
+test('descartar a sobra de um jogo ALHEIO: o jogo encurta, a mão fica, a vez passa', () => {
+  const state = freshGame();
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+  b.melds = [{ id: 9101, type: 't', rank: 5, ownerId: b.id,
+    cards: [c('5', '♠'), c('5', '♥'), c('5', '♦'), c('5', '♣')] }];
+  const maoAntes = a.hand.length;
+  const alvo = removableCards(b.melds[0])[0];
+  const ev = actMeldDiscard(state, a.id, 9101, alvo.id);
+  assert.equal(ev[0].e, 'meldDiscard');
+  assert.equal(ev[0].deQuem, b.id, 'o aviso diz de quem era o jogo');
+  assert.equal(b.melds[0].cards.length, 3, 'o jogo do B continua válido, com 3');
+  assert.equal(a.hand.length, maoAntes, 'a mão do A ficou intacta');
+  assert.equal(topoDoDescarte(state).id, alvo.id, 'a carta foi para o meio');
+  assert.equal(state.phase, 'draw', 'a vez passou');
+});
+
+test('descartar o coringa que sobra na ponta põe o coringa no topo do meio (que tranca)', () => {
+  const state = freshGame();
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+  const j = J();
+  b.melds = [{ id: 9102, type: 's', suit: 0, ownerId: b.id,
+    values: [3, 4, 5, 6, 7], cards: [c('3', '♠'), c('4', '♠'), c('5', '♠'), c('6', '♠'), j] }];
+  actMeldDiscard(state, a.id, 9102, j.id);
+  assert.ok(isJoker(topoDoDescarte(state)), 'o coringa está no topo do meio');
+  assert.equal(b.melds[0].cards.length, 4, 'a sequência continua válida sem ele');
+});
+
+test('a sobra pode vir para a MÃO, de jogo alheio ou próprio, sem passar a vez', () => {
+  const state = freshGame();
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+  b.melds = [{ id: 9103, type: 't', rank: 5, ownerId: b.id,
+    cards: [c('5', '♠'), c('5', '♥'), c('5', '♦'), c('5', '♣')] }];
+  a.melds = [{ id: 9104, type: 's', suit: 1, ownerId: a.id,
+    values: [8, 9, 10, 11, 12], cards: [c('8', '♥'), c('9', '♥'), c('10', '♥'), c('J', '♥'), c('Q', '♥')] }];
+  const maoAntes = a.hand.length;
+  const daTrinca = removableCards(b.melds[0])[0];
+  const ev = applyAction(state, a.id, { a: 'tomarSobra', meldId: 9103, cardId: daTrinca.id });
+  assert.equal(ev[0].e, 'tomouSobra');
+  assert.equal(ev[0].deQuem, b.id);
+  assert.ok(a.hand.some((x) => x.id === daTrinca.id), 'a carta está na mão do A');
+  assert.equal(b.melds[0].cards.length, 3);
+  assert.equal(state.phase, 'play', 'não passou a vez');
+  assert.equal(state.players[state.turn].id, a.id);
+  // do próprio jogo também, pela ponta
+  const daSeq = removableCards(a.melds[0]).find((x) => x.rank === 12);
+  actTomarSobra(state, a.id, 9104, daSeq.id);
+  assert.equal(a.melds[0].cards.length, 4);
+  assert.equal(a.hand.length, maoAntes + 2);
+});
+
+test('a sobra para a mão respeita vez, fase e o que está sobrando', () => {
+  const state = freshGame();
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  b.melds = [{ id: 9105, type: 't', rank: 5, ownerId: b.id,
+    cards: [c('5', '♠'), c('5', '♥'), c('5', '♦'), c('5', '♣')] }];
+  const alvo = removableCards(b.melds[0])[0];
+  assert.throws(() => actTomarSobra(state, a.id, 9105, alvo.id), /Puxe uma carta/, 'na fase de compra, não');
+  actDraw(state, a.id, 'deck');
+  assert.throws(() => actTomarSobra(state, b.id, 9105, alvo.id), /Não é a sua vez/);
+  b.melds.push({ id: 9106, type: 't', rank: 9, ownerId: b.id, cards: [c('9', '♠'), c('9', '♥'), c('9', '♦')] });
+  assert.throws(() => actTomarSobra(state, a.id, 9106, b.melds[1].cards[0].id), /não está sobrando/);
+  assert.throws(() => actTomarSobra(state, a.id, 424242, alvo.id), /não está na mesa/);
 });

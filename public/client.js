@@ -955,7 +955,7 @@ function decorateMeld(el, meld) {
   }
 
   if (meldDiscardMode) {
-    if (meld.ownerId !== me()) return;
+    // De qualquer jogo, seu ou de adversário — regra da casa de 2026-08-28.
     const rem = removableCards(meld).map((c) => c.id);
     for (const ce of el.children) {
       if (rem.includes(Number(ce.dataset.cardId))) {
@@ -969,18 +969,33 @@ function decorateMeld(el, meld) {
     return;
   }
 
-  // Carta sobrando neste jogo que fecha um jogo meu agora: vira alvo de toque.
-  // Ela nunca vem para a mão — ou desce na hora, ou fica onde está.
+  // A carta que sobra neste jogo vira alvo de toque, e o que o toque faz
+  // depende do que está escolhido na mão:
+  //   - com cartas escolhidas que fecham um jogo junto com ela: desce na hora;
+  //   - sem nada escolhido: ela VEM PARA A MÃO (regra da casa de 2026-08-28 —
+  //     antes só saía da mesa se fosse para baixar no mesmo gesto).
   if (selected.size > 0) {
     for (const sobra of removableCards(meld)) {
       if (!sobraAcende(sobra)) continue;
       const ce = [...el.children].find((x) => Number(x.dataset.cardId) === sobra.id);
       if (!ce) continue;
       ce.classList.add('puxavel');
+      ce.title = `Baixar com ${cardText(sobra)}`;
       ce.onclick = (e) => {
         e.stopPropagation();
         sendAction({ a: 'baixar', cardIds: [...selected], sobra: { meldId: meld.id, cardId: sobra.id } });
         selected.clear();
+      };
+    }
+  } else if (myTurn() && view.phase === 'play') {
+    for (const sobra of removableCards(meld)) {
+      const ce = [...el.children].find((x) => Number(x.dataset.cardId) === sobra.id);
+      if (!ce) continue;
+      ce.classList.add('puxavel', 'para-mao');
+      ce.title = `Trazer ${cardText(sobra)} para a mão`;
+      ce.onclick = (e) => {
+        e.stopPropagation();
+        sendAction({ a: 'tomarSobra', meldId: meld.id, cardId: sobra.id });
       };
     }
   }
@@ -1352,7 +1367,8 @@ function renderActions() {
   $('btn-discard').disabled = selected.size !== 1;
 
   const mine = view.players.find((p) => p.id === me());
-  const hasOversized = mine && mine.melds.some((m) => removableCards(m).length > 0);
+  // Qualquer jogo da mesa com sobra, não só os meus (regra da casa de 2026-08-28).
+  const hasOversized = (view.players || []).some((p) => (p.melds || []).some((m) => removableCards(m).length > 0));
   $('btn-meld-discard').hidden = !(playing && hasOversized && !meldDiscardMode);
   $('btn-cancel-mode').hidden = !meldDiscardMode;
 }
@@ -1632,9 +1648,18 @@ function announce(ev) {
       toast(`${JOKER_LABEL} ${playerName(ev.p)} esticou a sequência e levou o coringa que sobrou.`);
       reage(ev.p, 'coringa');
       break;
-    case 'meldDiscard':
-      toast(`${playerName(ev.p)} descartou ${cardText(ev.card)} de um jogo da mesa.`);
+    case 'meldDiscard': {
+      const dono = ev.deQuem === me() ? 'de um jogo SEU' : (ev.deQuem === ev.p ? 'de um jogo próprio' : `de um jogo de ${playerName(ev.deQuem)}`);
+      toast(`${playerName(ev.p)} descartou ${cardText(ev.card)} ${dono}.`);
+      if (ev.deQuem === me() && ev.p !== me()) reage(me(), 'perdeu');
       break;
+    }
+    case 'tomouSobra': {
+      const dono = ev.deQuem === me() ? 'de um jogo SEU' : (ev.deQuem === ev.p ? 'de um jogo próprio' : `de um jogo de ${playerName(ev.deQuem)}`);
+      toast(`🤏 ${playerName(ev.p)} levou ${cardText(ev.card)} ${dono} para a mão.`);
+      if (ev.deQuem === me() && ev.p !== me()) reage(me(), 'perdeu');
+      break;
+    }
     case 'swapJoker':
       toast(`${JOKER_LABEL} ${playerName(ev.p)} pôs ${cardText(ev.card)} no lugar do coringa.`);
       reage(ev.p, 'coringa');
@@ -1873,8 +1898,9 @@ function showRules() {
      <h3>Na sua vez</h3>
      <ol>
        <li><strong>Puxe uma carta</strong> (obrigatório): do monte ou do meio (descarte).</li>
-       <li><strong>Baixe seus jogos</strong> — pode ser <strong>um de cada vez</strong>: qualquer trinca ou sequência completa que o contrato ainda peça já pode descer (na 1ª rodada, uma trinca sozinha desce). <strong>Encaixar</strong> cartas nos jogos da mesa (seus e dos outros), só depois de baixar o contrato <strong>inteiro</strong>. E nunca baixe tudo a ponto de ficar de mão vazia sem completar o contrato.</li>
-       <li><strong>Descarte uma carta</strong> (obrigatório). Se não quiser descartar da mão, pode tirar de um jogo seu com sobra: sequência com mais de 4 cartas (pelas pontas) ou trinca com mais de 3.</li>
+       <li><strong>Baixe seus jogos</strong> — pode ser <strong>um de cada vez</strong>: qualquer trinca ou sequência completa que o contrato ainda peça já pode descer (na 1ª rodada, uma trinca sozinha desce). <strong>Encaixar</strong> cartas nos jogos da mesa (seus e dos outros) vale a qualquer momento. E nunca baixe ou encaixe a ponto de ficar com menos de duas cartas sem completar o contrato — só bate quem já o cumpriu.</li>
+       <li><strong>Carta que sobra na mesa</strong>: sequência com mais de 4 cartas (só as pontas, coringa incluído) ou trinca com mais de 3 (qualquer carta, desde que sobrem 3 naipes). Ela pode sair de <strong>qualquer jogo, seu ou de adversário</strong>, para três coisas: <strong>baixar</strong> um jogo seu com ela na hora, <strong>trazê-la para a mão</strong>, ou <strong>descartá-la</strong> direto.</li>
+       <li><strong>Descarte uma carta</strong> (obrigatório): da mão, ou a que sobra num jogo da mesa.</li>
      </ol>
      <h3>Compra fora da vez</h3>
      <p>Quando alguém descarta, os outros jogadores podem pedir a carta: leva <strong>quem apertar primeiro</strong>, e ele fica só com a carta pedida (não puxa nem descarta). Mas <strong>quem está na vez tem preferência</strong> sobre todos — se ele também quiser a carta, ela é dele.</p>
