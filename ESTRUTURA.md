@@ -71,7 +71,11 @@ projeto-caçamba/
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`public/vendor/GLTFLoader.js`](public/vendor/GLTFLoader.js) · `BufferGeometryUtils.js` | — | O carregador glTF do three (r170, MIT), vendido com os imports apontados para o `three.module.js` local. Só a mesa 3D usa. |
 | [`public/models/`](public/models/LEIA-ME.md) | — | Os personagens externos, `<slug>.glb`, e o contrato do que cada um precisa ter. `_exemplo.glb` é a prova de caminho. |
-| [`test/modelo-exemplo.mjs`](test/modelo-exemplo.mjs) | 60 | Gera o `_exemplo.glb`: GLB válido escrito à mão (JSON + BIN), duas caixas e os nós `Cabeca`, `MaoEsq`, `MaoDir`. |
+| [`test/modelo-exemplo.mjs`](test/modelo-exemplo.mjs) | 95 | Gera o `_exemplo.glb`: GLB válido escrito à mão (JSON + BIN), três caixas, textura PNG, morph `bocaAberta`, clips `idle`/`feliz` e os nós `Cabeca`, `MaoEsq`, `MaoDir`. |
+| [`test/modelo-recorta.mjs`](test/modelo-recorta.mjs) | 95 | Bancada: de uma "ficha" com várias vistas numa malha só, recorta a figura que olha para +Z (separa pelos vazios em x, acha a frente pela ponta dos pés). |
+| [`test/modelo-prepara.mjs`](test/modelo-prepara.mjs) | 80 | Bancada: solda, reduz para o orçamento de triângulos (`@gltf-transform/cli` via `npx`), encolhe texturas para 1024 px e injeta `Cabeca` (e as mãos, se pedido). |
+| [`public/modelo3d.js`](public/modelo3d.js) | 230 | O que mesa e provador têm em comum sobre modelos externos: estilo do elenco (toon + contorno, normal map mantido), `encaixaModelo`, `reage`, `confereModelo`, `criaBanqueta`. |
+| [`public/provador.html`](public/provador.html) · `provador.js` | 300 | O provador de modelos: abre um `.glb` do aparelho ou da lista, senta na banqueta com a luz da mesa e confere o contrato item a item. |
 | [`public/voz.js`](public/voz.js) | 169 | Chat de voz: microfone, pares WebRTC em malha, sinalização pela mensagem `voz` do WebSocket, e o nível de áudio de cada um (`nivel`/`falando`). Usado pelas duas mesas. |
 | [`shared/mao.js`](shared/mao.js) | 53 | A ordem das cartas na sua mão: a ordenação automática e o reordenar do arrasto. Vive em `shared/` para poder ser testada sem navegador — ver `test/mao.test.js`. |
 | [`shared/elenco.js`](shared/elenco.js) | 98 | O elenco: slug, nome, traço e tom de pele de cada personagem, mais a validação e o gancho de expressões. Vive em `shared/` porque o servidor precisa validar a escolha antes de repassá-la aos outros jogadores. |
