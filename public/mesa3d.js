@@ -18,7 +18,7 @@
 
 import * as THREE from './vendor/three.module.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
-import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage } from './modelo3d.js';
+import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta } from './modelo3d.js';
 import { planBaixada, isJoker, rankLabel } from '/shared/engine.js';
 import { SLUGS, personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
@@ -1034,13 +1034,11 @@ function criaAssento(p) {
   leque.rotation.x = -0.14;
   grupo.add(leque);
 
-  // a cadeira é o anel do assento em outra forma, como na mesa normal
+  // a cadeira: uma banqueta de madeira com a almofada na cor do assento (o
+  // anel da mesa normal, em outra forma). Era um disco no chão; com modelos
+  // que têm pernas, o disco os deixava sentados no ar.
   const cor = new THREE.Color(CORES_DE_ASSENTO[assentoDe(p.id) % CORES_DE_ASSENTO.length]);
-  const cadeira = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.3, 0.3, 0.05, 20),
-    new THREE.MeshLambertMaterial({ color: cor }),
-  );
-  cadeira.position.y = 0.03;
+  const cadeira = criaBanqueta(cor);
   grupo.add(cadeira);
 
   const nome = rotulo(p.name);

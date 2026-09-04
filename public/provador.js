@@ -10,7 +10,8 @@
 
 import * as THREE from './vendor/three.module.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
-import { ALTURA_SENTADO, encaixaModelo, confereModelo, reage } from './modelo3d.js';
+import { ALTURA_SENTADO, encaixaModelo, confereModelo, reage, criaBanqueta } from './modelo3d.js';
+import { SLUGS } from '/shared/elenco.js';
 
 const $ = (id) => document.getElementById(id);
 const MESA_TOPO = 0.92;          // o tampo, como na mesa 3D
@@ -73,6 +74,8 @@ const linhaAltura = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.006, 0.006), M_M
 linhaAltura.position.y = ALTURA_SENTADO;
 const seta = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0.02, 0.2), 0.4, 0xf2c14e, 0.12, 0.07);
 palco.add(linhaAltura, seta);
+// a banqueta da mesa: é nela que o personagem tem de estar sentado
+palco.add(criaBanqueta(0x8c6a45));
 
 // o leque de cartas viradas, no lugar em que a mesa o põe (entre as mãos)
 const texturaVerso = (() => {
@@ -203,6 +206,11 @@ function poeNaCena(gltf, nome) {
   for (const b of botoesReacao) b.disabled = false;
   $('ex-boca').disabled = false;
   document.title = `${nome} — Provador de modelos`;
+  // a arte 2D do mesmo personagem ao lado, para conferir os sinais de identidade
+  const slug = nome.replace(/[_-]?teste.*$/i, '').toLowerCase();
+  const ref = $('ref2d');
+  ref.hidden = !SLUGS.includes(slug);
+  if (!ref.hidden) ref.src = `assets/personagens/${slug}-corpo-inteiro.svg`;
 }
 
 function carrega(nome, fonte) {

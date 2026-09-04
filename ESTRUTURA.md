@@ -642,8 +642,12 @@ usuário: "personagens 3D bem desenhados, no nosso estilo"). Três coisas:
   que é cabeça (acima do pescoço, em 1,4 — regra por altura, não por lista)
   some, e a boca da fala passa para a frente do desenho.
 
-Ficou de fora, por ora: pernas e cadeira de verdade, e o boneco reagir ao que
-os outros jogam (virar a cabeça). Ver **2D×3D** abaixo.
+Ficou de fora, por ora: pernas no boneco de código, e o boneco reagir ao que
+os outros jogam (virar a cabeça). A cadeira chegou em 2026-09-04: uma
+**banqueta** de madeira com a almofada na cor do assento (`criaBanqueta`, em
+`modelo3d.js`, porque o provador a usa para julgar a pose). Era um disco
+colorido no chão — com modelos que têm pernas, o disco os deixava sentados
+no ar. Ver **2D×3D** abaixo.
 
 **Personagens vindos de fora** (2026-09-04; decisão do usuário: os oito serão
 modelados fora, no estilo do elenco, e a mesa integra). Quando existe
@@ -698,7 +702,10 @@ gira o palco, dois dedos ou a roda aproximam. A câmera olha de viés (azimute
 (0,6 m) porque a folha toma o pé da tela. Os modelos da lista são pedidos com
 `cache: 'reload'`: são arte, com cache longo, e aqui o arquivo é justamente o
 recém-trocado. Em tela larga a folha vira coluna à direita. `window.provador`
-expõe o modelo atual, o palco e a cena para olhar do console.
+expõe o modelo atual, o palco e a cena para olhar do console. O modelo senta
+na mesma banqueta da mesa, e quando o nome do arquivo é um slug do elenco a
+**arte 2D** do personagem aparece na folha, para conferir os sinais de
+identidade lado a lado.
 
 **O primeiro trio** (2026-09-04, pacote do usuário `cacamba_trio_patch_jogo_v1`):
 `gabizinsky.glb`, `dri.glb` e `esterex.glb` estão em `public/models` e na

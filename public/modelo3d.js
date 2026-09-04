@@ -141,6 +141,24 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
   return { raiz, materiais, morfos, mixer, acoes, alturaCabeca, posLeque, alturaOriginal, escala, caixa };
 }
 
+// A banqueta do assento: madeira escura com a almofada na cor do assento.
+// Mora aqui porque o provador precisa dela para julgar a pose (o modelo
+// senta nela) — na mesa, é a cadeira de cada personagem.
+export function criaBanqueta(corAlmofada) {
+  const g = new THREE.Group();
+  const madeira = new THREE.MeshToonMaterial({ color: 0x5a3720, gradientMap: GRADIENTE_TOON });
+  const tampo = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.25, 0.06, 20), madeira);
+  tampo.position.y = 0.47; tampo.castShadow = true; g.add(tampo);
+  const almofada = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.27, 0.05, 20), new THREE.MeshToonMaterial({ color: corAlmofada, gradientMap: GRADIENTE_TOON }));
+  almofada.position.y = 0.525; almofada.castShadow = true; g.add(almofada);
+  for (const [x, z] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) {
+    const pe = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.47, 8), madeira);
+    pe.position.set(x, 0.235, z); pe.castShadow = true; g.add(pe);
+  }
+  g.position.z = -0.04;   // um pouco para trás: as pernas sentadas vão para a frente
+  return g;
+}
+
 // Toca uma reação no modelo: o clip com esse nome (uma vez, e volta ao idle)
 // e/ou o morph com esse nome (sobe até 1). O chamador zera o morph quando a
 // reação passa. Devolve true se o modelo tinha algo para mostrar.
