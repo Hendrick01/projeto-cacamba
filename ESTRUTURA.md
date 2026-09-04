@@ -637,7 +637,11 @@ mapa de metal/rugosidade, converte a cor PNG em JPEG (`jpeg --formats png`
 do gltf-transform; sem `--formats` ele só recomprime JPEG) e leva os pés ao
 chão quando a origem veio no meio do corpo. **A Dri esculpida** entrou no
 mesmo dia: o arquivo já vinha com uma figura e 31 mil triângulos, mas 17,5 MB
-de PNG em 4096 px; saiu com 1,6 MB. Detalhes em `public/models/LEIA-ME.md`.
+de PNG em 4096 px; saiu com 1,6 MB. **A EstereX** chegou com 12 cm de altura
+(outra unidade), e o preparo passou a trazer todo arquivo para 1,65 m
+(`--altura`), escalando a raiz — a mesa normaliza de qualquer jeito, mas os
+arquivos ficam coerentes. Com isso o trio inteiro é escultura; a versão
+procedural vive só no histórico. Detalhes em `public/models/LEIA-ME.md`.
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a

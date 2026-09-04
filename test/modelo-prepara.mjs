@@ -14,14 +14,17 @@
 //   --cabeca: sem esqueleto, altura do centro da cabeça como FRAÇÃO da altura
 //             (0.91 em pé, ~0.88 sentado). --clip: o primeiro clip do arquivo
 //             entra com esse nome. O clip que já vem na fonte vira `idle` se
-//             não tiver nome de contrato.
+//             não tiver nome de contrato. --altura: a altura final em metros
+//             (1.65; cada ferramenta exporta numa unidade — veio de 12 cm a
+//             1,90 m — e a mesa normaliza, mas assim os arquivos batem entre
+//             si). 0 mantém a do arquivo.
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 
 const args = process.argv.slice(2);
-const opc = { tri: 30000, cabeca: 0.91, maos: null, erro: 0.02, clips: [] };
+const opc = { tri: 30000, cabeca: 0.91, maos: null, erro: 0.02, clips: [], altura: 1.65 };
 const pos = [];
 for (let i = 0; i < args.length; i++) {
   if (!args[i].startsWith('--')) { pos.push(args[i]); continue; }
@@ -154,12 +157,23 @@ gt('resize', '--width', '1024', '--height', '1024', reduzido, pequeno);
   if (tirou) console.log(`${tirou} mapa(s) de metal/rugosidade removido(s); cor em ${opaco ? 'JPEG' : 'PNG (há transparência)'}`);
 }
 
-// --- 4. os nós do contrato; e os pés no chão (y = 0) ---
+// --- 4. os nós do contrato; a altura combinada; e os pés no chão (y = 0) ---
 const p = leGlb(pequeno);
 let cx = caixa(p.json);
+const raizes = p.json.scenes[p.json.scene || 0].nodes;
+if (opc.altura > 0 && Math.abs((cx.max[1] - cx.min[1]) - opc.altura) > 0.01) {
+  const f = opc.altura / (cx.max[1] - cx.min[1]);
+  for (const i of raizes) {
+    const n = p.json.nodes[i];
+    if (n.matrix) { for (let k = 0; k < 16; k++) if (k % 4 !== 3) n.matrix[k] *= f; }   // rotação/escala e translação, sem a última linha
+    else { n.scale = (n.scale || [1, 1, 1]).map((v) => v * f); n.translation = (n.translation || [0, 0, 0]).map((v) => v * f); }
+  }
+  console.log(`altura ${(cx.max[1] - cx.min[1]).toFixed(2)} → ${opc.altura} m (escala ×${f.toFixed(3)} na raiz)`);
+  cx = caixa(p.json);
+}
 if (Math.abs(cx.min[1]) > 0.005) {
   const desce = -cx.min[1];
-  for (const i of p.json.scenes[p.json.scene || 0].nodes) { const n = p.json.nodes[i]; if (n.matrix) { n.matrix[13] += desce; } else { n.translation = n.translation || [0, 0, 0]; n.translation[1] += desce; } }
+  for (const i of raizes) { const n = p.json.nodes[i]; if (n.matrix) { n.matrix[13] += desce; } else { n.translation = n.translation || [0, 0, 0]; n.translation[1] += desce; } }
   console.log(`pés levados ao chão (o arquivo tinha o ponto mais baixo em y = ${cx.min[1].toFixed(2)})`);
   cx = caixa(p.json);
 }
