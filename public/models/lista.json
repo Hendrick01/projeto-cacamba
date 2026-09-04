@@ -1,1 +1,7 @@
-{ "modelos": [] }
+{
+  "modelos": [
+    "gabizinsky",
+    "dri",
+    "esterex"
+  ]
+}
