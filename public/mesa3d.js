@@ -168,21 +168,88 @@ scene.add(foco, foco.target);
   scene.add(chao);
 }
 
-// a mesa: tampo de feltro com aro de madeira
-{
-  const feltro = texturaDeCanvas(512, 512, (ctx) => {
-    const g = ctx.createRadialGradient(256, 236, 40, 256, 256, 260);
+// ---------------------------------------------------------------------------
+// Materiais da mesa. Tudo gerado em canvas, na hora: nada de textura baixada
+// (peso em celular, e a regra do projeto é não depender de fora). O que faz o
+// feltro parecer tecido é o GRÃO — um chuvisco fino de claro e escuro — mais
+// um mapa de relevo com o mesmo chuvisco, que a luz rasante da lâmpada revela.
+// A madeira é veio: faixas que ondulam e mudam de tom ao longo do aro.
+// ---------------------------------------------------------------------------
+function chuvisco(ctx, w, h, forca, semente = 7) {
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  let x = semente;
+  const rnd = () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+  for (let i = 0; i < d.length; i += 4) {
+    const v = (rnd() - 0.5) * 2 * forca;
+    d[i] = Math.max(0, Math.min(255, d[i] + v));
+    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + v));
+    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + v));
+  }
+  ctx.putImageData(img, 0, 0);
+}
+function texturaFeltro() {
+  return texturaDeCanvas(1024, 1024, (ctx) => {
+    const g = ctx.createRadialGradient(512, 472, 80, 512, 512, 520);
     g.addColorStop(0, '#1e6a50');
     g.addColorStop(0.55, '#12452f');
     g.addColorStop(1, '#082519');
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 512, 512);
+    ctx.fillRect(0, 0, 1024, 1024);
+    // a fibra: duas famílias de linhas finíssimas, quase invisíveis de perto,
+    // que de longe viram a trama
+    ctx.strokeStyle = 'rgba(255,255,255,0.035)'; ctx.lineWidth = 1;
+    for (let i = -1024; i < 2048; i += 6) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + 1024, 1024); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+    for (let i = -1024; i < 2048; i += 6) { ctx.beginPath(); ctx.moveTo(i + 1024, 0); ctx.lineTo(i, 1024); ctx.stroke(); }
+    chuvisco(ctx, 1024, 1024, 14, 3);
   });
+}
+function texturaRelevoFeltro() {
+  const t = texturaDeCanvas(256, 256, (ctx) => {
+    ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, 256, 256);
+    chuvisco(ctx, 256, 256, 60, 11);
+  });
+  t.colorSpace = THREE.NoColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(8, 8);
+  return t;
+}
+function texturaMadeira(repeticoes) {
+  const t = texturaDeCanvas(1024, 128, (ctx) => {
+    ctx.fillStyle = '#5a3a22'; ctx.fillRect(0, 0, 1024, 128);
+    // veios: faixas horizontais que ondulam e alternam claro/escuro
+    const tons = ['#4a2c19', '#7a4a2b', '#3e2717', '#6b4227', '#8c5733'];
+    for (let k = 0; k < 26; k++) {
+      const y0 = (k / 26) * 128 + (k % 3) * 1.7;
+      const larg = 1.2 + (k % 4) * 0.9;
+      ctx.strokeStyle = tons[k % tons.length];
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = larg;
+      ctx.beginPath();
+      for (let x = 0; x <= 1024; x += 8) {
+        const y = y0 + Math.sin(x / 90 + k) * 3.5 + Math.sin(x / 23 + k * 2) * 1.2;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    chuvisco(ctx, 1024, 128, 10, 5);
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeticoes, 1);
+  return t;
+}
+
+// a mesa: tampo de feltro com aro de madeira
+{
+  const feltro = texturaFeltro();
+  const madeiraLateral = texturaMadeira(10);
   const tampo = new THREE.Mesh(
     new THREE.CylinderGeometry(2.55, 2.55, 0.16, 48),
     [
-      new THREE.MeshLambertMaterial({ color: 0x3e2717 }),                // lateral
-      new THREE.MeshLambertMaterial({ map: feltro }),                    // topo
+      new THREE.MeshStandardMaterial({ map: madeiraLateral, roughness: 0.45, metalness: 0.05 }),   // lateral
+      new THREE.MeshStandardMaterial({ map: feltro, bumpMap: texturaRelevoFeltro(), bumpScale: 0.012, roughness: 0.96, metalness: 0 }), // topo
       new THREE.MeshLambertMaterial({ color: 0x1b110b }),                // fundo
     ],
   );
@@ -190,9 +257,12 @@ scene.add(foco, foco.target);
   tampo.receiveShadow = true;
   scene.add(tampo);
 
+  // O aro é madeira envernizada: veio ao longo do anel (u do toro dá a volta
+  // no anel) e rugosidade baixa, para a lâmpada deixar um brilho comprido
+  // nele — é o brilho que diz "madeira polida", não a cor.
   const aro = new THREE.Mesh(
     new THREE.TorusGeometry(2.62, 0.14, 12, 48),
-    new THREE.MeshLambertMaterial({ color: 0x4a2c19 }),
+    new THREE.MeshStandardMaterial({ map: texturaMadeira(6), roughness: 0.38, metalness: 0.06 }),
   );
   aro.rotation.x = Math.PI / 2;
   aro.position.y = MESA_TOPO - 0.04;
@@ -201,7 +271,7 @@ scene.add(foco, foco.target);
 
   const pe = new THREE.Mesh(
     new THREE.CylinderGeometry(0.4, 0.62, MESA_TOPO - 0.1, 20),
-    new THREE.MeshLambertMaterial({ color: 0x2a1b12 }),
+    new THREE.MeshStandardMaterial({ map: texturaMadeira(3), roughness: 0.6, metalness: 0.02, color: 0x8a7060 }),
   );
   pe.position.y = (MESA_TOPO - 0.1) / 2;
   scene.add(pe);
@@ -413,8 +483,9 @@ function materialDaCarta(card) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   // Fora do mapeamento tonal: a carta é desenho, e o mapeamento lavava o
-  // vermelho dos naipes para rosa. A luz continua batendo nela.
-  const mat = new THREE.MeshLambertMaterial({ map: tex, toneMapped: false });
+  // vermelho dos naipes para rosa. A luz continua batendo nela — e o Standard
+  // com rugosidade média dá o brilho de verniz que a carta plastificada tem.
+  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0, toneMapped: false });
   texturasDeCarta.set(chave, mat);
   // O retrato das figuras chega depois (a imagem é assíncrona): desenha de
   // novo por cima quando carregar.
@@ -521,9 +592,9 @@ const materialVerso = (() => {
     arredondado(ctx, 4, 4, 120, 172, 10);
     ctx.stroke();
   });
-  return new THREE.MeshLambertMaterial({ map: tex, toneMapped: false });
+  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0, toneMapped: false });
 })();
-const materialBorda = new THREE.MeshLambertMaterial({ color: 0xcbc2ae, toneMapped: false });
+const materialBorda = new THREE.MeshStandardMaterial({ color: 0xcbc2ae, roughness: 0.85, metalness: 0, toneMapped: false });
 
 const CARTA_L = 0.42; const CARTA_A = 0.59;
 const geoCarta = new THREE.PlaneGeometry(CARTA_L, CARTA_A);

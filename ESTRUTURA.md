@@ -531,6 +531,18 @@ sumia. Os **discos de contato** (`sombraDeContato`) ficaram, mais leves, para
 o que a sombra dura não pega. A do descarte fica FORA do grupo, que é
 esvaziado a cada carta nova.
 
+**Materiais com matéria** (2026-09-04): o feltro é `MeshStandardMaterial` com
+um mapa de cor de 1024 (o gradiente de antes mais um chuvisco fino de claro e
+escuro e duas famílias de fibras quase invisíveis) e um **mapa de relevo** com
+o mesmo chuvisco, repetido 8×8 — é a luz rasante da lâmpada sobre o relevo que
+faz o tecido parecer tecido. A madeira (aro, lateral do tampo, pé) é veio
+gerado em canvas: faixas que ondulam e alternam tons ao longo do anel, com
+rugosidade baixa no aro, para a lâmpada deixar um brilho comprido nele — é o
+brilho que diz "madeira polida", não a cor. As cartas passam a `Standard` com
+rugosidade média: o brilho de verniz da carta plastificada. Tudo gerado na
+hora (`texturaFeltro`, `texturaMadeira`, `texturaRelevoFeltro`), nada baixado:
+peso em celular, e a regra do projeto é não depender de fora.
+
 **Mapeamento tonal neutro** (`NeutralToneMapping`, exposição 1,1): a lâmpada
 forte estourava o feltro no meio; o Neutral segura o branco sem lavar o âmbar
 da paleta (o ACES lava). O que é **desenho** fica fora dele (`toneMapped:
@@ -543,8 +555,8 @@ cartas ocupam 84% da largura visível e cada carta gira em torno de si mesma
 2D. O que parece corte nas pontas são as mãos nos cantos e o recorte de baixo,
 que é de propósito.
 
-O que ela **ainda não tem**, conferido no código em 2026-09-04: materiais
-chapados sem trama nem veio, cartas sem espessura e de face única, o leque dos
+O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
+espessura e de face única, o leque dos
 adversários travado em 5 cartas, nenhum sinal 3D da sua própria vez, objetos de
 escala no tampo, animações de distribuir/puxar/baixar, e nada de sobras, troca
 de coringa, encaixe ou placar — para essas, o botão manda de volta à mesa
