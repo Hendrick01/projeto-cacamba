@@ -501,9 +501,13 @@ mesa 2D e espelhada para o outro lado (`texturaMao2D`), no tom de pele do seu
 personagem. Reações (boca feliz/brava, pulo) respondem aos mesmos eventos da
 mesa normal.
 
-**A câmera senta à mesa** (`encaixaTela`, 2026-09-04): o olho a ~1,3 m acima
-do tampo e a ~3,7 m do centro em pé, com 76° de campo — era 1,7 m acima e
-4,6 m atrás com 84°, e a mesa virava um campo vazio com gente miúda na borda.
+**A câmera senta à mesa, inclinada sobre o tampo** (`encaixaTela`,
+2026-09-04): em pé, o olho a ~1,8 m acima do tampo e ~3,2 m do centro, olhando
+o feltro a **~30°** com 74° de campo — era 1,7 m acima e 4,6 m atrás, a 17°,
+com 84°, e a mesa virava um campo vazio com gente miúda na borda. Os 30° não
+são gosto: são o mínimo para uma carta DEITADA no feltro ler (a 17° ela vira
+uma tira). Subir mais viraria vista de cima e sumiria a sensação de estar
+sentado com os outros, que é o que se quer da referência.
 Quem paga a conta de caber todo mundo é a **abertura dos assentos**
 (`posicaoDoAssento`): ±38° em pé, ±60° em paisagem — com ±60° e a câmera
 perto, os assentos das pontas saíam do quadro e os nomes ficavam cortados na
@@ -531,9 +535,15 @@ adversários travado em 5 cartas, nenhum sinal 3D da sua própria vez, e nada de
 sobras, troca de coringa, encaixe ou placar — para essas, o botão manda de
 volta à mesa normal. Sem `dispose()` nos rótulos e no descarte recriados a cada
 estado (vazamento lento), e o `requestAnimationFrame` não para com a aba
-escondida. As cartas do descarte e dos jogos ficam **em pé** de propósito —
-deitadas, deste ângulo, viravam lascas ilegíveis; deitá-las é decisão de
-câmera (mais de cima), não de acabamento.
+escondida.
+
+**As cartas da mesa ficam deitadas** — decisão do usuário em 2026-09-04
+("deitadas, desde que visíveis"). O que as torna legíveis é o conjunto: a
+câmera a ~30°, o descarte um pouco maior que o físico (1,15) e erguido 11°
+para a câmera, e os jogos baixados **mais perto do centro do que o assento de
+quem baixou** (fator 0,4 em vez de 0,52), maiores (0,85) e erguidos 20° — de
+longe e a 0,66, deitados, viravam tiras que ninguém lia. O autor anterior as
+tinha posto de pé exatamente por isso, com a câmera a 17°.
 
 A biblioteca (`public/vendor/three.module.js`, ~675 KB, 167 KB com gzip) **só é
 baixada quando se abre o 3D** — a mesa normal continua nos 181 KB. Vendida no

@@ -1236,10 +1236,12 @@ async function sincroniza(primeira) {
     // o número senta na caixa; solto no ar ele era mais uma coisa flutuando
     monte.num.position.set(-0.4, MESA_TOPO + alturaMonte + 0.09, -0.42);
 
-    // Descarte: a pilha fica deitada, mas a carta do topo fica DE PÉ, apoiada
-    // nela e inclinada para a câmera — deitada, deste ângulo raso, ela virava
-    // uma lasca branca ilegível. E é a carta mais importante da mesa: decide a
-    // compra a cada turno.
+    // Descarte: a pilha deitada e a carta do topo DEITADA sobre ela — como numa
+    // mesa de verdade (decisão do usuário, 2026-09-04). O que a torna legível
+    // é a câmera a ~30° sobre o tampo, o tamanho um pouco maior que o físico
+    // e o leve inclinar para a câmera. Antes ela ficava de pé, porque a 17° a
+    // carta deitada virava uma lasca ilegível — e é a carta mais importante da
+    // mesa: decide a compra a cada turno.
     const topo = view.discardTop;
     const topoId = topo ? topo.id : null;
     if (topoId !== descarte.topoId) {
@@ -1253,18 +1255,19 @@ async function sincroniza(primeira) {
         );
         base.position.y = MESA_TOPO + alturaPilha / 2;
         const face = new THREE.Mesh(geoCarta, materialDaCarta(topo));
-        face.scale.setScalar(0.9);
-        face.rotation.x = -0.42;
-        face.position.set(0, MESA_TOPO + alturaPilha + (CARTA_A / 2) * 0.82, 0.1);
+        face.scale.setScalar(1.15);
+        face.rotation.x = -Math.PI / 2 + 0.2;   // deitada, 11° erguida para a câmera
+        face.position.set(0, MESA_TOPO + alturaPilha + 0.05, 0.02);
         face.userData.alvo = face.position.clone();
         if (!semMovimento) { face.userData.cai = performance.now(); }
         descarte.grupo.add(base, face);
       }
     }
 
-    // Jogos baixados: fileira de cartas DE PÉ na frente de quem baixou, todas
-    // viradas para a câmera — deitadas no feltro, deste ângulo, eram lascas
-    // que ninguém lia, e ver os jogos da mesa é metade do planejamento.
+    // Jogos baixados: fileiras de cartas DEITADAS na frente de quem baixou,
+    // sobrepostas como as minis da mesa 2D e um pouco erguidas para a câmera
+    // (decisão do usuário, 2026-09-04). Ver os jogos da mesa é metade do
+    // planejamento; antes ficavam de pé porque a 17° deitadas eram lascas.
     jogosNaMesa.clear();
     const todos = [view.players.find((p) => p.id === me()), ...outros].filter(Boolean);
     for (const p of todos) {
@@ -1273,32 +1276,35 @@ async function sincroniza(primeira) {
       const idx = outros.indexOf(p);
       const pos = meu ? { x: 0, z: 1.05 } : posicaoDoAssento(idx, outros.length);
       const frente = new THREE.Group();
-      frente.position.set(pos.x * 0.52, 0, pos.z * 0.52 + (meu ? 0 : 0.3));
+      // Os jogos dos outros ficam mais perto do centro do que o assento sugere
+      // (fator 0,4 em vez de 0,52): deitados, longe, viravam tiras que ninguém
+      // lia. Os seus ficam junto da sua borda, como na mesa de verdade.
+      frente.position.set(pos.x * 0.4, 0, meu ? pos.z * 0.52 : pos.z * 0.4 + 0.25);
 
-      const passoCarta = 0.115;
-      const vaoEntreJogos = 0.1;
-      const larguras = p.melds.map((m) => (m.cards.length - 1) * passoCarta + CARTA_L * 0.6);
+      const passoCarta = 0.15;
+      const vaoEntreJogos = 0.12;
+      const larguras = p.melds.map((m) => (m.cards.length - 1) * passoCarta + CARTA_L * 0.85);
       const total = larguras.reduce((a, b) => a + b + vaoEntreJogos, -vaoEntreJogos);
       let x = -total / 2;
       p.melds.forEach((meld, mi) => {
         meld.cards.forEach((card, ci) => {
           const carta = new THREE.Mesh(geoCarta, materialDaCarta(card));
-          carta.scale.setScalar(0.6);
-          carta.rotation.x = -0.3;
+          carta.scale.setScalar(0.85);
+          carta.rotation.x = -Math.PI / 2 + 0.36;   // deitada, 20° erguida para a câmera
           carta.position.set(
-            x + CARTA_L * 0.3 + ci * passoCarta,
-            MESA_TOPO + (CARTA_A / 2) * 0.57,
-            ci * 0.004,
+            x + CARTA_L * 0.425 + ci * passoCarta,
+            MESA_TOPO + 0.008 + ci * 0.003,
+            ci * 0.014,
           );
           frente.add(carta);
         });
         x += larguras[mi] + vaoEntreJogos;
       });
-      const sombra = sombraDeContato(total + 0.25, 0.5);
-      sombra.position.z = 0.03;
+      const sombra = sombraDeContato(total + 0.25, 0.6);
+      sombra.position.z = 0.06;
       frente.add(sombra);
       // mesa cheia de jogos: encolhe o conjunto em vez de estourar o feltro
-      if (total > 2.1) frente.scale.setScalar(2.1 / total);
+      if (total > 2.3) frente.scale.setScalar(2.3 / total);
       jogosNaMesa.add(frente);
     }
 
@@ -1365,8 +1371,14 @@ function encaixaTela() {
   // ~3,7 m do centro em pé (era 1,7 m acima e 4,6 m atrás, com 84° de campo —
   // a mesa virava um campo vazio com gente miúda na borda). Quem paga a conta
   // de caber todo mundo é a abertura dos assentos, em `posicaoDoAssento`.
-  camera.fov = Math.min(80, 50 / Math.max(0.66, emPe * 1.15));
-  camera.position.set(0, 2.05 + (1 - emPe) * 0.3, 3.2 + (1 - emPe) * 0.9);
+  // Inclinação sobre o tampo: ~30° em pé (era ~17°). É o que faz uma carta
+  // DEITADA no feltro ler — a 17° ela virava uma tira; a 30°, com o descarte
+  // e os jogos um pouco maiores que o físico e um leve inclinar para a câmera,
+  // ela lê inteira. Decisão do usuário (2026-09-04): deitadas, desde que
+  // visíveis. Subir muito mais viraria vista de cima, e some a sensação de
+  // estar sentado com os outros — que é o que se quer da referência.
+  camera.fov = Math.min(78, 50 / Math.max(0.68, emPe * 1.15));
+  camera.position.set(0, 2.55 + (1 - emPe) * 0.35, 2.75 + (1 - emPe) * 0.75);
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', encaixaTela);
@@ -1377,7 +1389,7 @@ function quadro(t) {
 
   // a cabeça acompanha o ponteiro de leve; a mesa continua o alvo
   camera.position.x += ((olharX * 1.4) - camera.position.x) * 0.06;
-  camera.lookAt(camera.position.x * 0.25, MESA_TOPO - 0.05, -0.7);
+  camera.lookAt(camera.position.x * 0.25, MESA_TOPO - 0.05, -0.55);
 
   for (const [id, a] of assentos) {
     // respiro contínuo, dessincronizado por posição
