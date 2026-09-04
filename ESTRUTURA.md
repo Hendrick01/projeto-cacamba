@@ -594,10 +594,24 @@ porque está perto da câmera. Antes a sua vez era só o texto do aviso.
 trocam a cada jogada), e a caixa da pilha do descarte, que nasce com geometria
 própria a cada carta, é liberada antes de o grupo ser esvaziado.
 
+**O leque do adversário tem o tamanho da mão** (2026-09-04): até cinco
+cartas, a abertura de sempre; acima, o leque reabre no mesmo arco com as
+cartas mais juntas, até nove (`LEQUE_MAX`) — mão cheia se vê de longe, e o
+selo continua dizendo o número exato. Antes eram cinco costas fixas.
+
+**O corpo vira para quem joga** (2026-09-04): a cada estado a mesa calcula,
+para cada assento, o ângulo até quem está na vez (na sua vez, até a sua
+cadeira), no espaço do próprio assento, preso a ±0,5 rad, e o quadro a quadro
+leva o corpo até lá devagar. O rosto desenhado é um plano que encara a câmera,
+então o que vira é a postura, não o olhar — e é isso que lê como atenção. O
+leque e, num modelo externo, a boca da fala moram no grupo do assento, não no
+corpo: giram em volta do mesmo eixo, a partir de uma base guardada
+(`lequeBase`, `bocaBase`). Quem caiu não vira.
+
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
-espessura e de face única, o leque dos adversários travado em 5 cartas, e nada
-de sobras, troca de coringa, encaixe ou placar — para essas, o botão manda de
-volta à mesa normal. O `requestAnimationFrame` não para com a aba escondida —
+espessura e de face única (a espessura real seria invisível nesta escala; a
+sombra é o que dá volume), e nada de sobras, troca de coringa, encaixe ou
+placar — para essas, o botão manda de volta à mesa normal. O `requestAnimationFrame` não para com a aba escondida —
 o navegador já o pausa em aba de fundo, então é pouco.
 
 **As cartas da mesa ficam deitadas** — decisão do usuário em 2026-09-04
@@ -642,8 +656,9 @@ usuário: "personagens 3D bem desenhados, no nosso estilo"). Três coisas:
   que é cabeça (acima do pescoço, em 1,4 — regra por altura, não por lista)
   some, e a boca da fala passa para a frente do desenho.
 
-Ficou de fora, por ora: pernas no boneco de código, e o boneco reagir ao que
-os outros jogam (virar a cabeça). A cadeira chegou em 2026-09-04: uma
+Ficou de fora, por ora: pernas no boneco de código. O boneco virar para quem
+joga chegou em 2026-09-04 (o corpo, não a cabeça — ver acima). A cadeira
+chegou no mesmo dia: uma
 **banqueta** de madeira com a almofada na cor do assento (`criaBanqueta`, em
 `modelo3d.js`, porque o provador a usa para julgar a pose). Era um disco
 colorido no chão — com modelos que têm pernas, o disco os deixava sentados

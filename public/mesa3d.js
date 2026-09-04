@@ -956,6 +956,7 @@ function carregaModelo(slug) {
 }
 
 
+const LEQUE_MAX = 9;   // cartas viradas no leque de um adversário; o selo diz o número exato
 function criaAssento(p) {
   const slug = personagemDe(p);
   const grupo = new THREE.Group();
@@ -1001,6 +1002,8 @@ function criaAssento(p) {
       assento.ref.materiais = m.materiais;    // e o esmaecer de quem cai também
       assento.ref.cara = null;
       assento.ref.leque.position.copy(m.posLeque);
+      assento.ref.lequeBase = m.posLeque.clone();
+      assento.ref.bocaBase = bocas.aberta.position.clone();   // a boca está no grupo, e gira com o corpo no quadro
       assento.ref.nome.position.y = m.alturaCabeca + 0.5;
     }
   }).catch(() => { console.info(`modelo: ${slug} ausente — boneco de código`); });
@@ -1015,9 +1018,11 @@ function criaAssento(p) {
   sombra.position.y = 0.014;
   grupo.add(sombra);
 
-  // O leque de cartas viradas entre as mãos do boneco.
+  // O leque de cartas viradas entre as mãos do boneco. Nasce com LEQUE_MAX
+  // cartas na abertura de cinco; a sincronização mostra tantas quantas a mão
+  // tem (até o máximo) e reabre o leque para elas.
   const leque = new THREE.Group();
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < LEQUE_MAX; i++) {
     const carta = new THREE.Mesh(geoCarta, materialVerso);
     carta.scale.setScalar(0.42);
     const ang = (i - 2) * 0.17;
@@ -1059,7 +1064,7 @@ function criaAssento(p) {
   grupo.add(focoVez);
 
   scene.add(grupo);
-  const ref = { grupo, corpo, materiais, bocas, cara, leque, contagem, nome, focoVez, pulo: 0, caraAte: 0, assento, tAnterior: 0 };
+  const ref = { grupo, corpo, materiais, bocas, cara, leque, contagem, nome, focoVez, pulo: 0, caraAte: 0, assento, tAnterior: 0, lequeBase: leque.position.clone(), bocaBase: null, giroAlvo: 0 };
   assento.ref = ref;
   return ref;
 }
@@ -1494,15 +1499,39 @@ async function sincroniza(primeira) {
       a.grupo.rotation.y = pos.ang * 0.45;
 
       trocaRotulo(a.contagem, `${p.handCount}`);
-      // os cinco primeiros filhos são as cartas; dedos e selo ficam sempre
+      // os LEQUE_MAX primeiros filhos são as cartas; o selo fica sempre. Até
+      // cinco, a abertura é a de sempre; acima, o leque reabre no mesmo arco
+      // com as cartas mais juntas — mão cheia se vê de longe.
+      const nCartas = Math.min(LEQUE_MAX, p.handCount);
+      const passo = nCartas <= 5 ? 0.17 : 0.68 / (nCartas - 1);
       a.leque.children.forEach((c, i) => {
-        if (i < 5) c.visible = i < Math.min(5, p.handCount);
+        if (i >= LEQUE_MAX) return;
+        c.visible = i < nCartas;
+        if (!c.visible) return;
+        const ang = (i - (nCartas - 1) / 2) * passo;
+        c.position.set(Math.sin(ang) * 0.28, Math.cos(ang) * 0.02, i * 0.006);
+        c.rotation.z = -ang;
       });
       a.leque.visible = p.handCount > 0;
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
       minhaVez = view.turnId === me() && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
       a.apagado = (p.desistiu || (!p.isBot && !p.connected));
       for (const m of a.materiais) m.opacity = a.apagado ? 0.4 : 1;
+    }
+    // Para onde cada um olha: quem está na vez — e, na sua vez, você. O corpo
+    // vira só um pouco (±0,5 rad); o rosto desenhado continua encarando a
+    // câmera, então o que vira é a postura, não o olhar.
+    {
+      const foco = new THREE.Vector3(0, 0, 2.4);   // a sua cadeira
+      const naVez = assentos.get(view.turnId);
+      if (view.turnId !== me() && naVez) foco.copy(naVez.grupo.position);
+      const parado = view.phase === 'roundEnd' || view.phase === 'gameEnd';
+      for (const [id, a] of assentos) {
+        if (parado || id === view.turnId) { a.giroAlvo = 0; continue; }
+        a.grupo.updateMatrixWorld(true);
+        const local = a.grupo.worldToLocal(foco.clone());
+        a.giroAlvo = THREE.MathUtils.clamp(Math.atan2(local.x, local.z), -0.5, 0.5);
+      }
     }
 
     trocaRotulo(monte.num, String(view.deckCount));
@@ -1772,6 +1801,21 @@ function quadro(t) {
       const dt = (t - a.pulo) / 480;
       if (dt >= 1) a.pulo = 0;
       else a.corpo.position.y = Math.sin(dt * Math.PI) * 0.14;
+    }
+    // o corpo vira de leve para quem está jogando; o leque (e a boca da fala
+    // de um modelo externo, que mora no grupo) giram em volta do mesmo eixo
+    {
+      const alvoGiro = a.apagado ? 0 : a.giroAlvo;
+      a.corpo.rotation.y += (alvoGiro - a.corpo.rotation.y) * (semMovimento ? 1 : 0.06);
+      const r = a.corpo.rotation.y, s = Math.sin(r), c = Math.cos(r);
+      const b = a.lequeBase;
+      a.leque.position.set(c * b.x + s * b.z, b.y, c * b.z - s * b.x);
+      a.leque.rotation.y = r;
+      if (a.bocaBase) {
+        const q = a.bocaBase;
+        a.bocas.aberta.position.set(c * q.x + s * q.z, q.y, c * q.z - s * q.x);
+        a.bocas.aberta.rotation.y = r;
+      }
     }
     // a cara volta ao normal sozinha
     if (a.caraAte && t > a.caraAte) {
