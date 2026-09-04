@@ -520,11 +520,22 @@ em pé é ~20°. Acima de 4 adversários os assentos ímpares recuam para uma
 segunda fileira (raio 3,3 em vez de 2,66), como na mesa 2D — sete bonecos num
 arco só viravam um corpo atrás do outro. (Não conferido na tela com 5+.)
 
-**Sombras de contato** sob monte, descarte e jogos baixados
-(`sombraDeContato`): um disco com gradiente radial, a mesma técnica que já
-colava os bonecos no chão. Sem elas as cartas flutuavam; um mapa de sombra de
-verdade custa caro em celular e foi deixado de fora de propósito. A do
-descarte fica FORA do grupo, que é esvaziado a cada carta nova.
+**Sombra de verdade, da lâmpada** (2026-09-04): o `SpotLight` projeta um mapa
+PCF suave de 2048 sobre chão, tampo e aro; cartas da mesa, monte, bonecos e
+modelos projetam. O mapa é atualizado **de 4 em 4 quadros** (`autoUpdate`
+desligado) — cada atualização é um render extra da cena, e em celular isso
+pesa; para o que se move devagar (respiro, carta caindo) não se nota. A
+lâmpada saiu um palmo do eixo, para o lado da câmera (`0.45, 4.4, 0.7`):
+exatamente a pino, o que está encostado no tampo não projeta nada e a sombra
+sumia. Os **discos de contato** (`sombraDeContato`) ficaram, mais leves, para
+o que a sombra dura não pega. A do descarte fica FORA do grupo, que é
+esvaziado a cada carta nova.
+
+**Mapeamento tonal neutro** (`NeutralToneMapping`, exposição 1,1): a lâmpada
+forte estourava o feltro no meio; o Neutral segura o branco sem lavar o âmbar
+da paleta (o ACES lava). O que é **desenho** fica fora dele (`toneMapped:
+false`) — cartas, rostos, mãos e rótulos —, senão o vermelho dos naipes virava
+rosa.
 
 **O leque da mão cabe por conta própria** (`sincronizaMao`): os centros das
 cartas ocupam 84% da largura visível e cada carta gira em torno de si mesma
@@ -534,9 +545,10 @@ que é de propósito.
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: materiais
 chapados sem trama nem veio, cartas sem espessura e de face única, o leque dos
-adversários travado em 5 cartas, nenhum sinal 3D da sua própria vez, e nada de
-sobras, troca de coringa, encaixe ou placar — para essas, o botão manda de
-volta à mesa normal. Sem `dispose()` nos rótulos e no descarte recriados a cada
+adversários travado em 5 cartas, nenhum sinal 3D da sua própria vez, objetos de
+escala no tampo, animações de distribuir/puxar/baixar, e nada de sobras, troca
+de coringa, encaixe ou placar — para essas, o botão manda de volta à mesa
+normal. Sem `dispose()` nos rótulos e no descarte recriados a cada
 estado (vazamento lento), e o `requestAnimationFrame` não para com a aba
 escondida.
 
@@ -599,7 +611,11 @@ rótulo) e `MaoEsq`/`MaoDir` (onde o leque entra), os morphs `feliz`/`bravo`
 quem cai passam a agir sobre o modelo. O contrato completo está em
 [`public/models/LEIA-ME.md`](public/models/LEIA-ME.md);
 `test/modelo-exemplo.mjs` gera `_exemplo.glb`, um modelo mínimo (duas caixas
-com os nós nomeados) que prova o caminho — não é arte.
+com os nós nomeados) que prova o caminho — não é arte. Quem tem modelo está em
+`public/models/lista.json`: a mesa lê uma vez e só pede os que estão nela
+(tentar `<slug>.glb` às cegas era um 404 no console por assento sem modelo); a
+lista fica fora do cache da arte, para o modelo recém-posto aparecer na
+abertura seguinte.
 
 **Os personagens são 3D de verdade** — bonecos montados por código, de
 primitivas iluminadas (`montaBoneco` + `ESPEC_BONECO`): cabeça, tronco, braços

@@ -147,7 +147,11 @@ const server = http.createServer((req, res) => {
       // velha). Com `private`, quem guarda é o navegador de cada um: o ganho de
       // não repetir o download continua, e a janela de arte velha depois de um
       // deploy deixa de ser coletiva.
-      const arte = file.startsWith('/assets/') || file.startsWith('/fonts/') || file.startsWith('/models/');
+      // A lista de modelos fica fora do cache da arte: quem acabou de pôr um
+      // modelo e o listou precisa vê-lo na abertura seguinte, não cinco
+      // minutos depois.
+      const arte = file.startsWith('/assets/') || file.startsWith('/fonts/')
+        || (file.startsWith('/models/') && !file.endsWith('lista.json'));
       const cabecalho = {
         'Content-Type': MIME[ext] || 'application/octet-stream',
         'Cache-Control': arte ? 'private, max-age=300, must-revalidate' : 'no-cache',

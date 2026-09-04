@@ -104,6 +104,17 @@ const canvas = $('cena');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+// Sombra de verdade, da lâmpada: é o que cola cartas, monte e bonecos no feltro
+// (os discos de contato ficam, mais leves, para o que a sombra dura não pega).
+// Um mapa só, PCF suave, atualizado de 4 em 4 quadros no laço — cada
+// atualização é um render extra da cena, e em celular isso pesa.
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;
+// Mapeamento tonal neutro: a lâmpada forte deixava o feltro estourado no meio;
+// o Neutral segura o branco sem lavar o âmbar da paleta (o ACES lava).
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 1.1;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x17100a);
@@ -126,8 +137,17 @@ const reflexo = new THREE.DirectionalLight(0xffe2a8, 0.85);
 reflexo.position.set(0, 2.4, 5);
 scene.add(reflexo);
 const foco = new THREE.SpotLight(0xffe2a8, 140, 14, 0.72, 0.55, 1.6);
-foco.position.set(0, 4.4, 0);
+// Um palmo fora do eixo, para o lado da câmera: exatamente a pino, o que está
+// encostado no tampo não projeta nada e a sombra dura sumia. Assim ela cai
+// para trás dos objetos, curta, e continua lendo como uma lâmpada só.
+foco.position.set(0.45, 4.4, 0.7);
 foco.target.position.set(0, MESA_TOPO, 0);
+foco.castShadow = true;
+foco.shadow.mapSize.set(2048, 2048);
+foco.shadow.bias = -0.0004;
+foco.shadow.normalBias = 0.02;
+foco.shadow.camera.near = 1;
+foco.shadow.camera.far = 9;
 scene.add(foco, foco.target);
 
 // chão de tábuas escuras — só um disco com gradiente; a neblina faz o resto
@@ -144,6 +164,7 @@ scene.add(foco, foco.target);
     new THREE.MeshLambertMaterial({ map: tex }),
   );
   chao.rotation.x = -Math.PI / 2;
+  chao.receiveShadow = true;
   scene.add(chao);
 }
 
@@ -166,6 +187,7 @@ scene.add(foco, foco.target);
     ],
   );
   tampo.position.y = MESA_TOPO - 0.08;
+  tampo.receiveShadow = true;
   scene.add(tampo);
 
   const aro = new THREE.Mesh(
@@ -174,6 +196,7 @@ scene.add(foco, foco.target);
   );
   aro.rotation.x = Math.PI / 2;
   aro.position.y = MESA_TOPO - 0.04;
+  aro.receiveShadow = true; aro.castShadow = true;
   scene.add(aro);
 
   const pe = new THREE.Mesh(
@@ -389,7 +412,9 @@ function materialDaCarta(card) {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
-  const mat = new THREE.MeshLambertMaterial({ map: tex });
+  // Fora do mapeamento tonal: a carta é desenho, e o mapeamento lavava o
+  // vermelho dos naipes para rosa. A luz continua batendo nela.
+  const mat = new THREE.MeshLambertMaterial({ map: tex, toneMapped: false });
   texturasDeCarta.set(chave, mat);
   // O retrato das figuras chega depois (a imagem é assíncrona): desenha de
   // novo por cima quando carregar.
@@ -496,9 +521,9 @@ const materialVerso = (() => {
     arredondado(ctx, 4, 4, 120, 172, 10);
     ctx.stroke();
   });
-  return new THREE.MeshLambertMaterial({ map: tex });
+  return new THREE.MeshLambertMaterial({ map: tex, toneMapped: false });
 })();
-const materialBorda = new THREE.MeshLambertMaterial({ color: 0xcbc2ae });
+const materialBorda = new THREE.MeshLambertMaterial({ color: 0xcbc2ae, toneMapped: false });
 
 const CARTA_L = 0.42; const CARTA_A = 0.59;
 const geoCarta = new THREE.PlaneGeometry(CARTA_L, CARTA_A);
@@ -523,7 +548,7 @@ function rotulo(texto, corFundo = 'rgba(27,17,11,0.85)', corTexto = '#f5f1e6') {
   ctx.fillText(texto, 128, 38);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, toneMapped: false }));
   sp.scale.set(0.9, 0.25, 1);
   return sp;
 }
@@ -787,6 +812,7 @@ function montaBoneco(slug) {
   const daCabeca = [];
   corpo.traverse((m) => {
     if (m.isMesh && m !== bocaAberta && m.position.y > 1.44) { m.userData.cabeca = true; daCabeca.push(m); }
+    if (m.isMesh) m.castShadow = true;   // o boneco projeta no feltro e no chão
   });
   // Contorno só no corpo: a cabeça desenhada já traz o dela. O material é
   // deste boneco (uma cópia), e entra em `materiais` para esmaecer junto com o
@@ -832,11 +858,15 @@ function carasDoElenco(slug) {
 // ---------------------------------------------------------------------------
 const ALTURA_SENTADO = 1.55;
 const carregadorGLTF = new GLTFLoader();
-const modelosSemArquivo = new Set();
+// Quem tem modelo está em public/models/lista.json — a mesa lê uma vez e só
+// pede os que existem; tentar `<slug>.glb` às cegas era um 404 no console por
+// assento sem modelo.
+const listaDeModelos = fetch('/models/lista.json').then((r) => (r.ok ? r.json() : { modelos: [] }))
+  .then((j) => new Set(Array.isArray(j.modelos) ? j.modelos : [])).catch(() => new Set());
 function carregaModelo(slug) {
-  if (modelosSemArquivo.has(slug)) return Promise.reject(new Error('ausente'));
-  return new Promise((resolve, reject) => {
-    carregadorGLTF.load(`/models/${slug}.glb`, resolve, undefined, (e) => { modelosSemArquivo.add(slug); reject(e); });
+  return listaDeModelos.then((lista) => {
+    if (!lista.has(slug)) throw new Error('ausente');
+    return new Promise((resolve, reject) => carregadorGLTF.load(`/models/${slug}.glb`, resolve, undefined, reject));
   });
 }
 
@@ -856,7 +886,7 @@ function encaixaModelo(gltf, slug) {
   const morfos = {};
   raiz.traverse((o) => {
     if (o.isMesh) {
-      o.castShadow = false;
+      o.castShadow = true;
       const ms = Array.isArray(o.material) ? o.material : [o.material];
       for (const m of ms) { m.transparent = true; materiais.push(m); }
       if (o.morphTargetDictionary) {
@@ -897,7 +927,7 @@ function criaAssento(p) {
   // O rosto desenhado: um plano com o recorte do SVG, na frente da cabeça,
   // sem sombreamento (é desenho, como as mãos). Nasce invisível e entra quando
   // as três texturas chegam; até lá o rosto de primitivas segura a cena.
-  const mRosto = new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.5, depthWrite: true });
+  const mRosto = new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.5, depthWrite: true, toneMapped: false });
   materiais.push(mRosto);
   const plano = new THREE.Mesh(new THREE.PlaneGeometry(0.49, 0.40), mRosto);
   plano.position.set(0, 1.585, 0.17);
@@ -939,7 +969,7 @@ function criaAssento(p) {
   // sombra de contato: é ela que cola o boneco no chão
   const sombra = new THREE.Mesh(
     new THREE.CircleGeometry(0.4, 22),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18, depthWrite: false }),
   );
   sombra.rotation.x = -Math.PI / 2;
   sombra.scale.y = 0.42;
@@ -1022,8 +1052,8 @@ function posicaoDoAssento(indice, total) {
 // caro em celular), e é a mesma técnica que já cola os bonecos no chão.
 const texSombra = texturaDeCanvas(128, 128, (ctx) => {
   const g = ctx.createRadialGradient(64, 64, 6, 64, 64, 64);
-  g.addColorStop(0, 'rgba(0,0,0,0.6)');
-  g.addColorStop(0.55, 'rgba(0,0,0,0.28)');
+  g.addColorStop(0, 'rgba(0,0,0,0.32)');
+  g.addColorStop(0.55, 'rgba(0,0,0,0.14)');
   g.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
 });
@@ -1043,6 +1073,7 @@ const monte = (() => {
     [materialBorda, materialBorda, materialVerso, materialBorda, materialBorda, materialBorda],
   );
   caixa.scale.set(0.8, 1, 0.8);
+  caixa.castShadow = true;
   caixa.position.set(-0.4, MESA_TOPO, -0.5);
   scene.add(caixa);
   const sombra = sombraDeContato(0.62, 0.8);
@@ -1173,7 +1204,7 @@ function sincronizaMaos() {
     if (maos[lado]) maoGrupo.remove(maos[lado]);
     // desenho, como o elenco: sem sombreamento, só o escurecimento fixo
     const mat = new THREE.MeshBasicMaterial({
-      map: texturaMao2D(pele), transparent: true, depthWrite: false,
+      map: texturaMao2D(pele), transparent: true, depthWrite: false, toneMapped: false,
     });
     mat.color.setScalar(0.94);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.6), mat);
@@ -1433,8 +1464,10 @@ async function sincroniza(primeira) {
           new THREE.BoxGeometry(CARTA_L, alturaPilha, CARTA_A),
           materialBorda,
         );
+        base.castShadow = true;
         base.position.y = MESA_TOPO + alturaPilha / 2;
         const face = new THREE.Mesh(geoCarta, materialDaCarta(topo));
+        face.castShadow = true;
         face.scale.setScalar(1.15);
         face.rotation.x = -Math.PI / 2 + 0.2;   // deitada, 11° erguida para a câmera
         face.position.set(0, MESA_TOPO + alturaPilha + 0.05, 0.02);
@@ -1469,6 +1502,7 @@ async function sincroniza(primeira) {
       p.melds.forEach((meld, mi) => {
         meld.cards.forEach((card, ci) => {
           const carta = new THREE.Mesh(geoCarta, materialDaCarta(card));
+          carta.castShadow = true;
           carta.scale.setScalar(0.85);
           carta.rotation.x = -Math.PI / 2 + 0.36;   // deitada, 20° erguida para a câmera
           carta.position.set(
@@ -1640,6 +1674,8 @@ function quadro(t) {
     }
   }
 
+  quadro.n = (quadro.n || 0) + 1;
+  if (quadro.n % 4 === 0) renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, camera);
 }
 

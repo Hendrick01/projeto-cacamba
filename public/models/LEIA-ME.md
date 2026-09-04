@@ -40,6 +40,19 @@ terceiros com identidade própria — o critério é o mesmo do elenco em SVG.
 Sem nada disso, o personagem fica parado e a boca da fala é a elipse escura
 da mesa, pendurada no nó `Cabeca` (ou na altura calculada).
 
+## Como ligar um modelo
+
+Ponha o arquivo em `public/models/<slug>.glb` **e** acrescente o slug em
+`public/models/lista.json`:
+
+```json
+{ "modelos": ["dri", "mufasa"] }
+```
+
+A mesa lê essa lista uma vez e só pede os modelos que estão nela — sem a
+lista, ela não tenta às cegas (era um erro 404 no console por assento sem
+modelo).
+
 ## Como conferir
 
 Ponha o arquivo, abra `3d.html` numa partida com esse personagem na mesa e
