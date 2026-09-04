@@ -279,7 +279,10 @@ function texturaMadeira(repeticoes) {
 
 // Objetos de escala no tampo: sem eles as cartas flutuam num campo verde —
 // é o copo que diz o tamanho da carta (referência: os copinhos e fichas do
-// Capote). Ficam na beirada de quem olha, fora da área de jogo. Vidro barato:
+// Capote). Ficam ATRÁS das pilhas, um de cada lado: em pé a meia-abertura
+// horizontal da câmera é ~20°, e na beirada lateral (±1,5 m) saíam do quadro —
+// a ±1 m e −1 m de profundidade cabem, e ficam fora do caminho dos jogos
+// baixados, que ocupam a faixa entre −0,8 e +0,6. Vidro barato:
 // sem passe de transmissão, que pesa em celular; a transparência simples e o
 // dedo de bebida âmbar dentro bastam para ler como copo.
 {
@@ -292,22 +295,22 @@ function texturaMadeira(repeticoes) {
     objetos.add(m);
     return m;
   };
-  portaCopos(1.5, 0.85);
-  portaCopos(-1.45, 0.95);
+  portaCopos(1.0, -1.0);
+  portaCopos(-1.0, -1.0);
   const vidro = new THREE.MeshStandardMaterial({
     color: 0xdfe8e6, transparent: true, opacity: 0.32, roughness: 0.12, metalness: 0.08, side: THREE.DoubleSide, depthWrite: false,
   });
   const copo = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.044, 0.13, 20, 1, true), vidro);
-  copo.position.set(1.5, MESA_TOPO + 0.008 + 0.065, 0.85);
+  copo.position.set(1.0, MESA_TOPO + 0.008 + 0.065, -1.0);
   copo.castShadow = true;
   const fundoCopo = new THREE.Mesh(new THREE.CircleGeometry(0.044, 20), vidro);
   fundoCopo.rotation.x = -Math.PI / 2;
-  fundoCopo.position.set(1.5, MESA_TOPO + 0.009, 0.85);
+  fundoCopo.position.set(1.0, MESA_TOPO + 0.009, -1.0);
   const bebida = new THREE.Mesh(
     new THREE.CylinderGeometry(0.047, 0.042, 0.045, 20),
     new THREE.MeshStandardMaterial({ color: 0xc9822a, transparent: true, opacity: 0.9, roughness: 0.25, metalness: 0 }),
   );
-  bebida.position.set(1.5, MESA_TOPO + 0.009 + 0.0225, 0.85);
+  bebida.position.set(1.0, MESA_TOPO + 0.009 + 0.0225, -1.0);
   bebida.castShadow = true;
   objetos.add(copo, fundoCopo, bebida);
   scene.add(objetos);
@@ -1344,11 +1347,13 @@ function sincronizaMao() {
   layoutDaMao = { passo, escala, baseY, dist, meio: (n - 1) / 2, alturaVisivel, larguraVisivel };
   hand.forEach((card, i) => {
     let mesh = cartasDaMao.get(card.id);
+    let nova = false;
     if (!mesh) {
       mesh = new THREE.Mesh(geoCarta, materialDaCarta(card));
       mesh.userData.cardId = card.id;
       cartasDaMao.set(card.id, mesh);
       maoGrupo.add(mesh);
+      nova = true;
     }
     const meio = (n - 1) / 2;
     const sel = selecionadas.has(card.id);
@@ -1358,9 +1363,18 @@ function sincronizaMao() {
       baseY + Math.abs(i - meio) * -0.012 + (sel ? 0.1 * escala : 0),
       -dist + i * 0.004,
     );
+    // a carta que acabou de entrar voa do monte (ou do meio) até o lugar dela
+    if (nova && entradaNaMao && !semMovimento) {
+      const origem = entradaNaMao === 'meio' ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.06) : topoDoMonte();
+      maoGrupo.updateMatrixWorld(true);
+      voa(mesh, noEspacoDaMao(origem), mesh.position.clone(), { dur: 480, arco: 0.06 });
+    }
     mesh.rotation.z = -(i - meio) * 0.05;
     mesh.rotation.x = -0.12;
   });
+
+  entradaNaMao = null;
+  baixadaDe = null;   // os jogos já foram montados neste sincroniza
 
   // as duas mãos sobem por trás das pontas do leque, viradas para dentro —
   // é a composição da mesa 2D, que já era a aprovada
@@ -1627,6 +1641,16 @@ async function sincroniza(primeira) {
       // mesa cheia de jogos: encolhe o conjunto em vez de estourar o feltro
       if (total > 2.3) frente.scale.setScalar(2.3 / total);
       jogosNaMesa.add(frente);
+      // jogo novo de quem acabou de baixar: a fileira inteira voa do assento
+      // dele (ou da frente da sua cadeira) até o lugar — o grupo, não carta
+      // por carta, que é o gesto de quem põe o jogo na mesa
+      const temNovo = p.melds.some((m) => !jogosVistos.has(m.id));
+      if (temNovo && baixadaDe === p.id && !semMovimento) {
+        const a = assentos.get(p.id);
+        const origem = a ? lequeDe(a) : new THREE.Vector3(0, MESA_TOPO + 0.6, 1.9);
+        voa(frente, origem, frente.position.clone(), { dur: 520, arco: 0.15 });
+      }
+      for (const m of p.melds) jogosVistos.add(m.id);
     }
 
     sincronizaMao();
@@ -1660,7 +1684,35 @@ function trocaRotulo(sprite, texto) {
 
 // reações: cara e pulo, como na mesa normal
 function reageAoEvento(ev) {
-  if (ev.e === 'roundStart') { ordemManual = []; selecionadas.clear(); }
+  if (ev.e === 'roundStart') {
+    ordemManual = []; selecionadas.clear();
+    jogosVistos.clear();
+    // distribuir: três cartas viradas por assento saem do monte, escalonadas —
+    // as de verdade não vão (com oito na mesa seriam quase cem), como na 2D
+    if (!semMovimento) {
+      let k = 0;
+      for (const a of assentos.values()) {
+        for (let c = 0; c < 3; c++) {
+          const m = cartaPassageira();
+          voa(m, topoDoMonte(), lequeDe(a), { dur: 380, atraso: k++ * 90, aoFim: () => scene.remove(m) });
+        }
+      }
+      entradaNaMao = 'monte';
+    }
+  }
+  if ((ev.e === 'draw' || ev.e === 'buy' || ev.e === 'tomouSobra') && !semMovimento) {
+    const doMeio = ev.e === 'draw' && ev.source === 'discard';
+    if (ev.p === me()) entradaNaMao = doMeio ? 'meio' : 'monte';
+    else {
+      const a = assentos.get(ev.p);
+      if (a) {
+        const m = cartaPassageira();
+        const de = doMeio ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.06) : topoDoMonte();
+        voa(m, de, lequeDe(a), { dur: 420, aoFim: () => scene.remove(m) });
+      }
+    }
+  }
+  if (ev.e === 'baixou' && !semMovimento) baixadaDe = ev.p;
   const alvo = ev.p || ev.winnerId;
   const a = alvo ? assentos.get(alvo) : null;
   if (!a) return;
@@ -1712,8 +1764,48 @@ function encaixaTela() {
 window.addEventListener('resize', encaixaTela);
 encaixaTela();
 
+// ---------------------------------------------------------------------------
+// Voos: qualquer objeto indo de um ponto a outro com aceleração suave e um
+// arco. É o que anima distribuir, puxar e baixar — a mesa 2D tem os mesmos
+// gestos, e sem eles a 3D trocava de estado num piscar, como uma planilha.
+// ---------------------------------------------------------------------------
+const voos = [];
+function voa(obj, de, para, { dur = 450, atraso = 0, arco = 0.12, aoFim = null } = {}) {
+  obj.position.copy(de);
+  voos.push({ obj, de: de.clone(), para: para.clone(), t0: performance.now(), dur, atraso, arco, aoFim });
+}
+function animaVoos(t) {
+  for (let i = voos.length - 1; i >= 0; i--) {
+    const v = voos[i];
+    const k = (t - v.t0 - v.atraso) / v.dur;
+    if (k < 0) continue;
+    const e = 1 - Math.pow(1 - Math.min(1, k), 3);
+    v.obj.position.lerpVectors(v.de, v.para, e);
+    v.obj.position.y += Math.sin(e * Math.PI) * v.arco;
+    if (k >= 1) { v.obj.position.copy(v.para); voos.splice(i, 1); v.aoFim?.(); }
+  }
+}
+// uma carta virada, passageira, para os voos que não têm carta de verdade
+function cartaPassageira(escala = 0.42) {
+  const m = new THREE.Mesh(geoCarta, materialVerso);
+  m.scale.setScalar(escala);
+  m.rotation.x = -Math.PI / 2 + 0.3;
+  scene.add(m);
+  return m;
+}
+const topoDoMonte = () => new THREE.Vector3(monte.caixa.position.x, monte.caixa.position.y + monte.caixa.scale.y * 0.1 + 0.02, monte.caixa.position.z);
+const lequeDe = (a) => { const v = new THREE.Vector3(); a.leque.getWorldPosition(v); return v; };
+// A mão está presa à câmera: um ponto do mundo vira ponto do leque por aqui.
+const noEspacoDaMao = (mundo) => maoGrupo.worldToLocal(mundo.clone());
+
+// O que os eventos deixam armado para o próximo sincroniza animar.
+let entradaNaMao = null;     // 'monte' | 'meio' — a carta nova da minha mão vem de lá
+let baixadaDe = null;        // id de quem acabou de baixar: os jogos novos dele voam do assento
+const jogosVistos = new Set();
+
 function quadro(t) {
   requestAnimationFrame(quadro);
+  animaVoos(t);
 
   // a cabeça acompanha o ponteiro de leve; a mesa continua o alvo
   camera.position.x += ((olharX * 1.4) - camera.position.x) * 0.06;

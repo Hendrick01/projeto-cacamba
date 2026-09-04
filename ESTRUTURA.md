@@ -543,6 +543,24 @@ rugosidade média: o brilho de verniz da carta plastificada. Tudo gerado na
 hora (`texturaFeltro`, `texturaMadeira`, `texturaRelevoFeltro`), nada baixado:
 peso em celular, e a regra do projeto é não depender de fora.
 
+**Objetos de escala no tampo** (2026-09-04): um copo com um dedo de bebida
+sobre um porta-copos e um porta-copos sobrando, **atrás das pilhas**, um de
+cada lado — é o copo que diz o tamanho da carta (referência: os copinhos e
+fichas do Capote). Ficam ali e não na beirada porque em pé a meia-abertura
+horizontal da câmera é ~20°: a ±1,5 m da lateral saíam do quadro. Vidro
+barato, sem passe de transmissão (pesa em celular).
+
+**Voos** (2026-09-04): `voa(obj, de, para)` leva qualquer objeto de um ponto a
+outro com aceleração suave e um arco, e `animaVoos` roda no laço. É o que
+anima **distribuir** (três cartas viradas por assento saem do monte,
+escalonadas — as de verdade não vão, como na 2D), **puxar** (a carta nova da
+sua mão voa do monte ou do meio até o lugar dela no leque, convertida para o
+espaço da câmera, onde a mão vive; a dos outros é uma carta virada passageira
+até o assento) e **baixar** (a fileira inteira do jogo novo voa do assento de
+quem baixou). Os eventos armam (`entradaNaMao`, `baixadaDe`) e o `sincroniza`
+seguinte dispara; `jogosVistos` diz o que é jogo novo. Tudo desligado em
+`prefers-reduced-motion`.
+
 **Mapeamento tonal neutro** (`NeutralToneMapping`, exposição 1,1): a lâmpada
 forte estourava o feltro no meio; o Neutral segura o branco sem lavar o âmbar
 da paleta (o ACES lava). O que é **desenho** fica fora dele (`toneMapped:
@@ -557,10 +575,9 @@ que é de propósito.
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única, o leque dos
-adversários travado em 5 cartas, nenhum sinal 3D da sua própria vez, objetos de
-escala no tampo, animações de distribuir/puxar/baixar, e nada de sobras, troca
-de coringa, encaixe ou placar — para essas, o botão manda de volta à mesa
-normal. Sem `dispose()` nos rótulos e no descarte recriados a cada
+adversários travado em 5 cartas, nenhum sinal 3D da sua própria vez, e nada de
+sobras, troca de coringa, encaixe ou placar — para essas, o botão manda de
+volta à mesa normal. Sem `dispose()` nos rótulos e no descarte recriados a cada
 estado (vazamento lento), e o `requestAnimationFrame` não para com a aba
 escondida.
 
