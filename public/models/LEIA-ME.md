@@ -77,6 +77,38 @@ cabeça de alguém em pé; sentado, algo como 0.88). Com `--maos x,y,z` injeta
 também `MaoDir`/`MaoEsq` (a esquerda espelhada); sem isso o leque fica na
 posição padrão. Depois: abrir no provador e pôr o slug na lista.
 
+## Sentar e animar: o rig automático
+
+A escultura chega em pé e sem esqueleto. Para sentar com as mãos à frente e
+ter os clips `idle`/`feliz`/`bravo`, o caminho é um **rigger automático** —
+o Mixamo (Adobe, gratuito, no navegador) serve: ele cria o esqueleto e tem
+dezenas de animações sentadas prontas. Ferramentas de vídeo (Flow, Veo,
+Sora) não servem: geram imagens, não malha com esqueleto.
+
+1. Gere o pacote de subida a partir do `.glb` já reduzido:
+   ```bash
+   node test/modelo-obj.mjs public/models/<slug>.glb ~/Downloads/<slug>-para-rig.zip
+   ```
+   (OBJ + MTL + texturas, o formato que o rigger aceita).
+2. No Mixamo: **Upload character** → o `.zip` → marque queixo, pulsos,
+   cotovelos, joelhos e virilha na foto → **Next**. Depois escolha as
+   animações: uma sentada e parada para `idle` (busque *Sitting Idle*), uma
+   alegre para `feliz` (*Sitting Clap*, *Sitting Laughing*) e uma zangada
+   para `bravo` (*Sitting Disapproval*, *Sitting Angry*). Baixe cada uma em
+   **FBX Binary, With Skin, 30 fps** (a de `idle` pode ser *In Place*).
+3. Junte tudo num `.glb` da mesa:
+   ```bash
+   node test/modelo-prepara.mjs idle.fbx public/models/<slug>.glb --clip feliz=feliz.fbx --clip bravo=bravo.fbx
+   ```
+   O script converte os FBX (baixa o FBX2glTF uma vez, para `~/.cache`),
+   funde os clips casando os ossos pelo nome, pendura `Cabeca` no osso da
+   cabeça e `MaoEsq`/`MaoDir` nos ossos das mãos, e o leque entra entre
+   elas. Abra no provador: os botões **feliz** e **bravo** tocam os clips.
+
+O que o rig automático não dá: os morphs `feliz`/`bravo`/`bocaAberta` (a
+cara continua a mesma; a reação é do corpo, e a fala usa a elipse escura).
+Isso é escultura de expressão, na ferramenta de modelagem.
+
 A Gabizinsky de 2026-09-04 veio assim: ficha de 1,95 milhão de triângulos com
 as quatro vistas numa malha só → figura da frente com 510 mil → 29.995
 triângulos e 1,4 MB, com cor, normal map e metal/rugosidade em 1024 px. O que

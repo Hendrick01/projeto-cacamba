@@ -73,7 +73,8 @@ projeto-caçamba/
 | [`public/models/`](public/models/LEIA-ME.md) | — | Os personagens externos, `<slug>.glb`, e o contrato do que cada um precisa ter. `_exemplo.glb` é a prova de caminho. |
 | [`test/modelo-exemplo.mjs`](test/modelo-exemplo.mjs) | 95 | Gera o `_exemplo.glb`: GLB válido escrito à mão (JSON + BIN), três caixas, textura PNG, morph `bocaAberta`, clips `idle`/`feliz` e os nós `Cabeca`, `MaoEsq`, `MaoDir`. |
 | [`test/modelo-recorta.mjs`](test/modelo-recorta.mjs) | 95 | Bancada: de uma "ficha" com várias vistas numa malha só, recorta a figura que olha para +Z (separa pelos vazios em x, acha a frente pela ponta dos pés). |
-| [`test/modelo-prepara.mjs`](test/modelo-prepara.mjs) | 80 | Bancada: solda, reduz para o orçamento de triângulos (`@gltf-transform/cli` via `npx`), encolhe texturas para 1024 px e injeta `Cabeca` (e as mãos, se pedido). |
+| [`test/modelo-prepara.mjs`](test/modelo-prepara.mjs) | 150 | Bancada: aceita `.glb` ou `.fbx`, funde clips de outros arquivos pelo nome dos ossos, solda, reduz para o orçamento (`@gltf-transform/cli` via `npx`), encolhe texturas e pendura `Cabeca`/`MaoEsq`/`MaoDir` nos ossos (ou injeta na raiz). |
+| [`test/modelo-obj.mjs`](test/modelo-obj.mjs) | 60 | Bancada: exporta um `.glb` como OBJ + MTL + texturas num `.zip`, o pacote que o rigger automático aceita. |
 | [`public/modelo3d.js`](public/modelo3d.js) | 230 | O que mesa e provador têm em comum sobre modelos externos: estilo do elenco (toon + contorno, normal map mantido), `encaixaModelo`, `reage`, `confereModelo`, `criaBanqueta`. |
 | [`public/provador.html`](public/provador.html) · `provador.js` | 300 | O provador de modelos: abre um `.glb` do aparelho ou da lista, senta na banqueta com a luz da mesa e confere o contrato item a item. |
 | [`public/voz.js`](public/voz.js) | 169 | Chat de voz: microfone, pares WebRTC em malha, sinalização pela mensagem `voz` do WebSocket, e o nível de áudio de cada um (`nivel`/`falando`). Usado pelas duas mesas. |
@@ -623,7 +624,16 @@ reduz com o `@gltf-transform/cli` via `npx`, encolhe texturas, injeta
 `Cabeca` e, se pedido, as mãos). O estilo do elenco passou a manter o
 **normal map** do material original. A escultura está em pé, sem esqueleto: a
 mesa a mostra em pé, com o leque na posição padrão; sentar é trabalho de rig
-na ferramenta de modelagem. Detalhes em `public/models/LEIA-ME.md`.
+automático (Mixamo), e o fluxo está pronto dos dois lados: `modelo-obj.mjs`
+exporta o `.glb` reduzido como OBJ + MTL + texturas num `.zip` para subir no
+rigger, e `modelo-prepara.mjs` aceita o FBX rigado de volta (converte com o
+FBX2glTF, instalado uma vez em `~/.cache/cacamba-fbx2gltf`; é binário x86 e
+roda sob Rosetta), funde clips de outros arquivos casando os ossos pelo nome
+(`--clip feliz=arquivo.fbx`), renomeia o clip da fonte para `idle` e pendura
+`Cabeca`/`MaoEsq`/`MaoDir` nos ossos `Head`/`LeftHand`/`RightHand`. A fusão
+de clips foi testada com os `.glb` do trio; a conversão de FBX ainda não
+passou por um arquivo real do Mixamo (2026-09-04). Detalhes em
+`public/models/LEIA-ME.md`.
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a
