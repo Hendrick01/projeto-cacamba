@@ -499,14 +499,39 @@ mesa 2D e espelhada para o outro lado (`texturaMao2D`), no tom de pele do seu
 personagem. Reações (boca feliz/brava, pulo) respondem aos mesmos eventos da
 mesa normal.
 
-O que ela **ainda não tem**, conferido no código em 2026-08-28: nenhuma sombra
-projetada (`shadowMap` nunca é ligado; a única sombra é um disco escuro sob
-cada assento), materiais chapados sem trama nem veio, cartas sem espessura e
-de face única, o leque dos adversários travado em 5 cartas, nenhum sinal 3D da
-sua própria vez, e nada de sobras, troca de coringa, encaixe ou placar — para
-essas, o botão manda de volta à mesa normal. Sem `dispose()` nos rótulos e no
-descarte recriados a cada estado (vazamento lento), e o `requestAnimationFrame`
-não para com a aba escondida. A lista de melhorias parte daí.
+**A câmera senta à mesa** (`encaixaTela`, 2026-09-04): o olho a ~1,3 m acima
+do tampo e a ~3,7 m do centro em pé, com 76° de campo — era 1,7 m acima e
+4,6 m atrás com 84°, e a mesa virava um campo vazio com gente miúda na borda.
+Quem paga a conta de caber todo mundo é a **abertura dos assentos**
+(`posicaoDoAssento`): ±38° em pé, ±60° em paisagem — com ±60° e a câmera
+perto, os assentos das pontas saíam do quadro e os nomes ficavam cortados na
+borda. A conta que fecha: a 5,8 m da câmera, um rótulo de 0,66 de largura no
+assento a ±38° termina a ~19° do eixo, e a meia-abertura horizontal da câmera
+em pé é ~20°. Acima de 4 adversários os assentos ímpares recuam para uma
+segunda fileira (raio 3,3 em vez de 2,66), como na mesa 2D — sete bonecos num
+arco só viravam um corpo atrás do outro. (Não conferido na tela com 5+.)
+
+**Sombras de contato** sob monte, descarte e jogos baixados
+(`sombraDeContato`): um disco com gradiente radial, a mesma técnica que já
+colava os bonecos no chão. Sem elas as cartas flutuavam; um mapa de sombra de
+verdade custa caro em celular e foi deixado de fora de propósito. A do
+descarte fica FORA do grupo, que é esvaziado a cada carta nova.
+
+**O leque da mão cabe por conta própria** (`sincronizaMao`): os centros das
+cartas ocupam 84% da largura visível e cada carta gira em torno de si mesma
+(2,9° por posição), então o giro não empurra as pontas para fora como na mesa
+2D. O que parece corte nas pontas são as mãos nos cantos e o recorte de baixo,
+que é de propósito.
+
+O que ela **ainda não tem**, conferido no código em 2026-09-04: materiais
+chapados sem trama nem veio, cartas sem espessura e de face única, o leque dos
+adversários travado em 5 cartas, nenhum sinal 3D da sua própria vez, e nada de
+sobras, troca de coringa, encaixe ou placar — para essas, o botão manda de
+volta à mesa normal. Sem `dispose()` nos rótulos e no descarte recriados a cada
+estado (vazamento lento), e o `requestAnimationFrame` não para com a aba
+escondida. As cartas do descarte e dos jogos ficam **em pé** de propósito —
+deitadas, deste ângulo, viravam lascas ilegíveis; deitá-las é decisão de
+câmera (mais de cima), não de acabamento.
 
 A biblioteca (`public/vendor/three.module.js`, ~675 KB, 167 KB com gzip) **só é
 baixada quando se abre o 3D** — a mesa normal continua nos 181 KB. Vendida no

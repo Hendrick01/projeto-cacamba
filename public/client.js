@@ -1709,7 +1709,9 @@ function toast(text) {
 function notifyTurn() {
   const mine = myTurn() && (view.phase === 'draw' || view.phase === 'play');
   if (mine && !lastTurnWasMine) {
-    try { navigator.vibrate?.(80); } catch { /* ok */ }
+    // Só depois de um toque de verdade: antes disso o Chrome recusa e registra
+    // um erro no console a cada chamada (77 numa partida dirigida por script).
+    try { if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.(80); } catch { /* ok */ }
     document.title = '🟡 Sua vez! — Caçamba';
   } else if (!mine) {
     document.title = 'Caçamba';

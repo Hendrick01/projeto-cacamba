@@ -767,6 +767,9 @@ function criaAssento(p) {
   grupo.add(cadeira);
 
   const nome = rotulo(p.name);
+  // Menor que o padrão: é o rótulo mais largo da cena e o que primeiro sai do
+  // quadro nas pontas em pé (a conta está em `posicaoDoAssento`).
+  nome.scale.set(0.66, 0.183, 1);
   nome.position.y = 2.1;
   nome.scale.set(0.78, 0.21, 1);
   grupo.add(nome);
@@ -787,14 +790,42 @@ function criaAssento(p) {
 // os adversários sentam no arco do outro lado; você fica na câmera
 function posicaoDoAssento(indice, total) {
   const meio = (total - 1) / 2;
-  const ang = total === 1 ? 0 : ((indice - meio) / Math.max(1, meio)) * 1.05; // ±60°
-  const r = 2.66;
+  // Em pé (celular) a abertura encolhe: com ±60° e a câmera mais perto, os
+  // assentos das pontas saíam do quadro e os nomes ficavam cortados na borda.
+  // A conta que fecha: a 5,8 m da câmera, um rótulo de 0,66 de largura no
+  // assento a ±38° termina a ~19° do eixo, e a meia-abertura horizontal da
+  // câmera em pé é ~20°. Em paisagem cabe a volta inteira da mesa.
+  const abertura = camera.aspect < 1 ? 0.66 : 1.05;   // ±38° / ±60°
+  const ang = total === 1 ? 0 : ((indice - meio) / Math.max(1, meio)) * abertura;
+  // Mesa cheia: os assentos ímpares recuam para uma segunda fileira, como na
+  // mesa 2D — sete bonecos num arco só viravam um corpo atrás do outro.
+  const r = total > 4 && indice % 2 === 1 ? 3.3 : 2.66;
   return { x: Math.sin(ang) * r, z: -Math.cos(ang) * r, ang };
 }
 
 // ---------------------------------------------------------------------------
 // Cartas na mesa: monte, descarte, jogos
 // ---------------------------------------------------------------------------
+
+// Sombra de contato: um disco suave sob o que está apoiado no feltro. Sem ela
+// monte, descarte e jogos flutuavam — a cena não tem mapa de sombra (custa
+// caro em celular), e é a mesma técnica que já cola os bonecos no chão.
+const texSombra = texturaDeCanvas(128, 128, (ctx) => {
+  const g = ctx.createRadialGradient(64, 64, 6, 64, 64, 64);
+  g.addColorStop(0, 'rgba(0,0,0,0.6)');
+  g.addColorStop(0.55, 'rgba(0,0,0,0.28)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+});
+const geoSombra = new THREE.PlaneGeometry(1, 1);
+const materialSombra = new THREE.MeshBasicMaterial({ map: texSombra, transparent: true, depthWrite: false });
+function sombraDeContato(largura, profundidade) {
+  const m = new THREE.Mesh(geoSombra, materialSombra);
+  m.rotation.x = -Math.PI / 2;
+  m.scale.set(largura, profundidade, 1);
+  m.position.y = MESA_TOPO + 0.004;
+  return m;
+}
 
 const monte = (() => {
   const caixa = new THREE.Mesh(
@@ -804,6 +835,9 @@ const monte = (() => {
   caixa.scale.set(0.8, 1, 0.8);
   caixa.position.set(-0.4, MESA_TOPO, -0.5);
   scene.add(caixa);
+  const sombra = sombraDeContato(0.62, 0.8);
+  sombra.position.x = -0.4; sombra.position.z = -0.5;
+  scene.add(sombra);
   const num = rotulo('', 'rgba(27,17,11,0.85)', '#9dbbad');
   num.position.set(-0.4, MESA_TOPO + 0.3, -0.2);
   num.scale.set(0.5, 0.15, 1);
@@ -815,6 +849,10 @@ const descarte = (() => {
   const grupo = new THREE.Group();
   grupo.position.set(0.4, 0, -0.5);
   scene.add(grupo);
+  // fora do grupo, que é esvaziado a cada carta nova
+  const sombra = sombraDeContato(0.62, 0.8);
+  sombra.position.x = 0.4; sombra.position.z = -0.5;
+  scene.add(sombra);
   return { grupo, topoId: null };
 })();
 
@@ -1226,6 +1264,9 @@ async function sincroniza(primeira) {
         });
         x += larguras[mi] + vaoEntreJogos;
       });
+      const sombra = sombraDeContato(total + 0.25, 0.5);
+      sombra.position.z = 0.03;
+      frente.add(sombra);
       // mesa cheia de jogos: encolhe o conjunto em vez de estourar o feltro
       if (total > 2.1) frente.scale.setScalar(2.1 / total);
       jogosNaMesa.add(frente);
@@ -1290,8 +1331,12 @@ function encaixaTela() {
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   const emPe = Math.min(1, camera.aspect);
-  camera.fov = Math.min(88, 52 / Math.max(0.62, emPe * 1.15));
-  camera.position.set(0, 2.3 + (1 - emPe) * 0.55, 3.9 + (1 - emPe) * 1.3);
+  // Sentado à mesa, não pendurado no teto: o olho a ~1,3 m acima do tampo e a
+  // ~3,7 m do centro em pé (era 1,7 m acima e 4,6 m atrás, com 84° de campo —
+  // a mesa virava um campo vazio com gente miúda na borda). Quem paga a conta
+  // de caber todo mundo é a abertura dos assentos, em `posicaoDoAssento`.
+  camera.fov = Math.min(80, 50 / Math.max(0.66, emPe * 1.15));
+  camera.position.set(0, 2.05 + (1 - emPe) * 0.3, 3.2 + (1 - emPe) * 0.9);
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', encaixaTela);
