@@ -479,10 +479,15 @@ só que agora da madeira. O que mudou foi o `top`, de `-114px` para `-129px`,
 compensando os 15 px que o verde desceu; sem isso abria um vão entre a beirada e
 quem senta nela.
 
-**O que o aro ainda não resolve:** com 5 a 7 adversários a fileira de trás fica
-acima do tampo, e continua lendo como gente em pé no fundo do salão em vez de
-sentada. Alcançar aquela fileira é mudar o arranjo dos assentos, não o
-acabamento da mesa.
+**O balcão da fileira de trás** (2026-09-04): com 5 a 7 adversários a fileira
+de trás fica acima do tampo e lia como gente em pé no fundo do salão. Agora
+ela senta atrás de um **balcão** (`.balcao`): a borda de cima de uma elipse
+larga, no material do aro, exatamente na linha em que a figura de trás é
+cortada no peito (58 px × 0,8 de escala) — é o que faz o corte ler como gente
+sentada. A curva segue o arco em que os assentos de trás estão dispostos
+(mais alta no meio, mais baixa nas pontas; a elipse tem 568×220 para a queda
+bater com os ~13 px do arco). O miolo é transparente, não recebe toque, e fica
+atrás dos assentos: a cadeira colorida e o nome continuam por cima.
 
 ## A mesa em 3D
 
@@ -518,7 +523,11 @@ borda. A conta que fecha: a 5,8 m da câmera, um rótulo de 0,66 de largura no
 assento a ±38° termina a ~19° do eixo, e a meia-abertura horizontal da câmera
 em pé é ~20°. Acima de 4 adversários os assentos ímpares recuam para uma
 segunda fileira (raio 3,3 em vez de 2,66), como na mesa 2D — sete bonecos num
-arco só viravam um corpo atrás do outro. (Não conferido na tela com 5+.)
+arco só viravam um corpo atrás do outro — e a abertura aperta para **±30°**:
+a ±38°, com cinco, os das pontas saíam do quadro (visto na tela); cabe porque
+as fileiras alternam o raio e na da frente sobram ~0,9 m entre vizinhos.
+Conferido na tela com cinco adversários: todos inteiros, dois arcos, nomes
+completos.
 
 **Sombra de verdade, da lâmpada** (2026-09-04): o `SpotLight` projeta um mapa
 PCF suave de 2048 sobre chão, tampo e aro; cartas da mesa, monte, bonecos e

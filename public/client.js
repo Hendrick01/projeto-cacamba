@@ -660,6 +660,14 @@ function renderOpponents() {
   const lugares = posicoesDeAssento(adversarios.length);
   const alturaAssentos = alturaDaMesa(adversarios.length);
   box.style.height = `${alturaAssentos}px`;
+  // Com duas fileiras, a de trás fica acima do tampo e flutuava no assoalho.
+  // O balcão é uma faixa de madeira curva, no material do aro, exatamente na
+  // linha em que a figura de trás é cortada no peito (58 px × 0,8 de escala):
+  // é o que faz o corte ler como gente sentada atrás de um balcão, e não
+  // gente em pé no fundo do salão.
+  let balcao = box.querySelector('.balcao');
+  if (!balcao) { balcao = document.createElement('div'); balcao.className = 'balcao'; box.prepend(balcao); }
+  balcao.hidden = adversarios.length <= ASSENTOS_POR_FILEIRA;
   // O tampo precisa começar logo abaixo de quem senta, senão o feltro descola
   // dos assentos e eles ficam flutuando no cenário.
   box.parentElement?.style.setProperty('--altura-assentos', `${alturaAssentos}px`);

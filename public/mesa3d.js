@@ -1145,7 +1145,10 @@ function posicaoDoAssento(indice, total) {
   // A conta que fecha: a 5,8 m da câmera, um rótulo de 0,66 de largura no
   // assento a ±38° termina a ~19° do eixo, e a meia-abertura horizontal da
   // câmera em pé é ~20°. Em paisagem cabe a volta inteira da mesa.
-  const abertura = camera.aspect < 1 ? 0.66 : 1.05;   // ±38° / ±60°
+  // Com cinco ou mais, aperta mais (±30°): a ±38° os das pontas saíam do
+  // quadro (visto com cinco). Cabe porque as fileiras alternam o raio — na
+  // da frente sobram ~0,9 m entre vizinhos, mais que um boneco.
+  const abertura = camera.aspect < 1 ? (total >= 5 ? 0.52 : 0.66) : 1.05;   // ±30° / ±38° / ±60°
   const ang = total === 1 ? 0 : ((indice - meio) / Math.max(1, meio)) * abertura;
   // Mesa cheia: os assentos ímpares recuam para uma segunda fileira, como na
   // mesa 2D — sete bonecos num arco só viravam um corpo atrás do outro.

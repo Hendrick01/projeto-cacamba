@@ -317,6 +317,15 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
 
 .topbar-btns { display: flex; gap: 8px; }
 .icon-btn-sair { color: var(--danger); border-color: rgba(228, 87, 46, 0.5); }
+/* Cinco botões (placar, regras, voz, 3D, sair) não cabiam ao lado da rodada
+   numa tela de 375: o rótulo "RODADA 1/7 · 6 CARTAS" quebrava em duas linhas.
+   Em tela estreita os botões encolhem um pouco e o rótulo não quebra. */
+@media (max-width: 430px) {
+  .topbar { padding-left: 10px; padding-right: 10px; }
+  .topbar-btns { gap: 4px; }
+  .topbar-btns .icon-btn { width: 34px; height: 34px; min-width: 34px; padding: 0; font-size: 0.9rem; line-height: 34px; }
+  .round-pill span { white-space: nowrap; letter-spacing: 0.05em; }
+}
 .icon-btn {
   width: 38px; height: 38px; border-radius: 50%;
   border: 2px solid rgba(140, 106, 69, 0.45); background: rgba(0, 0, 0, 0.3);
@@ -459,8 +468,30 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
   margin-top: -14px;
 }
 
+/* O balcão da fileira de trás: só a borda de cima de uma elipse larga, o que
+   dá a faixa curva — mais alta no meio, mais baixa nas pontas, seguindo o
+   arco em que os assentos de trás estão dispostos (`posicoesDeAssento`). A
+   elipse tem 568×220 para a queda nas pontas bater com os ~13 px do arco; o
+   miolo é transparente e não recebe toque. Fica atrás dos assentos: a
+   cadeira colorida e o nome continuam por cima. */
+.balcao {
+  position: absolute; left: -30%; width: 160%;
+  top: 46px; height: 220px;
+  border-top: 14px solid var(--aro);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+.balcao::before, .balcao::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 220px;
+  border-radius: 50%; pointer-events: none;
+}
+.balcao::before { top: -15px; border-top: 3px solid var(--aro-luz); }   /* o tampo do balcão pega a lâmpada */
+.balcao::after { top: -1px; border-top: 3px solid var(--aro-noite); }  /* e a face de baixo cai na sombra */
+
 .assento {
   position: absolute;
+  z-index: 1;
   left: var(--x, 50%);
   top: var(--y, 0px);
   width: 62px;
