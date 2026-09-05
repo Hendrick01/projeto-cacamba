@@ -200,7 +200,7 @@ function poeNaCena(gltf, nome) {
   if (atual?.m) { atual.m.mixer?.stopAllAction(); limpa(atual.m.raiz); }
   const m = encaixaModelo(gltf, nome, { estilo, avisa: false });
   palco.add(m.raiz);
-  leque.position.copy(m.posLeque).add(new THREE.Vector3(0, -0.04, 0.02)); leque.rotation.x = -0.5; leque.visible = true;   // como na mesa: nas palmas, inclinado para o rosto
+  leque.position.copy(m.posLeque).add(new THREE.Vector3(0, -0.06, 0.05)); leque.rotation.x = -0.35; leque.visible = true;   // como na mesa: à frente das mãos, só os dedos acima da borda
   bocaFala.position.set(0, m.alturaCabeca - 0.07, 0.16); bocaFala.visible = false;
   atual = { ...atual, nome, m };
   mostraItens(confereModelo(gltf, m));
@@ -298,4 +298,4 @@ function quadro(t) {
 requestAnimationFrame(quadro);
 
 // para olhar de fora (console): o modelo atual, o palco e a cena
-window.provador = { atual: () => atual, palco, scene, camera, carrega };
+window.provador = { atual: () => atual, palco, scene, camera, carrega, leque };

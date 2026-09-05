@@ -667,9 +667,15 @@ mão e antebraço). Segunda rodada, com o olhar do usuário: o clip senta na
 beirada, então o quadril recua 12 cm e desce 6 cm (`--recuo`/`--desce`) até
 as coxas apoiarem; acima da cintura os ossos da perna perdem o peso
 (`--cintura`; 2.081 vértices da barriga e do cós seguiam a coxa e viravam
-uma mancha de pele na calça); e o leque de um modelo entra nas palmas,
-4 cm abaixo da ponta dos dedos e inclinado −0,5 rad para o rosto, porque sem
-ossos de dedo é a posição que faz parecer segurado.
+uma mancha de pele na calça); o tronco fica 15° mais ereto (o clip curva
+para a frente, e era isso que fazia a pele das costas descer sobre o cós) e
+a personagem desce 9 cm até as coxas afundarem de leve no assento; os pulsos
+viram 45° para dentro; e o leque de um modelo fica **à frente** das mãos,
+6 cm abaixo da ponta dos dedos, inclinado −0,35 rad — as cartas escondem as
+mãos e só os dedos aparecem acima da borda, como no boneco de código. Entre
+as mãos, as cartas atravessavam os dedos, e sem ossos de dedo não há como
+fechar a mão. Terceira rodada: tudo isso saiu de conferir a versão publicada
+pelos ângulos das capturas do usuário.
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a

@@ -22,9 +22,13 @@ const args = process.argv.slice(2);
 const pos = args.filter((a) => !a.startsWith('--') && !/^[A-Za-z]+=/.test(a));
 const [fonte, saida] = pos;
 let clipNome = 'Stand_to_Sit_Transition_M';
-const giros = {};
+// giros padrão, em eixos do mundo: o tronco 15° mais ereto (o clip de sentar
+// curva para a frente e a pele das costas desce sobre o cós) e os pulsos meio
+// virados para dentro (as mãos ficam atrás do leque, dedos acima da borda).
+// O endireitar do tronco (torção) depende de cada rig e vai por --gira.
+const giros = { Spine02: [-15, 0, 0], LeftHand: [45, 0, 0], RightHand: [-45, 0, 0] };
 const miras = { LeftForeArm: [0.20, 0.72, 0.10], RightForeArm: [-0.20, 0.72, 0.10], LeftHand: [0.05, 0.84, 0.26], RightHand: [-0.05, 0.84, 0.26] };
-const opc = { recuo: 0.12, desce: 0.06, cintura: null };   // metros: quadril para trás e para baixo até as coxas apoiarem; cintura = de onde para cima a perna não puxa
+const opc = { recuo: 0.12, desce: 0.09, cintura: null };   // metros: quadril para trás e para baixo até as coxas apoiarem; cintura = de onde para cima a perna não puxa
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--clip') clipNome = args[++i];
   else if (['--recuo', '--desce', '--cintura'].includes(args[i])) opc[args[i].slice(2)] = Number(args[++i]);

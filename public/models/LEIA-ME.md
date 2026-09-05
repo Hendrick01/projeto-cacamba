@@ -113,7 +113,7 @@ caso da EstereX: `Stand_to_Sit_Transition_M`, mais andar e correr), há um
 passo antes do preparo:
 
 ```bash
-node test/modelo-senta.mjs esterex-rigged.glb sentada.glb --gira Spine02=0,-55,0
+node test/modelo-senta.mjs esterex-rigged.glb sentada.glb --gira Spine02=-15,-55,0
 node test/modelo-prepara.mjs sentada.glb public/models/esterex.glb --tri 32000 --altura 0
 ```
 
@@ -130,9 +130,12 @@ deixa torcido. O quadril recua e desce um pouco (`--recuo 0.12 --desce
 apoiadas. E acima da cintura (`--cintura`, padrão 5 cm abaixo do osso do
 quadril) os ossos da perna perdem o peso: o rigger automático espalha o
 peso da coxa até a barriga, e com a coxa a 90° isso virava uma mancha de pele
-por cima da calça. Na mesa, o leque de um modelo entra nas palmas, 4 cm
-abaixo da ponta dos dedos e inclinado para o rosto — o rig não tem dedos
-para fechar a mão; é a posição que faz parecer segurado. Depois, `--altura 0` no preparo: um modelo sentado não pode
+por cima da calça. O tronco fica 15° mais ereto que no clip (que curva para
+a frente) e os pulsos meio virados para dentro. Na mesa, o leque de um
+modelo fica à frente das mãos, 6 cm abaixo da ponta dos dedos: as cartas
+escondem as mãos e só os dedos aparecem acima da borda, como no boneco de
+código — o rig não tem dedos para fechar a mão, e com o leque entre as mãos
+as cartas atravessavam os dedos. Depois, `--altura 0` no preparo: um modelo sentado não pode
 ser medido pela caixa. E como o arquivo traz o nó `Cabeca`, a mesa confia
 na escala dele em vez de normalizar (um sentado normalizado para 1,55 m
 viraria uma gigante).
