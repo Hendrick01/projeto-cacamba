@@ -10,8 +10,11 @@
 
 import * as THREE from './vendor/three.module.js';
 
-// Do chão ao topo da cabeça, sentado. Todo modelo é normalizado para isso.
+// Do chão ao topo da cabeça, sentado. Modelo cru é normalizado para isso.
 export const ALTURA_SENTADO = 1.55;
+// Fator do elenco para um modelo rigado e sentado, em metros de verdade
+// (1,33 m sentada × 1,2 ≈ a cabeça do boneco de código). A banqueta escala junto.
+export const ESCALA_ELENCO = 1.2;
 
 // Sombreamento CHAPADO, em três degraus: é o que o elenco tem no 2D (cor
 // lisa + sombra de um tom só), e o que faz o boneco parecer desenhado em vez
@@ -83,7 +86,13 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
   // escala é a dele. Normalizar pela caixa serve só ao que chega cru — um
   // modelo SENTADO normalizado para 1,55 m viraria uma gigante de 2 m.
   const preparado = !!raiz.getObjectByName('Cabeca');
-  const escala = preparado ? 1 : ALTURA_SENTADO / alturaOriginal;
+  // Um modelo rigado e sentado (esqueleto + preparo) entra na ESCALA DO
+  // ELENCO: a mesa é de desenho — cartas de 42 cm no tampo, bonecos de
+  // código com a cabeça a 1,55 m sentados — e uma pessoa de tamanho real
+  // (1,33 m sentada) ficava pequena e baixa atrás da borda. A banqueta
+  // acompanha (ver quem chama). Modelo em pé, sem esqueleto, fica como veio.
+  let temEsqueleto = false; raiz.traverse((o) => { if (o.isSkinnedMesh) temEsqueleto = true; });
+  const escala = preparado ? (temEsqueleto ? ESCALA_ELENCO : 1) : ALTURA_SENTADO / alturaOriginal;
   raiz.scale.setScalar(escala);
   // só a altura é corrigida, e só no que chega cru: a origem em x/z é a do
   // arquivo (o contrato), e num arquivo preparado o y também — uma pose
@@ -149,7 +158,7 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
     });
   }
   if (avisa) console.info(`modelo: ${slug} carregado (altura ${alturaOriginal.toFixed(2)}${preparado ? ', escala do arquivo' : ` → ${ALTURA_SENTADO}`})`);
-  return { raiz, materiais, morfos, mixer, acoes, alturaCabeca, posLeque, alturaOriginal, escala, caixa };
+  return { raiz, materiais, morfos, mixer, acoes, alturaCabeca, posLeque, alturaOriginal, escala, caixa, sentado: preparado && temEsqueleto };
 }
 
 // A banqueta do assento: madeira escura com a almofada na cor do assento.
@@ -204,10 +213,11 @@ export function confereModelo(gltf, m) {
   const c = m.caixa; const h = m.alturaOriginal;
   const cm = (v) => `${(v * 100).toFixed(0)} cm`;
 
-  if (m.escala === 1) item(h >= 0.8 && h <= 2.2, `Altura no arquivo: ${h.toFixed(2)} m, mantida (tem nó Cabeca: passou pelo preparo)` + (h < 0.8 || h > 2.2 ? ' — fora do esperado para metros' : ''));
+  if (m.sentado) item(true, `Altura no arquivo: ${h.toFixed(2)} m sentada, na escala do elenco (×${ESCALA_ELENCO}: ${(h * ESCALA_ELENCO).toFixed(2)} m na mesa)`);
+  else if (m.escala === 1) item(h >= 0.8 && h <= 2.2, `Altura no arquivo: ${h.toFixed(2)} m, mantida (tem nó Cabeca: passou pelo preparo)` + (h < 0.8 || h > 2.2 ? ' — fora do esperado para metros' : ''));
   else item(h >= 0.8 && h <= 2.2, `Altura no arquivo: ${h.toFixed(2)} m → normalizada para ${ALTURA_SENTADO} m` + (h < 0.8 || h > 2.2 ? ' (fora de metros? a mesa corrige, mas confira a unidade)' : ''));
   const pes = Math.abs(c.min.y) / h;
-  if (m.escala === 1 && c.min.y > 0 && c.min.y < 0.15) item(null, `Pés a ${cm(c.min.y)} do chão: a pose levanta os pés; a mesa mantém o arquivo como veio`);
+  if ((m.escala === 1 || m.sentado) && c.min.y > 0 && c.min.y < 0.3) item(null, `Pés a ${cm(c.min.y)} do chão: apoiados no aro da banqueta`);
   else item(pes < 0.02, pes < 0.02 ? 'Origem no chão, entre os pés' : `Os pés estão em y = ${cm(c.min.y)}: a mesa desce até o chão, mas o combinado é y = 0`);
   const cx = (c.min.x + c.max.x) / 2 / h, cz = (c.min.z + c.max.z) / 2 / h;
   item(Math.abs(cx) < 0.1 && Math.abs(cz) < 0.3, Math.abs(cx) < 0.1 && Math.abs(cz) < 0.3 ? 'Origem no eixo do corpo (x e z)' : `Deslocado da origem: x ${cm((c.min.x + c.max.x) / 2)}, z ${cm((c.min.z + c.max.z) / 2)} — a mesa NÃO corrige; o corpo sairia do assento`);

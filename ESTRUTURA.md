@@ -681,7 +681,17 @@ numa banqueta de 55 cm, só a cabeça dela passava da borda — o tampo está a
 banqueta virou **de balcão** (`BANQUETA_ASSENTO` = 0,72 m, com aro para os
 pés) e o script senta o quadril pela altura dela (`--assento`, `--folga`),
 não mais por um "desce" relativo ao clip. O boneco de código, que flutua com
-o tronco a ~0,9 m, também fica mais coerente com a banqueta alta.
+o tronco a ~0,9 m, também fica mais coerente com a banqueta alta. Quinta:
+ainda "muito lá embaixo". A mesa é de **escala de desenho** — cartas de
+42 cm no tampo, bonecos com a cabeça a 1,55 m sentados — e uma pessoa de
+tamanho real (1,33 m sentada) fica pequena e baixa atrás da borda. Um modelo
+rigado e sentado entra agora na escala do elenco (`ESCALA_ELENCO` = 1,2, em
+`encaixaModelo`; `m.sentado` diz quando), e a banqueta cresce junto (na mesa
+e no provador), para ele continuar sentado nela. Modelo em pé, sem esqueleto,
+fica como veio — é provisório. As alternativas descartadas: aproximar os
+assentos da borda (deixa maior, não mais alto, e a borda esconde mais) e
+baixar a mesa para 0,75 m (mexe em tudo, e as cartas de 42 cm ficariam ainda
+mais fora de escala).
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a

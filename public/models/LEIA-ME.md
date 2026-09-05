@@ -16,7 +16,7 @@ terceiros com identidade própria — o critério é o mesmo do elenco em SVG.
 |---|---|
 | Arquivo | `public/models/<slug>.glb` (glTF binário, um arquivo só, texturas embutidas) |
 | Unidade | metros. A mesa tem o tampo a **0,92 m** do chão |
-| Altura | em metros. Um arquivo que traz o nó `Cabeca` (passou pelo preparo) é mostrado na escala dele; sem o nó, a mesa **normaliza** para ~1,55 m (do chão ao topo da cabeça). Mantenha as proporções entre os oito |
+| Altura | em metros. Um arquivo que traz o nó `Cabeca` (passou pelo preparo) é mostrado na escala dele; se além disso tem esqueleto (rigado e sentado), entra na **escala do elenco**, ×1,2 — a mesa é de desenho (cartas de 42 cm, bonecos com a cabeça a 1,55 m sentados) e uma pessoa de tamanho real ficava pequena e baixa atrás da borda. Sem o nó, a mesa **normaliza** para ~1,55 m. Mantenha as proporções entre os oito |
 | Origem | no **chão, no eixo do corpo** (y = 0; x e z = 0 no tronco). A mesa põe a origem no assento e só corrige a altura — não centraliza em x/z, porque num modelo sentado as pernas vão para a frente e a caixa engana |
 | Frente | olhando para **+Z**. A mesa vira o personagem para a mesa |
 | Pose | **sentado**, mãos à frente na altura do peito (é onde o leque de cartas entra: ~1,02 m do chão, 0,17 m à frente) |

@@ -10,7 +10,7 @@
 
 import * as THREE from './vendor/three.module.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
-import { ALTURA_SENTADO, encaixaModelo, confereModelo, reage, criaBanqueta } from './modelo3d.js';
+import { ALTURA_SENTADO, encaixaModelo, confereModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
 import { SLUGS } from '/shared/elenco.js';
 
 const $ = (id) => document.getElementById(id);
@@ -75,7 +75,8 @@ linhaAltura.position.y = ALTURA_SENTADO;
 const seta = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0.02, 0.2), 0.4, 0xf2c14e, 0.12, 0.07);
 palco.add(linhaAltura, seta);
 // a banqueta da mesa: é nela que o personagem tem de estar sentado
-palco.add(criaBanqueta(0x8c6a45));
+const banqueta = criaBanqueta(0x8c6a45);
+palco.add(banqueta);
 
 // o leque de cartas viradas, no lugar em que a mesa o põe (entre as mãos)
 const texturaVerso = (() => {
@@ -200,6 +201,7 @@ function poeNaCena(gltf, nome) {
   if (atual?.m) { atual.m.mixer?.stopAllAction(); limpa(atual.m.raiz); }
   const m = encaixaModelo(gltf, nome, { estilo, avisa: false });
   palco.add(m.raiz);
+  banqueta.scale.setScalar(m.sentado ? ESCALA_ELENCO : 1);   // como na mesa: a banqueta cresce com quem senta nela
   leque.position.copy(m.posLeque).add(new THREE.Vector3(0, -0.06, 0.05)); leque.rotation.x = -0.35; leque.visible = true;   // como na mesa: à frente das mãos, só os dedos acima da borda
   bocaFala.position.set(0, m.alturaCabeca - 0.07, 0.16); bocaFala.visible = false;
   atual = { ...atual, nome, m };

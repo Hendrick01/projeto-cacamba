@@ -18,7 +18,7 @@
 
 import * as THREE from './vendor/three.module.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
-import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta } from './modelo3d.js';
+import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
 import { planBaixada, isJoker, rankLabel } from '/shared/engine.js';
 import { SLUGS, personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
@@ -992,6 +992,7 @@ function criaAssento(p) {
     const m = encaixaModelo(gltf, slug);
     corpo.visible = false;
     grupo.add(m.raiz);
+    if (m.sentado) cadeira.scale.setScalar(ESCALA_ELENCO);   // a banqueta cresce com quem senta nela
     // a boca da fala sai da cabeça do boneco e vai para a do modelo (sem
     // morph `bocaAberta`, é a elipse escura pendurada no nó `Cabeca`)
     bocas.aberta.removeFromParent();
