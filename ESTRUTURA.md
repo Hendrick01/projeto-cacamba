@@ -720,6 +720,25 @@ tampo. Rótulos de nome menores (a 1,5 m os antigos tampavam o vizinho), aviso
 em tela larga na faixa do painel, lâmpada mais baixa, neblina mais rala. O
 provador acompanha a geometria (tampo, raio, cadeira a 1,5 m).
 
+**O bar em volta** (2026-09-05, pedido: "maior semelhança à imagem do
+Capote"). A sala virou um bar de bairro claro: 5,4 m de raio e 3,2 m de
+pé-direito (era um salão de 8,5 m na penumbra), teto creme com três
+luminárias fluorescentes (corpo que brilha + ponto de luz cada), ambiente
+mais forte e mais quente, neblina rala, piso xadrez creme e marrom, parede
+ocre com azulejo creme até a meia altura. Objetos, tudo forma simples e cor
+gerada aqui: duas geladeiras de bebida (caixa colorida, porta de vidro,
+prateleiras com garrafas), prateleira de garrafas na parede, TV no suporte
+com futebol na tela, três cartazes de papel com texto original (nada de
+marca), mesa de sinuca ao fundo com bolas e tacos na parede, ventilador de
+parede, e dois copinhos de vidro no tampo à direita de cada assento. A
+posição de cada coisa é por ângulo em volta da mesa (`noBar`). O monte e o
+descarte foram para o seu lado do tampo (z = +0,12): no meio ficavam em
+cima dos jogos de quem senta à frente. E o alcance do mapa de sombra da
+lâmpada subiu de 9 para 14 m: com a câmera na altura da mesa, a beirada
+perto de você ficava fora dele e saía um retângulo escuro no feltro no
+celular em pé. O feltro verde e o aro de madeira ficam — são a identidade
+da mesa (a do Capote é amarela).
+
 **Os oito sentados** (2026-09-05): o usuário refez e rigou os oito, mas os
 arquivos vieram só com repouso, andar e correr. `modelo-senta.mjs` ganhou
 `--pose`: a pose sentada da EstereX do dia anterior viaja para cada um como
