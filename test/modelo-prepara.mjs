@@ -185,11 +185,24 @@ const filhoDe = (iPai, name, translation) => { p.json.nodes.push({ name, transla
 const naRaiz = (name, translation) => { p.json.nodes.push({ name, translation }); cena.nodes.push(p.json.nodes.length - 1); };
 const iCabeca = acha(/(^|[:_])head$/i), iEsq = acha(/(^|[:_])(left|l)_?hand$/i), iDir = acha(/(^|[:_])(right|r)_?hand$/i);
 if (!tem('Cabeca')) {
-  if (iCabeca >= 0) { filhoDe(iCabeca, 'Cabeca', [0, altura * 0.06, altura * 0.01]); console.log(`Cabeca pendurada no osso "${p.json.nodes[iCabeca].name}"`); }
+  if (iCabeca >= 0) {
+    // do osso da cabeça (na base do crânio) ao centro dela: um pouco mais
+    // que o comprimento do próprio osso, nas UNIDADES do rig (num rig em
+    // centímetros a raiz traz escala 0,01, e a altura em metros enganaria)
+    const t = p.json.nodes[iCabeca].translation || [0, 0, 0]; const L = Math.hypot(...t) || altura * 0.05;
+    filhoDe(iCabeca, 'Cabeca', [0, L * 1.1, L * 0.3]);
+    console.log(`Cabeca pendurada no osso "${p.json.nodes[iCabeca].name}" (${(L * 1.1).toFixed(2)} unidades acima)`);
+  }
   else naRaiz('Cabeca', [0, cx.min[1] + altura * opc.cabeca, 0]);
 }
 if (!tem('MaoEsq') && !tem('MaoDir')) {
-  if (iEsq >= 0 && iDir >= 0) { filhoDe(iEsq, 'MaoEsq', [0, 0, 0]); filhoDe(iDir, 'MaoDir', [0, 0, 0]); console.log(`mãos penduradas nos ossos "${p.json.nodes[iEsq].name}" e "${p.json.nodes[iDir].name}"`); }
+  if (iEsq >= 0 && iDir >= 0) {
+    // o osso da mão nasce no pulso; o leque fica na ponta dos dedos, um
+    // terço do comprimento do osso adiante (os ossos apontam pelo eixo Y)
+    const ponta = (i) => { const t = p.json.nodes[i].translation || [0, 0, 0]; return [0, Math.hypot(...t) * 0.35, 0]; };
+    filhoDe(iEsq, 'MaoEsq', ponta(iEsq)); filhoDe(iDir, 'MaoDir', ponta(iDir));
+    console.log(`mãos penduradas nos ossos "${p.json.nodes[iEsq].name}" e "${p.json.nodes[iDir].name}", na ponta dos dedos`);
+  }
   else if (opc.maos) { naRaiz('MaoDir', [-Math.abs(opc.maos[0]), opc.maos[1], opc.maos[2]]); naRaiz('MaoEsq', [Math.abs(opc.maos[0]), opc.maos[1], opc.maos[2]]); }
 }
 escreveGlb(p, saida);

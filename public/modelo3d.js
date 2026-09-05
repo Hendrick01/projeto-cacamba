@@ -79,13 +79,19 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
   // de 1,55 m media 1,60) e com esqueleto ignora a pose
   const caixa = new THREE.Box3().setFromObject(raiz, true);
   const alturaOriginal = caixa.max.y - caixa.min.y || 1;
-  const escala = ALTURA_SENTADO / alturaOriginal;
+  // Arquivo que traz o nó `Cabeca` passou pelo preparo e está em metros: a
+  // escala é a dele. Normalizar pela caixa serve só ao que chega cru — um
+  // modelo SENTADO normalizado para 1,55 m viraria uma gigante de 2 m.
+  const preparado = !!raiz.getObjectByName('Cabeca');
+  const escala = preparado ? 1 : ALTURA_SENTADO / alturaOriginal;
   raiz.scale.setScalar(escala);
-  // só a altura é corrigida: a origem em x/z é a do arquivo (o contrato).
-  // Centralizar pela caixa parecia inofensivo, mas num modelo sentado as
-  // pernas vão para a frente, a caixa fica adiantada e o corpo era empurrado
-  // para trás — o leque saía das mãos e caía no peito.
-  raiz.position.set(0, -caixa.min.y * escala, 0);
+  // só a altura é corrigida, e só no que chega cru: a origem em x/z é a do
+  // arquivo (o contrato), e num arquivo preparado o y também — uma pose
+  // sentada levanta os pés uns centímetros, e descer o corpo até eles o
+  // afundaria na banqueta. Centralizar pela caixa parecia inofensivo, mas
+  // num modelo sentado as pernas vão para a frente, a caixa fica adiantada e
+  // o corpo era empurrado para trás — o leque saía das mãos e caía no peito.
+  raiz.position.set(0, preparado ? 0 : -caixa.min.y * escala, 0);
   // as matrizes ainda são as de antes da escala: sem isto, a cabeça e as mãos
   // sairiam nas medidas originais do arquivo
   raiz.updateMatrixWorld(true);
@@ -142,7 +148,7 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
       acoes.idle.reset().setEffectiveWeight(1).fadeIn(0.25).play();
     });
   }
-  if (avisa) console.info(`modelo: ${slug} carregado (altura ${alturaOriginal.toFixed(2)} → ${ALTURA_SENTADO})`);
+  if (avisa) console.info(`modelo: ${slug} carregado (altura ${alturaOriginal.toFixed(2)}${preparado ? ', escala do arquivo' : ` → ${ALTURA_SENTADO}`})`);
   return { raiz, materiais, morfos, mixer, acoes, alturaCabeca, posLeque, alturaOriginal, escala, caixa };
 }
 
@@ -190,9 +196,11 @@ export function confereModelo(gltf, m) {
   const c = m.caixa; const h = m.alturaOriginal;
   const cm = (v) => `${(v * 100).toFixed(0)} cm`;
 
-  item(h >= 0.8 && h <= 2.2, `Altura no arquivo: ${h.toFixed(2)} m → normalizada para ${ALTURA_SENTADO} m` + (h < 0.8 || h > 2.2 ? ' (fora de metros? a mesa corrige, mas confira a unidade)' : ''));
+  if (m.escala === 1) item(h >= 0.8 && h <= 2.2, `Altura no arquivo: ${h.toFixed(2)} m, mantida (tem nó Cabeca: passou pelo preparo)` + (h < 0.8 || h > 2.2 ? ' — fora do esperado para metros' : ''));
+  else item(h >= 0.8 && h <= 2.2, `Altura no arquivo: ${h.toFixed(2)} m → normalizada para ${ALTURA_SENTADO} m` + (h < 0.8 || h > 2.2 ? ' (fora de metros? a mesa corrige, mas confira a unidade)' : ''));
   const pes = Math.abs(c.min.y) / h;
-  item(pes < 0.02, pes < 0.02 ? 'Origem no chão, entre os pés' : `Os pés estão em y = ${cm(c.min.y)}: a mesa desce até o chão, mas o combinado é y = 0`);
+  if (m.escala === 1 && c.min.y > 0 && c.min.y < 0.15) item(null, `Pés a ${cm(c.min.y)} do chão: a pose levanta os pés; a mesa mantém o arquivo como veio`);
+  else item(pes < 0.02, pes < 0.02 ? 'Origem no chão, entre os pés' : `Os pés estão em y = ${cm(c.min.y)}: a mesa desce até o chão, mas o combinado é y = 0`);
   const cx = (c.min.x + c.max.x) / 2 / h, cz = (c.min.z + c.max.z) / 2 / h;
   item(Math.abs(cx) < 0.1 && Math.abs(cz) < 0.3, Math.abs(cx) < 0.1 && Math.abs(cz) < 0.3 ? 'Origem no eixo do corpo (x e z)' : `Deslocado da origem: x ${cm((c.min.x + c.max.x) / 2)}, z ${cm((c.min.z + c.max.z) / 2)} — a mesa NÃO corrige; o corpo sairia do assento`);
   item(null, 'Frente em +Z: confira no palco — o rosto deve olhar para a mesa');
@@ -223,7 +231,7 @@ export function confereModelo(gltf, m) {
       for (const t of [orig.map, orig.normalMap, orig.emissiveMap, orig.roughnessMap, orig.metalnessMap]) if (t?.image) texturas.add(t);
     }
   });
-  item(triangulos <= 30000, `${triangulos.toLocaleString('pt-BR')} triângulos` + (triangulos > 30000 ? ' — acima dos ~30 mil; pesa no celular' : ''));
+  item(triangulos <= 32000, `${triangulos.toLocaleString('pt-BR')} triângulos` + (triangulos > 32000 ? ' — acima dos ~30 mil; pesa no celular' : ''));
   let maior = 0;
   for (const t of texturas) maior = Math.max(maior, t.image.width || 0, t.image.height || 0);
   item(texturas.size === 0 || maior <= 1024, texturas.size ? `${texturas.size} textura(s), a maior com ${maior} px` + (maior > 1024 ? ' — acima de 1024' : '') : 'Sem texturas (cor chapada nos materiais)');

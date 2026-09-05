@@ -957,6 +957,7 @@ function carregaModelo(slug) {
 
 
 const LEQUE_MAX = 9;   // cartas viradas no leque de um adversário; o selo diz o número exato
+const LEQUE_ESCALA_MODELO = 0.55;   // o leque encolhe nas mãos de um modelo externo (escala humana)
 function criaAssento(p) {
   const slug = personagemDe(p);
   const grupo = new THREE.Group();
@@ -1003,6 +1004,11 @@ function criaAssento(p) {
       assento.ref.cara = null;
       assento.ref.leque.position.copy(m.posLeque);
       assento.ref.lequeBase = m.posLeque.clone();
+      // cartas em escala humana nas mãos de um modelo: o leque do boneco de
+      // código é exagerado de propósito (mãos de desenho), numa escultura
+      // fica gigante. O selo compensa para continuar legível.
+      assento.ref.leque.scale.setScalar(LEQUE_ESCALA_MODELO);
+      assento.ref.contagem.scale.multiplyScalar(1 / LEQUE_ESCALA_MODELO);
       assento.ref.bocaBase = bocas.aberta.position.clone();   // a boca está no grupo, e gira com o corpo no quadro
       assento.ref.nome.position.y = m.alturaCabeca + 0.5;
     }

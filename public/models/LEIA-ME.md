@@ -16,7 +16,7 @@ terceiros com identidade própria — o critério é o mesmo do elenco em SVG.
 |---|---|
 | Arquivo | `public/models/<slug>.glb` (glTF binário, um arquivo só, texturas embutidas) |
 | Unidade | metros. A mesa tem o tampo a **0,92 m** do chão |
-| Altura | qualquer: a mesa **normaliza** para ~1,55 m sentado (do chão ao topo da cabeça). Mas mantenha as proporções entre os oito |
+| Altura | em metros. Um arquivo que traz o nó `Cabeca` (passou pelo preparo) é mostrado na escala dele; sem o nó, a mesa **normaliza** para ~1,55 m (do chão ao topo da cabeça). Mantenha as proporções entre os oito |
 | Origem | no **chão, no eixo do corpo** (y = 0; x e z = 0 no tronco). A mesa põe a origem no assento e só corrige a altura — não centraliza em x/z, porque num modelo sentado as pernas vão para a frente e a caixa engana |
 | Frente | olhando para **+Z**. A mesa vira o personagem para a mesa |
 | Pose | **sentado**, mãos à frente na altura do peito (é onde o leque de cartas entra: ~1,02 m do chão, 0,17 m à frente) |
@@ -107,6 +107,28 @@ Sora) não servem: geram imagens, não malha com esqueleto.
    funde os clips casando os ossos pelo nome, pendura `Cabeca` no osso da
    cabeça e `MaoEsq`/`MaoDir` nos ossos das mãos, e o leque entra entre
    elas. Abra no provador: os botões **feliz** e **bravo** tocam os clips.
+
+**Se o rigger devolveu um clip de sentar em vez de uma pose sentada** (foi o
+caso da EstereX: `Stand_to_Sit_Transition_M`, mais andar e correr), há um
+passo antes do preparo:
+
+```bash
+node test/modelo-senta.mjs esterex-rigged.glb sentada.glb --gira Spine02=0,-55,0
+node test/modelo-prepara.mjs sentada.glb public/models/esterex.glb --tri 32000 --altura 0
+```
+
+`modelo-senta` assa o último quadro do clip como pose de repouso (ela passa a
+ESTAR sentada, na origem: o andar até a cadeira é descartado, fica só a
+descida do quadril), gira os braços até cotovelos e mãos caírem nos pontos
+de quem segura um leque na frente do peito (`--mira Junta=x,y,z`, em metros;
+os padrões servem a um rig humano), apaga os clips de andar e cria os três
+do contrato em cima da pose nova: `idle` (respiro), `feliz` (aceno de
+cabeça), `bravo` (balanço de cabeça). `--gira Osso=x,y,z` gira um osso em
+graus nos eixos do mundo — serve para endireitar o tronco, que esse clip
+deixa torcido. Depois, `--altura 0` no preparo: um modelo sentado não pode
+ser medido pela caixa. E como o arquivo traz o nó `Cabeca`, a mesa confia
+na escala dele em vez de normalizar (um sentado normalizado para 1,55 m
+viraria uma gigante).
 
 O que o rig automático não dá: os morphs `feliz`/`bravo`/`bocaAberta` (a
 cara continua a mesma; a reação é do corpo, e a fala usa a elipse escura).

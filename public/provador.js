@@ -99,6 +99,7 @@ for (let i = 0; i < 5; i++) {
 }
 leque.position.set(0, 1.02, 0.17);
 leque.rotation.x = -0.14;
+leque.scale.setScalar(0.55);   // como na mesa: escala humana nas mãos de um modelo
 leque.visible = false;
 palco.add(leque);
 

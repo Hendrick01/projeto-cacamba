@@ -75,6 +75,7 @@ projeto-caçamba/
 | [`test/modelo-recorta.mjs`](test/modelo-recorta.mjs) | 95 | Bancada: de uma "ficha" com várias vistas numa malha só, recorta a figura que olha para +Z (separa pelos vazios em x, acha a frente pela ponta dos pés). |
 | [`test/modelo-prepara.mjs`](test/modelo-prepara.mjs) | 150 | Bancada: aceita `.glb` ou `.fbx`, funde clips de outros arquivos pelo nome dos ossos, solda, reduz para o orçamento (`@gltf-transform/cli` via `npx`), encolhe texturas e pendura `Cabeca`/`MaoEsq`/`MaoDir` nos ossos (ou injeta na raiz). |
 | [`test/modelo-obj.mjs`](test/modelo-obj.mjs) | 60 | Bancada: exporta um `.glb` como OBJ + MTL + texturas num `.zip`, o pacote que o rigger automático aceita. |
+| [`test/modelo-senta.mjs`](test/modelo-senta.mjs) | 150 | Bancada: assa a pose final de um clip de sentar como repouso, mira braços por cinemática direta e escreve os clips `idle`/`feliz`/`bravo`. |
 | [`public/modelo3d.js`](public/modelo3d.js) | 230 | O que mesa e provador têm em comum sobre modelos externos: estilo do elenco (toon + contorno, normal map mantido), `encaixaModelo`, `reage`, `confereModelo`, `criaBanqueta`. |
 | [`public/provador.html`](public/provador.html) · `provador.js` | 300 | O provador de modelos: abre um `.glb` do aparelho ou da lista, senta na banqueta com a luz da mesa e confere o contrato item a item. |
 | [`public/voz.js`](public/voz.js) | 169 | Chat de voz: microfone, pares WebRTC em malha, sinalização pela mensagem `voz` do WebSocket, e o nível de áudio de cada um (`nivel`/`falando`). Usado pelas duas mesas. |
@@ -642,6 +643,27 @@ de PNG em 4096 px; saiu com 1,6 MB. **A EstereX** chegou com 12 cm de altura
 (`--altura`), escalando a raiz — a mesa normaliza de qualquer jeito, mas os
 arquivos ficam coerentes. Com isso o trio inteiro é escultura; a versão
 procedural vive só no histórico. Detalhes em `public/models/LEIA-ME.md`.
+
+**A primeira sentada** (2026-09-05): a EstereX voltou do rigger com esqueleto
+de 24 ossos e cinco clips de andar e sentar, não com uma pose. Nasceu
+`test/modelo-senta.mjs`: assa o último quadro do clip de sentar como pose de
+repouso (na origem; só a descida do quadril fica), endireita o tronco que o
+clip deixa torcido 55° (`--gira`, em eixos do mundo), gira braços e
+antebraços por cinemática direta até cotovelos e mãos caírem nos pontos de
+quem segura um leque (`--mira`, em metros — girar por ângulos falhou porque
+o antebraço dela aponta para o lado e um giro em X mal o move), apaga os
+clips de andar e escreve `idle`/`feliz`/`bravo` em cima da pose. Três coisas
+mudaram para ela caber: `encaixaModelo` **confia na escala** de um arquivo
+que traz `Cabeca` (normalizar um sentado para 1,55 m fazia uma gigante de
+2 m, com cartas gigantes na proporção); o leque encolhe para 0,55 nas mãos
+de um modelo externo (`LEQUE_ESCALA_MODELO`; o selo compensa), porque o
+leque do boneco de código é exagerado de propósito; e o preparo pendura
+`Cabeca` um comprimento de osso acima do osso da cabeça e `MaoEsq`/`MaoDir`
+na ponta dos dedos, nas unidades do rig (centímetros, com a raiz em escala
+0,01 — a altura em metros enganava). O que o usuário viu como "mãos nas
+pernas" era a pose final do clip, com as mãos nas coxas: rig e textura
+estavam certos (UVs idênticas às da escultura, pesos das mãos só em ossos de
+mão e antebraço).
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a
