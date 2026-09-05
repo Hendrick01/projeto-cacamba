@@ -19,7 +19,7 @@
 import * as THREE from './vendor/three.module.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
-import { planBaixada, isJoker, rankLabel } from '/shared/engine.js';
+import { planBaixada, isJoker, rankLabel, cardLabel } from '/shared/engine.js';
 import { SLUGS, personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
 
@@ -1455,7 +1455,16 @@ function montaBotoes() {
     barra.appendChild(botao('Ver o placar na mesa normal', 'primario', () => { location.href = '/'; }));
     return;
   }
-  if (!minhaVez) return;
+  // compra fora da vez: a mesma regra da mesa normal (carta fresca e
+  // comprável no meio, fase de puxar, não é a sua vez)
+  if (!minhaVez) {
+    const podePedir = view.phase === 'draw' && view.discardFresh && view.discardBuyable && view.discardTop;
+    if (podePedir) {
+      const pedi = view.claims.includes(me());
+      barra.appendChild(botao(pedi ? '✓ Pedido feito — toque para desistir' : `🛒 Quero o ${cardLabel(view.discardTop)} do meio`, pedi ? 'normal' : 'primario', () => sendAction({ a: pedi ? 'unclaim' : 'claim' })));
+    }
+    return;
+  }
   if (view.phase === 'draw') {
     barra.appendChild(botao('Puxar do monte', 'normal', () => sendAction({ a: 'draw', source: 'deck' })));
     if (view.discardTop && view.discardBuyable) {
@@ -1511,6 +1520,7 @@ async function sincroniza(primeira) {
       a.grupo.rotation.y = pos.ang * 0.45;
 
       trocaRotulo(a.contagem, `${p.handCount}`);
+      trocaRotulo(a.nome, view.claims?.includes(p.id) ? `🛒 ${p.name}` : p.name);
       // os LEQUE_MAX primeiros filhos são as cartas; o selo fica sempre. Até
       // cinco, a abertura é a de sempre; acima, o leque reabre no mesmo arco
       // com as cartas mais juntas — mão cheia se vê de longe.
