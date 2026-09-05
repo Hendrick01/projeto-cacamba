@@ -131,7 +131,7 @@ quadril) os ossos da perna perdem o peso: o rigger automático espalha o
 peso da coxa até a barriga, e com a coxa a 90° isso virava uma mancha de pele
 por cima da calça. O tronco fica 15° mais ereto que no clip (que curva para
 a frente) e os pulsos meio virados para dentro. O quadril vai para a altura
-da **banqueta de balcão** da mesa (`--assento 0.72`, mais `--folga 0.07`):
+da **banqueta de balcão** da mesa (`--assento 0.72`, mais `--folga 0.16`, que é a distância do assento ao osso do quadril para as coxas apoiarem EM CIMA, sem atravessar):
 a mesa tem o tampo a 0,92 m, e numa banqueta baixa os ombros de quem senta
 ficam na altura do tampo — só a cabeça passava da borda. Na mesa, o leque de um
 modelo fica à frente das mãos, 6 cm abaixo da ponta dos dedos: as cartas

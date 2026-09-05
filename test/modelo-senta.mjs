@@ -32,7 +32,7 @@ const miras = { LeftForeArm: [0.20, 0.72, 0.10], RightForeArm: [-0.20, 0.72, 0.1
 // metros: recuo do quadril (o clip senta na beirada); assento = altura da
 // banqueta da mesa (a de balcão, BANQUETA_ASSENTO em modelo3d.js) — o osso do
 // quadril fica `folga` acima dele; cintura = de onde para cima a perna não puxa
-const opc = { recuo: 0.12, assento: 0.72, folga: 0.07, cintura: null };
+const opc = { recuo: 0.12, assento: 0.72, folga: 0.16, cintura: null };   // folga: do assento ao osso do quadril — as coxas (uns 13 cm) apoiam EM CIMA, sem atravessar
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--clip') clipNome = args[++i];
   else if (['--recuo', '--assento', '--folga', '--cintura'].includes(args[i])) opc[args[i].slice(2)] = Number(args[++i]);
