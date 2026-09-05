@@ -753,6 +753,24 @@ sinuca e tacos, cores menos saturadas e um grão fino na parede e no piso —
 cor lisa ao lado de textura assada parecia papel. Ambiente de 1,6 para 1,15,
 luminárias de 14 para 9, foco 80, exposição 1,0.
 
+Terceira passada (mesmo dia; pedido: "o cenário de fundo no mesmo estilo dos
+personagens e da mesa, algo realista"). O que faz realismo é luz e material,
+não mais objetos: a cena ganhou um **mapa de ambiente gerado** (uma salinha
+de paredes ocre com retângulos de luz no teto, filtrada pelo `PMREMGenerator`
+uma vez, `scene.environment` a 0,5) — é ele que dá luz indireta e reflexo ao
+verniz do aro, ao vidro da geladeira e das garrafas, ao brilho do azulejo;
+os objetos do bar passaram a **materiais físicos** (`MeshStandardMaterial`:
+tinta de metal na geladeira e nas calhas, vidro colorido com rótulo de papel
+nas garrafas, madeira envernizada, feltro de verdade na sinuca); a parede
+virou reboco pintado com grão e manchas de umidade sobre azulejo com variação
+de tom e rejunte fundo, e o piso lajota cerâmica com tom por peça, rejunte e
+verniz — os dois com **mapa de relevo** que a luz rasante das luminárias
+revela. E os personagens passaram a ser mostrados com o **material original
+da escultura** (cor + normal map, `estilo: 'original'` em `encaixaModelo`,
+também padrão no provador): com o cenário realista, o sombreamento em
+degraus deixava o rosto chapado. O boneco de código continua em degraus —
+é o reserva, e é desenho.
+
 **Os oito sentados** (2026-09-05): o usuário refez e rigou os oito, mas os
 arquivos vieram só com repouso, andar e correr. `modelo-senta.mjs` ganhou
 `--pose`: a pose sentada da EstereX do dia anterior viaja para cada um como

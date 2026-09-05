@@ -161,7 +161,7 @@ canvas.addEventListener('wheel', (e) => { e.preventDefault(); dist = Math.min(6,
 // ---------------------------------------------------------------------------
 const carregador = new GLTFLoader();
 let atual = null;            // { nome, fonte, m }  — fonte: ArrayBuffer ou URL
-let estilo = 'elenco';
+let estilo = 'original';   // como na mesa desde o cenário realista (2026-09-05)
 let caraAte = 0;
 const itensEl = $('itens');
 const dicaEl = document.querySelector('.dica');
