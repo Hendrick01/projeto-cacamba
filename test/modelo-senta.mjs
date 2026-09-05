@@ -35,11 +35,12 @@ const giros = { Spine02: [-15, 0, 0], LeftHand: [45, 0, 0], RightHand: [-45, 0, 
 // pontos de mira em metros, RELATIVOS AO OSSO DO QUADRIL (x para a esquerda
 // dela, y para cima, z para a frente): cotovelos ao lado do corpo, mãos na
 // frente do peito. Assim valem para qualquer altura de banqueta.
-const miras = { LeftForeArm: [0.20, 0.01, 0.22], RightForeArm: [-0.20, 0.01, 0.22], LeftHand: [0.05, 0.13, 0.38], RightHand: [-0.05, 0.13, 0.38] };
+// (mesa de jantar: cotovelos na borda do tampo, mãos com o leque logo acima dele)
+const miras = { LeftForeArm: [0.20, 0.16, 0.22], RightForeArm: [-0.20, 0.16, 0.22], LeftHand: [0.05, 0.24, 0.34], RightHand: [-0.05, 0.24, 0.34] };
 // metros: recuo do quadril (o clip senta na beirada); assento = altura da
 // banqueta da mesa (a de balcão, BANQUETA_ASSENTO em modelo3d.js) — o osso do
 // quadril fica `folga` acima dele; cintura = de onde para cima a perna não puxa
-const opc = { recuo: 0.12, assento: 0.55, folga: 0.16, cintura: null };   // folga: do assento ao osso do quadril — as coxas (uns 13 cm) apoiam EM CIMA, sem atravessar
+const opc = { recuo: 0.12, assento: 0.45, folga: 0.16, cintura: null };   // folga: do assento ao osso do quadril — as coxas (uns 13 cm) apoiam EM CIMA, sem atravessar
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--clip') clipNome = args[++i];
   else if (args[i] === '--pose') poseDe = args[++i];

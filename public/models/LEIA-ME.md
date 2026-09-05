@@ -15,7 +15,7 @@ terceiros com identidade própria — o critério é o mesmo do elenco em SVG.
 | | |
 |---|---|
 | Arquivo | `public/models/<slug>.glb` (glTF binário, um arquivo só, texturas embutidas) |
-| Unidade | metros. A mesa tem o tampo a **0,92 m** do chão |
+| Unidade | metros. A mesa tem o tampo a **0,76 m** do chão (mesa de jantar; era 0,92 até 2026-09-05) |
 | Altura | em metros. Um arquivo que traz o nó `Cabeca` (passou pelo preparo) é mostrado na escala dele; se além disso tem esqueleto (rigado e sentado), entra na **escala do elenco**, ×1,2 — a mesa é de desenho (cartas de 42 cm, bonecos com a cabeça a 1,55 m sentados) e uma pessoa de tamanho real ficava pequena e baixa atrás da borda. Sem o nó, a mesa **normaliza** para ~1,55 m. Mantenha as proporções entre os oito |
 | Origem | no **chão, no eixo do corpo** (y = 0; x e z = 0 no tronco). A mesa põe a origem no assento e só corrige a altura — não centraliza em x/z, porque num modelo sentado as pernas vão para a frente e a caixa engana |
 | Frente | olhando para **+Z**. A mesa vira o personagem para a mesa |
@@ -131,9 +131,12 @@ quadril) os ossos da perna perdem o peso: o rigger automático espalha o
 peso da coxa até a barriga, e com a coxa a 90° isso virava uma mancha de pele
 por cima da calça. O tronco fica 15° mais ereto que no clip (que curva para
 a frente) e os pulsos meio virados para dentro. O quadril vai para a altura
-da **banqueta de balcão** da mesa (`--assento 0.72`, mais `--folga 0.16`, que é a distância do assento ao osso do quadril para as coxas apoiarem EM CIMA, sem atravessar):
-a mesa tem o tampo a 0,92 m, e numa banqueta baixa os ombros de quem senta
-ficam na altura do tampo — só a cabeça passava da borda. Na mesa, o leque de um
+da **cadeira** da mesa (`--assento 0.45`, mais `--folga 0.16`, que é a
+distância do assento ao osso do quadril para as coxas apoiarem EM CIMA, sem
+atravessar). A mesa é de jantar (tampo a 0,76 m) desde 2026-09-05: as coxas
+entram sob o tampo e os cotovelos ficam na borda — as miras padrão dos braços
+já são essas (cotovelos a 16 cm acima do quadril, mãos a 24 cm, com o leque
+logo acima do tampo). Na mesa, o leque de um
 modelo fica à frente das mãos, 6 cm abaixo da ponta dos dedos: as cartas
 escondem as mãos e só os dedos aparecem acima da borda, como no boneco de
 código — o rig não tem dedos para fechar a mão, e com o leque entre as mãos

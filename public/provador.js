@@ -14,9 +14,9 @@ import { ALTURA_SENTADO, encaixaModelo, confereModelo, reage, criaBanqueta, ESCA
 import { SLUGS } from '/shared/elenco.js';
 
 const $ = (id) => document.getElementById(id);
-const MESA_TOPO = 0.92;          // o tampo, como na mesa 3D
-const MESA_RAIO = 1.8;
-const DIST_ASSENTO = 2.66;       // do centro da mesa à cadeira, como na mesa 3D
+const MESA_TOPO = 0.76;          // o tampo, como na mesa 3D
+const MESA_RAIO = 1.15;
+const DIST_ASSENTO = 1.5;        // do centro da mesa à cadeira, como na mesa 3D
 
 // ---------------------------------------------------------------------------
 // Cena: o mesmo salão, uma cadeira só

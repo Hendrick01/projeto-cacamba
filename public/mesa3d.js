@@ -121,11 +121,24 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x17100a);
 // A penumbra do salão é neblina, não parede: o que está longe some no escuro,
 // como na mesa normal — só que aqui de verdade, por distância.
-scene.fog = new THREE.FogExp2(0x17100a, 0.075);
+scene.fog = new THREE.FogExp2(0x17100a, 0.06);
 
 const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 40);
 
-const MESA_TOPO = 0.92;
+// A geometria é a da referência (Capote, 2026-09-05): mesa de jantar
+// pequena, gente a um braço de distância com as coxas sob o tampo e os
+// cotovelos na borda, câmera na altura dos olhos de quem senta. Antes o tampo
+// estava a 0,92 m com 2,55 m de raio e a câmera a 30° sobre ele — bom para
+// ler cartas deitadas, ruim para ver gente: um modelo em tamanho real ficava
+// pequeno e baixo atrás da borda. Agora as cartas do tampo encolhem
+// (ESCALA_TAMPO) e se erguem mais para a câmera, e é isso que as mantém
+// legíveis de lado.
+const MESA_TOPO = 0.76;
+const MESA_RAIO = 1.15;          // o feltro; o aro vai a 1,2
+const ASSENTO_RAIO = 1.5;        // a cadeira: as coxas entram sob o tampo
+const ASSENTO_RAIO_FUNDO = 2.25; // segunda fileira, com cinco ou mais
+const ESCALA_TAMPO = 0.55;       // monte, descarte e jogos, em relação à carta da mão
+const OLHO = { x: 0, y: 1.2, z: 1.35 };   // a sua cabeça, sentada na sua cadeira
 
 // A lâmpada é a mesma decisão de luz do jogo inteiro: uma fonte só, a pino
 // sobre o meio. O foco ilumina o feltro; o ambiente quente e fraco é o que
@@ -141,7 +154,7 @@ const foco = new THREE.SpotLight(0xffe2a8, 140, 14, 0.72, 0.55, 1.6);
 // Um palmo fora do eixo, para o lado da câmera: exatamente a pino, o que está
 // encostado no tampo não projeta nada e a sombra dura sumia. Assim ela cai
 // para trás dos objetos, curta, e continua lendo como uma lâmpada só.
-foco.position.set(0.45, 4.4, 0.7);
+foco.position.set(0.3, 3.1, 0.45);
 foco.target.position.set(0, MESA_TOPO, 0);
 foco.castShadow = true;
 foco.shadow.mapSize.set(2048, 2048);
@@ -247,14 +260,14 @@ function texturaMadeira(repeticoes) {
   const feltro = texturaFeltro();
   const madeiraLateral = texturaMadeira(10);
   const tampo = new THREE.Mesh(
-    new THREE.CylinderGeometry(2.55, 2.55, 0.16, 48),
+    new THREE.CylinderGeometry(MESA_RAIO, MESA_RAIO, 0.1, 48),
     [
       new THREE.MeshStandardMaterial({ map: madeiraLateral, roughness: 0.45, metalness: 0.05 }),   // lateral
       new THREE.MeshStandardMaterial({ map: feltro, bumpMap: texturaRelevoFeltro(), bumpScale: 0.012, roughness: 0.96, metalness: 0 }), // topo
       new THREE.MeshLambertMaterial({ color: 0x1b110b }),                // fundo
     ],
   );
-  tampo.position.y = MESA_TOPO - 0.08;
+  tampo.position.y = MESA_TOPO - 0.05;
   tampo.receiveShadow = true;
   scene.add(tampo);
 
@@ -262,16 +275,16 @@ function texturaMadeira(repeticoes) {
   // no anel) e rugosidade baixa, para a lâmpada deixar um brilho comprido
   // nele — é o brilho que diz "madeira polida", não a cor.
   const aro = new THREE.Mesh(
-    new THREE.TorusGeometry(2.62, 0.14, 12, 48),
+    new THREE.TorusGeometry(MESA_RAIO + 0.05, 0.08, 12, 48),
     new THREE.MeshStandardMaterial({ map: texturaMadeira(6), roughness: 0.38, metalness: 0.06 }),
   );
   aro.rotation.x = Math.PI / 2;
-  aro.position.y = MESA_TOPO - 0.04;
+  aro.position.y = MESA_TOPO - 0.03;
   aro.receiveShadow = true; aro.castShadow = true;
   scene.add(aro);
 
   const pe = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.4, 0.62, MESA_TOPO - 0.1, 20),
+    new THREE.CylinderGeometry(0.22, 0.4, MESA_TOPO - 0.1, 20),
     new THREE.MeshStandardMaterial({ map: texturaMadeira(3), roughness: 0.6, metalness: 0.02, color: 0x8a7060 }),
   );
   pe.position.y = (MESA_TOPO - 0.1) / 2;
@@ -296,22 +309,22 @@ function texturaMadeira(repeticoes) {
     objetos.add(m);
     return m;
   };
-  portaCopos(1.0, -1.0);
-  portaCopos(-1.0, -1.0);
+  portaCopos(0.55, -0.55);
+  portaCopos(-0.55, -0.55);
   const vidro = new THREE.MeshStandardMaterial({
     color: 0xdfe8e6, transparent: true, opacity: 0.32, roughness: 0.12, metalness: 0.08, side: THREE.DoubleSide, depthWrite: false,
   });
   const copo = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.044, 0.13, 20, 1, true), vidro);
-  copo.position.set(1.0, MESA_TOPO + 0.008 + 0.065, -1.0);
+  copo.position.set(0.55, MESA_TOPO + 0.008 + 0.065, -0.55);
   copo.castShadow = true;
   const fundoCopo = new THREE.Mesh(new THREE.CircleGeometry(0.044, 20), vidro);
   fundoCopo.rotation.x = -Math.PI / 2;
-  fundoCopo.position.set(1.0, MESA_TOPO + 0.009, -1.0);
+  fundoCopo.position.set(0.55, MESA_TOPO + 0.009, -0.55);
   const bebida = new THREE.Mesh(
     new THREE.CylinderGeometry(0.047, 0.042, 0.045, 20),
     new THREE.MeshStandardMaterial({ color: 0xc9822a, transparent: true, opacity: 0.9, roughness: 0.25, metalness: 0 }),
   );
-  bebida.position.set(1.0, MESA_TOPO + 0.009 + 0.0225, -1.0);
+  bebida.position.set(0.55, MESA_TOPO + 0.009 + 0.0225, -0.55);
   bebida.castShadow = true;
   objetos.add(copo, fundoCopo, bebida);
   scene.add(objetos);
@@ -323,7 +336,7 @@ function texturaMadeira(repeticoes) {
     new THREE.ConeGeometry(0.5, 0.42, 24, 1, true),
     new THREE.MeshLambertMaterial({ color: 0x2a1b12, side: THREE.DoubleSide }),
   );
-  cupula.position.set(0, 3.35, 0);
+  cupula.position.set(0, 2.35, 0);
   const bulbo = new THREE.Mesh(
     new THREE.SphereGeometry(0.09, 12, 12),
     new THREE.MeshBasicMaterial({ color: 0xfff3d0 }),
@@ -525,7 +538,7 @@ function materialDaCarta(card) {
   // Fora do mapeamento tonal: a carta é desenho, e o mapeamento lavava o
   // vermelho dos naipes para rosa. A luz continua batendo nela — e o Standard
   // com rugosidade média dá o brilho de verniz que a carta plastificada tem.
-  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0, toneMapped: false });
+  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: false });
   texturasDeCarta.set(chave, mat);
   // O retrato das figuras chega depois (a imagem é assíncrona): desenha de
   // novo por cima quando carregar.
@@ -632,7 +645,7 @@ const materialVerso = (() => {
     arredondado(ctx, 4, 4, 120, 172, 10);
     ctx.stroke();
   });
-  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0, toneMapped: false });
+  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: false });
 })();
 const materialBorda = new THREE.MeshStandardMaterial({ color: 0xcbc2ae, roughness: 0.85, metalness: 0, toneMapped: false });
 
@@ -964,6 +977,9 @@ function criaAssento(p) {
 
   const { corpo, materiais, daCabeca, bocas } = montaBoneco(slug);
   grupo.add(corpo);
+  // o boneco de código foi desenhado para uma mesa de 1,55 m sentado; na mesa
+  // de jantar ele encolhe para o tamanho de gente (o modelo, quando chega, volta a 1)
+  grupo.scale.setScalar(0.8);
 
   // O rosto desenhado: um plano com o recorte do SVG, na frente da cabeça,
   // sem sombreamento (é desenho, como as mãos). Nasce invisível e entra quando
@@ -992,6 +1008,7 @@ function criaAssento(p) {
     const m = encaixaModelo(gltf, slug);
     corpo.visible = false;
     grupo.add(m.raiz);
+    grupo.scale.setScalar(1);   // tamanho real: a mesa é de gente de verdade
     if (m.sentado) cadeira.scale.setScalar(ESCALA_ELENCO);   // a banqueta cresce com quem senta nela
     // a boca da fala sai da cabeça do boneco e vai para a do modelo (sem
     // morph `bocaAberta`, é a elipse escura pendurada no nó `Cabeca`)
@@ -1016,7 +1033,7 @@ function criaAssento(p) {
       assento.ref.leque.scale.setScalar(LEQUE_ESCALA_MODELO);
       assento.ref.contagem.scale.multiplyScalar(1 / LEQUE_ESCALA_MODELO);
       assento.ref.bocaBase = bocas.aberta.position.clone();   // a boca está no grupo, e gira com o corpo no quadro
-      assento.ref.nome.position.y = m.alturaCabeca + 0.5;
+      assento.ref.nome.position.y = m.alturaCabeca + 0.34;
     }
   }).catch(() => { console.info(`modelo: ${slug} ausente — boneco de código`); });
 
@@ -1061,18 +1078,20 @@ function criaAssento(p) {
   const nome = rotulo(p.name);
   // Menor que o padrão: é o rótulo mais largo da cena e o que primeiro sai do
   // quadro nas pontas em pé (a conta está em `posicaoDoAssento`).
-  nome.scale.set(0.66, 0.183, 1);
-  nome.position.y = 2.1;
-  nome.scale.set(0.78, 0.21, 1);
+  // perto assim (1,5 m), o rótulo grande da mesa antiga tampava o vizinho
+  nome.position.y = 2.0;
+  nome.scale.set(0.46, 0.124, 1);
   grupo.add(nome);
 
   // foco da vez: um disco de luz no chão, que pulsa
+  // no TAMPO, na frente da cadeira (no chão ficaria escondido sob a mesa)
   const focoVez = new THREE.Mesh(
-    new THREE.CircleGeometry(0.55, 24),
+    new THREE.CircleGeometry(0.24, 24),
     new THREE.MeshBasicMaterial({ color: 0xf2c14e, transparent: true, opacity: 0, depthWrite: false }),
   );
   focoVez.rotation.x = -Math.PI / 2;
-  focoVez.position.y = 0.012;
+  focoVez.position.set(0, MESA_TOPO + 0.006, ASSENTO_RAIO - MESA_RAIO + 0.2);
+  focoVez.scale.y = 0.6;
   grupo.add(focoVez);
 
   scene.add(grupo);
@@ -1092,11 +1111,14 @@ function posicaoDoAssento(indice, total) {
   // Com cinco ou mais, aperta mais (±30°): a ±38° os das pontas saíam do
   // quadro (visto com cinco). Cabe porque as fileiras alternam o raio — na
   // da frente sobram ~0,9 m entre vizinhos, mais que um boneco.
-  const abertura = camera.aspect < 1 ? (total >= 5 ? 0.52 : 0.66) : 1.05;   // ±30° / ±38° / ±60°
+  // Mesa pequena e câmera perto (2026-09-05): a meia-abertura horizontal da
+  // câmera em pé é ~18°, e um assento a 1,5 m do centro fica fora do quadro
+  // além de ±35°; em paisagem (~38°) cabe até ±65°.
+  const abertura = camera.aspect < 1 ? (total >= 5 ? 0.46 : 0.58) : 0.96;   // ±26° / ±33° / ±55°
   const ang = total === 1 ? 0 : ((indice - meio) / Math.max(1, meio)) * abertura;
   // Mesa cheia: os assentos ímpares recuam para uma segunda fileira, como na
   // mesa 2D — sete bonecos num arco só viravam um corpo atrás do outro.
-  const r = total > 4 && indice % 2 === 1 ? 3.3 : 2.66;
+  const r = total > 4 && indice % 2 === 1 ? ASSENTO_RAIO_FUNDO : ASSENTO_RAIO;
   return { x: Math.sin(ang) * r, z: -Math.cos(ang) * r, ang };
 }
 
@@ -1129,27 +1151,27 @@ const monte = (() => {
     new THREE.BoxGeometry(CARTA_L, 0.2, CARTA_A),
     [materialBorda, materialBorda, materialVerso, materialBorda, materialBorda, materialBorda],
   );
-  caixa.scale.set(0.8, 1, 0.8);
+  caixa.scale.set(ESCALA_TAMPO, 1, ESCALA_TAMPO);
   caixa.castShadow = true;
-  caixa.position.set(-0.4, MESA_TOPO, -0.5);
+  caixa.position.set(-0.28, MESA_TOPO, -0.25);
   scene.add(caixa);
-  const sombra = sombraDeContato(0.62, 0.8);
-  sombra.position.x = -0.4; sombra.position.z = -0.5;
+  const sombra = sombraDeContato(0.42, 0.55);
+  sombra.position.x = -0.28; sombra.position.z = -0.25;
   scene.add(sombra);
   const num = rotulo('', 'rgba(27,17,11,0.85)', '#9dbbad');
-  num.position.set(-0.4, MESA_TOPO + 0.3, -0.2);
-  num.scale.set(0.5, 0.15, 1);
+  num.position.set(-0.28, MESA_TOPO + 0.2, -0.1);
+  num.scale.set(0.3, 0.09, 1);
   scene.add(num);
   return { caixa, num };
 })();
 
 const descarte = (() => {
   const grupo = new THREE.Group();
-  grupo.position.set(0.4, 0, -0.5);
+  grupo.position.set(0.28, 0, -0.25);
   scene.add(grupo);
   // fora do grupo, que é esvaziado a cada carta nova
-  const sombra = sombraDeContato(0.62, 0.8);
-  sombra.position.x = 0.4; sombra.position.z = -0.5;
+  const sombra = sombraDeContato(0.42, 0.55);
+  sombra.position.x = 0.28; sombra.position.z = -0.25;
   scene.add(sombra);
   return { grupo, topoId: null };
 })();
@@ -1161,11 +1183,11 @@ scene.add(jogosNaMesa);
 // adversário da vez, aqui na sua beirada do feltro. Antes a sua vez era só o
 // texto do aviso — na 3D, tudo o que importa está na mesa, e a vez também.
 const meuFoco = new THREE.Mesh(
-  new THREE.CircleGeometry(0.75, 28),
+  new THREE.CircleGeometry(0.32, 28),
   new THREE.MeshBasicMaterial({ color: 0xf2c14e, transparent: true, opacity: 0, depthWrite: false }),
 );
 meuFoco.rotation.x = -Math.PI / 2;
-meuFoco.position.set(0, MESA_TOPO + 0.005, 1.55);
+meuFoco.position.set(0, MESA_TOPO + 0.005, 0.9);
 meuFoco.scale.y = 0.55;
 scene.add(meuFoco);
 let minhaVez = false;
@@ -1279,6 +1301,7 @@ function sincronizaMaos() {
     mat.color.setScalar(0.94);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.6), mat);
     maos[lado] = m;
+    m.material.depthTest = false; m.renderOrder = 19;   // as mãos, como o leque: por cima do tampo
     maoGrupo.add(m);
   }
 }
@@ -1309,7 +1332,11 @@ function sincronizaMao() {
     let mesh = cartasDaMao.get(card.id);
     let nova = false;
     if (!mesh) {
-      mesh = new THREE.Mesh(geoCarta, materialDaCarta(card));
+      // material PRÓPRIO, por cima de tudo: o leque é interface presa à
+      // câmera, e com o olho na altura da mesa ele ficava atrás do tampo
+      mesh = new THREE.Mesh(geoCarta, materialDaCarta(card).clone());
+      mesh.material.depthTest = false;
+      mesh.renderOrder = 20;
       mesh.userData.cardId = card.id;
       cartasDaMao.set(card.id, mesh);
       maoGrupo.add(mesh);
@@ -1517,7 +1544,7 @@ async function sincroniza(primeira) {
       // Meio caminho entre encarar a câmera e encarar o centro: virado por
       // inteiro para o centro, o assento da ponta (±60°) virava uma lasca —
       // pior ainda com a curvatura do recorte.
-      a.grupo.rotation.y = pos.ang * 0.45;
+      a.grupo.rotation.y = pos.ang * 0.8;
 
       trocaRotulo(a.contagem, `${p.handCount}`);
       trocaRotulo(a.nome, view.claims?.includes(p.id) ? `🛒 ${p.name}` : p.name);
@@ -1557,11 +1584,11 @@ async function sincroniza(primeira) {
     }
 
     trocaRotulo(monte.num, String(view.deckCount));
-    const alturaMonte = Math.max(0.03, Math.min(0.2, view.deckCount * 0.0022));
+    const alturaMonte = Math.max(0.02, Math.min(0.12, view.deckCount * 0.0013));
     monte.caixa.scale.y = alturaMonte / 0.2;
     monte.caixa.position.y = MESA_TOPO + alturaMonte / 2;
     // o número senta na caixa; solto no ar ele era mais uma coisa flutuando
-    monte.num.position.set(-0.4, MESA_TOPO + alturaMonte + 0.09, -0.42);
+    monte.num.position.set(-0.28, MESA_TOPO + alturaMonte + 0.06, -0.2);
 
     // Descarte: a pilha deitada e a carta do topo DEITADA sobre ela — como numa
     // mesa de verdade (decisão do usuário, 2026-09-04). O que a torna legível
@@ -1577,18 +1604,20 @@ async function sincroniza(primeira) {
       for (const c of descarte.grupo.children) if (c.geometry && c.geometry !== geoCarta) c.geometry.dispose();
       descarte.grupo.clear();
       if (topo) {
-        const alturaPilha = 0.02 + view.discardCount * 0.0016;
+        const alturaPilha = 0.012 + view.discardCount * 0.001;
         const base = new THREE.Mesh(
-          new THREE.BoxGeometry(CARTA_L, alturaPilha, CARTA_A),
+          new THREE.BoxGeometry(CARTA_L * ESCALA_TAMPO, alturaPilha, CARTA_A * ESCALA_TAMPO),
           materialBorda,
         );
         base.castShadow = true;
         base.position.y = MESA_TOPO + alturaPilha / 2;
         const face = new THREE.Mesh(geoCarta, materialDaCarta(topo));
         face.castShadow = true;
-        face.scale.setScalar(1.15);
-        face.rotation.x = -Math.PI / 2 + 0.2;   // deitada, 11° erguida para a câmera
-        face.position.set(0, MESA_TOPO + alturaPilha + 0.05, 0.02);
+        face.scale.setScalar(ESCALA_TAMPO);
+        // com a câmera na altura dos olhos, a carta do topo se ergue 30° para
+        // ela — deitada de vez virava uma lasca; é a carta que decide a compra
+        face.rotation.x = -Math.PI / 2 + 0.52;
+        face.position.set(0, MESA_TOPO + alturaPilha + 0.085, 0.0);
         face.userData.alvo = face.position.clone();
         if (!semMovimento) { face.userData.cai = performance.now(); }
         descarte.grupo.add(base, face);
@@ -1605,38 +1634,37 @@ async function sincroniza(primeira) {
       if (!p.melds?.length) continue;
       const meu = p.id === me();
       const idx = outros.indexOf(p);
-      const pos = meu ? { x: 0, z: 1.05 } : posicaoDoAssento(idx, outros.length);
+      const pos = meu ? { x: 0, z: ASSENTO_RAIO } : posicaoDoAssento(idx, outros.length);
       const frente = new THREE.Group();
-      // Os jogos dos outros ficam mais perto do centro do que o assento sugere
-      // (fator 0,4 em vez de 0,52): deitados, longe, viravam tiras que ninguém
-      // lia. Os seus ficam junto da sua borda, como na mesa de verdade.
-      frente.position.set(pos.x * 0.4, 0, meu ? pos.z * 0.52 : pos.z * 0.4 + 0.25);
+      // Os jogos dos outros ficam na faixa do feltro na frente de cada um,
+      // entre a borda e o meio; os seus, junto da sua borda.
+      frente.position.set(pos.x * 0.5, 0, meu ? 0.72 : pos.z * 0.5 + 0.08);
 
-      const passoCarta = 0.15;
-      const vaoEntreJogos = 0.12;
-      const larguras = p.melds.map((m) => (m.cards.length - 1) * passoCarta + CARTA_L * 0.85);
+      const passoCarta = 0.08;
+      const vaoEntreJogos = 0.07;
+      const larguras = p.melds.map((m) => (m.cards.length - 1) * passoCarta + CARTA_L * ESCALA_TAMPO * 0.85);
       const total = larguras.reduce((a, b) => a + b + vaoEntreJogos, -vaoEntreJogos);
       let x = -total / 2;
       p.melds.forEach((meld, mi) => {
         meld.cards.forEach((card, ci) => {
           const carta = new THREE.Mesh(geoCarta, materialDaCarta(card));
           carta.castShadow = true;
-          carta.scale.setScalar(0.85);
-          carta.rotation.x = -Math.PI / 2 + 0.36;   // deitada, 20° erguida para a câmera
+          carta.scale.setScalar(ESCALA_TAMPO * 0.85);
+          carta.rotation.x = -Math.PI / 2 + 0.6;   // erguida 34° para a câmera na altura dos olhos
           carta.position.set(
-            x + CARTA_L * 0.425 + ci * passoCarta,
-            MESA_TOPO + 0.008 + ci * 0.003,
-            ci * 0.014,
+            x + CARTA_L * ESCALA_TAMPO * 0.425 + ci * passoCarta,
+            MESA_TOPO + 0.06 + ci * 0.003,
+            ci * 0.01,
           );
           frente.add(carta);
         });
         x += larguras[mi] + vaoEntreJogos;
       });
-      const sombra = sombraDeContato(total + 0.25, 0.6);
-      sombra.position.z = 0.06;
+      const sombra = sombraDeContato(total + 0.15, 0.35);
+      sombra.position.z = 0.03;
       frente.add(sombra);
       // mesa cheia de jogos: encolhe o conjunto em vez de estourar o feltro
-      if (total > 2.3) frente.scale.setScalar(2.3 / total);
+      if (total > 1.3) frente.scale.setScalar(1.3 / total);
       jogosNaMesa.add(frente);
       // jogo novo de quem acabou de baixar: a fileira inteira voa do assento
       // dele (ou da frente da sua cadeira) até o lugar — o grupo, não carta
@@ -1644,7 +1672,7 @@ async function sincroniza(primeira) {
       const temNovo = p.melds.some((m) => !jogosVistos.has(m.id));
       if (temNovo && baixadaDe === p.id && !semMovimento) {
         const a = assentos.get(p.id);
-        const origem = a ? lequeDe(a) : new THREE.Vector3(0, MESA_TOPO + 0.6, 1.9);
+        const origem = a ? lequeDe(a) : new THREE.Vector3(0, MESA_TOPO + 0.3, 1.2);
         voa(frente, origem, frente.position.clone(), { dur: 520, arco: 0.15 });
       }
       for (const m of p.melds) jogosVistos.add(m.id);
@@ -1759,8 +1787,11 @@ function encaixaTela() {
   // ela lê inteira. Decisão do usuário (2026-09-04): deitadas, desde que
   // visíveis. Subir muito mais viraria vista de cima, e some a sensação de
   // estar sentado com os outros — que é o que se quer da referência.
-  camera.fov = Math.min(78, 50 / Math.max(0.68, emPe * 1.15));
-  camera.position.set(0, 2.55 + (1 - emPe) * 0.35, 2.75 + (1 - emPe) * 0.75);
+  // Na altura dos olhos de quem senta (2026-09-05, referência do Capote): a
+  // cabeça a 1,2 m, um pouco à frente da própria cadeira, olhando 12° para
+  // baixo, para o meio do tampo. Em pé o campo abre para caber os vizinhos.
+  camera.fov = camera.aspect < 1 ? 72 : 55;
+  camera.position.set(OLHO.x, OLHO.y, OLHO.z + (1 - emPe) * 0.15);
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', encaixaTela);
@@ -1810,8 +1841,8 @@ function quadro(t) {
   animaVoos(t);
 
   // a cabeça acompanha o ponteiro de leve; a mesa continua o alvo
-  camera.position.x += ((olharX * 1.4) - camera.position.x) * 0.06;
-  camera.lookAt(camera.position.x * 0.25, MESA_TOPO - 0.05, -0.55);
+  camera.position.x += ((olharX * 0.4) - camera.position.x) * 0.06;
+  camera.lookAt(camera.position.x * 0.25, MESA_TOPO + 0.12, -0.35);
 
   for (const [id, a] of assentos) {
     // respiro contínuo, dessincronizado por posição

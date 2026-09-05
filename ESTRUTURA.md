@@ -695,6 +695,31 @@ mais fora de escala). Sexta: com a escala ×1,2 a banqueta de balcão punha as
 coxas ACIMA do tampo; voltou a 55 cm (`BANQUETA_ASSENTO`), que com a escala
 deixa as coxas sob o tampo e o peito acima.
 
+**A mesa de jantar** (2026-09-05, à tarde; decisão do usuário a partir da
+referência do Capote: "fazer algo referenciado nisso não encaixaria
+melhor?"). A mesa antiga tinha o tampo a 0,92 m com 2,55 m de raio, os
+assentos a 2,66 m do centro e a câmera a 30° sobre o tampo — boa para ler
+cartas deitadas, ruim para ver gente: um modelo em tamanho real ficava
+pequeno e baixo atrás da borda, e nenhuma escala consertava sem estragar
+outra coisa. Agora: tampo a **0,76 m** com **1,15 m** de raio, assentos a
+**1,5 m** do centro (as coxas entram sob o tampo, os cotovelos ficam na
+borda; segunda fileira a 2,25 m com cinco ou mais), câmera na altura dos
+olhos de quem senta (`OLHO` = 1,2 m, um pouco à frente da própria cadeira,
+12° para baixo; 55° de campo em paisagem, 72° em pé), abertura dos assentos
+±55° em paisagem e ±33°/±26° em pé (a meia-abertura horizontal em pé é ~18°),
+cadeira de 0,45 m, modelos em **tamanho real** (`ESCALA_ELENCO` = 1) e o
+boneco de código a 0,8. As cartas do tampo (monte, descarte, jogos) encolhem
+para `ESCALA_TAMPO` = 0,55 da carta da mão e se erguem mais para a câmera
+(descarte 30°, jogos 34°) — de lado, deitadas de vez viravam lascas; e ficam
+foscas (rugosidade 0,88), porque erguidas refletiam a lâmpada e saíam
+brancas. O foco da vez de cada um sai do chão (ficaria sob a mesa) e vai para
+o tampo, na frente da cadeira. O leque próprio e as suas mãos, presos à
+câmera, passaram a ser desenhados por cima de tudo (`depthTest` desligado,
+materiais próprios): com o olho na altura da mesa eles ficavam atrás do
+tampo. Rótulos de nome menores (a 1,5 m os antigos tampavam o vizinho), aviso
+em tela larga na faixa do painel, lâmpada mais baixa, neblina mais rala. O
+provador acompanha a geometria (tampo, raio, cadeira a 1,5 m).
+
 **Os oito sentados** (2026-09-05): o usuário refez e rigou os oito, mas os
 arquivos vieram só com repouso, andar e correr. `modelo-senta.mjs` ganhou
 `--pose`: a pose sentada da EstereX do dia anterior viaja para cada um como
