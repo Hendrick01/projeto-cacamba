@@ -125,13 +125,15 @@ os padrões servem a um rig humano), apaga os clips de andar e cria os três
 do contrato em cima da pose nova: `idle` (respiro), `feliz` (aceno de
 cabeça), `bravo` (balanço de cabeça). `--gira Osso=x,y,z` gira um osso em
 graus nos eixos do mundo — serve para endireitar o tronco, que esse clip
-deixa torcido. O quadril recua e desce um pouco (`--recuo 0.12 --desce
-0.06`, em metros): o clip senta na beirada, e a banqueta quer as coxas
-apoiadas. E acima da cintura (`--cintura`, padrão 5 cm abaixo do osso do
+deixa torcido. O quadril recua um pouco (`--recuo 0.12`, em metros): o clip senta na
+beirada, e a banqueta quer as coxas apoiadas. E acima da cintura (`--cintura`, padrão 5 cm abaixo do osso do
 quadril) os ossos da perna perdem o peso: o rigger automático espalha o
 peso da coxa até a barriga, e com a coxa a 90° isso virava uma mancha de pele
 por cima da calça. O tronco fica 15° mais ereto que no clip (que curva para
-a frente) e os pulsos meio virados para dentro. Na mesa, o leque de um
+a frente) e os pulsos meio virados para dentro. O quadril vai para a altura
+da **banqueta de balcão** da mesa (`--assento 0.72`, mais `--folga 0.07`):
+a mesa tem o tampo a 0,92 m, e numa banqueta baixa os ombros de quem senta
+ficam na altura do tampo — só a cabeça passava da borda. Na mesa, o leque de um
 modelo fica à frente das mãos, 6 cm abaixo da ponta dos dedos: as cartas
 escondem as mãos e só os dedos aparecem acima da borda, como no boneco de
 código — o rig não tem dedos para fechar a mão, e com o leque entre as mãos

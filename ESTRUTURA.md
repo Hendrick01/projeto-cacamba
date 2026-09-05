@@ -675,7 +675,13 @@ viram 45° para dentro; e o leque de um modelo fica **à frente** das mãos,
 mãos e só os dedos aparecem acima da borda, como no boneco de código. Entre
 as mãos, as cartas atravessavam os dedos, e sem ossos de dedo não há como
 fechar a mão. Terceira rodada: tudo isso saiu de conferir a versão publicada
-pelos ângulos das capturas do usuário.
+pelos ângulos das capturas do usuário. Quarta: na mesa, sentada de verdade
+numa banqueta de 55 cm, só a cabeça dela passava da borda — o tampo está a
+0,92 m, altura de balcão, e os ombros de quem senta ficam nessa altura. A
+banqueta virou **de balcão** (`BANQUETA_ASSENTO` = 0,72 m, com aro para os
+pés) e o script senta o quadril pela altura dela (`--assento`, `--folga`),
+não mais por um "desce" relativo ao clip. O boneco de código, que flutua com
+o tronco a ~0,9 m, também fica mais coerente com a banqueta alta.
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a
@@ -729,7 +735,8 @@ Ficou de fora, por ora: pernas no boneco de código. O boneco virar para quem
 joga chegou em 2026-09-04 (o corpo, não a cabeça — ver acima). A cadeira
 chegou no mesmo dia: uma
 **banqueta** de madeira com a almofada na cor do assento (`criaBanqueta`, em
-`modelo3d.js`, porque o provador a usa para julgar a pose). Era um disco
+`modelo3d.js`, porque o provador a usa para julgar a pose) — de balcão, 0,72 m,
+com aro para os pés, desde 2026-09-05 (ver "A primeira sentada"). Era um disco
 colorido no chão — com modelos que têm pernas, o disco os deixava sentados
 no ar. Ver **2D×3D** abaixo.
 

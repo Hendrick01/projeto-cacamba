@@ -8,6 +8,7 @@
 // Uso: node test/modelo-senta.mjs <rigado.glb> <saida.glb> [--clip Stand_to_Sit_Transition_M]
 //        [--gira LeftArm=ax,ay,az] [--gira RightForeArm=ax,ay,az] ...
 //        [--mira LeftForeArm=x,y,z] [--mira LeftHand=x,y,z] ...
+//        [--recuo 0.12] [--assento 0.72] [--folga 0.07] [--cintura y]
 //   --gira: giro extra de um osso, em graus, em torno dos EIXOS DO MUNDO
 //           (x = para a frente/trás, y = para dentro/fora, z = de lado),
 //           aplicado por cima da pose assada — serve para endireitar o
@@ -28,10 +29,13 @@ let clipNome = 'Stand_to_Sit_Transition_M';
 // O endireitar do tronco (torção) depende de cada rig e vai por --gira.
 const giros = { Spine02: [-15, 0, 0], LeftHand: [45, 0, 0], RightHand: [-45, 0, 0] };
 const miras = { LeftForeArm: [0.20, 0.72, 0.10], RightForeArm: [-0.20, 0.72, 0.10], LeftHand: [0.05, 0.84, 0.26], RightHand: [-0.05, 0.84, 0.26] };
-const opc = { recuo: 0.12, desce: 0.09, cintura: null };   // metros: quadril para trás e para baixo até as coxas apoiarem; cintura = de onde para cima a perna não puxa
+// metros: recuo do quadril (o clip senta na beirada); assento = altura da
+// banqueta da mesa (a de balcão, BANQUETA_ASSENTO em modelo3d.js) — o osso do
+// quadril fica `folga` acima dele; cintura = de onde para cima a perna não puxa
+const opc = { recuo: 0.12, assento: 0.72, folga: 0.07, cintura: null };
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--clip') clipNome = args[++i];
-  else if (['--recuo', '--desce', '--cintura'].includes(args[i])) opc[args[i].slice(2)] = Number(args[++i]);
+  else if (['--recuo', '--assento', '--folga', '--cintura'].includes(args[i])) opc[args[i].slice(2)] = Number(args[++i]);
   else if (args[i] === '--gira') { const [osso, v] = args[++i].split('='); giros[osso] = v.split(',').map(Number); }
   else if (args[i] === '--mira') { const [junta, v] = args[++i].split('='); miras[junta] = v === '-' ? null : v.split(',').map(Number); }
 }
@@ -76,8 +80,10 @@ for (const ch of clip.channels) {
 // E recua/desce mais um pouco (--recuo/--desce, em metros): o clip senta na
 // beirada, e a banqueta da mesa quer as coxas apoiadas no assento
 const escalaRaiz0 = (() => { const r = json.nodes.find((n) => n.name === 'Armature') || json.nodes[json.scenes[0].nodes[0]]; return (r.scale || [1, 1, 1])[1]; })();
-hips.translation = [hipsRepouso[0], hips.translation[1] - opc.desce / escalaRaiz0, hipsRepouso[2] - opc.recuo / escalaRaiz0];
-console.log(`pose assada de "${clipNome}"; quadril desceu de ${hipsRepouso[1].toFixed(1)} para ${hips.translation[1].toFixed(1)} (unidades do rig), recuou ${opc.recuo} m e desceu mais ${opc.desce} m`);
+const quadrilClip = hips.translation[1];
+hips.translation = [hipsRepouso[0], (opc.assento + opc.folga) / escalaRaiz0, hipsRepouso[2] - opc.recuo / escalaRaiz0];
+opc.desce = quadrilClip * escalaRaiz0 - (opc.assento + opc.folga);   // quanto o corpo desceu (ou subiu) em relação ao clip; as miras acompanham
+console.log(`pose assada de "${clipNome}"; quadril do clip a ${(quadrilClip * escalaRaiz0).toFixed(2)} m → ${(opc.assento + opc.folga).toFixed(2)} m (banqueta de ${opc.assento} m), recuado ${opc.recuo} m`);
 
 // --- 1b. a pele da cintura não desce com a coxa: acima da cintura, os ossos
 // da perna perdem o peso (o rigger automático espalha o peso da coxa até a

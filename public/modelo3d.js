@@ -155,17 +155,25 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
 // A banqueta do assento: madeira escura com a almofada na cor do assento.
 // Mora aqui porque o provador precisa dela para julgar a pose (o modelo
 // senta nela) — na mesa, é a cadeira de cada personagem.
+// É banqueta ALTA, de balcão: o tampo da mesa está a 0,92 m, e numa banqueta
+// de 55 cm os ombros de uma pessoa sentada ficam na altura do tampo — só a
+// cabeça passava da borda. Com o assento a BANQUETA_ASSENTO, o peito fica
+// acima do tampo, e um aro embaixo apoia os pés.
+export const BANQUETA_ASSENTO = 0.72;
 export function criaBanqueta(corAlmofada) {
   const g = new THREE.Group();
   const madeira = new THREE.MeshToonMaterial({ color: 0x5a3720, gradientMap: GRADIENTE_TOON });
+  const A = BANQUETA_ASSENTO;
   const tampo = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.25, 0.06, 20), madeira);
-  tampo.position.y = 0.47; tampo.castShadow = true; g.add(tampo);
+  tampo.position.y = A - 0.03; tampo.castShadow = true; g.add(tampo);
   const almofada = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.27, 0.05, 20), new THREE.MeshToonMaterial({ color: corAlmofada, gradientMap: GRADIENTE_TOON }));
-  almofada.position.y = 0.525; almofada.castShadow = true; g.add(almofada);
+  almofada.position.y = A + 0.025; almofada.castShadow = true; g.add(almofada);
   for (const [x, z] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) {
-    const pe = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.47, 8), madeira);
-    pe.position.set(x, 0.235, z); pe.castShadow = true; g.add(pe);
+    const pe = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, A - 0.06, 8), madeira);
+    pe.position.set(x, (A - 0.06) / 2, z); pe.castShadow = true; g.add(pe);
   }
+  const aro = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.014, 8, 24), madeira);
+  aro.rotation.x = Math.PI / 2; aro.position.y = 0.22; g.add(aro);
   g.position.z = -0.04;   // um pouco para trás: as pernas sentadas vão para a frente
   return g;
 }
