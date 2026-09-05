@@ -691,7 +691,22 @@ e no provador), para ele continuar sentado nela. Modelo em pé, sem esqueleto,
 fica como veio — é provisório. As alternativas descartadas: aproximar os
 assentos da borda (deixa maior, não mais alto, e a borda esconde mais) e
 baixar a mesa para 0,75 m (mexe em tudo, e as cartas de 42 cm ficariam ainda
-mais fora de escala).
+mais fora de escala). Sexta: com a escala ×1,2 a banqueta de balcão punha as
+coxas ACIMA do tampo; voltou a 55 cm (`BANQUETA_ASSENTO`), que com a escala
+deixa as coxas sob o tampo e o peito acima.
+
+**Os oito sentados** (2026-09-05): o usuário refez e rigou os oito, mas os
+arquivos vieram só com repouso, andar e correr. `modelo-senta.mjs` ganhou
+`--pose`: a pose sentada da EstereX do dia anterior viaja para cada um como
+**deslocamento de cada osso em relação ao próprio repouso** (lido das
+`inverseBindMatrices`). Copiar rotação local ou orientação no mundo torcia
+os membros — rigs do mesmo esqueleto têm ossos de repouso orientados de
+jeitos diferentes. As miras dos braços passaram a ser relativas ao osso do
+quadril (eram absolutas e ficavam no colo quando a banqueta baixou). O
+"endireitar automático" pela linha dos ombros foi desligado: no clip de
+sentar os ombros não são simétricos, e a correção torcia um tronco reto.
+Os três antigos (procedurais e esculturas em pé) foram substituídos; o
+boneco de código só entra se um arquivo faltar.
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a

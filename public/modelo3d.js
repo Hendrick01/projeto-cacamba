@@ -164,11 +164,13 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
 // A banqueta do assento: madeira escura com a almofada na cor do assento.
 // Mora aqui porque o provador precisa dela para julgar a pose (o modelo
 // senta nela) — na mesa, é a cadeira de cada personagem.
-// É banqueta ALTA, de balcão: o tampo da mesa está a 0,92 m, e numa banqueta
-// de 55 cm os ombros de uma pessoa sentada ficam na altura do tampo — só a
-// cabeça passava da borda. Com o assento a BANQUETA_ASSENTO, o peito fica
-// acima do tampo, e um aro embaixo apoia os pés.
-export const BANQUETA_ASSENTO = 0.72;
+// Assento de cadeira comum (55 cm). Foi de balcão (72 cm) por um dia: com o
+// tampo a 0,92 m, uma pessoa de tamanho real sentada em 55 cm fica com os
+// ombros na altura do tampo. Mas o que resolve é a ESCALA_ELENCO (×1,2), e
+// com ela a banqueta alta punha as coxas ACIMA do tampo, atravessando a
+// mesa. Em 55 cm × 1,2 as coxas ficam sob o tampo e o peito bem acima. O
+// aro embaixo apoia os pés.
+export const BANQUETA_ASSENTO = 0.55;
 export function criaBanqueta(corAlmofada) {
   const g = new THREE.Group();
   const madeira = new THREE.MeshToonMaterial({ color: 0x5a3720, gradientMap: GRADIENTE_TOON });
@@ -182,7 +184,7 @@ export function criaBanqueta(corAlmofada) {
     pe.position.set(x, (A - 0.06) / 2, z); pe.castShadow = true; g.add(pe);
   }
   const aro = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.014, 8, 24), madeira);
-  aro.rotation.x = Math.PI / 2; aro.position.y = 0.22; g.add(aro);
+  aro.rotation.x = Math.PI / 2; aro.position.y = 0.16; g.add(aro);
   g.position.z = -0.04;   // um pouco para trás: as pernas sentadas vão para a frente
   return g;
 }

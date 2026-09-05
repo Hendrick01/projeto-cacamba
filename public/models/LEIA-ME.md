@@ -142,9 +142,28 @@ ser medido pela caixa. E como o arquivo traz o nó `Cabeca`, a mesa confia
 na escala dele em vez de normalizar (um sentado normalizado para 1,55 m
 viraria uma gigante).
 
+**Se o rigger devolveu só repouso, andar e correr** (foi o caso dos oito de
+2026-09-05), a pose sentada vem de outro arquivo já assado, com `--pose`:
+
+```bash
+node test/modelo-senta.mjs 3D-Junior.glb junior-s.glb --pose pose-esterex-antiga.glb
+node test/modelo-prepara.mjs junior-s.glb public/models/junior.glb --tri 32000 --altura 0
+```
+
+O que viaja não é a rotação de cada osso (rigs do mesmo esqueleto têm os
+ossos de repouso orientados de jeitos diferentes, e copiar torcia os
+membros), mas o **deslocamento de cada osso em relação ao próprio repouso**,
+lido das `inverseBindMatrices` do skin: `D = pose_fonte · repouso_fonte⁻¹`,
+`pose_alvo = D · repouso_alvo`. Braços e mãos são resolvidos depois pelas
+miras, que são relativas ao osso do quadril. A pose de referência é a EstereX
+sentada do dia 5 (`git show 0d9b0a3:public/models/esterex.glb`).
+
 O que o rig automático não dá: os morphs `feliz`/`bravo`/`bocaAberta` (a
 cara continua a mesma; a reação é do corpo, e a fala usa a elipse escura).
-Isso é escultura de expressão, na ferramenta de modelagem.
+Isso é escultura de expressão, na ferramenta de modelagem. E **dedos**: este
+rig tem 24 ossos e nenhum de dedo, então a mão não fecha; um rigger com
+esqueleto de dedos (Mixamo com o esqueleto de 65 ossos, AccuRIG, Rigify no
+Blender) resolve, e aí o script pode fechar os dedos em volta do leque.
 
 A Dri veio diferente: já com uma figura só e 31 mil triângulos, mas 17,5 MB
 de PNG assado (cor 6,7 MB e metal 9,6 MB em 4096 px) e a origem no meio do

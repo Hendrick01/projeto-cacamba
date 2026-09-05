@@ -6,6 +6,9 @@
 // roda uma vez por personagem, e o resultado vai para test/modelo-prepara.mjs.
 //
 // Uso: node test/modelo-senta.mjs <rigado.glb> <saida.glb> [--clip Stand_to_Sit_Transition_M]
+//        [--pose outro-rigado.glb]  (a pose sentada vem do clip DESSE arquivo,
+//        transferida osso a osso pelo nome — para rigs do mesmo esqueleto que
+//        chegaram sem clip de sentar)
 //        [--gira LeftArm=ax,ay,az] [--gira RightForeArm=ax,ay,az] ...
 //        [--mira LeftForeArm=x,y,z] [--mira LeftHand=x,y,z] ...
 //        [--recuo 0.12] [--assento 0.72] [--folga 0.07] [--cintura y]
@@ -13,28 +16,33 @@
 //           (x = para a frente/trás, y = para dentro/fora, z = de lado),
 //           aplicado por cima da pose assada — serve para endireitar o
 //           tronco (Spine02) que o clip deixa torcido.
-//   --mira: onde, em METROS no mundo, deve ficar a junta dada (a ponta do
-//           osso pai): o pai gira até apontar para lá. Os padrões põem
-//           cotovelos e mãos como quem segura um leque na frente do peito.
-//           Pais são resolvidos antes dos filhos.
+//   --mira: onde deve ficar a junta dada (a ponta do osso pai), em METROS
+//           relativos ao osso do quadril: o pai gira até apontar para lá. Os
+//           padrões põem cotovelos e mãos como quem segura um leque na frente
+//           do peito. Pais são resolvidos antes dos filhos.
 import fs from 'node:fs';
 
 const args = process.argv.slice(2);
 const pos = args.filter((a) => !a.startsWith('--') && !/^[A-Za-z]+=/.test(a));
 const [fonte, saida] = pos;
 let clipNome = 'Stand_to_Sit_Transition_M';
+let poseDe = null;
 // giros padrão, em eixos do mundo: o tronco 15° mais ereto (o clip de sentar
 // curva para a frente e a pele das costas desce sobre o cós) e os pulsos meio
 // virados para dentro (as mãos ficam atrás do leque, dedos acima da borda).
 // O endireitar do tronco (torção) depende de cada rig e vai por --gira.
 const giros = { Spine02: [-15, 0, 0], LeftHand: [45, 0, 0], RightHand: [-45, 0, 0] };
-const miras = { LeftForeArm: [0.20, 0.72, 0.10], RightForeArm: [-0.20, 0.72, 0.10], LeftHand: [0.05, 0.84, 0.26], RightHand: [-0.05, 0.84, 0.26] };
+// pontos de mira em metros, RELATIVOS AO OSSO DO QUADRIL (x para a esquerda
+// dela, y para cima, z para a frente): cotovelos ao lado do corpo, mãos na
+// frente do peito. Assim valem para qualquer altura de banqueta.
+const miras = { LeftForeArm: [0.20, 0.01, 0.22], RightForeArm: [-0.20, 0.01, 0.22], LeftHand: [0.05, 0.13, 0.38], RightHand: [-0.05, 0.13, 0.38] };
 // metros: recuo do quadril (o clip senta na beirada); assento = altura da
 // banqueta da mesa (a de balcão, BANQUETA_ASSENTO em modelo3d.js) — o osso do
 // quadril fica `folga` acima dele; cintura = de onde para cima a perna não puxa
-const opc = { recuo: 0.12, assento: 0.72, folga: 0.16, cintura: null };   // folga: do assento ao osso do quadril — as coxas (uns 13 cm) apoiam EM CIMA, sem atravessar
+const opc = { recuo: 0.12, assento: 0.55, folga: 0.16, cintura: null };   // folga: do assento ao osso do quadril — as coxas (uns 13 cm) apoiam EM CIMA, sem atravessar
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--clip') clipNome = args[++i];
+  else if (args[i] === '--pose') poseDe = args[++i];
   else if (['--recuo', '--assento', '--folga', '--cintura'].includes(args[i])) opc[args[i].slice(2)] = Number(args[++i]);
   else if (args[i] === '--gira') { const [osso, v] = args[++i].split('='); giros[osso] = v.split(',').map(Number); }
   else if (args[i] === '--mira') { const [junta, v] = args[++i].split('='); miras[junta] = v === '-' ? null : v.split(',').map(Number); }
@@ -67,15 +75,73 @@ const qEuler = (ax, ay, az) => qMul(qEixo([0, 1, 0], ay), qMul(qEixo([1, 0, 0], 
 // --- 1. o último quadro do clip vira a pose de repouso ---
 const pai = {}; json.nodes.forEach((n, i) => (n.children || []).forEach((c) => (pai[c] = i)));
 const no = (nome) => json.nodes.findIndex((n) => n.name === nome);
-const clip = json.animations.find((a) => a.name === clipNome);
-if (!clip) throw new Error(`clip "${clipNome}" não existe; há: ${json.animations.map((a) => a.name).join(', ')}`);
 const hips = json.nodes[no('Hips')] || json.nodes[json.skins[0].joints[0]];
 const hipsRepouso = (hips.translation || [0, 0, 0]).slice();
-for (const ch of clip.channels) {
-  const s = clip.samplers[ch.sampler]; const out = le(s.output);
-  const ultimo = Array.from(out.arr.slice((out.count - 1) * out.n, out.count * out.n));
-  json.nodes[ch.target.node][ch.target.path] = ultimo;
+// o clip de sentar: deste arquivo ou do arquivo de --pose (mesmo esqueleto)
+const fontePose = poseDe ? (() => { const bb = fs.readFileSync(poseDe); const jl2 = bb.readUInt32LE(12); const j2 = JSON.parse(bb.toString('utf8', 20, 20 + jl2)); const bin2 = bb.subarray(28 + jl2, 28 + jl2 + bb.readUInt32LE(20 + jl2)); return { json: j2, bin: bin2 }; })() : { json, bin };
+const clip = (fontePose.json.animations || []).find((a) => a.name === clipNome);
+if (!clip && !poseDe) throw new Error(`clip "${clipNome}" não existe em ${fonte}; há: ${(json.animations || []).map((a) => a.name).join(', ')}`);
+let transferidos = 0, semPar = [];
+if (!clip) {
+  // A fonte de pose já está ASSADA (saída deste script), possivelmente de um
+  // rig com ossos de repouso orientados de outro jeito. O que viaja é o
+  // DESLOCAMENTO de cada osso em relação ao PRÓPRIO repouso, no mundo:
+  //   D = W_pose_fonte · W_repouso_fonte⁻¹  ;  W_pose_alvo = D · W_repouso_alvo
+  // O repouso (bind) de cada osso está nas inverseBindMatrices do skin.
+  // Copiar a rotação local ou a orientação no mundo torcia os membros.
+  const qMulL = (a, b) => [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0], a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+  const qInvL = (q) => [-q[0], -q[1], -q[2], q[3]];
+  const qNormL = (q) => { const l = Math.hypot(...q) || 1; return q.map((v) => v / l); };
+  // quaternion da rotação de uma matriz 4x4 (coluna-maior), tirando a escala
+  const qDeMatriz = (m) => {
+    const c = [[m[0], m[1], m[2]], [m[4], m[5], m[6]], [m[8], m[9], m[10]]].map((v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); });
+    const r = [[c[0][0], c[1][0], c[2][0]], [c[0][1], c[1][1], c[2][1]], [c[0][2], c[1][2], c[2][2]]];   // r[linha][coluna]
+    const tr = r[0][0] + r[1][1] + r[2][2]; let q;
+    if (tr > 0) { const s = Math.sqrt(tr + 1) * 2; q = [(r[2][1] - r[1][2]) / s, (r[0][2] - r[2][0]) / s, (r[1][0] - r[0][1]) / s, 0.25 * s]; }
+    else if (r[0][0] > r[1][1] && r[0][0] > r[2][2]) { const s = Math.sqrt(1 + r[0][0] - r[1][1] - r[2][2]) * 2; q = [0.25 * s, (r[0][1] + r[1][0]) / s, (r[0][2] + r[2][0]) / s, (r[2][1] - r[1][2]) / s]; }
+    else if (r[1][1] > r[2][2]) { const s = Math.sqrt(1 + r[1][1] - r[0][0] - r[2][2]) * 2; q = [(r[0][1] + r[1][0]) / s, 0.25 * s, (r[1][2] + r[2][1]) / s, (r[0][2] - r[2][0]) / s]; }
+    else { const s = Math.sqrt(1 + r[2][2] - r[0][0] - r[1][1]) * 2; q = [(r[0][2] + r[2][0]) / s, (r[1][2] + r[2][1]) / s, 0.25 * s, (r[1][0] - r[0][1]) / s]; }
+    return qNormL(q);
+  };
+  const repousoDe = (g) => {   // nome do osso → quaternion do repouso no mundo (inversa da IBM)
+    const skin = g.json.skins[0]; const a = g.json.accessors[skin.inverseBindMatrices]; const bv = g.json.bufferViews[a.bufferView];
+    const off = (bv.byteOffset || 0) + (a.byteOffset || 0);
+    const arr = new Float32Array(g.bin.buffer.slice(g.bin.byteOffset + off, g.bin.byteOffset + off + a.count * 16 * 4));
+    const out = {};
+    skin.joints.forEach((iNo, k) => { out[g.json.nodes[iNo].name] = qInvL(qDeMatriz(Array.from(arr.slice(k * 16, k * 16 + 16)))); });
+    return out;
+  };
+  const paiF = {}; fontePose.json.nodes.forEach((n, i) => (n.children || []).forEach((c) => (paiF[c] = i)));
+  const mundoF = (i) => { const n = fontePose.json.nodes[i]; const l = n.rotation || [0, 0, 0, 1]; return paiF[i] == null ? l : qMulL(mundoF(paiF[i]), l); };
+  const mundoA = (i) => { const n = json.nodes[i]; const l = n.rotation || [0, 0, 0, 1]; return pai[i] == null ? l : qMulL(mundoA(pai[i]), l); };
+  const repF = repousoDe(fontePose), repA = repousoDe({ json, bin });
+  const prof = (i) => (pai[i] == null ? 0 : 1 + prof(pai[i]));
+  const ossos = json.skins[0].joints.map((i) => i).sort((a, b) => prof(a) - prof(b));
+  for (const i of ossos) {
+    const nome = json.nodes[i].name; const iF = fontePose.json.nodes.findIndex((n) => n.name === nome);
+    if (iF < 0 || !repF[nome] || !repA[nome]) { semPar.push(nome); continue; }
+    const D = qMulL(mundoF(iF), qInvL(repF[nome]));
+    const W = qMulL(D, repA[nome]);
+    const P = pai[i] == null ? [0, 0, 0, 1] : mundoA(pai[i]);
+    json.nodes[i].rotation = qNormL(qMulL(qInvL(P), W)); transferidos++;
+  }
+  const hipsFonte = fontePose.json.nodes.find((n) => n.name === 'Hips');
+  if (hipsFonte?.translation) hips.translation = [hipsRepouso[0], hipsFonte.translation[1], hipsRepouso[2]];
 }
+for (const ch of clip ? clip.channels : []) {
+  const s = clip.samplers[ch.sampler]; const a = fontePose.json.accessors[s.output]; const bv = fontePose.json.bufferViews[a.bufferView];
+  const off = (bv.byteOffset || 0) + (a.byteOffset || 0); const n = N[a.type];
+  const arr = new Float32Array(fontePose.bin.buffer.slice(fontePose.bin.byteOffset + off, fontePose.bin.byteOffset + off + a.count * n * 4));
+  const ultimo = Array.from(arr.slice((a.count - 1) * n, a.count * n));
+  const nome = fontePose.json.nodes[ch.target.node].name;
+  const i = poseDe ? no(nome) : ch.target.node;
+  if (i < 0) { semPar.push(nome); continue; }
+  // de outro arquivo só a ROTAÇÃO viaja: translações são os comprimentos dos ossos de cada um
+  if (poseDe && ch.target.path !== 'rotation' && nome !== 'Hips') continue;
+  json.nodes[i][ch.target.path] = ultimo;
+  transferidos++;
+}
+if (poseDe) console.log(`pose sentada transferida de ${poseDe.split('/').pop()}: ${transferidos} canais${semPar.length ? `; sem osso correspondente: ${[...new Set(semPar)].join(', ')}` : ''}`);
 // sentada NA ORIGEM: o clip anda até a cadeira; fica só a descida do quadril.
 // E recua/desce mais um pouco (--recuo/--desce, em metros): o clip senta na
 // beirada, e a banqueta da mesa quer as coxas apoiadas no assento
@@ -124,6 +190,23 @@ function giraNoMundo(i, delta) {
 // pais antes dos filhos: o giro do tronco arrasta os braços, e o giro dos
 // braços é medido já com o tronco no lugar
 const profundidade = (i) => (pai[i] == null ? 0 : 1 + profundidade(pai[i]));
+// (Opcional, --endireita) mede a linha dos ombros no mundo e desfaz a torção
+// girando Spine02 em Y. Fica DESLIGADO: no clip de sentar os dois ombros não
+// são simétricos (um vai à frente), a linha entre eles não diz para onde o
+// tronco olha, e a "correção" torcia um tronco que já estava reto. Quando a
+// pose vem de --pose, a torção certa já viaja junto; num clip novo, ajuste a
+// olho com --gira Spine02=0,<graus>,0 no provador.
+if (args.includes('--endireita')) {
+  const iT = no('Spine02'), iE = no('LeftArm'), iD = no('RightArm');
+  if (iT >= 0 && iE >= 0 && iD >= 0) {
+    const vRot0 = (q, v) => { const [x, y, z, w] = q; const ix = w * v[0] + y * v[2] - z * v[1], iy = w * v[1] + z * v[0] - x * v[2], iz = w * v[2] + x * v[1] - y * v[0], iw = -x * v[0] - y * v[1] - z * v[2]; return [ix * w + iw * -x + iy * -z - iz * -y, iy * w + iw * -y + iz * -x - ix * -z, iz * w + iw * -z + ix * -y - iy * -x]; };
+    const posM = (i) => { const n = json.nodes[i]; const t = n.translation || [0, 0, 0]; if (pai[i] == null) return t.slice(); const pp = posM(pai[i]); const r = vRot0(mundo(pai[i]), t); return [pp[0] + r[0], pp[1] + r[1], pp[2] + r[2]]; };
+    const E = posM(iE), D = posM(iD);
+    const torcao = Math.atan2(E[2] - D[2], E[0] - D[0]);   // 0 = ombros alinhados em X
+    json.nodes[iT].rotation = giraNoMundo(iT, qEixo([0, 1, 0], -torcao * 180 / Math.PI));
+    console.log(`tronco endireitado: ombros estavam torcidos ${(torcao * 180 / Math.PI).toFixed(0)}°`);
+  }
+}
 for (const [osso, [ax, ay, az]] of Object.entries(giros).sort((a, b) => profundidade(no(a[0])) - profundidade(no(b[0])))) {
   const i = no(osso); if (i < 0) { console.log(`aviso: osso ${osso} não existe`); continue; }
   json.nodes[i].rotation = giraNoMundo(i, qEuler(ax, ay, az));
@@ -144,8 +227,9 @@ const mirasOrdenadas = Object.entries(miras).filter(([, alvo]) => alvo).sort((a,
 for (const [junta, alvoM] of mirasOrdenadas) {
   const iJ = no(junta); if (iJ < 0 || pai[iJ] == null) { console.log(`aviso: junta ${junta} não existe`); continue; }
   const iOsso = pai[iJ];
-  // os pontos são dados para o corpo na origem; acompanham o recuo/descida
-  const alvo = [alvoM[0], alvoM[1] - opc.desce, alvoM[2] - opc.recuo].map((v) => v / raizEscala);
+  // os pontos são relativos ao quadril: somam a posição dele no mundo
+  const q0 = posMundo(no('Hips')).map((v) => v * raizEscala);
+  const alvo = [q0[0] + alvoM[0], q0[1] + alvoM[1], q0[2] + alvoM[2]].map((v) => v / raizEscala);
   const base = posMundo(iOsso), ponta = posMundo(iJ);
   const D = entreVetores(norm(sub(ponta, base)), norm(sub(alvo, base)));
   json.nodes[iOsso].rotation = giraNoMundo(iOsso, D);
