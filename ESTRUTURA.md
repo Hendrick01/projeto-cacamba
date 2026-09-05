@@ -706,7 +706,11 @@ quadril (eram absolutas e ficavam no colo quando a banqueta baixou). O
 "endireitar automático" pela linha dos ombros foi desligado: no clip de
 sentar os ombros não são simétricos, e a correção torcia um tronco reto.
 Os três antigos (procedurais e esculturas em pé) foram substituídos; o
-boneco de código só entra se um arquivo faltar.
+boneco de código só entra se um arquivo faltar. A pose transferida trazia a
+cabeça virada 59° de lado (todos olhavam para o mesmo canto): o script agora
+mede o desvio da cabeça em relação ao próprio repouso, tira só a guinada e
+mantém o olhar para baixo. `window.mesa3d` expõe assentos, cena e câmera
+para medir do console, como o provador.
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a

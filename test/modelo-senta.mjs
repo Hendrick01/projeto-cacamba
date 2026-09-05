@@ -237,6 +237,37 @@ for (const [junta, alvoM] of mirasOrdenadas) {
   console.log(`mira ${junta}: ${json.nodes[iOsso].name} girou; junta em ${nova.map((v) => (v * raizEscala).toFixed(2)).join(',')} m (pedido ${alvoM.join(',')})`);
 }
 
+// --- 2c. a cabeça olha para a frente: o clip (e a pose transferida) deixa a
+// cabeça virada de lado. Mede o desvio da cabeça em relação ao PRÓPRIO
+// repouso (bind, que olha para +Z), tira só a guinada (giro em Y) e mantém o
+// resto — o olhar para baixo, para as cartas, fica.
+{
+  const iH = no('Head');
+  const skin = json.skins?.[0];
+  if (iH >= 0 && skin) {
+    const a = json.accessors[skin.inverseBindMatrices]; const bv = json.bufferViews[a.bufferView];
+    const off = (bv.byteOffset || 0) + (a.byteOffset || 0);
+    const arr = new Float32Array(bin.buffer.slice(bin.byteOffset + off, bin.byteOffset + off + a.count * 16 * 4));
+    const k = skin.joints.indexOf(iH);
+    if (k >= 0) {
+      const m = Array.from(arr.slice(k * 16, k * 16 + 16));
+      const c = [[m[0], m[1], m[2]], [m[4], m[5], m[6]], [m[8], m[9], m[10]]].map((v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); });
+      const r = [[c[0][0], c[1][0], c[2][0]], [c[0][1], c[1][1], c[2][1]], [c[0][2], c[1][2], c[2][2]]];
+      const tr = r[0][0] + r[1][1] + r[2][2]; let q;
+      if (tr > 0) { const s = Math.sqrt(tr + 1) * 2; q = [(r[2][1] - r[1][2]) / s, (r[0][2] - r[2][0]) / s, (r[1][0] - r[0][1]) / s, 0.25 * s]; }
+      else if (r[0][0] > r[1][1] && r[0][0] > r[2][2]) { const s = Math.sqrt(1 + r[0][0] - r[1][1] - r[2][2]) * 2; q = [0.25 * s, (r[0][1] + r[1][0]) / s, (r[0][2] + r[2][0]) / s, (r[2][1] - r[1][2]) / s]; }
+      else if (r[1][1] > r[2][2]) { const s = Math.sqrt(1 + r[1][1] - r[0][0] - r[2][2]) * 2; q = [(r[0][1] + r[1][0]) / s, 0.25 * s, (r[1][2] + r[2][1]) / s, (r[0][2] - r[2][0]) / s]; }
+      else { const s = Math.sqrt(1 + r[2][2] - r[0][0] - r[1][1]) * 2; q = [(r[0][2] + r[2][0]) / s, (r[1][2] + r[2][1]) / s, 0.25 * s, (r[1][0] - r[0][1]) / s]; }
+      const repouso = qNorm(qInv(qNorm(q)));   // inversa da IBM = orientação de repouso no mundo
+      const D = qMul(mundo(iH), qInv(repouso));
+      const v = vRot(D, [0, 0, 1]);
+      const guinada = Math.atan2(v[0], v[2]) * 180 / Math.PI;
+      json.nodes[iH].rotation = giraNoMundo(iH, qEixo([0, 1, 0], -guinada));
+      console.log(`cabeça: estava virada ${guinada.toFixed(0)}° de lado; agora olha para a frente`);
+    }
+  }
+}
+
 // --- 3. os clips do contrato, em cima da pose ---
 json.animations = [];
 function clipDe(nome, faixas) {

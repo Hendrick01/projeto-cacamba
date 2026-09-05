@@ -1903,3 +1903,6 @@ if (!sessao) {
   conecta();
   requestAnimationFrame(quadro);
 }
+
+// para olhar de fora (console), como o provador: os assentos, a cena e a câmera
+window.mesa3d = { assentos, scene, camera };
