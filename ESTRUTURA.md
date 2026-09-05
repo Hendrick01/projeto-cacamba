@@ -739,6 +739,20 @@ perto de você ficava fora dele e saía um retângulo escuro no feltro no
 celular em pé. O feltro verde e o aro de madeira ficam — são a identidade
 da mesa (a do Capote é amarela).
 
+Segunda passada (mesmo dia; pedido: "cartas com visual e alocação melhor,
+cenário condizente com os personagens, luz um pouco mais baixa"): as cartas
+ganharam cantos de verdade (`alphaTest` no material — o desenho já era
+arredondado, mas o canto transparente virava canto cheio) e um fio escuro na
+borda; as pilhas voltaram ao **centro** do tampo e os jogos baixados ficam
+num **anel** em volta delas, cada um na frente da própria cadeira (fileira
+da frente a 0,78 m, a de trás a 0,52, os seus a 0,72), com o conjunto de
+cada um encolhendo para caber no vão entre vizinhos (nunca abaixo de 0,45).
+O cenário passou ao mesmo sombreamento em degraus dos personagens
+(`MeshToonMaterial` em vez de Lambert), com madeira de veio nas tábuas,
+sinuca e tacos, cores menos saturadas e um grão fino na parede e no piso —
+cor lisa ao lado de textura assada parecia papel. Ambiente de 1,6 para 1,15,
+luminárias de 14 para 9, foco 80, exposição 1,0.
+
 **Os oito sentados** (2026-09-05): o usuário refez e rigou os oito, mas os
 arquivos vieram só com repouso, andar e correr. `modelo-senta.mjs` ganhou
 `--pose`: a pose sentada da EstereX do dia anterior viaja para cada um como

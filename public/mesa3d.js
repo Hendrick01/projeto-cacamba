@@ -115,7 +115,7 @@ renderer.shadowMap.autoUpdate = false;
 // Mapeamento tonal neutro: a lâmpada forte deixava o feltro estourado no meio;
 // o Neutral segura o branco sem lavar o âmbar da paleta (o ACES lava).
 renderer.toneMapping = THREE.NeutralToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.0;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x17100a);
@@ -143,14 +143,14 @@ const OLHO = { x: 0, y: 1.2, z: 1.35 };   // a sua cabeça, sentada na sua cadei
 // A lâmpada é a mesma decisão de luz do jogo inteiro: uma fonte só, a pino
 // sobre o meio. O foco ilumina o feltro; o ambiente quente e fraco é o que
 // sobra refletido no salão.
-scene.add(new THREE.AmbientLight(0xc9a982, 1.6));   // bar claro (2026-09-05): era penumbra 0x9a7850 a 1,05
+scene.add(new THREE.AmbientLight(0xc9a982, 1.15));   // bar claro (2026-09-05): era penumbra 0x9a7850 a 1,05; baixou de 1,6 a pedido
 // O reflexo do feltro: uma luz fraca vinda do lado da câmera, para o elenco do
 // outro lado não ficar só silhueta — o foco da lâmpada ilumina a mesa, não os
 // rostos.
 const reflexo = new THREE.DirectionalLight(0xffe2a8, 0.85);
 reflexo.position.set(0, 2.4, 5);
 scene.add(reflexo);
-const foco = new THREE.SpotLight(0xffe2a8, 90, 14, 0.72, 0.55, 1.6);
+const foco = new THREE.SpotLight(0xffe2a8, 80, 14, 0.72, 0.55, 1.6);
 // Um palmo fora do eixo, para o lado da câmera: exatamente a pino, o que está
 // encostado no tampo não projeta nada e a sombra dura sumia. Assim ela cai
 // para trás dos objetos, curta, e continua lendo como uma lâmpada só.
@@ -170,11 +170,12 @@ scene.add(foco, foco.target);
   // o rejunte; a neblina escurece o que está longe
   const tex = texturaDeCanvas(256, 256, (ctx) => {
     for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
-      ctx.fillStyle = (i + j) % 2 ? '#5a3b25' : '#d9c8a6';
+      ctx.fillStyle = (i + j) % 2 ? '#4f3623' : '#c8b896';
       ctx.fillRect(i * 128, j * 128, 128, 128);
     }
     ctx.strokeStyle = 'rgba(60,40,25,0.45)'; ctx.lineWidth = 4;
     ctx.strokeRect(2, 2, 252, 252); ctx.beginPath(); ctx.moveTo(128, 0); ctx.lineTo(128, 256); ctx.moveTo(0, 128); ctx.lineTo(256, 128); ctx.stroke();
+    chuvisco(ctx, 256, 256, 10, 11);
   });
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(14, 14);
   const chao = new THREE.Mesh(
@@ -382,6 +383,7 @@ const materialVidro = new THREE.MeshStandardMaterial({
     for (let x = 0; x <= 1024; x += 40) {
       ctx.beginPath(); ctx.moveTo(x, 140); ctx.lineTo(x, 256); ctx.stroke();
     }
+    chuvisco(ctx, 1024, 256, 9, 5);   // grão: ao lado de personagens com textura, cor lisa parecia papel
   });
   parede.wrapS = THREE.RepeatWrapping;
   parede.repeat.set(6, 1);
@@ -404,7 +406,7 @@ const materialVidro = new THREE.MeshStandardMaterial({
     calha.position.set(x, 3.12, z); calha.rotation.y = ang;
     const tubo = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.03, 0.12), mTubo);
     tubo.position.set(x, 3.07, z); tubo.rotation.y = ang;
-    const luz = new THREE.PointLight(0xfff1d6, 14, 9, 1.6);
+    const luz = new THREE.PointLight(0xfff1d6, 9, 9, 1.6);
     luz.position.set(x, 2.95, z);
     scene.add(calha, tubo, luz);
   }
@@ -464,7 +466,10 @@ const materialVidro = new THREE.MeshStandardMaterial({
 {
   const R = 5.0;
   const noBar = (ang, y, raio = R) => new THREE.Vector3(Math.sin(ang) * raio, y, -Math.cos(ang) * raio);
-  const lambert = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
+  // o mesmo sombreamento em degraus dos personagens: cenário e elenco na
+  // mesma língua (era Lambert liso, e os objetos pareciam de outro jogo)
+  const lambert = (color, extra = {}) => new THREE.MeshToonMaterial({ color, gradientMap: GRADIENTE_TOON, ...extra });
+  const madeira = (rep = 2) => new THREE.MeshStandardMaterial({ map: texturaMadeira(rep), roughness: 0.6, metalness: 0.02 });
   const bar = new THREE.Group();
   const CORES_GARRAFA = [0x7a3b12, 0x2f6b3a, 0xd9a441, 0xe8e2d0, 0xb4312a, 0x3f7d9c];
   const garrafa = (cor, alt = 0.24) => {
@@ -504,14 +509,14 @@ const materialVidro = new THREE.MeshStandardMaterial({
     g.rotation.y = ang;
     bar.add(g);
   };
-  geladeira(-0.78, 0xc23a2a);
-  geladeira(-1.0, 0xe0b52a);
+  geladeira(-0.78, 0xa8382c);
+  geladeira(-1.0, 0xc29a3a);
 
   // prateleira de garrafas na parede
   {
     const g = new THREE.Group();
     for (const y of [1.55, 1.95]) {
-      const tabua = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.04, 0.26), lambert(0x6b4425));
+      const tabua = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.04, 0.26), madeira(3));
       tabua.position.set(0, y, 0);
       g.add(tabua);
       for (let i = 0; i < 12; i++) {
@@ -561,20 +566,20 @@ const materialVidro = new THREE.MeshStandardMaterial({
     m.rotation.y = ang;
     bar.add(m);
   };
-  cartaz(0.22, 2.1, '#b4312a', [['CERVEJA', 44, 110], ['GELADA', 44, 165], ['R$ 9,99', 40, 250]]);
-  cartaz(0.5, 2.15, '#2f6b3a', [['SINUCA', 46, 120], ['a ficha', 30, 180], ['R$ 5', 44, 250]]);
-  cartaz(-0.62, 2.1, '#d9a441', [['CAÇAMBA', 40, 110], ['toda', 30, 165], ['sexta', 44, 240]], '#3d2c07');
+  cartaz(0.22, 2.1, '#9c3a30', [['CERVEJA', 44, 110], ['GELADA', 44, 165], ['R$ 9,99', 40, 250]]);
+  cartaz(0.5, 2.15, '#3a6b45', [['SINUCA', 46, 120], ['a ficha', 30, 180], ['R$ 5', 44, 250]]);
+  cartaz(-0.62, 2.1, '#c9a24e', [['CAÇAMBA', 40, 110], ['toda', 30, 165], ['sexta', 44, 240]], '#3d2c07');
 
   // a mesa de sinuca ao fundo, e os tacos na parede
   {
     const g = new THREE.Group();
     const tampo = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.12, 1.1), lambert(0x2f8a4a));
     tampo.position.y = 0.8;
-    const moldura = new THREE.Mesh(new THREE.BoxGeometry(2.16, 0.14, 1.26), lambert(0x5a3720));
+    const moldura = new THREE.Mesh(new THREE.BoxGeometry(2.16, 0.14, 1.26), madeira(3));
     moldura.position.y = 0.75;
     g.add(moldura, tampo);
     for (const [x, z] of [[-0.95, -0.5], [0.95, -0.5], [-0.95, 0.5], [0.95, 0.5]]) {
-      const pe = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), lambert(0x4a2c18));
+      const pe = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), madeira(1));
       pe.position.set(x, 0.35, z);
       g.add(pe);
     }
@@ -587,7 +592,7 @@ const materialVidro = new THREE.MeshStandardMaterial({
     g.rotation.y = 0.3;
     bar.add(g);
     for (let i = 0; i < 3; i++) {
-      const taco = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.014, 1.45, 6), lambert(0x9b6b3a));
+      const taco = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.014, 1.45, 6), madeira(1));
       taco.position.copy(noBar(0.12 + i * 0.05, 1.5, R - 0.05));
       taco.rotation.y = 0.12 + i * 0.05;
       taco.rotation.z = 0.05;
@@ -724,7 +729,8 @@ function materialDaCarta(card) {
   // Fora do mapeamento tonal: a carta é desenho, e o mapeamento lavava o
   // vermelho dos naipes para rosa. A luz continua batendo nela — e o Standard
   // com rugosidade média dá o brilho de verniz que a carta plastificada tem.
-  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: false });
+  // alphaTest: os cantos arredondados do desenho viram cantos de verdade
+  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: false, alphaTest: 0.5 });
   texturasDeCarta.set(chave, mat);
   // O retrato das figuras chega depois (a imagem é assíncrona): desenha de
   // novo por cima quando carregar.
@@ -751,6 +757,9 @@ function desenhaFrente(ctx, card) {
   }
   ctx.fillStyle = g;
   ctx.fill();
+  // um fio escuro na borda: separa a carta do feltro e da carta de baixo
+  ctx.strokeStyle = 'rgba(70,52,34,0.42)'; ctx.lineWidth = 5;
+  arredondado(ctx, 2.5, 2.5, W - 5, H - 5, 20); ctx.stroke();
 
   const cor = joker ? '#33240a' : (SUIT_RED[card.suit] ? '#c93a3a' : '#232a33');
   const rank = joker ? 'C' : rankLabel(card.rank);
@@ -831,7 +840,7 @@ const materialVerso = (() => {
     arredondado(ctx, 4, 4, 120, 172, 10);
     ctx.stroke();
   });
-  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: false });
+  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: false, alphaTest: 0.5 });
 })();
 const materialBorda = new THREE.MeshStandardMaterial({ color: 0xcbc2ae, roughness: 0.85, metalness: 0, toneMapped: false });
 
@@ -1345,13 +1354,13 @@ const monte = (() => {
   );
   caixa.scale.set(ESCALA_TAMPO, 1, ESCALA_TAMPO);
   caixa.castShadow = true;
-  caixa.position.set(-0.28, MESA_TOPO, 0.12);
+  caixa.position.set(-0.2, MESA_TOPO, 0);
   scene.add(caixa);
   const sombra = sombraDeContato(0.42, 0.55);
-  sombra.position.x = -0.28; sombra.position.z = 0.12;
+  sombra.position.x = -0.2; sombra.position.z = 0;
   scene.add(sombra);
   const num = rotulo('', 'rgba(27,17,11,0.85)', '#9dbbad');
-  num.position.set(-0.28, MESA_TOPO + 0.2, 0.27);
+  num.position.set(-0.2, MESA_TOPO + 0.2, 0.15);
   num.scale.set(0.3, 0.09, 1);
   scene.add(num);
   return { caixa, num };
@@ -1359,11 +1368,11 @@ const monte = (() => {
 
 const descarte = (() => {
   const grupo = new THREE.Group();
-  grupo.position.set(0.28, 0, 0.12);
+  grupo.position.set(0.2, 0, 0);
   scene.add(grupo);
   // fora do grupo, que é esvaziado a cada carta nova
   const sombra = sombraDeContato(0.42, 0.55);
-  sombra.position.x = 0.28; sombra.position.z = 0.12;
+  sombra.position.x = 0.2; sombra.position.z = 0;
   scene.add(sombra);
   return { grupo, topoId: null };
 })();
@@ -1780,7 +1789,7 @@ async function sincroniza(primeira) {
     monte.caixa.scale.y = alturaMonte / 0.2;
     monte.caixa.position.y = MESA_TOPO + alturaMonte / 2;
     // o número senta na caixa; solto no ar ele era mais uma coisa flutuando
-    monte.num.position.set(-0.28, MESA_TOPO + alturaMonte + 0.06, 0.17);
+    monte.num.position.set(-0.2, MESA_TOPO + alturaMonte + 0.06, 0.05);
 
     // Descarte: a pilha deitada e a carta do topo DEITADA sobre ela — como numa
     // mesa de verdade (decisão do usuário, 2026-09-04). O que a torna legível
@@ -1826,11 +1835,16 @@ async function sincroniza(primeira) {
       if (!p.melds?.length) continue;
       const meu = p.id === me();
       const idx = outros.indexOf(p);
-      const pos = meu ? { x: 0, z: ASSENTO_RAIO } : posicaoDoAssento(idx, outros.length);
+      const pos = meu ? { x: 0, z: ASSENTO_RAIO, ang: Math.PI } : posicaoDoAssento(idx, outros.length);
       const frente = new THREE.Group();
-      // Os jogos dos outros ficam na faixa do feltro na frente de cada um,
-      // entre a borda e o meio; os seus, junto da sua borda.
-      frente.position.set(pos.x * 0.5, 0, meu ? 0.72 : pos.z * 0.5 + 0.08);
+      // Os jogos ficam num ANEL em volta das pilhas do centro, cada um na
+      // frente da própria cadeira: a fileira da frente a 0,78 m do centro, a
+      // de trás (mesa cheia) mais para dentro, a 0,52. Os seus, junto da sua
+      // borda. Antes ficavam onde caíssem da posição do assento, e o monte
+      // se enfiava no meio deles.
+      const fundo = !meu && outros.length > 4 && idx % 2 === 1;
+      const raioJogos = meu ? 0.72 : fundo ? 0.52 : 0.78;
+      frente.position.set(Math.sin(pos.ang) * raioJogos, 0, -Math.cos(pos.ang) * raioJogos);
 
       const passoCarta = 0.08;
       const vaoEntreJogos = 0.07;
@@ -1855,8 +1869,11 @@ async function sincroniza(primeira) {
       const sombra = sombraDeContato(total + 0.15, 0.35);
       sombra.position.z = 0.03;
       frente.add(sombra);
-      // mesa cheia de jogos: encolhe o conjunto em vez de estourar o feltro
-      if (total > 1.3) frente.scale.setScalar(1.3 / total);
+      // mesa cheia de jogos: encolhe o conjunto em vez de estourar o feltro —
+      // e, com vizinhos no anel, cabe no vão entre eles (nunca abaixo de 0,45)
+      const vao = meu || outros.length < 2 ? 1.3 : Math.max(0.45, raioJogos * (2 * (camera.aspect < 1 ? 0.58 : 0.96) / Math.max(1, outros.length - 1)) * 1.7);
+      const limite = Math.min(1.3, vao);
+      if (total > limite) frente.scale.setScalar(limite / total);
       jogosNaMesa.add(frente);
       // jogo novo de quem acabou de baixar: a fileira inteira voa do assento
       // dele (ou da frente da sua cadeira) até o lugar — o grupo, não carta
