@@ -23,9 +23,11 @@ const pos = args.filter((a) => !a.startsWith('--') && !/^[A-Za-z]+=/.test(a));
 const [fonte, saida] = pos;
 let clipNome = 'Stand_to_Sit_Transition_M';
 const giros = {};
-const miras = { LeftForeArm: [0.21, 0.72, 0.10], RightForeArm: [-0.21, 0.72, 0.10], LeftHand: [0.07, 0.86, 0.27], RightHand: [-0.07, 0.86, 0.27] };
+const miras = { LeftForeArm: [0.20, 0.72, 0.10], RightForeArm: [-0.20, 0.72, 0.10], LeftHand: [0.05, 0.84, 0.26], RightHand: [-0.05, 0.84, 0.26] };
+const opc = { recuo: 0.12, desce: 0.06, cintura: null };   // metros: quadril para trás e para baixo até as coxas apoiarem; cintura = de onde para cima a perna não puxa
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--clip') clipNome = args[++i];
+  else if (['--recuo', '--desce', '--cintura'].includes(args[i])) opc[args[i].slice(2)] = Number(args[++i]);
   else if (args[i] === '--gira') { const [osso, v] = args[++i].split('='); giros[osso] = v.split(',').map(Number); }
   else if (args[i] === '--mira') { const [junta, v] = args[++i].split('='); miras[junta] = v === '-' ? null : v.split(',').map(Number); }
 }
@@ -66,9 +68,40 @@ for (const ch of clip.channels) {
   const ultimo = Array.from(out.arr.slice((out.count - 1) * out.n, out.count * out.n));
   json.nodes[ch.target.node][ch.target.path] = ultimo;
 }
-// sentada NA ORIGEM: o clip anda até a cadeira; fica só a descida do quadril
-hips.translation = [hipsRepouso[0], hips.translation[1], hipsRepouso[2]];
-console.log(`pose assada de "${clipNome}"; quadril desceu de ${hipsRepouso[1].toFixed(1)} para ${hips.translation[1].toFixed(1)} (unidades do rig)`);
+// sentada NA ORIGEM: o clip anda até a cadeira; fica só a descida do quadril.
+// E recua/desce mais um pouco (--recuo/--desce, em metros): o clip senta na
+// beirada, e a banqueta da mesa quer as coxas apoiadas no assento
+const escalaRaiz0 = (() => { const r = json.nodes.find((n) => n.name === 'Armature') || json.nodes[json.scenes[0].nodes[0]]; return (r.scale || [1, 1, 1])[1]; })();
+hips.translation = [hipsRepouso[0], hips.translation[1] - opc.desce / escalaRaiz0, hipsRepouso[2] - opc.recuo / escalaRaiz0];
+console.log(`pose assada de "${clipNome}"; quadril desceu de ${hipsRepouso[1].toFixed(1)} para ${hips.translation[1].toFixed(1)} (unidades do rig), recuou ${opc.recuo} m e desceu mais ${opc.desce} m`);
+
+// --- 1b. a pele da cintura não desce com a coxa: acima da cintura, os ossos
+// da perna perdem o peso (o rigger automático espalha o peso da coxa até a
+// barriga; com a coxa a 90°, isso vira uma mancha de pele por cima da calça)
+{
+  const prim = json.meshes[0].primitives[0];
+  const P = le(prim.attributes.POSITION).arr;
+  const aJ = json.accessors[prim.attributes.JOINTS_0], aW = json.accessors[prim.attributes.WEIGHTS_0];
+  const bvJ = json.bufferViews[aJ.bufferView], bvW = json.bufferViews[aW.bufferView];
+  if (aJ.componentType === 5121 && aW.componentType === 5126 && !bvJ.byteStride && !bvW.byteStride) {
+    const J = new Uint8Array(bin.buffer, bin.byteOffset + (bvJ.byteOffset || 0) + (aJ.byteOffset || 0), aJ.count * 4);
+    const W = new Float32Array(bin.buffer, bin.byteOffset + (bvW.byteOffset || 0) + (aW.byteOffset || 0), aW.count * 4);
+    const nomesOssos = json.skins[0].joints.map((i) => json.nodes[i].name);
+    const perna = new Set(nomesOssos.map((n, i) => [n, i]).filter(([n]) => /UpLeg|Leg|Foot|ToeBase/.test(n)).map(([, i]) => i));
+    const iHips = Math.max(0, nomesOssos.indexOf('Hips'));
+    const cintura = opc.cintura ?? (hipsRepouso[1] * escalaRaiz0 - 0.05);
+    let mexidos = 0;
+    for (let v = 0; v < aJ.count; v++) {
+      if (P[v * 3 + 1] < cintura) continue;
+      let tirou = 0, resto = 0;
+      for (let k = 0; k < 4; k++) { if (perna.has(J[v * 4 + k]) && W[v * 4 + k] > 0) { tirou += W[v * 4 + k]; W[v * 4 + k] = 0; } else resto += W[v * 4 + k]; }
+      if (!tirou) continue;
+      mexidos++;
+      if (resto > 0) { for (let k = 0; k < 4; k++) W[v * 4 + k] /= resto; } else { J[v * 4] = iHips; W[v * 4] = 1; }
+    }
+    console.log(`cintura em ${cintura.toFixed(2)} m: ${mexidos} vértices deixaram de seguir a perna`);
+  } else console.log('aviso: pesos num formato inesperado; a cintura ficou como veio');
+}
 
 // --- 2. orientação de cada osso no mundo (pose assada), para girar em eixos do mundo ---
 function mundo(i) { const n = json.nodes[i]; const local = n.rotation || [0, 0, 0, 1]; return pai[i] == null ? local : qMul(mundo(pai[i]), local); }
@@ -101,7 +134,8 @@ const mirasOrdenadas = Object.entries(miras).filter(([, alvo]) => alvo).sort((a,
 for (const [junta, alvoM] of mirasOrdenadas) {
   const iJ = no(junta); if (iJ < 0 || pai[iJ] == null) { console.log(`aviso: junta ${junta} não existe`); continue; }
   const iOsso = pai[iJ];
-  const alvo = alvoM.map((v) => v / raizEscala);
+  // os pontos são dados para o corpo na origem; acompanham o recuo/descida
+  const alvo = [alvoM[0], alvoM[1] - opc.desce, alvoM[2] - opc.recuo].map((v) => v / raizEscala);
   const base = posMundo(iOsso), ponta = posMundo(iJ);
   const D = entreVetores(norm(sub(ponta, base)), norm(sub(alvo, base)));
   json.nodes[iOsso].rotation = giraNoMundo(iOsso, D);

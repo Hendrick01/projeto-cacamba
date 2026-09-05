@@ -663,7 +663,13 @@ na ponta dos dedos, nas unidades do rig (centímetros, com a raiz em escala
 0,01 — a altura em metros enganava). O que o usuário viu como "mãos nas
 pernas" era a pose final do clip, com as mãos nas coxas: rig e textura
 estavam certos (UVs idênticas às da escultura, pesos das mãos só em ossos de
-mão e antebraço).
+mão e antebraço). Segunda rodada, com o olhar do usuário: o clip senta na
+beirada, então o quadril recua 12 cm e desce 6 cm (`--recuo`/`--desce`) até
+as coxas apoiarem; acima da cintura os ossos da perna perdem o peso
+(`--cintura`; 2.081 vértices da barriga e do cós seguiam a coxa e viravam
+uma mancha de pele na calça); e o leque de um modelo entra nas palmas,
+4 cm abaixo da ponta dos dedos e inclinado −0,5 rad para o rosto, porque sem
+ossos de dedo é a posição que faz parecer segurado.
 
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a

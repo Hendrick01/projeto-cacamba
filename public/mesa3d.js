@@ -1002,8 +1002,12 @@ function criaAssento(p) {
       assento.ref.corpo = m.raiz;             // respiro e pulo passam a mover o modelo
       assento.ref.materiais = m.materiais;    // e o esmaecer de quem cai também
       assento.ref.cara = null;
-      assento.ref.leque.position.copy(m.posLeque);
-      assento.ref.lequeBase = m.posLeque.clone();
+      // o leque entra nas palmas: um pouco abaixo da ponta dos dedos e
+      // inclinado para o rosto, como quem lê as cartas (o rig não tem dedos
+      // para fechar a mão; é a posição que faz parecer segurado)
+      assento.ref.lequeBase = m.posLeque.clone().add(new THREE.Vector3(0, -0.04, 0.02));
+      assento.ref.leque.position.copy(assento.ref.lequeBase);
+      assento.ref.leque.rotation.x = -0.5;
       // cartas em escala humana nas mãos de um modelo: o leque do boneco de
       // código é exagerado de propósito (mãos de desenho), numa escultura
       // fica gigante. O selo compensa para continuar legível.

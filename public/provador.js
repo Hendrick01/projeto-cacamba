@@ -200,7 +200,7 @@ function poeNaCena(gltf, nome) {
   if (atual?.m) { atual.m.mixer?.stopAllAction(); limpa(atual.m.raiz); }
   const m = encaixaModelo(gltf, nome, { estilo, avisa: false });
   palco.add(m.raiz);
-  leque.position.copy(m.posLeque); leque.visible = true;
+  leque.position.copy(m.posLeque).add(new THREE.Vector3(0, -0.04, 0.02)); leque.rotation.x = -0.5; leque.visible = true;   // como na mesa: nas palmas, inclinado para o rosto
   bocaFala.position.set(0, m.alturaCabeca - 0.07, 0.16); bocaFala.visible = false;
   atual = { ...atual, nome, m };
   mostraItens(confereModelo(gltf, m));

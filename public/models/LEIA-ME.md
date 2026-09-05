@@ -125,7 +125,14 @@ os padrões servem a um rig humano), apaga os clips de andar e cria os três
 do contrato em cima da pose nova: `idle` (respiro), `feliz` (aceno de
 cabeça), `bravo` (balanço de cabeça). `--gira Osso=x,y,z` gira um osso em
 graus nos eixos do mundo — serve para endireitar o tronco, que esse clip
-deixa torcido. Depois, `--altura 0` no preparo: um modelo sentado não pode
+deixa torcido. O quadril recua e desce um pouco (`--recuo 0.12 --desce
+0.06`, em metros): o clip senta na beirada, e a banqueta quer as coxas
+apoiadas. E acima da cintura (`--cintura`, padrão 5 cm abaixo do osso do
+quadril) os ossos da perna perdem o peso: o rigger automático espalha o
+peso da coxa até a barriga, e com a coxa a 90° isso virava uma mancha de pele
+por cima da calça. Na mesa, o leque de um modelo entra nas palmas, 4 cm
+abaixo da ponta dos dedos e inclinado para o rosto — o rig não tem dedos
+para fechar a mão; é a posição que faz parecer segurado. Depois, `--altura 0` no preparo: um modelo sentado não pode
 ser medido pela caixa. E como o arquivo traz o nó `Cabeca`, a mesa confia
 na escala dele em vez de normalizar (um sentado normalizado para 1,55 m
 viraria uma gigante).
