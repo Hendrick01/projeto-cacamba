@@ -17,7 +17,7 @@
 // ============================================================================
 
 import * as THREE from './vendor/three.module.js';
-import { MESA, conectaLeque, arrumaLeque, atualizaInteracao, ajustaBanqueta, gestoCarta } from './interacao3d.js';
+import { MESA, ESCALA_CARTA_MAO, conectaLeque, arrumaLeque, atualizaInteracao, ajustaBanqueta, gestoCarta } from './interacao3d.js';
 import { iluminaSala, criaMesa, criaSala } from './cenario3d.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
@@ -154,8 +154,11 @@ const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 40);
 // legíveis de lado.
 const MESA_TOPO = 0.76;
 const MESA_RAIO = 1.15;          // o feltro; o aro vai a 1,2
-const ASSENTO_RAIO = MESA.assento;        // a cadeira: as coxas entram sob o tampo
-const ASSENTO_RAIO_FUNDO = 2.25; // segunda fileira, com cinco ou mais
+// A roda de cadeiras: encostada na mesa com poucos (raio mínimo), e abrindo
+// só o necessário para 78 cm entre vizinhos quando a mesa enche — com sete
+// adversários a roda vai a 1,8 m e a câmera recua para caber todos.
+const raioDosAssentos = (total) => Math.max(MESA.assento, (total - 1) * 0.30);
+let ASSENTO_RAIO = MESA.assento;
 const ESCALA_TAMPO = 0.55;       // monte, descarte e jogos, em relação à carta da mão
 const OLHO = { x: 0, y: 1.2, z: 1.35 };   // a sua cabeça, sentada na sua cadeira
 
@@ -827,7 +830,6 @@ function carregaModelo(slug) {
 
 
 const LEQUE_MAX = 9;   // cartas viradas no leque de um adversário; o selo diz o número exato
-const LEQUE_ESCALA_MODELO = 0.55;   // o leque encolhe nas mãos de um modelo externo (escala humana)
 function criaAssento(p) {
   const slug = personagemDe(p);
   const grupo = new THREE.Group();
@@ -882,11 +884,13 @@ function criaAssento(p) {
       assento.ref.materiais = m.materiais;    // e o esmaecer de quem cai também
       assento.ref.cara = null;
       const cartaAtiva = new THREE.Mesh(geoCarta, materialVerso);
-      cartaAtiva.scale.setScalar(0.19);
+      cartaAtiva.scale.setScalar(ESCALA_CARTA_MAO);
       conectaLeque(m, assento.ref.leque, cartaAtiva);
       arrumaLeque(assento.ref.leque, p.handCount || 5);
-      assento.ref.contagem.position.set(0.16, 0.03, 0.025);
-      assento.ref.contagem.scale.set(0.12, 0.045, 1);
+      // o selo com a contagem sobe para o canto de cima do leque, do lado da
+      // outra mão, onde não tampa carta nem dedo
+      assento.ref.contagem.position.set(-0.1, 0.19, 0.03);
+      assento.ref.contagem.scale.set(0.13, 0.05, 1);
       atualizaInteracao(m, 0, { parado: true });
       assento.ref.bocaBase = bocas.aberta.position.clone();   // a boca está no grupo, e gira com o corpo no quadro
       assento.ref.nome.position.y = m.alturaCabeca + 0.34;
@@ -939,25 +943,29 @@ function criaAssento(p) {
   nome.scale.set(0.46, 0.124, 1);
   grupo.add(nome);
 
-  // foco da vez: um disco de luz no chão, que pulsa
-  // copinhos de bar no tampo, à direita de cada um (referência do Capote)
-  for (const [cx, cz] of [[0.3, ASSENTO_RAIO - MESA_RAIO + 0.12], [0.38, ASSENTO_RAIO - MESA_RAIO + 0.2]]) {
+  // copinhos de bar no tampo, à direita de cada um (referência do Capote), e
+  // o foco da vez no TAMPO, na frente da cadeira (no chão ficaria escondido
+  // sob a mesa). Os dois ficam num grupo preso à beirada do feltro: a roda de
+  // cadeiras abre e fecha com a mesa, e `naBeirada` os põe sempre no lugar.
+  const naBeirada = new THREE.Group();
+  for (const [cx, cz] of [[0.3, 0.12], [0.38, 0.2]]) {
     const copinho = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.06, 12, 1, true), materialVidro);
     copinho.position.set(cx, MESA_TOPO + 0.03, cz);
-    grupo.add(copinho);
+    naBeirada.add(copinho);
   }
-  // no TAMPO, na frente da cadeira (no chão ficaria escondido sob a mesa)
   const focoVez = new THREE.Mesh(
     new THREE.CircleGeometry(0.24, 24),
     new THREE.MeshBasicMaterial({ color: 0xf2c14e, transparent: true, opacity: 0, depthWrite: false }),
   );
   focoVez.rotation.x = -Math.PI / 2;
-  focoVez.position.set(0, MESA_TOPO + 0.006, ASSENTO_RAIO - MESA_RAIO + 0.2);
+  focoVez.position.set(0, MESA_TOPO + 0.006, 0.2);
   focoVez.scale.y = 0.6;
-  grupo.add(focoVez);
+  naBeirada.add(focoVez);
+  naBeirada.position.z = ASSENTO_RAIO - MESA_RAIO;
+  grupo.add(naBeirada);
 
   scene.add(grupo);
-  const ref = { grupo, corpo, materiais, bocas, cara, leque, contagem, nome, focoVez, cadeira, pulo: 0, caraAte: 0, assento, tAnterior: 0, lequeBase: leque.position.clone(), bocaBase: null, giroAlvo: 0 };
+  const ref = { grupo, corpo, materiais, bocas, cara, leque, contagem, nome, focoVez, naBeirada, cadeira, pulo: 0, caraAte: 0, assento, tAnterior: 0, lequeBase: leque.position.clone(), bocaBase: null, giroAlvo: 0 };
   assento.ref = ref;
   return ref;
 }
@@ -965,9 +973,10 @@ function criaAssento(p) {
 // os adversários sentam no arco do outro lado; você fica na câmera
 function posicaoDoAssento(indice, total) {
   // Uma única roda de cadeiras, com distância mínima de 78 cm entre centros.
-  const passo = 2 * Math.asin(0.78 / (2 * ASSENTO_RAIO));
+  const raio = raioDosAssentos(total);
+  const passo = 2 * Math.asin(0.78 / (2 * raio));
   const ang = (indice - (total - 1) / 2) * Math.max(passo, total < 4 ? 0.6 : passo);
-  return { x: Math.sin(ang) * ASSENTO_RAIO, z: -Math.cos(ang) * ASSENTO_RAIO, ang };
+  return { x: Math.sin(ang) * raio, z: -Math.cos(ang) * raio, ang };
 }
 
 // ---------------------------------------------------------------------------
@@ -1380,6 +1389,7 @@ async function sincroniza(primeira) {
     if (primeira) $('aviso').hidden = true;
 
     const outros = view.players.filter((p) => p.id !== me());
+    ASSENTO_RAIO = raioDosAssentos(outros.length);
     ajustaCameraParaAssentos(outros.length);
     for (const [id, a] of assentos) {
       if (!outros.some((p) => p.id === id)) { scene.remove(a.grupo); assentos.delete(id); }
@@ -1392,6 +1402,7 @@ async function sincroniza(primeira) {
       a.grupo.position.set(pos.x, 0, pos.z);
       // A frente +Z de cada personagem aponta para o centro da mesa.
       a.grupo.rotation.y = -pos.ang;
+      a.naBeirada.position.z = ASSENTO_RAIO - MESA_RAIO;
 
       trocaRotulo(a.contagem, `${p.handCount}`);
       trocaRotulo(a.nome, view.claims?.includes(p.id) ? `🛒 ${p.name}` : p.name);
@@ -1496,7 +1507,7 @@ async function sincroniza(primeira) {
       if (!p.melds?.length) continue;
       const meu = p.id === me();
       const idx = outros.indexOf(p);
-      const pos = meu ? { x: 0, z: ASSENTO_RAIO, ang: Math.PI } : posicaoDoAssento(idx, outros.length);
+      const pos = meu ? { x: 0, z: MESA.assento, ang: Math.PI } : posicaoDoAssento(idx, outros.length);
       const frente = new THREE.Group();
       // Os jogos ficam num ANEL em volta das pilhas do centro, cada um na
       // frente da própria cadeira: a fileira da frente a 0,78 m do centro, a
@@ -1613,7 +1624,7 @@ function reageAoEvento(ev) {
         if (a.assento?.modelo) {
           gestoCarta(a.assento.modelo, 'comprar', de);
           const destino = a.grupo.localToWorld(new THREE.Vector3(-0.1, 0.91, 0.53));
-          m.scale.setScalar(0.19);
+          m.scale.setScalar(ESCALA_CARTA_MAO);
           voa(m, de, destino, { dur: 430, arco: 0.015, paraAtual: () => pontoDaMaoAtiva(a), aoFim: () => scene.remove(m) });
         } else voa(m, de, lequeDe(a), { dur: 420, aoFim: () => scene.remove(m) });
       }
@@ -1849,4 +1860,4 @@ if (!sessao) {
 }
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
-window.mesa3d = { assentos, scene, camera };
+window.mesa3d = { assentos, scene, camera, renderer, quadro };

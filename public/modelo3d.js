@@ -173,25 +173,32 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
   return modelo;
 }
 
-// A banqueta do assento: madeira escura com a almofada na cor do assento.
-// Mora aqui porque o provador precisa dela para julgar a pose (o modelo
-// senta nela) — na mesa, é a cadeira de cada personagem.
-// Dimensões de construção. ajustaBanqueta calcula altura e recuo do modelo.
+// A cadeira de cada assento: a cadeira de plástico do boteco (referência do
+// Capote) — assento e encosto de plástico creme, com o friso de cima na cor do
+// assento do jogador. Mora aqui porque o provador precisa dela para julgar a
+// pose. ajustaBanqueta (interacao3d.js) põe a altura pelo osso do quadril.
 export const BANQUETA_ASSENTO = 0.45;   // cadeira de mesa de jantar (tampo a 0,76 m)
-export function criaBanqueta(corAlmofada) {
+const M_PLASTICO = new THREE.MeshStandardMaterial({ color: 0xf1e8d2, roughness: 0.5, metalness: 0 });
+const G_ASSENTO = new THREE.BoxGeometry(0.44, 0.045, 0.42);
+const G_ENCOSTO = new THREE.BoxGeometry(0.42, 0.34, 0.03);
+const G_FRISO = new THREE.BoxGeometry(0.43, 0.05, 0.045);
+const G_PERNA = new THREE.CylinderGeometry(0.018, 0.026, BANQUETA_ASSENTO, 5);
+const G_TRAVESSA = new THREE.BoxGeometry(0.36, 0.02, 0.02);
+export function criaBanqueta(corFriso) {
   const g = new THREE.Group();
-  const madeira = new THREE.MeshStandardMaterial({ color: 0x5a3720, roughness: 0.6 });
   const A = BANQUETA_ASSENTO;
-  const tampo = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.25, 0.06, 20), madeira);
-  tampo.position.y = A - 0.03; tampo.castShadow = true; g.add(tampo);
-  const almofada = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.27, 0.05, 20), new THREE.MeshStandardMaterial({ color: corAlmofada, roughness: 0.92 }));
-  almofada.position.y = A + 0.025; almofada.castShadow = true; g.add(almofada);
-  for (const [x, z] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) {
-    const pe = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, A - 0.06, 8), madeira);
-    pe.position.set(x, (A - 0.06) / 2, z); pe.castShadow = true; g.add(pe);
+  const assento = new THREE.Mesh(G_ASSENTO, M_PLASTICO);
+  assento.position.y = A + 0.0225; assento.castShadow = true; assento.receiveShadow = true; g.add(assento);
+  const encosto = new THREE.Mesh(G_ENCOSTO, M_PLASTICO);
+  encosto.position.set(0, A + 0.045 + 0.17, -0.205); encosto.rotation.x = -0.14; encosto.castShadow = true; g.add(encosto);
+  const friso = new THREE.Mesh(G_FRISO, new THREE.MeshStandardMaterial({ color: corFriso, roughness: 0.55, metalness: 0 }));
+  friso.position.set(0, A + 0.045 + 0.34, -0.23); friso.rotation.x = -0.14; g.add(friso);
+  for (const [x, z] of [[-0.19, -0.18], [0.19, -0.18], [-0.19, 0.18], [0.19, 0.18]]) {
+    const pe = new THREE.Mesh(G_PERNA, M_PLASTICO);
+    pe.position.set(x, A / 2, z); pe.castShadow = true; g.add(pe);
   }
-  const aro = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.014, 8, 24), madeira);
-  aro.rotation.x = Math.PI / 2; aro.position.y = 0.12; g.add(aro);
+  for (const z of [-0.18, 0.18]) { const t = new THREE.Mesh(G_TRAVESSA, M_PLASTICO); t.position.set(0, 0.16, z); g.add(t); }
+  g.userData.alturaAssento = A + 0.045;   // o topo do assento com escala 1: ajustaBanqueta escala a partir daqui
   g.position.z = -0.04;   // um pouco para trás: as pernas sentadas vão para a frente
   return g;
 }

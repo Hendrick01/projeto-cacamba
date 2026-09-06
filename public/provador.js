@@ -297,4 +297,4 @@ function quadro(t) {
 requestAnimationFrame(quadro);
 
 // para olhar de fora (console): o modelo atual, o palco e a cena
-window.provador = { atual: () => atual, palco, scene, camera, carrega, leque };
+window.provador = { atual: () => atual, palco, scene, camera, carrega, leque, renderer, quadro, banqueta };

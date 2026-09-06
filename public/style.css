@@ -997,7 +997,8 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
 .hand .card.nova {
   transform: rotate(var(--giro, 0deg)) translateX(var(--desloca, 0px)) translateY(-14px);
   box-shadow: 0 0 0 2px var(--halo), var(--shadow);
-  z-index: 2;
+  /* Sem z-index: subir a carta já a mostra inteira. Com z-index ela cobria o
+     índice da vizinha da direita — a mão parecia ter perdido uma carta. */
 }
 
 /* A escolhida sai do leque e sobe: fica inteira à vista e vira alvo de toque
