@@ -9,6 +9,7 @@
 // ============================================================================
 
 import * as THREE from './vendor/three.module.js';
+import { preparaDedos } from './dedos3d.js';
 
 // Do chão ao topo da cabeça, sentado. Modelo cru é normalizado para isso.
 export const ALTURA_SENTADO = 1.55;
@@ -58,7 +59,7 @@ function materialDoElenco(m) {
     normalMap: m.normalMap || null,
     normalScale: m.normalScale ? m.normalScale.clone() : undefined,
     gradientMap: GRADIENTE_TOON,
-    transparent: true,
+    transparent: !!m.transparent,
     opacity: m.opacity ?? 1,
     side: m.side ?? THREE.FrontSide,
     alphaTest: m.alphaTest || 0,
@@ -115,7 +116,12 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
       o.material = Array.isArray(o.material) ? o.material.map(materialDoElenco) : materialDoElenco(o.material);
     }
     const ms = Array.isArray(o.material) ? o.material : [o.material];
-    for (const m of ms) { m.transparent = true; materiais.push(m); }
+    o.receiveShadow = true;
+    for (const m of ms) {
+      m.userData.opacityBase = m.opacity;
+      m.userData.transparentBase = m.transparent;
+      materiais.push(m);
+    }
     if (o.morphTargetDictionary) {
       for (const nome of ['feliz', 'bravo', 'bocaAberta']) {
         if (nome in o.morphTargetDictionary && !morfos[nome]) morfos[nome] = { malha: o, indice: o.morphTargetDictionary[nome] };
@@ -158,7 +164,7 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
     });
   }
   if (avisa) console.info(`modelo: ${slug} carregado (altura ${alturaOriginal.toFixed(2)}${preparado ? ', escala do arquivo' : ` → ${ALTURA_SENTADO}`})`);
-  return { raiz, materiais, morfos, mixer, acoes, alturaCabeca, posLeque, alturaOriginal, escala, caixa, sentado: preparado && temEsqueleto };
+  return { dedos: preparaDedos(raiz), raiz, materiais, morfos, mixer, acoes, alturaCabeca, posLeque, alturaOriginal, escala, caixa, sentado: preparado && temEsqueleto };
 }
 
 // A banqueta do assento: madeira escura com a almofada na cor do assento.
@@ -173,11 +179,11 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
 export const BANQUETA_ASSENTO = 0.45;   // cadeira de mesa de jantar (tampo a 0,76 m)
 export function criaBanqueta(corAlmofada) {
   const g = new THREE.Group();
-  const madeira = new THREE.MeshToonMaterial({ color: 0x5a3720, gradientMap: GRADIENTE_TOON });
+  const madeira = new THREE.MeshStandardMaterial({ color: 0x5a3720, roughness: 0.6 });
   const A = BANQUETA_ASSENTO;
   const tampo = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.25, 0.06, 20), madeira);
   tampo.position.y = A - 0.03; tampo.castShadow = true; g.add(tampo);
-  const almofada = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.27, 0.05, 20), new THREE.MeshToonMaterial({ color: corAlmofada, gradientMap: GRADIENTE_TOON }));
+  const almofada = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.27, 0.05, 20), new THREE.MeshStandardMaterial({ color: corAlmofada, roughness: 0.92 }));
   almofada.position.y = A + 0.025; almofada.castShadow = true; g.add(almofada);
   for (const [x, z] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) {
     const pe = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, A - 0.06, 8), madeira);
@@ -230,6 +236,7 @@ export function confereModelo(gltf, m) {
   const maos = no('MaoEsq') && no('MaoDir');
   item(maos ? true : null, maos ? `Nós MaoEsq/MaoDir: o leque entra a ${cm(m.posLeque.y)} do chão, ${cm(m.posLeque.z)} à frente` : 'Sem MaoEsq/MaoDir: o leque fica na posição padrão (1,02 m; 0,17 m à frente)');
 
+  item(m.dedos?.juntas.length ? true : null, m.dedos?.juntas.length ? `${m.dedos.juntas.length} ossos de dedos: use o controle de flexão para conferir as duas mãos` : 'Sem articulação dos dedos');
   for (const nome of ['feliz', 'bravo', 'bocaAberta']) {
     item(m.morfos[nome] ? true : null, (m.morfos[nome] ? 'Morph ' : 'Sem morph ') + nome + (nome === 'bocaAberta' ? (m.morfos[nome] ? ' (a voz move)' : ' (a fala usa a elipse escura)') : ''));
   }

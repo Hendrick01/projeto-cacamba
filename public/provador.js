@@ -9,6 +9,7 @@
 // ============================================================================
 
 import * as THREE from './vendor/three.module.js';
+import { atualizaDedos } from './dedos3d.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { ALTURA_SENTADO, encaixaModelo, confereModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
 import { SLUGS } from '/shared/elenco.js';
@@ -22,12 +23,17 @@ const DIST_ASSENTO = 1.5;        // do centro da mesa à cadeira, como na mesa 3
 // Cena: o mesmo salão, uma cadeira só
 // ---------------------------------------------------------------------------
 const canvas = $('cena');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); }
+catch (error) {
+  const aviso = document.createElement('p'); aviso.textContent = 'O 3D não está disponível neste navegador. Ative a aceleração gráfica ou use outro navegador.';
+  document.body.prepend(aviso); throw error;
+}
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.NeutralToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.0;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1b110b);
@@ -35,8 +41,8 @@ scene.fog = new THREE.Fog(0x1b110b, 7, 16);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 40);
 
 // a lâmpada da mesa: uma fonte só sobre o meio do tampo, mais o reflexo do feltro
-scene.add(new THREE.AmbientLight(0x9a7850, 1.05));
-const reflexo = new THREE.DirectionalLight(0xffe2a8, 0.85);
+scene.add(new THREE.HemisphereLight(0xe3edff, 0x685445, 1.15));
+const reflexo = new THREE.DirectionalLight(0xfff1dc, 1.15);
 reflexo.position.set(0, 2.4, 5);
 scene.add(reflexo);
 const foco = new THREE.SpotLight(0xffe2a8, 140, 14, 0.72, 0.55, 1.6);
@@ -194,7 +200,7 @@ function mostraItens(itens) {
   const pendentes = itens.filter((i) => i.ok === false).length;
   dicaEl.innerHTML = pendentes
     ? `<span class="aviso">${pendentes} item(ns) fora do combinado.</span> A mesa corrige medidas, mas o resto é do arquivo. Arraste para girar; dois dedos ou a roda aproximam.`
-    : 'Tudo no combinado. Arraste para girar; dois dedos ou a roda aproximam. Ponha o arquivo em public/models/&lt;slug&gt;.glb e o slug em lista.json.';
+    : 'Conferência técnica concluída. Confira visualmente dedos, punhos e contato com as cartas antes de publicar. Arraste para girar; dois dedos ou a roda aproximam.';
 }
 
 function poeNaCena(gltf, nome) {
@@ -205,6 +211,8 @@ function poeNaCena(gltf, nome) {
   leque.position.copy(m.posLeque).add(new THREE.Vector3(0, -0.06, 0.05)); leque.rotation.x = -0.35; leque.visible = true;   // como na mesa: à frente das mãos, só os dedos acima da borda
   bocaFala.position.set(0, m.alturaCabeca - 0.07, 0.16); bocaFala.visible = false;
   atual = { ...atual, nome, m };
+  $('dedos').disabled = !m.dedos.juntas.length;
+  m.dedos.alvo = Number($('dedos').value); atualizaDedos(m.dedos, 0, true);
   mostraItens(confereModelo(gltf, m));
   for (const b of botoesReacao) b.disabled = false;
   $('ex-boca').disabled = false;
@@ -216,7 +224,9 @@ function poeNaCena(gltf, nome) {
   if (!ref.hidden) ref.src = `assets/personagens/${slug}-corpo-inteiro.svg`;
 }
 
+let geracaoModelo = 0;
 function carrega(nome, fonte) {
+  const geracao = ++geracaoModelo;
   avisa(`Abrindo ${nome}…`);
   const erro = (e) => { console.error(e); avisa(`Não deu para abrir ${nome}: ${e?.message || e}`, 'nao'); };
   atual = { nome, fonte, m: atual?.m || null };
@@ -225,7 +235,7 @@ function carrega(nome, fonte) {
   // `parse` do arquivo local
   const bytes = fonte instanceof ArrayBuffer ? Promise.resolve(fonte)
     : fetch(fonte, { cache: 'reload' }).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
-  bytes.then((buf) => carregador.parse(buf, '', (g) => poeNaCena(g, nome), erro)).catch(erro);
+  bytes.then((buf) => carregador.parse(buf, '', (g) => { if (geracao === geracaoModelo) poeNaCena(g, nome); else limpa(g.scene); }, erro)).catch(erro);
 }
 
 $('arquivo').addEventListener('change', async (e) => {
@@ -286,16 +296,22 @@ $('mesa').onclick = () => {
 // ---------------------------------------------------------------------------
 // Quadro a quadro
 // ---------------------------------------------------------------------------
+$('dedos').addEventListener('input', () => {
+  $('dedos-valor').textContent = `${Math.round(Number($('dedos').value) * 100)}%`;
+  if (atual?.m) atual.m.dedos.alvo = Number($('dedos').value);
+});
 let tAnterior = 0;
 function quadro(t) {
-  const dt = tAnterior ? (t - tAnterior) / 1000 : 0; tAnterior = t;
+  requestAnimationFrame(quadro);
+  if (document.hidden) { tAnterior = 0; return; }
+  const dt = tAnterior ? Math.min(0.05, (t - tAnterior) / 1000) : 0; tAnterior = t;
   const m = atual?.m;
   if (m) {
     m.mixer?.update(dt);
+    atualizaDedos(m.dedos, dt);
     if (caraAte && t > caraAte) neutro();
   }
   renderer.render(scene, camera);
-  requestAnimationFrame(quadro);
 }
 requestAnimationFrame(quadro);
 
