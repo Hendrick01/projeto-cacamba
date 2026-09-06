@@ -17,6 +17,7 @@
 // ============================================================================
 
 import * as THREE from './vendor/three.module.js';
+import { atualizaDedos } from './dedos3d.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
 import { planBaixada, isJoker, rankLabel, cardLabel } from '/shared/engine.js';
@@ -77,7 +78,7 @@ function conecta() {
     t: 'resume', code: sessao.code, playerId: sessao.playerId, token: sessao.token,
   }));
   ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
+    let msg; try { msg = JSON.parse(e.data); } catch { return; }
     if (msg.t === 'state') {
       const primeira = !view;
       view = msg.view;
@@ -94,7 +95,12 @@ function conecta() {
       setTimeout(() => { location.href = '/'; }, 1500);
     }
   };
-  ws.onclose = () => setTimeout(conecta, 1200);
+  ws.onclose = (event) => {
+    voz.desligar();
+    if ([4001, 1008].includes(event.code)) { aviso('Conexão pausada. Recarregue para retomar nesta janela.', true); return; }
+    aviso('Reconectando à partida…', true);
+    setTimeout(conecta, 1800 + Math.random() * 1000);
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -102,12 +108,24 @@ function conecta() {
 // ---------------------------------------------------------------------------
 
 const canvas = $('cena');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); }
+catch (error) {
+  aviso('O 3D não está disponível neste navegador. Use a mesa normal para continuar.', true);
+  $('btn-voltar').onclick = () => { location.href = '/'; };
+  throw error;
+}
+canvas.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault(); aviso('O 3D foi interrompido. Volte à mesa normal ou recarregue.', true);
+});
+canvas.addEventListener('webglcontextrestored', () => { location.reload(); });
+const compacto = matchMedia('(pointer: coarse)').matches || (navigator.deviceMemory || 8) <= 4;
+let escalaPixels = Math.min(compacto ? 1.25 : 1.75, window.devicePixelRatio || 1);
+renderer.setPixelRatio(escalaPixels);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 // Sombra de verdade, da lâmpada: é o que cola cartas, monte e bonecos no feltro
 // (os discos de contato ficam, mais leves, para o que a sombra dura não pega).
-// Um mapa só, PCF suave, atualizado de 4 em 4 quadros no laço — cada
+// Um mapa só, PCF suave, atualizado a cada 100–150 ms no laço — cada
 // atualização é um render extra da cena, e em celular isso pesa.
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -121,7 +139,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x17100a);
 // A penumbra do salão é neblina, não parede: o que está longe some no escuro,
 // como na mesa normal — só que aqui de verdade, por distância.
-scene.fog = new THREE.FogExp2(0x2a1c10, 0.035);
+scene.fog = new THREE.FogExp2(0x272a29, 0.025);
 
 // Mapa de ambiente GERADO (2026-09-05, pedido de realismo): uma salinha de
 // paredes ocre com retângulos de luz no teto, filtrada pelo PMREM. É o que dá
@@ -130,10 +148,10 @@ scene.fog = new THREE.FogExp2(0x2a1c10, 0.035);
 {
   const pmrem = new THREE.PMREMGenerator(renderer);
   const salinha = new THREE.Scene();
-  const caixa = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 12), new THREE.MeshBasicMaterial({ color: 0x5e4227, side: THREE.BackSide }));
+  const caixa = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 12), new THREE.MeshBasicMaterial({ color: 0x74716b, side: THREE.BackSide }));
   caixa.position.y = 3;
   salinha.add(caixa);
-  const piso = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({ color: 0x7d6a4c }));
+  const piso = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({ color: 0x554c40 }));
   piso.rotation.x = -Math.PI / 2; piso.position.y = 0.02;
   salinha.add(piso);
   for (const [x, z] of [[0, -2.5], [-3, 1], [3, 1], [0, 3.5]]) {
@@ -142,7 +160,8 @@ scene.fog = new THREE.FogExp2(0x2a1c10, 0.035);
     salinha.add(luz);
   }
   scene.environment = pmrem.fromScene(salinha, 0.04).texture;
-  scene.environmentIntensity = 0.5;
+  scene.environmentIntensity = 0.45;
+  salinha.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
   pmrem.dispose();
 }
 
@@ -166,23 +185,23 @@ const OLHO = { x: 0, y: 1.2, z: 1.35 };   // a sua cabeça, sentada na sua cadei
 // A lâmpada é a mesma decisão de luz do jogo inteiro: uma fonte só, a pino
 // sobre o meio. O foco ilumina o feltro; o ambiente quente e fraco é o que
 // sobra refletido no salão.
-scene.add(new THREE.AmbientLight(0xc9a982, 1.15));   // bar claro (2026-09-05): era penumbra 0x9a7850 a 1,05; baixou de 1,6 a pedido
+scene.add(new THREE.HemisphereLight(0xe3edff, 0x685445, 1.15));   // bar claro (2026-09-05): era penumbra 0x9a7850 a 1,05; baixou de 1,6 a pedido
 // O reflexo do feltro: uma luz fraca vinda do lado da câmera, para o elenco do
 // outro lado não ficar só silhueta — o foco da lâmpada ilumina a mesa, não os
 // rostos.
-const reflexo = new THREE.DirectionalLight(0xffe2a8, 0.85);
+const reflexo = new THREE.DirectionalLight(0xfff1dc, 1.15);
 reflexo.position.set(0, 2.4, 5);
 scene.add(reflexo);
-const foco = new THREE.SpotLight(0xffe2a8, 80, 14, 0.72, 0.55, 1.6);
+const foco = new THREE.SpotLight(0xffecd3, 62, 14, 0.85, 0.75, 2);
 // Um palmo fora do eixo, para o lado da câmera: exatamente a pino, o que está
 // encostado no tampo não projeta nada e a sombra dura sumia. Assim ela cai
 // para trás dos objetos, curta, e continua lendo como uma lâmpada só.
 foco.position.set(0.3, 3.1, 0.45);
 foco.target.position.set(0, MESA_TOPO, 0);
 foco.castShadow = true;
-foco.shadow.mapSize.set(2048, 2048);
+foco.shadow.mapSize.set(compacto ? 1024 : 2048, compacto ? 1024 : 2048);
 foco.shadow.bias = -0.0004;
-foco.shadow.normalBias = 0.02;
+foco.shadow.normalBias = 0.004;
 foco.shadow.camera.near = 1;
 foco.shadow.camera.far = 14;   // com a câmera na altura da mesa, a beirada perto de você ficava fora do mapa de sombra e saía um retângulo escuro no feltro
 scene.add(foco, foco.target);
@@ -207,7 +226,7 @@ scene.add(foco, foco.target);
   for (const t of [tex, texRelevo]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(7, 7); }
   const chao = new THREE.Mesh(
     new THREE.CircleGeometry(16, 40),
-    new THREE.MeshStandardMaterial({ map: tex, bumpMap: texRelevo, bumpScale: 0.02, roughness: 0.42, metalness: 0 }),
+    new THREE.MeshStandardMaterial({ map: tex, bumpMap: texRelevo, bumpScale: 0.002, roughness: 0.62, metalness: 0 }),
   );
   chao.rotation.x = -Math.PI / 2;
   chao.receiveShadow = true;
@@ -237,9 +256,9 @@ function chuvisco(ctx, w, h, forca, semente = 7) {
 function texturaFeltro() {
   return texturaDeCanvas(1024, 1024, (ctx) => {
     const g = ctx.createRadialGradient(512, 472, 80, 512, 512, 520);
-    g.addColorStop(0, '#1e6a50');
-    g.addColorStop(0.55, '#12452f');
-    g.addColorStop(1, '#082519');
+    g.addColorStop(0, '#245d4c');
+    g.addColorStop(0.55, '#225948');
+    g.addColorStop(1, '#205544');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 1024, 1024);
     // a fibra: duas famílias de linhas finíssimas, quase invisíveis de perto,
@@ -295,7 +314,7 @@ function texturaMadeira(repeticoes) {
     new THREE.CylinderGeometry(MESA_RAIO, MESA_RAIO, 0.1, 48),
     [
       new THREE.MeshStandardMaterial({ map: madeiraLateral, roughness: 0.45, metalness: 0.05 }),   // lateral
-      new THREE.MeshStandardMaterial({ map: feltro, bumpMap: texturaRelevoFeltro(), bumpScale: 0.012, roughness: 0.96, metalness: 0 }), // topo
+      new THREE.MeshStandardMaterial({ map: feltro, bumpMap: texturaRelevoFeltro(), bumpScale: 0.0015, roughness: 0.96, metalness: 0 }), // topo
       new THREE.MeshLambertMaterial({ color: 0x1b110b }),                // fundo
     ],
   );
@@ -740,8 +759,8 @@ const imagens = new Map();     // url → HTMLImageElement (carregada)
 function pegaImagem(url) {
   if (imagens.has(url)) return imagens.get(url);
   const prom = fetch(url)
-    .then((r) => r.text())
-    .then((texto) => new Promise((res) => {
+    .then((r) => { if (!r.ok) throw new Error(`Imagem: HTTP ${r.status}`); return r.text(); })
+    .then((texto) => new Promise((res, reject) => {
       // Safari só rasteriza SVG em canvas quando o SVG declara width/height.
       let t = texto;
       if (!/<svg[^>]*\swidth=/.test(t)) {
@@ -750,6 +769,7 @@ function pegaImagem(url) {
       }
       const img = new Image();
       img.onload = () => res(img);
+      img.onerror = () => reject(new Error('Imagem inválida'));
       img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(t)}`;
     }));
   imagens.set(url, prom);
@@ -775,7 +795,7 @@ function materialDaCarta(card) {
   // vermelho dos naipes para rosa. A luz continua batendo nela — e o Standard
   // com rugosidade média dá o brilho de verniz que a carta plastificada tem.
   // alphaTest: os cantos arredondados do desenho viram cantos de verdade
-  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: false, alphaTest: 0.5 });
+  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: true, alphaTest: 0.5 });
   texturasDeCarta.set(chave, mat);
   // O retrato das figuras chega depois (a imagem é assíncrona): desenha de
   // novo por cima quando carregar.
@@ -785,7 +805,7 @@ function materialDaCarta(card) {
       const lado = 150;
       ctx.drawImage(img, (256 - lado) / 2, 358 * 0.52 - lado / 2, lado, lado);
       tex.needsUpdate = true;
-    });
+    }).catch(() => { /* a carta continua legível com seus índices */ });
   }
   return mat;
 }
@@ -885,9 +905,9 @@ const materialVerso = (() => {
     arredondado(ctx, 4, 4, 120, 172, 10);
     ctx.stroke();
   });
-  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: false, alphaTest: 0.5 });
+  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: true, alphaTest: 0.5 });
 })();
-const materialBorda = new THREE.MeshStandardMaterial({ color: 0xcbc2ae, roughness: 0.85, metalness: 0, toneMapped: false });
+const materialBorda = new THREE.MeshStandardMaterial({ color: 0xcbc2ae, roughness: 0.85, metalness: 0, toneMapped: true });
 
 const CARTA_L = 0.42; const CARTA_A = 0.59;
 const geoCarta = new THREE.PlaneGeometry(CARTA_L, CARTA_A);
@@ -1235,6 +1255,7 @@ function criaAssento(p) {
     mostra(nome) { if (this.texturas) { mRosto.map = this.texturas[nome] || this.texturas.neutra; mRosto.needsUpdate = true; } },
   };
   carasDoElenco(slug).then((texturas) => {
+    if (assento.modelo) return;
     cara.texturas = texturas;
     cara.mostra('neutra');
     plano.visible = true;
@@ -1248,6 +1269,7 @@ function criaAssento(p) {
     // material ORIGINAL da escultura (cor, normal map): com o cenário
     // realista, o sombreamento em degraus deixava o rosto chapado
     const m = encaixaModelo(gltf, slug, { estilo: 'original' });
+    m.dedos.alvo = 0.6; atualizaDedos(m.dedos, 0, true);
     corpo.visible = false;
     grupo.add(m.raiz);
     grupo.scale.setScalar(1);   // tamanho real: a mesa é de gente de verdade
@@ -1264,8 +1286,7 @@ function criaAssento(p) {
       assento.ref.cara = null;
       // o leque fica À FRENTE das mãos, um pouco abaixo da ponta dos dedos:
       // as cartas escondem as mãos e só os dedos aparecem acima da borda,
-      // como no boneco de código. O rig não tem dedos para fechar a mão, e
-      // com o leque entre as mãos as cartas atravessavam os dedos.
+      // com flexão moderada dos dedos. O encaixe fino fica no provador.
       assento.ref.lequeBase = m.posLeque.clone().add(new THREE.Vector3(0, -0.06, 0.05));
       assento.ref.leque.position.copy(assento.ref.lequeBase);
       assento.ref.leque.rotation.x = -0.35;
@@ -1277,7 +1298,7 @@ function criaAssento(p) {
       assento.ref.bocaBase = bocas.aberta.position.clone();   // a boca está no grupo, e gira com o corpo no quadro
       assento.ref.nome.position.y = m.alturaCabeca + 0.34;
     }
-  }).catch(() => { console.info(`modelo: ${slug} ausente — boneco de código`); });
+  }).catch((error) => { console.info(`modelo: ${slug} — usando o boneco de reserva (${error.message})`); });
 
   // sombra de contato: é ela que cola o boneco no chão
   const sombra = new THREE.Mesh(
@@ -1813,7 +1834,12 @@ async function sincroniza(primeira) {
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
       minhaVez = view.turnId === me() && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
       a.apagado = (p.desistiu || (!p.isBot && !p.connected));
-      for (const m of a.materiais) m.opacity = a.apagado ? 0.4 : 1;
+      for (const m of a.materiais) {
+        const transparent = a.apagado || !!m.userData.transparentBase;
+        if (m.transparent !== transparent) { m.transparent = transparent; m.needsUpdate = true; }
+        m.opacity = (m.userData.opacityBase ?? 1) * (a.apagado ? 0.4 : 1);
+        m.depthWrite = !a.apagado;
+      }
     }
     // Para onde cada um olha: quem está na vez — e, na sua vez, você. O corpo
     // vira só um pouco (±0,5 rad); o rosto desenhado continua encarando a
@@ -2052,6 +2078,7 @@ function encaixaTela() {
 }
 window.addEventListener('resize', encaixaTela);
 encaixaTela();
+window.addEventListener('resize', () => { if (view) sincroniza(true); });
 
 // ---------------------------------------------------------------------------
 // Voos: qualquer objeto indo de um ponto a outro com aceleração suave e um
@@ -2092,21 +2119,34 @@ let entradaNaMao = null;     // 'monte' | 'meio' — a carta nova da minha mão 
 let baixadaDe = null;        // id de quem acabou de baixar: os jogos novos dele voam do assento
 const jogosVistos = new Set();
 
+let ultimoDesenho = 0, ultimaSombra = 0, somaFrame = 0, nFrames = 0;
 function quadro(t) {
   requestAnimationFrame(quadro);
+  if (document.hidden || renderer.getContext().isContextLost()) { ultimoDesenho = 0; return; }
+  const intervalo = compacto || semMovimento ? 1000 / 30 : 1000 / 60;
+  if (ultimoDesenho && t - ultimoDesenho < intervalo - 1) return;
+  const frameMs = ultimoDesenho ? t - ultimoDesenho : intervalo;
+  ultimoDesenho = t;
+  somaFrame += frameMs; nFrames++;
+  if (nFrames >= 240) {
+    if (somaFrame / nFrames > 42 && escalaPixels > 1) {
+      escalaPixels = Math.max(1, escalaPixels - 0.25); renderer.setPixelRatio(escalaPixels);
+    }
+    somaFrame = 0; nFrames = 0;
+  }
   animaVoos(t);
 
   // a cabeça acompanha o ponteiro de leve; a mesa continua o alvo
-  camera.position.x += ((olharX * 0.4) - camera.position.x) * 0.06;
+  camera.position.x += (((semMovimento ? 0 : olharX) * 0.4) - camera.position.x) * (1 - Math.exp(-frameMs / 160));
   camera.lookAt(camera.position.x * 0.25, MESA_TOPO + 0.12, -0.35);
 
   for (const [id, a] of assentos) {
     // respiro contínuo, dessincronizado por posição
     if (!semMovimento && !a.apagado) {
-      a.corpo.position.y = Math.sin(t / 1300 + a.grupo.position.x * 3) * 0.012;
+      a.corpo.position.y = a.assento?.modelo ? 0 : Math.sin(t / 1300 + a.grupo.position.x * 3) * 0.006;
     }
     // pulo de reação
-    if (a.pulo) {
+    if (a.pulo && !semMovimento) {
       const dt = (t - a.pulo) / 480;
       if (dt >= 1) a.pulo = 0;
       else a.corpo.position.y = Math.sin(dt * Math.PI) * 0.14;
@@ -2118,7 +2158,7 @@ function quadro(t) {
       a.corpo.rotation.y += (alvoGiro - a.corpo.rotation.y) * (semMovimento ? 1 : 0.06);
       const r = a.corpo.rotation.y, s = Math.sin(r), c = Math.cos(r);
       const b = a.lequeBase;
-      a.leque.position.set(c * b.x + s * b.z, b.y, c * b.z - s * b.x);
+      a.leque.position.set(c * b.x + s * b.z, b.y + a.corpo.position.y, c * b.z - s * b.x);
       a.leque.rotation.y = r;
       if (a.bocaBase) {
         const q = a.bocaBase;
@@ -2139,8 +2179,10 @@ function quadro(t) {
     // modelo externo: anima os clips e move a boca por morph, se houver
     if (a.assento?.modelo) {
       const m = a.assento.modelo;
-      const dt = a.tAnterior ? (t - a.tAnterior) / 1000 : 0; a.tAnterior = t;
-      if (m.mixer) m.mixer.update(dt);
+      const dt = a.tAnterior ? Math.min(0.05, (t - a.tAnterior) / 1000) : 0; a.tAnterior = t;
+      if (m.mixer && !semMovimento) m.mixer.update(dt);
+      m.dedos.alvo = a.leque.visible ? 0.6 : 0;
+      atualizaDedos(m.dedos, dt, semMovimento);
       if (m.morfos.bocaAberta) {
         const nvm = voz.nivel(id);
         m.morfos.bocaAberta.malha.morphTargetInfluences[m.morfos.bocaAberta.indice] = Math.min(1, nvm * 2.2);
@@ -2183,7 +2225,7 @@ function quadro(t) {
   meuFoco.material.opacity += (alvoMeu - meuFoco.material.opacity) * 0.1;
 
   quadro.n = (quadro.n || 0) + 1;
-  if (quadro.n % 4 === 0) renderer.shadowMap.needsUpdate = true;
+  if (t - ultimaSombra > (compacto ? 150 : 100)) { renderer.shadowMap.needsUpdate = true; ultimaSombra = t; }
   renderer.render(scene, camera);
 }
 

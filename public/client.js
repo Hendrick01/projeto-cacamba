@@ -63,7 +63,12 @@ function connect() {
     try { msg = JSON.parse(e.data); } catch { return; }
     handleMessage(msg);
   };
-  ws.onclose = () => {
+  ws.onclose = (event) => {
+    if (event.code === 4001 || event.code === 1008) {
+      voz.desligar();
+      toast(event.code === 4001 ? 'Partida aberta em outra janela. Recarregue para voltar aqui.' : 'Conexão pausada por excesso de mensagens. Aguarde e recarregue.');
+      return;
+    }
     setTimeout(connect, reconnectDelay);
     reconnectDelay = Math.min(reconnectDelay * 1.6, 6000);
   };

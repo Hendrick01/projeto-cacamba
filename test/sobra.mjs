@@ -30,6 +30,8 @@ const deadline = setTimeout(() => { console.error('SOBRA FALHOU: tempo esgotado 
 
 function client(name) {
   const ws = new WebSocket(URL);
+  ws.on('error', (error) => { console.error(error.message); process.exit(1); });
+  ws.on('close', (code) => { if (code !== 1000) { console.error(`Conexão encerrada: ${code}`); process.exit(1); } });
   const c = { name, ws, id: null, view: null, isHost: false, code: null, lastAction: null, pendente: null };
   ws.on('message', (raw) => {
     const msg = JSON.parse(raw);
@@ -43,7 +45,7 @@ function client(name) {
       if (a === 'baixar' || a === 'layoff') {
         if (a === 'baixar') c.semBaixar = true; else c.semEncaixe = true;
         c.lastSig = null;
-        setImmediate(() => act(c));
+        if (!c.acaoTimer) c.acaoTimer = setTimeout(() => { c.acaoTimer = null; act(c); }, 12);
         return;
       }
       console.error(`[${name}] erro do servidor: ${msg.msg}\n  última ação: ${JSON.stringify(c.lastAction)}`);
@@ -53,7 +55,7 @@ function client(name) {
       c.view = msg.view;
       for (const ev of msg.events || []) if (ev.e === 'roundEnd') feitos.rodadas++;
       if (c.pendente) confere(c);
-      setImmediate(() => act(c));
+      if (!c.acaoTimer) c.acaoTimer = setTimeout(() => { c.acaoTimer = null; act(c); }, 12);
     }
   });
   return c;

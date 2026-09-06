@@ -4,6 +4,7 @@
 // ============================================================================
 
 import http from 'node:http';
+import { consume, clientIp, validOrigin, validMessage } from './lib/security.js';
 import zlib from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,10 +21,11 @@ import {
 import { personagemValido } from './shared/elenco.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.PORT) || 3000;
+const cliValue = (name) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
+const PORT = Number(process.env.PORT || cliValue('--port')) || 3000;
 // Hospedagens injetam a porta e esperam que o processo escute em todas as
 // interfaces. HOST permite restringir de novo (ex.: 127.0.0.1) se precisar.
-const HOST = process.env.HOST || '0.0.0.0';
+const HOST = process.env.HOST || cliValue('--host') || '0.0.0.0';
 
 // ---------------------------------------------------------------------------
 // Arquivos estáticos
@@ -105,17 +107,31 @@ function corpoComprimido(full, stat, ext) {
   const chave = `${full}:${stat.mtimeMs}`;
   const guardado = cacheGzip.get(chave);
   if (guardado) return guardado;
-  const cru = fs.readFileSync(full);
-  const fonte = ext === '.svg' ? Buffer.from(svgEnxuto(cru.toString('utf8'))) : cru;
-  const buf = zlib.gzipSync(fonte, { level: 9 });
-  cacheGzip.set(chave, buf);
+  // Leitura e gzip fora do event loop: carregar a arte não pausa as jogadas.
+  // Guardar a Promise também evita comprimir o mesmo arquivo simultaneamente.
+  const tarefa = fs.promises.readFile(full).then((cru) => {
+    const fonte = ext === '.svg' ? Buffer.from(svgEnxuto(cru.toString('utf8'))) : cru;
+    return new Promise((resolve, reject) => zlib.gzip(fonte, { level: 6 }, (erro, buf) => erro ? reject(erro) : resolve(buf)));
+  }).catch((erro) => { cacheGzip.delete(chave); throw erro; });
+  cacheGzip.set(chave, tarefa);
   if (cacheGzip.size > 200) cacheGzip.delete(cacheGzip.keys().next().value);
-  return buf;
+  return tarefa;
+}
+
+function politicaDaPagina(req) {
+  let host = req.headers.host;
+  try { if (process.env.PUBLIC_URL) host = new URL(process.env.PUBLIC_URL).host; } catch { host = ''; }
+  const destinos = hostValido(host) ? ` ws://${host} wss://${host}` : '';
+  return CSP.replace("connect-src 'self' ws: wss: blob:", `connect-src 'self' blob:${destinos}`);
 }
 
 const STATIC_ROOTS = [path.join(__dirname, 'public'), __dirname];
 
 const server = http.createServer((req, res) => {
+  for (const [key, value] of Object.entries(CABECALHOS_SEGUROS)) res.setHeader(key, value);
+  if (!['GET', 'HEAD'].includes(req.method)) {
+    res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return;
+  }
   let url;
   try { url = new URL(req.url, 'http://localhost'); } catch {
     // `//[` e afins fazem o construtor lançar (visto em Node 22). Dentro do
@@ -129,9 +145,10 @@ const server = http.createServer((req, res) => {
   file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
   for (const root of STATIC_ROOTS) {
     const full = path.join(root, file);
-    if (!full.startsWith(root)) continue;
-    if (root === __dirname && !full.startsWith(path.join(__dirname, 'shared'))) continue;
-    if (fs.existsSync(full) && fs.statSync(full).isFile()) {
+    if (!full.startsWith(root + path.sep)) continue;
+    if (file.split(/[\\/]/).some((part) => part.startsWith('.'))) continue;
+    if (root === __dirname && !full.startsWith(path.join(__dirname, 'shared') + path.sep)) continue;
+    if (fs.existsSync(full) && fs.statSync(full).isFile() && fs.realpathSync(full).startsWith(root + path.sep)) {
       const ext = path.extname(full);
       const stat = fs.statSync(full);
       // ETag de tamanho + mtime. Sem ele, `no-cache` significava baixar tudo de
@@ -160,7 +177,7 @@ const server = http.createServer((req, res) => {
         ETag: etag,
         Vary: 'Accept-Encoding',
         ...CABECALHOS_SEGUROS,
-        ...(ext === '.html' ? { 'Content-Security-Policy': CSP } : {}),
+        ...(ext === '.html' ? { 'Content-Security-Policy': politicaDaPagina(req) } : {}),
       };
       if (req.headers['if-none-match'] === etag) {
         res.writeHead(304, cabecalho);
@@ -169,13 +186,19 @@ const server = http.createServer((req, res) => {
       }
       const aceitaGzip = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
       if (aceitaGzip && COMPRIMIVEL.has(ext)) {
-        const corpo = corpoComprimido(full, stat, ext);
-        res.writeHead(200, { ...cabecalho, 'Content-Encoding': 'gzip', 'Content-Length': corpo.length });
-        res.end(req.method === 'HEAD' ? undefined : corpo);
+        corpoComprimido(full, stat, ext).then((corpo) => {
+          if (res.destroyed) return;
+          res.writeHead(200, { ...cabecalho, 'Content-Encoding': 'gzip', 'Content-Length': corpo.length });
+          res.end(req.method === 'HEAD' ? undefined : corpo);
+        }).catch(() => { if (!res.destroyed) { res.writeHead(500); res.end('Falha ao ler arquivo'); } });
         return;
       }
-      res.writeHead(200, cabecalho);
-      fs.createReadStream(full).pipe(res);
+      res.writeHead(200, { ...cabecalho, 'Content-Length': stat.size });
+      if (req.method === 'HEAD') { res.end(); return; }
+      const stream = fs.createReadStream(full);
+      stream.on('error', () => res.destroy());
+      res.on('close', () => stream.destroy());
+      stream.pipe(res);
       return;
     }
   }
@@ -203,7 +226,7 @@ const BOT_NAMES = [
 
 function makeCode() {
   for (let tentativa = 0; tentativa < 64; tentativa++) {
-    const code = Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+    const code = Array.from({ length: 4 }, () => CODE_CHARS[crypto.randomInt(CODE_CHARS.length)]).join('');
     if (!rooms.has(code)) return code;
   }
   // 64 sorteios sem código livre só acontece com a tabela quase cheia — e aí a
@@ -212,7 +235,9 @@ function makeCode() {
 }
 
 function lanAddress() {
-  for (const list of Object.values(os.networkInterfaces())) {
+  let interfaces;
+  try { interfaces = os.networkInterfaces(); } catch { return 'localhost'; }
+  for (const list of Object.values(interfaces)) {
     for (const iface of list || []) {
       if (iface.family === 'IPv4' && !iface.internal) return iface.address;
     }
@@ -283,7 +308,9 @@ function hostOf(room) {
 }
 
 function send(ws, msg) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+  if (!ws || ws.readyState !== 1) return;
+  if (ws.bufferedAmount > 256 * 1024) { ws.terminate(); return; }
+  ws.send(JSON.stringify(msg));
 }
 
 // Personagem escolhido pelo jogador. Fora da lista vira `null`, e aí o rosto
@@ -425,21 +452,19 @@ function scheduleBots(room) {
 // Quem pode abrir o WebSocket. Com PUBLIC_URL definido, só páginas servidas
 // dele (o navegador manda o Origin, e não dá para forjar de outro site): é o
 // que impede um site qualquer de usar este servidor como cliente. Sem
-// PUBLIC_URL (desenvolvimento, rede local), aceita tudo. E um teto de
+// PUBLIC_URL (desenvolvimento, rede local), compara Origin com Host. Um teto de
 // conexões por IP: uma família num mesmo NAT cabe folgada em 40; um script
 // abrindo centenas, não.
 const MAX_CONEXOES_POR_IP = 40;
 const conexoesPorIp = new Map();
-function ipDe(req) {
-  const fwd = process.env.TRUST_PROXY === '1' ? String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() : '';
-  return fwd || req.socket?.remoteAddress || '?';
-}
+const ipDe = (req) => clientIp(req, process.env.TRUST_PROXY === '1');
+const entradasPorIp = new Map();
 const wss = new WebSocketServer({
   server,
   maxPayload: 16 * 1024,
   verifyClient: ({ req, origin }) => {
-    const publico = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
-    if (publico && origin && origin !== publico) return false;
+    if (!validOrigin(req, process.env.PUBLIC_URL)) return false;
+    if (req.url !== '/' || wss.clients.size >= 800) return false;
     if ((conexoesPorIp.get(ipDe(req)) || 0) >= MAX_CONEXOES_POR_IP) return false;
     return true;
   },
@@ -450,6 +475,8 @@ wss.on('connection', (ws, req) => {
   ws.playerId = null;
   ws.ip = ipDe(req);
   conexoesPorIp.set(ws.ip, (conexoesPorIp.get(ws.ip) || 0) + 1);
+  ws.alive = true; ws.on('pong', () => { ws.alive = true; });
+  ws.budget = {};
   ws.origin = originFrom(req); // endereço por onde ESTE jogador chegou
 
   // Sem este ouvinte, um frame malformado (sem máscara, UTF-8 inválido) faz o
@@ -457,16 +484,17 @@ wss.on('connection', (ws, req) => {
   // isso numa exceção não tratada que derruba o processo com todas as salas.
   ws.on('error', (err) => console.error('ws:', err.message));
 
-  // Sem freio de mensagens por conexão, de propósito — por enquanto. Um contador
-  // por segundo (60/s e depois 300/s) fechava os clientes roteirizados dos
-  // testes, que agem no mesmo tick em que o estado chega: e2e e sobra.mjs
-  // estouravam o tempo. O que a auditoria pediu de verdade — limite de
-  // conexões por IP e freio só em `claim`/`unclaim`, que geram broadcast do
-  // estado inteiro — fica anotado no ESTRUTURA.md.
-
-  ws.on('message', (raw) => {
+  ws.on('message', (raw, binary) => {
+    if (!consume(ws.budget, 600, 180)) { ws.close(1008, 'Muitas mensagens'); return; }
+    if (binary) { ws.close(1003, 'Somente JSON'); return; }
     let msg;
-    try { msg = JSON.parse(raw); } catch { return; }
+    try { msg = JSON.parse(raw); } catch { send(ws, { t: 'error', msg: 'Mensagem inválida.' }); return; }
+    if (!validMessage(msg)) { send(ws, { t: 'error', msg: 'Mensagem inválida.' }); return; }
+    if (['create', 'join', 'resume'].includes(msg.t)) {
+      let bucket = entradasPorIp.get(ws.ip);
+      if (!bucket) { bucket = {}; entradasPorIp.set(ws.ip, bucket); }
+      if (!consume(bucket, 40, 1)) { ws.close(1008, 'Muitas entradas'); return; }
+    }
     try { handle(ws, msg); } catch (err) {
       send(ws, { t: 'error', msg: err.gameRule ? err.message : 'Algo deu errado. Tente de novo.' });
       if (!err.gameRule) console.error(err);
@@ -500,7 +528,7 @@ function currentRoom(ws) {
 
 function currentPlayer(ws, room) {
   const p = room.players.find((x) => x.id === ws.playerId);
-  if (!p) { const e = new Error('Você não está nesta sala.'); e.gameRule = true; throw e; }
+  if (!p || p.ws !== ws || !p.connected) { const e = new Error('Você não está nesta sala.'); e.gameRule = true; throw e; }
   return p;
 }
 
@@ -523,7 +551,12 @@ function detach(ws) {
 }
 
 function attach(ws, room, player) {
-  if (ws.roomCode && ws.roomCode !== room.code) detach(ws);
+  if (ws.roomCode && (ws.roomCode !== room.code || ws.playerId !== player.id)) detach(ws);
+  if (player.ws && player.ws !== ws) {
+    const anterior = player.ws;
+    anterior.roomCode = null; anterior.playerId = null;
+    anterior.close(4001, 'Sessão retomada em outra janela');
+  }
   ws.roomCode = room.code;
   ws.playerId = player.id;
   player.ws = ws;
@@ -537,6 +570,7 @@ function attach(ws, room, player) {
 }
 
 function handle(ws, msg) {
+  if (!['create', 'join', 'resume'].includes(msg.t)) currentPlayer(ws, currentRoom(ws));
   switch (msg.t) {
     case 'create': {
       if (rooms.size >= MAX_SALAS) { const e = new Error('O servidor está lotado de salas agora. Tente daqui a pouco.'); e.gameRule = true; throw e; }
@@ -679,6 +713,7 @@ function handle(ws, msg) {
       const player = currentPlayer(ws, room);
       const dados = msg.dados;
       if (!dados || typeof dados !== 'object' || Array.isArray(dados)) return;
+      if (!consume(ws.voiceBudget ||= {}, 100, 30)) return;
       const alvos = room.players.filter((p) => !p.isBot && p.id !== player.id
         && (msg.to === '*' || p.id === msg.to));
       for (const p of alvos) send(p.ws, { t: 'voz', from: player.id, dados });
@@ -725,6 +760,17 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!ws.alive) { ws.terminate(); continue; }
+    ws.alive = false; ws.ping();
+  }
+  for (const [ip, bucket] of entradasPorIp) if (Date.now() - bucket.at > 120000) entradasPorIp.delete(ip);
+}, 30000);
+heartbeat.unref();
+server.headersTimeout = 10000;
+server.requestTimeout = 15000;
+server.maxHeadersCount = 60;
 server.listen(PORT, HOST, () => {
   console.log('🃏 Caçamba no ar!');
   console.log(`   Neste computador:  http://localhost:${PORT}`);

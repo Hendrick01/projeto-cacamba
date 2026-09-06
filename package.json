@@ -1,12 +1,15 @@
 {
   "name": "cacamba",
   "version": "0.1.0",
-  "description": "Caçamba — jogo de cartas multiplayer para celular (7 rodadas de contratos com trincas e sequências)",
+  "description": "Ca\u00e7amba \u2014 jogo de cartas multiplayer para celular (7 rodadas de contratos com trincas e sequ\u00eancias)",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\"",
+    "dev": "node server.js",
+    "test:integration": "node test/integration.mjs",
+    "test:security": "node test/security-live.mjs"
   },
   "engines": {
     "node": ">=20"

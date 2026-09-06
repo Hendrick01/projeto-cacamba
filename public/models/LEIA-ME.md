@@ -211,3 +211,27 @@ elenco em SVG. Metal e rugosidade são ignorados. Numa malha com esqueleto
 (skin) o sombreamento entra, mas o contorno não (a casca não acompanharia os
 ossos). No provador, **estilo: original** mostra o material do arquivo como
 veio, para comparar.
+## Atualização de 06/09/2026: articulação dos dedos
+
+Os oito GLBs desta revisão agora têm 54 ossos: os 24 originais mais 30 de
+dedos (cinco dedos × três segmentos × duas mãos). O texto histórico abaixo
+que descreve a ausência de dedos se refere à versão anterior.
+
+As malhas, a contagem de triângulos e as texturas foram mantidas. O preparo
+usa marcos específicos de cada personagem e redistribui somente a influência
+da mão; não é um rigger universal nem uma retopologia anatômica. Há um clip
+`dedosTeste` para ferramentas externas. No jogo, `dedos3d.js` controla a
+flexão diretamente, mantendo os clips de corpo existentes.
+
+Abra `provador.html`, escolha um personagem em **da mesa…** e mova **Flexão
+dos dedos** de 0% a 100%, conferindo ambos os lados. A mesa usa 60% quando há
+cartas. Conferir visualmente punhos, eventuais dedos fundidos e contato com o
+leque antes de publicar: as verificações numéricas não atestam anatomia ou
+ausência de interpenetração.
+
+Para reproduzir sobre uma cópia ORIGINAL, ainda sem os novos ossos:
+
+```bash
+python scripts/rig_dedos.py original.glb preparado.glb --slug matheus
+python scripts/verifica_rig.py
+```

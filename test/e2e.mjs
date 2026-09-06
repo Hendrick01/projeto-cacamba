@@ -18,6 +18,8 @@ let buysSeen = 0;
 
 function client(name) {
   const ws = new WebSocket(URL);
+  ws.on('error', (error) => { console.error(error.message); process.exit(1); });
+  ws.on('close', (code) => { if (code !== 1000) { console.error(`Conexão encerrada: ${code}`); process.exit(1); } });
   const c = { name, ws, id: null, view: null, isHost: false, hostId: null, code: null, acting: false };
 
   ws.on('message', (raw) => {
@@ -31,7 +33,7 @@ function client(name) {
         if (ev.e === 'buy') buysSeen++;
         if (ev.e === 'roundEnd') roundsSeen++;
       }
-      setImmediate(() => act(c));
+      if (!c.acaoTimer) c.acaoTimer = setTimeout(() => { c.acaoTimer = null; act(c); }, 12);
     }
   });
   return c;

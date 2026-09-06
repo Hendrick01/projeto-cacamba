@@ -1,5 +1,30 @@
 # 🃏 Caçamba
 
+## Revisão de dedos, visual e segurança — 06/09/2026
+
+Consulte [o relatório da revisão](REVISAO-2026-09-06.md) para alterações,
+testes e limitações. Os oito modelos incluem articulação inicial dos dedos,
+com controle de flexão em `provador.html`. A aprovação visual final em um
+navegador com WebGL ainda é necessária antes de publicar esta revisão.
+
+```bash
+npm ci
+npm test
+npm run test:security
+npm run test:integration
+npm start
+```
+
+Os testes de integração iniciam e encerram seu próprio servidor local. Os
+scripts Python em `scripts/` são ferramentas opcionais de preparação e
+conferência dos modelos (NumPy e SciPy); o jogo não depende de Python.
+
+Com `PUBLIC_URL` definido, conexões WebSocket precisam enviar o `Origin`
+exato do site, como os navegadores fazem. Ferramentas de teste externas
+também precisam configurá-lo. Use `TRUST_PROXY=1` somente quando a origem
+estiver atrás de um proxy confiável que trate `X-Forwarded-For` corretamente.
+
+
 Jogo de cartas multiplayer para celular. São **7 rodadas de contratos** — trincas e
 sequências —, de 2 a 8 jogadores, cada um no seu aparelho. Quem terminar com **menos
 pontos** ganha.
