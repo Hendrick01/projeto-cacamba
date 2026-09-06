@@ -10,6 +10,7 @@
 
 import * as THREE from './vendor/three.module.js';
 import { preparaDedos } from './dedos3d.js';
+import { preparaInteracao } from './interacao3d.js';
 
 // Do chão ao topo da cabeça, sentado. Modelo cru é normalizado para isso.
 export const ALTURA_SENTADO = 1.55;
@@ -87,21 +88,14 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
   // escala é a dele. Normalizar pela caixa serve só ao que chega cru — um
   // modelo SENTADO normalizado para 1,55 m viraria uma gigante de 2 m.
   const preparado = !!raiz.getObjectByName('Cabeca');
-  // Um modelo rigado e sentado (esqueleto + preparo) entra na ESCALA DO
-  // ELENCO: a mesa é de desenho — cartas de 42 cm no tampo, bonecos de
-  // código com a cabeça a 1,55 m sentados — e uma pessoa de tamanho real
-  // (1,33 m sentada) ficava pequena e baixa atrás da borda. A banqueta
-  // acompanha (ver quem chama). Modelo em pé, sem esqueleto, fica como veio.
+  // Preserva metros e proporções do elenco preparado. Modelos externos
+  // sem o contrato de escala recebem a normalização de altura.
   let temEsqueleto = false; raiz.traverse((o) => { if (o.isSkinnedMesh) temEsqueleto = true; });
   const escala = preparado ? (temEsqueleto ? ESCALA_ELENCO : 1) : ALTURA_SENTADO / alturaOriginal;
   raiz.scale.setScalar(escala);
-  // só a altura é corrigida, e só no que chega cru: a origem em x/z é a do
-  // arquivo (o contrato), e num arquivo preparado o y também — uma pose
-  // sentada levanta os pés uns centímetros, e descer o corpo até eles o
-  // afundaria na banqueta. Centralizar pela caixa parecia inofensivo, mas
-  // num modelo sentado as pernas vão para a frente, a caixa fica adiantada e
-  // o corpo era empurrado para trás — o leque saía das mãos e caía no peito.
-  raiz.position.set(0, preparado ? 0 : -caixa.min.y * escala, 0);
+  // Mantém a origem horizontal e eleva somente pés que atravessam o chão.
+  // O banco acompanha a superfície da roupa na pose já deformada.
+  raiz.position.set(0, preparado ? Math.max(0, -caixa.min.y * escala + 0.003) : -caixa.min.y * escala, 0);
   // as matrizes ainda são as de antes da escala: sem isto, a cabeça e as mãos
   // sairiam nas medidas originais do arquivo
   raiz.updateMatrixWorld(true);
@@ -118,6 +112,15 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
     const ms = Array.isArray(o.material) ? o.material : [o.material];
     o.receiveShadow = true;
     for (const m of ms) {
+      // O GLB usava a própria textura como lâmpada e metal implícito = 1.
+      // Roupa/pele precisam receber luz: cor e textura continuam originais.
+      if (estilo === 'original' && (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial)) {
+        m.emissiveIntensity = 0; m.metalness = 0; m.roughness = 0.78;
+        if ('specularIntensity' in m) m.specularIntensity = 0.3;
+        if (m.specularColor) m.specularColor.set(0xffffff);
+        m.envMapIntensity = 0.55;
+        if (m.map) m.map.anisotropy = 4;
+      }
       m.userData.opacityBase = m.opacity;
       m.userData.transparentBase = m.transparent;
       materiais.push(m);
@@ -164,18 +167,16 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
     });
   }
   if (avisa) console.info(`modelo: ${slug} carregado (altura ${alturaOriginal.toFixed(2)}${preparado ? ', escala do arquivo' : ` → ${ALTURA_SENTADO}`})`);
-  return { dedos: preparaDedos(raiz), raiz, materiais, morfos, mixer, acoes, alturaCabeca, posLeque, alturaOriginal, escala, caixa, sentado: preparado && temEsqueleto };
+  const cabecaAnimada = gltf.animations?.some(a => a.name === 'idle' && a.tracks.some(t => t.name === 'Head.quaternion'));
+  const modelo = { dedos: preparaDedos(raiz), raiz, materiais, morfos, mixer, acoes, cabecaAnimada, alturaCabeca, posLeque, alturaOriginal, escala, caixa, sentado: preparado && temEsqueleto };
+  if (modelo.dedos.juntas.length) preparaInteracao(modelo);
+  return modelo;
 }
 
 // A banqueta do assento: madeira escura com a almofada na cor do assento.
 // Mora aqui porque o provador precisa dela para julgar a pose (o modelo
 // senta nela) — na mesa, é a cadeira de cada personagem.
-// Assento de cadeira comum (55 cm). Foi de balcão (72 cm) por um dia: com o
-// tampo a 0,92 m, uma pessoa de tamanho real sentada em 55 cm fica com os
-// ombros na altura do tampo. Mas o que resolve é a ESCALA_ELENCO (×1,2), e
-// com ela a banqueta alta punha as coxas ACIMA do tampo, atravessando a
-// mesa. Em 55 cm × 1,2 as coxas ficam sob o tampo e o peito bem acima. O
-// aro embaixo apoia os pés.
+// Dimensões de construção. ajustaBanqueta calcula altura e recuo do modelo.
 export const BANQUETA_ASSENTO = 0.45;   // cadeira de mesa de jantar (tampo a 0,76 m)
 export function criaBanqueta(corAlmofada) {
   const g = new THREE.Group();
@@ -226,7 +227,7 @@ export function confereModelo(gltf, m) {
   else item(h >= 0.8 && h <= 2.2, `Altura no arquivo: ${h.toFixed(2)} m → normalizada para ${ALTURA_SENTADO} m` + (h < 0.8 || h > 2.2 ? ' (fora de metros? a mesa corrige, mas confira a unidade)' : ''));
   const pes = Math.abs(c.min.y) / h;
   if ((m.escala === 1 || m.sentado) && c.min.y > 0 && c.min.y < 0.3) item(null, `Pés a ${cm(c.min.y)} do chão: apoiados no aro da banqueta`);
-  else item(pes < 0.02, pes < 0.02 ? 'Origem no chão, entre os pés' : `Os pés estão em y = ${cm(c.min.y)}: a mesa desce até o chão, mas o combinado é y = 0`);
+  else item(c.min.y * m.escala + m.raiz.position.y >= -0.001, m.raiz.position.y > 0 ? `Pés corrigidos no chão: modelo elevado ${cm(m.raiz.position.y)}` : 'Origem no chão, entre os pés');
   const cx = (c.min.x + c.max.x) / 2 / h, cz = (c.min.z + c.max.z) / 2 / h;
   item(Math.abs(cx) < 0.1 && Math.abs(cz) < 0.3, Math.abs(cx) < 0.1 && Math.abs(cz) < 0.3 ? 'Origem no eixo do corpo (x e z)' : `Deslocado da origem: x ${cm((c.min.x + c.max.x) / 2)}, z ${cm((c.min.z + c.max.z) / 2)} — a mesa NÃO corrige; o corpo sairia do assento`);
   item(null, 'Frente em +Z: confira no palco — o rosto deve olhar para a mesa');
@@ -234,7 +235,7 @@ export function confereModelo(gltf, m) {
   const no = (nome) => !!m.raiz.getObjectByName(nome);
   item(no('Cabeca') ? true : null, no('Cabeca') ? `Nó Cabeca a ${cm(m.alturaCabeca)} do chão` : `Sem nó Cabeca: a boca da fala e o nome ficam a ${cm(m.alturaCabeca)} (88% da altura)`);
   const maos = no('MaoEsq') && no('MaoDir');
-  item(maos ? true : null, maos ? `Nós MaoEsq/MaoDir: o leque entra a ${cm(m.posLeque.y)} do chão, ${cm(m.posLeque.z)} à frente` : 'Sem MaoEsq/MaoDir: o leque fica na posição padrão (1,02 m; 0,17 m à frente)');
+  item(m.interacao ? true : maos ? true : null, m.interacao ? 'Cartas ligadas à pinça da mão; braços acompanham compra, descarte e baixada' : maos ? `Nós MaoEsq/MaoDir: leque a ${cm(m.posLeque.y)} do chão` : 'Sem MaoEsq/MaoDir: o leque fica na posição padrão (1,02 m; 0,17 m à frente)');
 
   item(m.dedos?.juntas.length ? true : null, m.dedos?.juntas.length ? `${m.dedos.juntas.length} ossos de dedos: use o controle de flexão para conferir as duas mãos` : 'Sem articulação dos dedos');
   for (const nome of ['feliz', 'bravo', 'bocaAberta']) {

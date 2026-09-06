@@ -9,7 +9,8 @@
 // ============================================================================
 
 import * as THREE from './vendor/three.module.js';
-import { atualizaDedos } from './dedos3d.js';
+import { MESA, conectaLeque, arrumaLeque, atualizaInteracao, ajustaBanqueta, gestoCarta } from './interacao3d.js';
+import { iluminaSala, criaMesa, criaSala } from './cenario3d.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { ALTURA_SENTADO, encaixaModelo, confereModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
 import { SLUGS } from '/shared/elenco.js';
@@ -17,7 +18,7 @@ import { SLUGS } from '/shared/elenco.js';
 const $ = (id) => document.getElementById(id);
 const MESA_TOPO = 0.76;          // o tampo, como na mesa 3D
 const MESA_RAIO = 1.15;
-const DIST_ASSENTO = 1.5;        // do centro da mesa à cadeira, como na mesa 3D
+const DIST_ASSENTO = MESA.assento;        // do centro da mesa à cadeira, como na mesa 3D
 
 // ---------------------------------------------------------------------------
 // Cena: o mesmo salão, uma cadeira só
@@ -40,39 +41,14 @@ scene.background = new THREE.Color(0x1b110b);
 scene.fog = new THREE.Fog(0x1b110b, 7, 16);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 40);
 
-// a lâmpada da mesa: uma fonte só sobre o meio do tampo, mais o reflexo do feltro
-scene.add(new THREE.HemisphereLight(0xe3edff, 0x685445, 1.15));
-const reflexo = new THREE.DirectionalLight(0xfff1dc, 1.15);
-reflexo.position.set(0, 2.4, 5);
-scene.add(reflexo);
-const foco = new THREE.SpotLight(0xffe2a8, 140, 14, 0.72, 0.55, 1.6);
-foco.position.set(0.45, 4.4, DIST_ASSENTO - 0.7);
-foco.target.position.set(0, MESA_TOPO, DIST_ASSENTO);
-foco.castShadow = true;
-foco.shadow.mapSize.set(1024, 1024);
-foco.shadow.bias = -0.0004;
-foco.shadow.normalBias = 0.02;
-foco.shadow.camera.near = 1;
-scene.add(foco, foco.target);
-
-// chão e mesa (a parte que interessa: a beirada na frente da cadeira)
-const chao = new THREE.Mesh(new THREE.CircleGeometry(9, 48), new THREE.MeshStandardMaterial({ color: 0x2b1a10, roughness: 0.95 }));
-chao.rotation.x = -Math.PI / 2; chao.receiveShadow = true;
-scene.add(chao);
-const mesa = new THREE.Group();
-const tampo = new THREE.Mesh(new THREE.CylinderGeometry(MESA_RAIO, MESA_RAIO, 0.06, 64), new THREE.MeshStandardMaterial({ color: 0x2f7a4a, roughness: 0.92 }));
-tampo.position.y = MESA_TOPO - 0.03; tampo.receiveShadow = true; tampo.castShadow = true;
-const aro = new THREE.Mesh(new THREE.TorusGeometry(MESA_RAIO, 0.07, 12, 96), new THREE.MeshStandardMaterial({ color: 0x6b3f22, roughness: 0.6 }));
-aro.rotation.x = Math.PI / 2; aro.position.y = MESA_TOPO - 0.01; aro.castShadow = true;
-const pe = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.5, MESA_TOPO - 0.06, 24), new THREE.MeshStandardMaterial({ color: 0x4a2a16, roughness: 0.7 }));
-pe.position.y = (MESA_TOPO - 0.06) / 2;
-mesa.add(tampo, aro, pe);
-mesa.position.z = DIST_ASSENTO;
-scene.add(mesa);
+iluminaSala(scene, renderer, { centro: new THREE.Vector3(0, 0, DIST_ASSENTO), compacto: true });
+const sala = criaSala(); sala.position.z = DIST_ASSENTO; scene.add(sala);
+const mesa = criaMesa(); mesa.position.z = DIST_ASSENTO;
 
 // o palco gira com o dedo: o personagem, as marcas e o leque vão junto
 const palco = new THREE.Group();
 scene.add(palco);
+palco.add(mesa);
 
 // marcas: a linha de 1,55 m e a seta da frente (+Z)
 const M_MARCA = new THREE.MeshBasicMaterial({ color: 0xf2c14e, toneMapped: false });
@@ -93,7 +69,7 @@ const texturaVerso = (() => {
   ctx.strokeStyle = '#f2c14e'; ctx.lineWidth = 3; ctx.strokeRect(18, 18, 92, 144);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 })();
-const materialVerso = new THREE.MeshStandardMaterial({ map: texturaVerso, roughness: 0.5, toneMapped: false });
+const materialVerso = new THREE.MeshStandardMaterial({ map: texturaVerso, roughness: 0.82, side: THREE.DoubleSide });
 const geoCarta = new THREE.PlaneGeometry(0.42, 0.59);
 const leque = new THREE.Group();
 for (let i = 0; i < 5; i++) {
@@ -106,7 +82,7 @@ for (let i = 0; i < 5; i++) {
 }
 leque.position.set(0, 1.02, 0.17);
 leque.rotation.x = -0.14;
-leque.scale.setScalar(0.55);   // como na mesa: escala humana nas mãos de um modelo
+leque.scale.setScalar(1);   // como na mesa: escala humana nas mãos de um modelo
 leque.visible = false;
 palco.add(leque);
 
@@ -121,7 +97,7 @@ palco.add(bocaFala);
 // o alvo fica baixo de propósito: a folha de conferência toma o pé da tela,
 // e o personagem inteiro (0 a 1,55 m) precisa caber no que sobra em cima
 // e de viés (AZIMUTE): de frente, o tampo da mesa tapava tudo abaixo do peito
-const alvo = new THREE.Vector3(0, 0.6, 0);
+const alvo = new THREE.Vector3(0, 0.82, 0);
 const AZIMUTE = 0.95;
 let elev = 0.3, dist = 3.2;
 function posicionaCamera() {
@@ -204,15 +180,17 @@ function mostraItens(itens) {
 }
 
 function poeNaCena(gltf, nome) {
+  leque.removeFromParent();
   if (atual?.m) { atual.m.mixer?.stopAllAction(); limpa(atual.m.raiz); }
   const m = encaixaModelo(gltf, nome, { estilo, avisa: false });
   palco.add(m.raiz);
-  banqueta.scale.setScalar(m.sentado ? ESCALA_ELENCO : 1);   // como na mesa: a banqueta cresce com quem senta nela
-  leque.position.copy(m.posLeque).add(new THREE.Vector3(0, -0.06, 0.05)); leque.rotation.x = -0.35; leque.visible = true;   // como na mesa: à frente das mãos, só os dedos acima da borda
+  ajustaBanqueta(m, banqueta);   // como na mesa: a banqueta cresce com quem senta nela
+  const cartaAtiva = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.112), materialVerso.clone());
+  conectaLeque(m, leque, cartaAtiva); arrumaLeque(leque, 5, 5); leque.visible = true;
   bocaFala.position.set(0, m.alturaCabeca - 0.07, 0.16); bocaFala.visible = false;
   atual = { ...atual, nome, m };
   $('dedos').disabled = !m.dedos.juntas.length;
-  m.dedos.alvo = Number($('dedos').value); atualizaDedos(m.dedos, 0, true);
+  atualizaInteracao(m, 0, { flexao: Number($('dedos').value), parado: true });
   mostraItens(confereModelo(gltf, m));
   for (const b of botoesReacao) b.disabled = false;
   $('ex-boca').disabled = false;
@@ -296,6 +274,9 @@ $('mesa').onclick = () => {
 // ---------------------------------------------------------------------------
 // Quadro a quadro
 // ---------------------------------------------------------------------------
+for (const [id, tipo] of [['ex-comprar', 'comprar'], ['ex-descartar', 'descartar'], ['ex-baixar', 'baixar']]) {
+  $(id).onclick = () => { if (atual?.m) gestoCarta(atual.m, tipo, palco.localToWorld(new THREE.Vector3(-0.1, 0.88, 0.55))); };
+}
 $('dedos').addEventListener('input', () => {
   $('dedos-valor').textContent = `${Math.round(Number($('dedos').value) * 100)}%`;
   if (atual?.m) atual.m.dedos.alvo = Number($('dedos').value);
@@ -308,7 +289,7 @@ function quadro(t) {
   const m = atual?.m;
   if (m) {
     m.mixer?.update(dt);
-    atualizaDedos(m.dedos, dt);
+    atualizaInteracao(m, dt, { flexao: Number($('dedos').value) });
     if (caraAte && t > caraAte) neutro();
   }
   renderer.render(scene, camera);
