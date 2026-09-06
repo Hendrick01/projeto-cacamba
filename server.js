@@ -26,6 +26,8 @@ const PORT = Number(process.env.PORT || cliValue('--port')) || 3000;
 // Hospedagens injetam a porta e esperam que o processo escute em todas as
 // interfaces. HOST permite restringir de novo (ex.: 127.0.0.1) se precisar.
 const HOST = process.env.HOST || cliValue('--host') || '0.0.0.0';
+const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '';
+const TRUST_PROXY = process.env.TRUST_PROXY === '1' || (process.env.RENDER === 'true' && process.env.TRUST_PROXY !== '0');
 
 // ---------------------------------------------------------------------------
 // Arquivos estáticos
@@ -72,7 +74,7 @@ const CABECALHOS_SEGUROS = {
   'X-Frame-Options': 'DENY',
   'Permissions-Policy': 'camera=(), geolocation=(), microphone=(self)',
   // HSTS só faz sentido onde há TLS, e só o deploy sabe que há: PUBLIC_URL.
-  ...(/^https:/.test(process.env.PUBLIC_URL || '') ? { 'Strict-Transport-Security': 'max-age=31536000' } : {}),
+  ...(/^https:/.test(PUBLIC_URL) ? { 'Strict-Transport-Security': 'max-age=31536000' } : {}),
 };
 
 // O que vale comprimir: texto. SVG é texto, e é o grosso do peso do jogo — as
@@ -120,7 +122,7 @@ function corpoComprimido(full, stat, ext) {
 
 function politicaDaPagina(req) {
   let host = req.headers.host;
-  try { if (process.env.PUBLIC_URL) host = new URL(process.env.PUBLIC_URL).host; } catch { host = ''; }
+  try { if (PUBLIC_URL) host = new URL(PUBLIC_URL).host; } catch { host = ''; }
   const destinos = hostValido(host) ? ` ws://${host} wss://${host}` : '';
   return CSP.replace("connect-src 'self' ws: wss: blob:", `connect-src 'self' blob:${destinos}`);
 }
@@ -262,8 +264,8 @@ const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS || '')
   .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 
 function originFrom(req) {
-  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/+$/, '');
-  const trustProxy = process.env.TRUST_PROXY === '1';
+  if (PUBLIC_URL) return PUBLIC_URL.replace(/\/+$/, '');
+  const trustProxy = TRUST_PROXY;
   const fwdHost = trustProxy ? String(req?.headers['x-forwarded-host'] || '').split(',')[0].trim() : '';
   const host = fwdHost || (req && req.headers.host);
   if (!hostValido(host)) return LAN_HOST;
@@ -457,13 +459,13 @@ function scheduleBots(room) {
 // abrindo centenas, não.
 const MAX_CONEXOES_POR_IP = 40;
 const conexoesPorIp = new Map();
-const ipDe = (req) => clientIp(req, process.env.TRUST_PROXY === '1');
+const ipDe = (req) => clientIp(req, TRUST_PROXY);
 const entradasPorIp = new Map();
 const wss = new WebSocketServer({
   server,
   maxPayload: 16 * 1024,
   verifyClient: ({ req, origin }) => {
-    if (!validOrigin(req, process.env.PUBLIC_URL)) return false;
+    if (!validOrigin(req, PUBLIC_URL)) return false;
     if (req.url !== '/' || wss.clients.size >= 800) return false;
     if ((conexoesPorIp.get(ipDe(req)) || 0) >= MAX_CONEXOES_POR_IP) return false;
     return true;
@@ -485,7 +487,7 @@ wss.on('connection', (ws, req) => {
   ws.on('error', (err) => console.error('ws:', err.message));
 
   ws.on('message', (raw, binary) => {
-    if (!consume(ws.budget, 600, 180)) { ws.close(1008, 'Muitas mensagens'); return; }
+    if (!consume(ws.budget, 120, 45)) { ws.close(1008, 'Muitas mensagens'); return; }
     if (binary) { ws.close(1003, 'Somente JSON'); return; }
     let msg;
     try { msg = JSON.parse(raw); } catch { send(ws, { t: 'error', msg: 'Mensagem inválida.' }); return; }
@@ -775,7 +777,7 @@ server.listen(PORT, HOST, () => {
   console.log('🃏 Caçamba no ar!');
   console.log(`   Neste computador:  http://localhost:${PORT}`);
   console.log(`   Celulares (mesmo Wi-Fi):  ${LAN_HOST}`);
-  if (process.env.PUBLIC_URL) console.log(`   Endereço público:  ${process.env.PUBLIC_URL}`);
+  if (PUBLIC_URL) console.log(`   Endereço público:  ${PUBLIC_URL}`);
 });
 
 // Hospedagens param o processo com SIGTERM e esperam que ele saia sozinho.
