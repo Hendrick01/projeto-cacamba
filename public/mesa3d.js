@@ -1664,8 +1664,12 @@ function reageAoEvento(ev) {
 function ajustaCameraParaAssentos(total) {
   const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
   let z = OLHO.z;
-  for (let i=0;i<total;i++) { const p=posicaoDoAssento(i,total); z=Math.max(z, p.z + (Math.abs(p.x)+0.36)/tanH); }
-  camera.position.z=z; camera.position.y=OLHO.y + (total>4?0.12:0);
+  // Recua só o necessário para o corpo de cada vizinho caber (folga de 22 cm;
+  // o rótulo do nome pode cortar), e nunca além de 2,6 m: em pé, com sete na
+  // mesa, recuar para caber quem senta ao seu lado mostrava o pé da mesa e
+  // deixava todo mundo miúdo — os das pontas ficam de fora do quadro.
+  for (let i=0;i<total;i++) { const p=posicaoDoAssento(i,total); z=Math.max(z, p.z + (Math.abs(p.x)+0.22)/tanH); }
+  camera.position.z=Math.min(2.6, z); camera.position.y=OLHO.y + (total>4?0.12:0);
 }
 function encaixaTela() {
   const w = innerWidth; const h = innerHeight;
