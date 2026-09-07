@@ -103,19 +103,24 @@ export function preparaInteracao(m) {
     i.desalinha = i.alinha.clone().invert();
   }
   for (const lado of ['Left', 'Right']) {
-    const ombro = raiz.getObjectByName(`${lado}Arm`), cotovelo = raiz.getObjectByName(`${lado}ForeArm`), mao = m.dedos.maos[lado];
-    if (!ombro || !cotovelo || !mao) continue;
+    const ombro = raiz.getObjectByName(`${lado}Arm`), cotovelo = raiz.getObjectByName(`${lado}ForeArm`), maoOsso = raiz.getObjectByName(`${lado}Hand`);
+    if (!ombro || !cotovelo || !maoOsso) continue;
     // Os braços foram assados em volta do leque com o tronco torcido; ao
     // endireitar o tronco eles iriam junto, para o lado. Guarda onde cada mão
     // ESTAVA (no espaço da raiz) e desfaz o giro no ombro: a cinemática do
     // repouso leva a mão de volta a esse ponto a partir daí, e só o cotovelo
     // se acomoda ao ombro que mudou de lugar com o tronco.
-    const repouso = raiz.worldToLocal(wp(mao.osso));
+    const repouso = raiz.worldToLocal(wp(maoOsso));
     if (i.desalinha) giraNaRaiz(m, ombro, i.desalinha);
-    i.bracos[lado] = { ombro, cotovelo, mao: mao.osso, dedos: mao, repouso, baseO: ombro.quaternion.clone(), baseC: cotovelo.quaternion.clone(), sinal: lado === 'Left' ? 1 : -1 };
+    // `dedos` (eixos da palma) só existe num rig com ossos de dedo; sem ele o
+    // braço ainda vai e volta, mas o leque se pendura no osso da mão
+    i.bracos[lado] = { ombro, cotovelo, mao: maoOsso, dedos: m.dedos.maos[lado] || null, repouso, baseO: ombro.quaternion.clone(), baseC: cotovelo.quaternion.clone(), sinal: lado === 'Left' ? 1 : -1 };
   }
-  if (i.bracos.Left) i.pegaEsq = pontoNaMao(i.bracos.Left.dedos, PEGA.leque);
-  if (i.bracos.Right) i.pegaDir = pontoNaMao(i.bracos.Right.dedos, PEGA.carta);
+  // Endireitar o tronco sem poder levar as mãos de volta deixaria os braços
+  // apontando para o lado: rig sem os dois braços fica com o tronco do arquivo.
+  if (!i.bracos.Left || !i.bracos.Right) i.alinha = i.desalinha = null;
+  if (i.bracos.Left?.dedos) i.pegaEsq = pontoNaMao(i.bracos.Left.dedos, PEGA.leque);
+  if (i.bracos.Right?.dedos) i.pegaDir = pontoNaMao(i.bracos.Right.dedos, PEGA.carta);
   m.interacao = i;
   raiz.add(i.ancora);
   return i;
@@ -134,7 +139,7 @@ export function conectaLeque(m, leque, carta = null) {
   if (carta) {
     carta.visible = false; carta.removeFromParent();
     const b = i.bracos.Right;
-    if (b) {
+    if (b?.dedos) {
       b.mao.add(carta);
       carta.scale.divideScalar(escalaDoOsso(b.mao));   // o tamanho pedido pelo chamador é em metros
       carta.position.copy(i.pegaDir);
@@ -223,10 +228,12 @@ export function atualizaInteracao(m, dt, { flexao = 0.62, flexaoDir = 0.3, parad
   m.dedos.alvo = flexao; m.dedos.alvos = { Left: flexao, Right: aperto };
   atualizaDedos(m.dedos, dt, parado);
   m.raiz.updateWorldMatrix(true, true);
-  // o leque segue a palma esquerda (posição), com a orientação da mesa
-  if (i.bracos.Left && i.pegaEsq) {
-    const p = i.bracos.Left.mao.localToWorld(i.pegaEsq.clone());
+  // o leque segue a palma esquerda (posição), com a orientação da mesa; sem
+  // ossos de dedo, segue o osso da mão, um pouco acima e à frente dele
+  if (i.bracos.Left) {
+    const p = i.pegaEsq ? i.bracos.Left.mao.localToWorld(i.pegaEsq.clone()) : wp(i.bracos.Left.mao);
     i.ancora.position.copy(m.raiz.worldToLocal(p));
+    if (!i.pegaEsq) i.ancora.position.add(new T.Vector3(0, 0.03, 0.04));
   }
   if (i.carta) i.carta.visible = !!e && !parado && (e.tipo === 'comprar' ? e.t / e.dur > 0.42 : e.t / e.dur < 0.49);
 }

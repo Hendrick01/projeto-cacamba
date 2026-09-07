@@ -141,7 +141,7 @@ export function criaSala(){const g=new T.Group();
   cartaz(-.6,2.5,-5.985,0,'#9c3a30',[['CERVEJA',44,110],['GELADA',44,165],['R$ 9,99',40,250]]);
   cartaz(2.5,2.75,-5.985,0,'#3a6b45',[['PETISCOS',40,110],['porção',30,165],['R$ 15',44,250]]);
   cartaz(-2.15,2.62,-5.985,0,'#c9a24e',[['CAÇAMBA',40,110],['toda',30,165],['sexta',44,240]],'#3d2c07');
-  cartaz(4.985,2.1,-3.9,-Math.PI/2,'#2f5f8f',[['SINUCA',46,120],['a ficha',30,180],['R$ 5',44,250]]);
+  cartaz(4.985,2.1,-3.2,-Math.PI/2,'#2f5f8f',[['SINUCA',46,120],['a ficha',30,180],['R$ 5',44,250]]); // depois da janela (que vai de z −5,35 a −3,85)
   plano(g,.42,.42,basico({map:texturaRelogio(),transparent:true}),3.9,2.55,-5.985);
   // --- espada-de-são-jorge no vaso de barro, ao lado da porta ---
   const vaso=new T.Mesh(new T.CylinderGeometry(.16,.12,.3,14),mat(0xb5613a,.9));vaso.position.set(-3.05,.15,-5.55);g.add(vaso);
@@ -151,7 +151,7 @@ export function criaSala(){const g=new T.Group();
   caixa(sinuca,2,.12,1.1,0,.8,0,mat(0xc8f0d0,.95,{map:texturaFeltro()}));caixa(sinuca,2.16,.14,1.26,0,.72,0,madeira);
   sinuca.add(instancias(CUBO,madeiraEscura,[[-.95,-.5],[.95,-.5],[-.95,.5],[.95,.5]].map(([x,z])=>({x,y:.33,z,s:[.12,.66,.12]}))));
   sinuca.add(instancias(new T.SphereGeometry(.03,10,8),mat(0xffffff,.15),[0xf2e6c8,0xc23a2a,0x2a4fb4,0xd9a441,0x1c1c1c,0x2f7d3a].map((cor,i)=>({x:-.55+i*.22,y:.89,z:(i%2)*.3-.15,cor}))));
-  g.add(instancias(new T.CylinderGeometry(.008,.014,1.45,6),madeira,[0,1,2].map(i=>({x:4.91,y:.72,z:-5.2+i*.1,rz:-.09}))));
+  g.add(instancias(new T.CylinderGeometry(.008,.014,1.45,6),madeira,[0,1,2].map(i=>({x:4.91,y:.72,z:-3.75+i*.1,rz:-.09})))); // entre a janela e o cartaz
   // --- janela com veneziana na parede direita: luz forte entre as réguas ---
   caixa(g,.06,1.3,1.5,4.97,1.9,-4.6,madeiraEscura);plano(g,1.38,1.18,basico({map:texturaVeneziana()}),4.93,1.9,-4.6,-Math.PI/2);
   // --- cadeiras de plástico encostadas e uma mesinha de plástico; as pernas de tudo num só desenho ---

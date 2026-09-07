@@ -158,7 +158,6 @@ const MESA_RAIO = 1.15;          // o feltro; o aro vai a 1,2
 // só o necessário para 78 cm entre vizinhos quando a mesa enche — com sete
 // adversários a roda vai a 1,8 m e a câmera recua para caber todos.
 const raioDosAssentos = (total) => Math.max(MESA.assento, (total - 1) * 0.30);
-let ASSENTO_RAIO = MESA.assento;
 const ESCALA_TAMPO = 0.55;       // monte, descarte e jogos, em relação à carta da mão
 const OLHO = { x: 0, y: 1.2, z: 1.35 };   // a sua cabeça, sentada na sua cadeira
 
@@ -945,8 +944,10 @@ function criaAssento(p) {
 
   // copinhos de bar no tampo, à direita de cada um (referência do Capote), e
   // o foco da vez no TAMPO, na frente da cadeira (no chão ficaria escondido
-  // sob a mesa). Os dois ficam num grupo preso à beirada do feltro: a roda de
-  // cadeiras abre e fecha com a mesa, e `naBeirada` os põe sempre no lugar.
+  // sob a mesa). Os dois ficam num grupo próprio, na CENA, preso à beirada do
+  // feltro na direção da cadeira (a sincronia o põe lá): dentro do grupo do
+  // assento eles herdariam a escala 0,8 do boneco de reserva e afundariam no
+  // tampo enquanto o modelo não chega.
   const naBeirada = new THREE.Group();
   for (const [cx, cz] of [[0.3, 0.12], [0.38, 0.2]]) {
     const copinho = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.06, 12, 1, true), materialVidro);
@@ -961,8 +962,7 @@ function criaAssento(p) {
   focoVez.position.set(0, MESA_TOPO + 0.006, 0.2);
   focoVez.scale.y = 0.6;
   naBeirada.add(focoVez);
-  naBeirada.position.z = ASSENTO_RAIO - MESA_RAIO;
-  grupo.add(naBeirada);
+  scene.add(naBeirada);
 
   scene.add(grupo);
   const ref = { grupo, corpo, materiais, bocas, cara, leque, contagem, nome, focoVez, naBeirada, cadeira, pulo: 0, caraAte: 0, assento, tAnterior: 0, lequeBase: leque.position.clone(), bocaBase: null, giroAlvo: 0 };
@@ -1389,10 +1389,9 @@ async function sincroniza(primeira) {
     if (primeira) $('aviso').hidden = true;
 
     const outros = view.players.filter((p) => p.id !== me());
-    ASSENTO_RAIO = raioDosAssentos(outros.length);
     ajustaCameraParaAssentos(outros.length);
     for (const [id, a] of assentos) {
-      if (!outros.some((p) => p.id === id)) { scene.remove(a.grupo); assentos.delete(id); }
+      if (!outros.some((p) => p.id === id)) { scene.remove(a.grupo); scene.remove(a.naBeirada); assentos.delete(id); }
     }
     for (let i = 0; i < outros.length; i++) {
       const p = outros[i];
@@ -1402,7 +1401,9 @@ async function sincroniza(primeira) {
       a.grupo.position.set(pos.x, 0, pos.z);
       // A frente +Z de cada personagem aponta para o centro da mesa.
       a.grupo.rotation.y = -pos.ang;
-      a.naBeirada.position.z = ASSENTO_RAIO - MESA_RAIO;
+      // na beirada do feltro, na direção desta cadeira, com +Z para o centro
+      a.naBeirada.position.set(Math.sin(pos.ang) * MESA_RAIO, 0, -Math.cos(pos.ang) * MESA_RAIO);
+      a.naBeirada.rotation.y = -pos.ang;
 
       trocaRotulo(a.contagem, `${p.handCount}`);
       trocaRotulo(a.nome, view.claims?.includes(p.id) ? `🛒 ${p.name}` : p.name);

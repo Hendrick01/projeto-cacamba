@@ -9,7 +9,7 @@
 // ============================================================================
 
 import * as THREE from './vendor/three.module.js';
-import { MESA, conectaLeque, arrumaLeque, atualizaInteracao, ajustaBanqueta, gestoCarta } from './interacao3d.js';
+import { MESA, ESCALA_CARTA_MAO, conectaLeque, arrumaLeque, atualizaInteracao, ajustaBanqueta, gestoCarta } from './interacao3d.js';
 import { iluminaSala, criaMesa, criaSala } from './cenario3d.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { ALTURA_SENTADO, encaixaModelo, confereModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
@@ -185,12 +185,14 @@ function poeNaCena(gltf, nome) {
   const m = encaixaModelo(gltf, nome, { estilo, avisa: false });
   palco.add(m.raiz);
   ajustaBanqueta(m, banqueta);   // como na mesa: a banqueta cresce com quem senta nela
-  const cartaAtiva = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.112), materialVerso.clone());
+  // a mesma carta da mesa 3D (42×59 cm na escala da mão): é o tamanho que a pegada tem de segurar
+  const cartaAtiva = new THREE.Mesh(geoCarta, materialVerso.clone());
+  cartaAtiva.scale.setScalar(ESCALA_CARTA_MAO);
   conectaLeque(m, leque, cartaAtiva); arrumaLeque(leque, 5, 5); leque.visible = true;
   bocaFala.position.set(0, m.alturaCabeca - 0.07, 0.16); bocaFala.visible = false;
   atual = { ...atual, nome, m };
   $('dedos').disabled = !m.dedos.juntas.length;
-  atualizaInteracao(m, 0, { flexao: Number($('dedos').value), parado: true });
+  atualizaInteracao(m, 0, { flexao: Number($('dedos').value), flexaoDir: Number($('dedos').value), parado: true });
   mostraItens(confereModelo(gltf, m));
   for (const b of botoesReacao) b.disabled = false;
   $('ex-boca').disabled = false;
@@ -289,7 +291,8 @@ function quadro(t) {
   const m = atual?.m;
   if (m) {
     m.mixer?.update(dt);
-    atualizaInteracao(m, dt, { flexao: Number($('dedos').value) });
+    // o controle move as DUAS mãos: é para conferir o rig, não a pose de jogo
+    atualizaInteracao(m, dt, { flexao: Number($('dedos').value), flexaoDir: Number($('dedos').value) });
     if (caraAte && t > caraAte) neutro();
   }
   renderer.render(scene, camera);

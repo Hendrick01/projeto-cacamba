@@ -98,6 +98,29 @@ for (const slug of ['matheus', 'junior', 'dri', 'esterex', 'gabizinsky', 'lyly',
   });
 }
 
+test('rig do elenco SEM ossos de dedo: tronco reto, mãos no lugar assado e leque na mão', async () => {
+  // o arquivo que chega do senta.mjs antes do rig de dedos: tem Hand, não tem falanges
+  const gltf = await carregaCPU('matheus');
+  gltf.scene.traverse((o) => { if (o.isBone && /Hand(Thumb|Index|Middle|Ring|Pinky)/.test(o.name)) o.name += '_x'; });
+  gltf.scene.updateMatrixWorld(true);
+  const raiz = gltf.scene;
+  const osso = (n) => raiz.getObjectByName(n);
+  const maoAssada = raiz.worldToLocal(world(osso('LeftHand')));
+  const cabecaAssada = osso('Head').getWorldQuaternion(new T.Quaternion());
+  const m = encaixaModelo(gltf, 'matheus', { estilo: 'original', avisa: false });
+  assert.equal(m.dedos.juntas.length, 0);
+  const leque = new T.Group(); leque.add(new T.Mesh(new T.PlaneGeometry(0.42, 0.59), new T.MeshStandardMaterial()));
+  conectaLeque(m, leque, new T.Mesh(new T.PlaneGeometry(0.42, 0.59), new T.MeshStandardMaterial()));
+  for (let f = 0; f < 3; f++) atualizaInteracao(m, 1 / 60);
+  raiz.updateMatrixWorld(true);
+  const oe = raiz.worldToLocal(world(osso('LeftArm'))), od = raiz.worldToLocal(world(osso('RightArm')));
+  assert.ok(Math.abs(oe.z - od.z) < 0.03, 'tronco continua torcido');
+  assert.ok(raiz.worldToLocal(world(osso('LeftHand'))).distanceTo(maoAssada) < 0.03, 'a mão esquerda saiu do ponto assado');
+  assert.ok(osso('Head').getWorldQuaternion(new T.Quaternion()).angleTo(cabecaAssada) < 0.02, 'cabeça girou');
+  assert.ok(world(m.interacao.ancora).distanceTo(world(osso('LeftHand'))) < 0.08, 'leque longe da mão');
+  m.mixer?.stopAllAction();
+});
+
 test('importação sem ossos de dedos mantém leque na posição de apoio', () => {
   const g = { scene: new T.Group(), animations: [] };
   g.scene.add(new T.Mesh(new T.BoxGeometry(0.3, 1, 0.2), new T.MeshStandardMaterial()));
