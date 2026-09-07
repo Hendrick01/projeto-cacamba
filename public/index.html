@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e3b2c">
 <title>Caçamba</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="fonts/fontes.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="interface.css">
 </head>
 <body>
 
@@ -60,38 +61,31 @@
 
 <!-- ======================= TELA INICIAL ======================= -->
 <section id="screen-home" class="screen">
-  <div class="home-box">
-    <div class="palco-inicio"><img id="persona-figura" alt=""></div>
-    <h1 class="logo">Caçamba</h1>
-    <p class="tagline">7 rodadas, trincas e sequências.<br>Quem fizer menos pontos leva.</p>
-
-    <label class="field">
-      <span>Seu nome</span>
-      <input id="name-input" maxlength="16" placeholder="ex.: Matheus" autocomplete="nickname">
-    </label>
-
-    <button id="btn-personagem" class="btn btn-persona">
-      <img id="persona-cara" class="persona-cara" alt="">
-      <span class="persona-txt">
-        <small>Seu personagem</small>
-        <strong id="persona-nome">Gabizinsky</strong>
-      </span>
-      <span class="persona-seta">trocar</span>
-    </button>
-
-    <button id="btn-create" class="btn btn-primary">Criar sala</button>
-
-    <div class="join-row">
-      <input id="code-input" maxlength="4" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off">
-      <button id="btn-join" class="btn">Entrar</button>
-    </div>
-
-    <button id="btn-rules-home" class="btn btn-ghost">Como se joga?</button>
-    <p id="home-error" class="error" hidden></p>
+  <div class="ui-shell">
+    <header class="ui-top"><div class="ui-brand">Caçamba</div><div class="ui-top-right"><span data-connection role="status">Conectando…</span><span class="ui-version" data-interface-version>UI 07.09 / R1</span></div></header>
+    <main class="ui-grid">
+      <div class="ui-hero">
+        <p class="ui-eyebrow">Seu lugar na mesa</p>
+        <h1>Uma boa mão.<br><em>Uma boa resenha.</em></h1>
+        <p class="ui-description">Junte os amigos, escolha seu personagem e deixe as cartas contarem a história.</p>
+        <div class="ui-stats"><span><strong>2–8</strong>jogadores</span><span><strong>7</strong>rodadas</span><span><strong>Menos pontos</strong>mais perto da vitória</span></div>
+        <div class="ui-stage" aria-hidden="true"><div class="palco-inicio"><img id="persona-figura" alt=""></div><span class="ui-mini-card">A<br>♠</span><span class="ui-mini-card">7<br>♥</span></div>
+      </div>
+      <div class="ui-entry">
+        <h2>Vamos jogar?</h2><p>Crie sua mesa ou entre na sala dos amigos.</p>
+        <label class="field"><span>Como podemos chamar você?</span><input id="name-input" maxlength="16" placeholder="Seu nome" autocomplete="nickname"></label>
+        <button id="btn-personagem" type="button" class="btn btn-persona"><img id="persona-cara" class="persona-cara" alt=""><span class="persona-txt"><small>Seu personagem</small><strong id="persona-nome">Gabizinsky</strong></span><span class="persona-seta">Trocar ↗</span></button>
+        <button id="btn-create" type="button" class="btn btn-primary"><span>Criar minha sala<small>Convide amigos ou adicione robôs</small></span><span aria-hidden="true">→</span></button>
+        <div class="ui-divider">Já tem um convite?</div>
+        <div class="join-row"><input id="code-input" maxlength="4" aria-label="Código da sala, quatro letras" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off"><button id="btn-join" type="button" class="btn">Entrar</button></div>
+        <button id="btn-rules-home" type="button" class="btn btn-ghost">Como se joga? ↗</button>
+        <p id="home-error" class="error" role="alert" hidden></p>
+      </div>
+    </main>
+    <footer class="ui-footer"><span>Trincas, sequências e boas histórias.</span><span>O mesmo jogo. Sua turma.</span></footer>
   </div>
 </section>
 
-<!-- ======================= ESCOLHA DO PERSONAGEM ======================= -->
 <section id="screen-avatar" class="screen" hidden>
   <div class="escolha">
     <header class="escolha-topo">
@@ -331,3 +325,5 @@
 <script type="module" src="client.js"></script>
 </body>
 </html>
+
+<!-- interface-2026-09-07-r1 -->
