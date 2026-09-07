@@ -2,6 +2,7 @@
 
 Base: `62319a81a0c3c4e79dac24edd751dfbe56ed1b8c`.
 Solicitacao: executar as melhorias visuais enquanto Matheus resolve os dedos.
+Entrega: PR #4, em rascunho, sem merge ou deploy automatico.
 
 ## Implementado
 
@@ -12,6 +13,7 @@ Solicitacao: executar as melhorias visuais enquanto Matheus resolve os dedos.
   Cor, textura, UV, geometria e transparencia originais sao preservadas.
 - Relevo procedural pequeno no feltro/piso, e contato suave sob os assentos.
   As tres texturas novas medem 128x128, 128x128 e 64x64; sao reutilizadas.
+  O contato atualiza a matriz no mesmo quadro e respeita a visibilidade dos pais.
 - Transicao de altura/recuo da camera independente de FPS; preservado o teto
   de 2,6 m, sem zoom em jogadas. Mudanca de orientacao aplica o enquadramento
   imediatamente. Paralaxe horizontal limitada a 18 cm.
@@ -40,21 +42,32 @@ Os ajustes sentados existentes foram preservados. Esta camada nao corrige
 interpenetracao anatomica, nao e nova escultura e nao substitui o ajuste de
 ombro/cotovelo/punho no rig. O relevo de superficie nao e nova geometria.
 
-## Validacao
+## Validacao executada
 
-Executado no ambiente local: 15 testes das funcoes puras, todos aprovados;
-checagem de sintaxe dos quatro modulos novos e dos testes.
+Localmente: 15 testes das funcoes puras, todos aprovados.
 
-Adicionados 9 testes de integracao da Scene com o Three.js ja versionado no
-repositorio: restauracao de pose, preservacao de dedos/maos, materiais, camera
-orbital, liberacao de recursos e callbacks. Eles nao foram executados neste
-ambiente local, que nao conseguiu baixar o vendor e os assets do repositorio.
-O workflow visual-qa executa esses testes, a suite completa e test:security.
-Consultar o resultado efetivo no PR; incluir o workflow nao significa que passou.
+No GitHub Actions, execucao 34095261431, para o commit inicial
+`6777f92580859b1f6f212eedd48c4e187cf4afe8` integrado temporariamente a base do PR:
+
+- Camada visual: 24 testes aprovados (15 puros e 9 de integracao da Scene).
+- `npm test`: 110 testes aprovados, zero falhas, incluindo os modelos reais
+  do elenco, regras do jogo e os 24 testes visuais acima.
+- `npm run test:security`: aprovado para HTTP, origem, revogacao de sessao,
+  troca de assento, JSON invalido e limite de mensagens.
+
+Registro: https://github.com/LeRicciardi/projeto-cacamba/actions/runs/34095261431
+
+A revisao seguinte acrescenta dois testes de contato (matriz no primeiro
+quadro e visibilidade herdada). O resultado dessa revisao deve ser consultado
+na execucao correspondente ao commit mais recente do PR; os numeros acima
+identificam explicitamente a execucao inicial, nao testes futuros.
+
+## Validacao ainda pendente
 
 Sem validacao visual final em navegador com os GLBs, sem medicao de FPS em
-hardware real e sem teste de iPhone. Por isso, entregar como PR de revisao,
-sem merge automatico ou alteracao do servico publicado.
+hardware real e sem teste de iPhone. Os testes automatizados nao substituem
+essa conferencia. PR de revisao, sem merge automatico ou alteracao do servico
+publicado. Os testes de seguranca nao equivalem a uma auditoria independente.
 
 ## Conferencia visual antes de publicar
 

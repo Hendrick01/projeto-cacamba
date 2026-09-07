@@ -87,7 +87,11 @@ export function instalaVisual3d(contexto, { modo = 'mesa', animar = modo === 'me
     }
     referencia.getWorldPosition(ponto);
     o.position.set(ponto.x, 0.003, ponto.z); o.scale.set(largura, profundidade, 1);
-    o.visible = referencia.visible;
+    o.visible = true;
+    for (let pai = referencia; pai; pai = pai.parent) if (!pai.visible) { o.visible = false; break; }
+    // onBeforeRender roda depois da atualizacao inicial das matrizes da cena.
+    // O plano novo/movido precisa estar no lugar neste quadro, nao no seguinte.
+    o.updateWorldMatrix(true, false);
   }
   const nomeNormal = nome => String(nome).toLowerCase().replace(/[^a-z0-9]/g, '');
   function prepararModelo(m, id) {
