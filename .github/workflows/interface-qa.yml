@@ -1,0 +1,36 @@
+name: Interface - verificacao integrada
+on:
+  pull_request:
+    paths:
+      - 'public/**'
+      - 'test/**'
+      - 'scripts/**'
+      - '.github/workflows/interface-qa.yml'
+permissions:
+  contents: read
+jobs:
+  interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Testes da base atual
+        run: npm test
+      - name: Seguranca
+        run: npm run test:security
+      - name: Snapshot temporario dos arquivos publicos para revisao
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import base64, gzip, pathlib
+          for name in ['public/index.html', 'public/style.css', 'public/client.js', 'public/mesa3d.js']:
+              data = pathlib.Path(name).read_bytes()
+              print('SOURCE ' + name + ' ' + base64.b64encode(gzip.compress(data, mtime=0)).decode())
+          PY
