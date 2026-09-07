@@ -5,32 +5,99 @@ on:
       - 'public/**'
       - 'test/**'
       - 'scripts/**'
+      - '.github/interface-payload.zip'
       - '.github/workflows/interface-qa.yml'
 permissions:
   contents: read
 jobs:
-  interface:
+  aplicar:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'melhoria/interface-completa-2026-09-07'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 3
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.aplicar.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: melhoria/interface-completa-2026-09-07
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Aplicar alteracoes verificadas somente na branch de revisao
+        id: aplicar
+        run: |
+          set -eu
+          if [ -f .github/interface-payload.zip ]; then
+            python3 - <<'PY'
+          import hashlib, pathlib, zipfile
+          p = pathlib.Path('.github/interface-payload.zip')
+          assert hashlib.sha256(p.read_bytes()).hexdigest() == 'f4f40931a4ec3e968aa35ce64d1a618804e93dd351b7fb05fee8c59e30fa26ec'
+          allowed = {'public/interface-core.js', 'public/interface.js', 'public/interface.css', 'scripts/implementar-interface.mjs', 'scripts/interface-smoke.mjs', 'test/interface-core.test.js'}
+          with zipfile.ZipFile(p) as z:
+              assert set(z.namelist()) == allowed and len(z.namelist()) == len(allowed)
+              for name in allowed:
+                  target = pathlib.Path(name)
+                  assert not target.exists(), name
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(z.read(name))
+          PY
+            node scripts/implementar-interface.mjs
+            for file in public/client.js public/mesa3d.js public/interface.js public/interface-core.js scripts/interface-smoke.mjs test/interface-core.test.js; do node --check "$file"; done
+            git diff --check
+            git add public/index.html public/3d.html public/client.js public/mesa3d.js public/interface.js public/interface-core.js public/interface.css scripts/interface-smoke.mjs test/interface-core.test.js
+            git rm .github/interface-payload.zip
+            rm scripts/implementar-interface.mjs
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Implementa Home, interface 2D, leque 3D responsivo e controles de voz'
+            git push origin HEAD:refs/heads/melhoria/interface-completa-2026-09-07
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  interface:
+    needs: aplicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.aplicar.outputs.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Testes da base atual
+      - name: Testes completos incluindo os modelos existentes
         run: npm test
-      - name: Seguranca
+      - name: Seguranca HTTP e WebSocket
         run: npm run test:security
-      - name: Snapshot temporario dos arquivos publicos para revisao
+      - name: Instalar navegador apenas para os testes
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Home, sala, mesa 2D, voz e mesa 3D no navegador
+        run: node scripts/interface-smoke.mjs
+      - name: Evidencias do navegador
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: interface-browser-evidence
+          path: qa-interface/
+          retention-days: 7
+      - name: Resumo e miniaturas para conferencia
         if: always()
         run: |
           python3 - <<'PY'
-          import base64, gzip, pathlib
-          for name in ['public/index.html', 'public/style.css', 'public/client.js', 'public/mesa3d.js']:
-              data = pathlib.Path(name).read_bytes()
-              print('SOURCE ' + name + ' ' + base64.b64encode(gzip.compress(data, mtime=0)).decode())
+          import pathlib, io, base64
+          from PIL import Image
+          report = pathlib.Path('qa-interface/report.json')
+          if report.exists(): print(report.read_text())
+          for p in sorted(pathlib.Path('qa-interface').glob('*.png')):
+              im = Image.open(p).convert('RGB'); im.thumbnail((800, 950))
+              buf = io.BytesIO(); im.save(buf, 'JPEG', quality=72)
+              print('SCREENSHOT ' + p.name + ' ' + base64.b64encode(buf.getvalue()).decode())
           PY
