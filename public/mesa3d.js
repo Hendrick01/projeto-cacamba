@@ -24,6 +24,9 @@ import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqu
 import { planBaixada, isJoker, rankLabel, cardLabel } from '/shared/engine.js';
 import { SLUGS, personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
+import { layoutMao3D, indiceInsercao3D } from '/interface-core.js';
+import { configuraInterface, estadoConexao, ligaControlesVoz } from '/interface.js';
+configuraInterface();
 
 const $ = (id) => document.getElementById(id);
 const semMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -63,42 +66,39 @@ function atualizaBotaoVoz() {
   b.classList.toggle('voz-mudo', voz.ligado() && voz.mudo);
   b.textContent = !voz.ligado() ? '🎙 voz' : voz.mudo ? '🔇 mudo' : '🎙 falando';
 }
-document.getElementById('btn-voz')?.addEventListener('click', async () => {
-  try {
-    if (!voz.ligado()) await voz.ligar();
-    else if (!voz.mudo) voz.silenciar(true);
-    else voz.desligar();
-  } catch (e) { aviso(`🎙 ${e.message || 'Não deu para ligar o microfone.'}`, true); }
-  atualizaBotaoVoz();
-});
+const controlesVoz = ligaControlesVoz(voz, { botao: $('btn-voz'), avisar: texto => aviso(texto,true) });
 
 function conecta() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}`);
-  ws.onopen = () => ws.send(JSON.stringify({
+  ws.onopen = () => { estadoConexao('online'); ws.send(JSON.stringify({
     t: 'resume', code: sessao.code, playerId: sessao.playerId, token: sessao.token,
-  }));
+  })); };
   ws.onmessage = (e) => {
     let msg; try { msg = JSON.parse(e.data); } catch { return; }
     if (msg.t === 'state') {
       const primeira = !view;
       view = msg.view;
+      controlesVoz.presenca(view.players);
       for (const ev of msg.events || []) reageAoEvento(ev);
       sincroniza(primeira);
     } else if (msg.t === 'lobby' && !msg.started) {
       aviso('A partida ainda não começou — comece pela mesa normal.', true);
+    } else if (msg.t === 'welcome') {
+      voz.reconectar?.();
     } else if (msg.t === 'voz') {
       voz.receber(msg);
     } else if (msg.t === 'error') {
       aviso(`⚠️ ${msg.msg}`);
     } else if (msg.t === 'gone') {
+      voz.desligar();
       aviso('A sala não existe mais. Voltando…', true);
       setTimeout(() => { location.href = '/'; }, 1500);
     }
   };
   ws.onclose = (event) => {
-    voz.desligar();
-    if ([4001, 1008].includes(event.code)) { aviso('Conexão pausada. Recarregue para retomar nesta janela.', true); return; }
+    estadoConexao([4001,1008].includes(event.code) ? 'paused' : 'offline');
+    if ([4001, 1008].includes(event.code)) { voz.desligar(); aviso('Conexão pausada. Recarregue para retomar nesta janela.', true); return; }
     aviso('Reconectando à partida…', true);
     setTimeout(conecta, 1800 + Math.random() * 1000);
   };
@@ -1164,76 +1164,45 @@ function sincronizaMaos() {
 }
 
 function sincronizaMao() {
-  const hand = maoOrdenada();
-  selecionadas = new Set([...selecionadas].filter((id) => hand.some((c) => c.id === id)));
-  ordemManual = ordemManual.filter((id) => hand.some((c) => c.id === id));
-
+  if (!view?.you) return;
+  const hand = maoOrdenada(), ids = new Set(hand.map(c => c.id));
+  selecionadas = new Set([...selecionadas].filter(id => ids.has(id)));
+  ordemManual = ordemManual.filter(id => ids.has(id));
+  const cancelarVoo = mesh => { for (let i = voos.length - 1; i >= 0; i--) if (voos[i].obj === mesh) voos.splice(i, 1); };
   for (const [id, mesh] of cartasDaMao) {
-    if (!hand.some((c) => c.id === id)) { maoGrupo.remove(mesh); cartasDaMao.delete(id); }
+    if (!ids.has(id)) { cancelarVoo(mesh); maoGrupo.remove(mesh); mesh.material.dispose(); cartasDaMao.delete(id); }
   }
   const n = hand.length;
-  // Largura visível na distância do leque, calculada da câmera de verdade:
-  // é o que faz a mão caber tanto no monitor quanto no celular em pé.
-  const dist = 1.3;
-  const alturaVisivel = 2 * dist * Math.tan((camera.fov * Math.PI) / 360);
-  const larguraVisivel = alturaVisivel * camera.aspect;
-  const escala = Math.min(0.8, larguraVisivel / 1.9);
-  const passo = n > 1
-    ? Math.min(0.16 * escala, (larguraVisivel * 0.84 - CARTA_L * escala) / (n - 1))
-    : 0;
-  // O leque é CORTADO pela borda de baixo, como no Capote: carta inteira com
-  // um vão de cenário embaixo é o que fazia a mão parecer flutuar.
-  const baseY = -alturaVisivel * 0.43;
-  layoutDaMao = { passo, escala, baseY, dist, meio: (n - 1) / 2, alturaVisivel, larguraVisivel };
-  hand.forEach((card, i) => {
-    let mesh = cartasDaMao.get(card.id);
-    let nova = false;
+  const plano = layoutMao3D({ quantidade:n, largura:innerWidth, altura:innerHeight, fov:camera.fov, cartaL:CARTA_L, cartaA:CARTA_A });
+  layoutDaMao = plano;
+  document.body.style.setProperty('--hand-height', plano.alturaMao + 'px');
+  hand.forEach((card,i) => {
+    let mesh = cartasDaMao.get(card.id), nova = false;
     if (!mesh) {
-      // material PRÓPRIO, por cima de tudo: o leque é interface presa à
-      // câmera, e com o olho na altura da mesa ele ficava atrás do tampo
       mesh = new THREE.Mesh(geoCarta, materialDaCarta(card).clone());
-      mesh.material.depthTest = false;
-      mesh.renderOrder = 20;
-      mesh.userData.cardId = card.id;
-      cartasDaMao.set(card.id, mesh);
-      maoGrupo.add(mesh);
-      nova = true;
+      mesh.material.depthTest = false; mesh.material.depthWrite = false;
+      mesh.userData.cardId = card.id; cartasDaMao.set(card.id,mesh); maoGrupo.add(mesh); nova = true;
     }
-    const meio = (n - 1) / 2;
-    const sel = selecionadas.has(card.id);
-    mesh.scale.setScalar(escala);
-    mesh.position.set(
-      (i - meio) * passo,
-      baseY + Math.abs(i - meio) * -0.012 + (sel ? 0.1 * escala : 0),
-      -dist + i * 0.004,
-    );
-    // a carta que acabou de entrar voa do monte (ou do meio) até o lugar dela
+    cancelarVoo(mesh);
+    const p = plano.posicoes[i];
+    mesh.visible = true; mesh.renderOrder = 100 + i; mesh.userData.linhaMao = p.fila;
+    mesh.scale.setScalar(p.escala); mesh.position.set(p.x,p.y + (selecionadas.has(card.id) ? 14 * plano.unidade : 0),p.z);
+    mesh.rotation.set(0,0,p.giro);
     if (nova && entradaNaMao && !semMovimento) {
       const origem = entradaNaMao === 'meio' ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.06) : topoDoMonte();
-      maoGrupo.updateMatrixWorld(true);
-      voa(mesh, noEspacoDaMao(origem), mesh.position.clone(), { dur: 480, arco: 0.06 });
+      maoGrupo.updateWorldMatrix(true,true);
+      voa(mesh,noEspacoDaMao(origem),mesh.position.clone(),{dur:400,arco:0.04});
     }
-    mesh.rotation.z = -(i - meio) * 0.05;
-    mesh.rotation.x = -0.12;
   });
-
-  entradaNaMao = null;
-  baixadaDe = null;   // os jogos já foram montados neste sincroniza
-
-  // as duas mãos sobem por trás das pontas do leque, viradas para dentro —
-  // é a composição da mesa 2D, que já era a aprovada
+  entradaNaMao = null; baixadaDe = null;
   sincronizaMaos();
-  const larguraLeque = (n - 1) * passo + CARTA_L * escala;
   if (maos.esq && maos.dir) {
-    maos.esq.visible = n > 0; maos.dir.visible = n > 0;
-    const yMao = baseY - 0.24 * escala;
-    const zTras = -dist - 0.03;   // atrás das cartas, como na mesa 2D
-    maos.esq.position.set(-larguraLeque * 0.5 - 0.03, yMao, zTras);
-    maos.dir.position.set(larguraLeque * 0.5 + 0.03, yMao, zTras);
-    maos.esq.rotation.z = -0.42;
-    maos.dir.rotation.z = 0.42;
-    maos.esq.scale.set(-escala, escala, 1);   // a esquerda é a direita espelhada
-    maos.dir.scale.set(escala, escala, 1);
+    const { escala,baseY,dist,larguraLeque } = plano;
+    maos.esq.visible = maos.dir.visible = n > 0;
+    maos.esq.position.set(-larguraLeque * .5 - .03,baseY - .24 * escala,-dist - .03);
+    maos.dir.position.set(larguraLeque * .5 + .03,baseY - .24 * escala,-dist - .03);
+    maos.esq.rotation.z = -.42; maos.dir.rotation.z = .42;
+    maos.esq.scale.set(-escala,escala,1); maos.dir.scale.set(escala,escala,1);
   }
 }
 
@@ -1257,7 +1226,7 @@ canvas.addEventListener('pointerdown', (e) => {
   ponteiro.x = (e.clientX / innerWidth) * 2 - 1;
   ponteiro.y = -(e.clientY / innerHeight) * 2 + 1;
   raycaster.setFromCamera(ponteiro, camera);
-  const hits = raycaster.intersectObjects([...cartasDaMao.values()], false);
+  const hits = raycaster.intersectObjects([...cartasDaMao.values()], false).sort((a,b) => b.object.renderOrder - a.object.renderOrder);
   if (hits.length) {
     arrasto3d = { id: hits[0].object.userData.cardId, x0: e.clientX, y0: e.clientY, ativo: false };
   }
@@ -1272,7 +1241,8 @@ window.addEventListener('pointermove', (e) => {
   const mesh = cartasDaMao.get(arrasto3d.id);
   if (!mesh) return;
   mesh.position.x = dedoParaXDoLeque(e.clientX);
-  mesh.position.y = layoutDaMao.baseY + 0.14 * layoutDaMao.escala;
+  mesh.position.y = (innerHeight / 2 - e.clientY) * layoutDaMao.unidade;
+  mesh.renderOrder = 1000;
   mesh.position.z = -layoutDaMao.dist + 0.06;
   mesh.rotation.z = 0;
 });
@@ -1293,10 +1263,8 @@ window.addEventListener('pointerup', (e) => {
   // esquerda dele, que é a mesma régua da mesa 2D
   const x = dedoParaXDoLeque(e.clientX);
   const semEla = maoOrdenada().filter((c) => c.id !== id);
-  const antes = semEla.filter((c, i) => {
-    const meshC = cartasDaMao.get(c.id);
-    return meshC && meshC.position.x < x;
-  }).length;
+  const y = (innerHeight / 2 - e.clientY) * layoutDaMao.unidade;
+  const antes = indiceInsercao3D(semEla.map(c => { const m = cartasDaMao.get(c.id); return {fila:m.userData.linhaMao,x:m.position.x,y:m.position.y}; }),x,y);
   const ordem = semEla.map((c) => c.id);
   ordem.splice(antes, 0, id);
   ordemManual = ordem;
@@ -1315,6 +1283,7 @@ window.addEventListener('pointermove', (e) => {
 // ---------------------------------------------------------------------------
 
 const barra = document.createElement('div');
+barra.className = 'action-3d';
 // `left: 0; right: 0` e centrar pelo flex: com `left: 50%`, o shrink-to-fit
 // de elemento fixo só enxerga metade da tela e empilhava os botões.
 barra.style.cssText = `position:fixed;left:0;right:0;bottom:max(200px, 27vh);
@@ -1866,3 +1835,5 @@ if (!sessao) {
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
 window.mesa3d = { assentos, scene, camera, renderer, quadro };
+
+// interface-2026-09-07-r1

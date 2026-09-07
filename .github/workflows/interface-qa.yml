@@ -1,0 +1,47 @@
+name: Interface - verificacao integrada
+on:
+  pull_request:
+    paths:
+      - 'public/**'
+      - 'test/**'
+      - 'scripts/**'
+      - '.github/workflows/interface-qa.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - 'test/**'
+      - 'scripts/**'
+      - '.github/workflows/interface-qa.yml'
+permissions:
+  contents: read
+jobs:
+  interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Testes completos incluindo modelos e voz
+        run: npm test
+      - name: Seguranca HTTP e WebSocket
+        run: npm run test:security
+      - name: Instalar navegador apenas para os testes
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Home, sala, mesa 2D, voz e mesa 3D no navegador
+        run: node scripts/interface-smoke.mjs
+      - name: Evidencias do navegador
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: interface-browser-evidence
+          path: qa-interface/
+          retention-days: 7

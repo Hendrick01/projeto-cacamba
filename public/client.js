@@ -13,6 +13,9 @@ import {
 } from '/shared/elenco.js';
 import { ordenaMao, reordena } from '/shared/mao.js';
 import { criaVoz } from '/voz.js';
+import { layoutMao2D } from '/interface-core.js';
+import { configuraInterface, estadoConexao, ligaControlesVoz } from '/interface.js';
+configuraInterface();
 
 const $ = (id) => document.getElementById(id);
 
@@ -55,6 +58,7 @@ function connect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}`);
   ws.onopen = () => {
+    estadoConexao('online');
     reconnectDelay = 500;
     if (session) ws.send(JSON.stringify({ t: 'resume', ...session }));
   };
@@ -64,6 +68,7 @@ function connect() {
     handleMessage(msg);
   };
   ws.onclose = (event) => {
+    estadoConexao([4001,1008].includes(event.code) ? 'paused' : 'offline');
     if (event.code === 4001 || event.code === 1008) {
       voz.desligar();
       toast(event.code === 4001 ? 'Partida aberta em outra janela. Recarregue para voltar aqui.' : 'Conexão pausada por excesso de mensagens. Aguarde e recarregue.');
@@ -95,16 +100,7 @@ function atualizaBotaoVoz() {
 }
 // Um botão, três estados: desligado → ligado → mudo → desligado. Ligar pede o
 // microfone ao navegador, e isso só pode acontecer num toque de verdade.
-$('btn-voz').onclick = async () => {
-  try {
-    if (!voz.ligado()) await voz.ligar();
-    else if (!voz.mudo) voz.silenciar(true);
-    else voz.desligar();
-  } catch (e) {
-    toast(`🎙 ${e.message || 'Não deu para ligar o microfone.'}`);
-  }
-  atualizaBotaoVoz();
-};
+const controlesVoz = ligaControlesVoz(voz, { botao: $('btn-voz'), avisar: toast });
 // Quem está falando acende no assento — inclusive você, no seu.
 setInterval(() => {
   if (!voz.ligado() && !voz.quantos) return;
@@ -116,6 +112,7 @@ function handleMessage(msg) {
   switch (msg.t) {
     case 'welcome':
       saveSession({ code: msg.code, playerId: msg.playerId, token: msg.token });
+      voz.reconectar?.();
       break;
     case 'lobby': {
       // Anfitrião pode mudar no meio (o antigo caiu): quem foi promovido
@@ -123,6 +120,7 @@ function handleMessage(msg) {
       // botão de continuar — senão a sala fica presa em "esperando…".
       const hostMudou = lobby && msg.hostId !== lobby.hostId;
       lobby = msg;
+      controlesVoz.presenca(msg.players);
       if (!msg.started) showScreen('lobby');
       renderLobby();
       if (hostMudou && view) { modalPhaseShown = null; render(); }
@@ -130,6 +128,7 @@ function handleMessage(msg) {
     }
     case 'state':
       view = msg.view;
+      controlesVoz.presenca(view.players);
       showScreen('game');
       for (const ev of msg.events || []) announce(ev);
       render();
@@ -144,6 +143,7 @@ function handleMessage(msg) {
       toast(`⚠️ ${msg.msg}`);
       break;
     case 'gone':
+      voz.desligar();
       saveSession(null);
       showScreen('home');
       break;
@@ -1206,8 +1206,9 @@ function renderHand() {
   const box = $('hand');
   box.innerHTML = '';
   const cartas = sortedHand();
-  const fileiras = cartas.length > CARTAS_POR_FILEIRA ? 2 : 1;
-  const porFileira = Math.ceil(cartas.length / fileiras);
+  const planoMao = layoutMao2D(cartas.length, box.clientWidth || 355);
+  const fileiras = planoMao.fileiras;
+  const porFileira = planoMao.itensPorFila;
 
   for (let f = 0; f < fileiras; f++) {
     const fila = document.createElement('div');
@@ -1226,18 +1227,18 @@ function montaLeque(fila, cartas, largura) {
   // leque precisa da largura, e mão cheia cobrindo as próprias mãos é o que
   // acontece de verdade. O que o giro empurra para fora entra na conta uma
   // vez, aqui — é isso que faz a folga ser a da tela e não a do papel.
-  const folga = n > 8 ? 22 : 40;
-  const espaco = Math.max(180, (largura || 355) - 2 * (folga + SOBRA_DO_GIRO));
-  const passo = n > 1
-    ? Math.min(PASSO_MAXIMO, Math.max(PASSO_MINIMO, (espaco - CARTA_LARGURA) / (n - 1)))
-    : CARTA_LARGURA;
+  const { passo } = layoutMao2D(n, largura || 355);
   const meio = (n - 1) / 2;
 
   cartas.forEach((card, i) => {
     const el = cardEl(card);
     el.dataset.cardId = card.id;
-    el.style.setProperty('--passo', `${passo - CARTA_LARGURA}px`);
-    el.style.setProperty('--giro', n > 1 ? `${(i - meio) * (ABERTURA / (n - 1))}deg` : '0deg');
+    el.style.setProperty('--passo', `${passo - 60}px`);
+    el.style.setProperty('--giro', n > 1 ? `${(i - meio) * (8 / (n - 1))}deg` : '0deg');
+    el.setAttribute('role','button'); el.tabIndex = 0;
+    el.setAttribute('aria-label', cardText(card));
+    el.setAttribute('aria-pressed', String(selected.has(card.id)));
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } });
     if (cartasNovas.has(card.id)) el.classList.add('nova');
     if (selected.has(card.id)) el.classList.add('sel');
     el.onclick = () => {
@@ -1987,3 +1988,5 @@ function escapeHTML(s) {
 
 showScreen('home');
 connect();
+
+// interface-2026-09-07-r1
