@@ -72,11 +72,24 @@ def persistencia(adj, d):
     return eventos
 
 
-def eixo_runtime(lado, thumb1, middle1):
-    """O mesmo eixo que dedos3d.js calcula no espaço da mão (Y = para os dedos)."""
+def eixos_da_mao(lado, thumb1, middle1):
+    """Lateral (para o polegar), palma e eixo de flexão no espaço da mão (Y = para os dedos).
+    Nestes esqueletos a palma fica do lado OPOSTO ao que a fórmula antiga de dedos3d.js
+    supunha (na pose de bind, braços caídos, o polegar aponta para o meio do corpo: palma
+    para trás); o arquivo grava os vetores e a mesa passa a lê-los."""
     lateral = np.array(thumb1) - np.array(middle1); lateral[1] = 0; lateral = unit(lateral)
-    palma = unit(np.cross(lateral, [0, 1, 0]) * (1 if lado == 'Left' else -1))
-    return unit(np.cross([0, 1, 0], palma))
+    palma = unit(np.cross(lateral, [0, 1, 0]) * (-1 if lado == 'Left' else 1))
+    return lateral, palma, unit(np.cross([0, 1, 0], palma))
+
+
+def eixo_runtime(lado, thumb1, middle1): return eixos_da_mao(lado, thumb1, middle1)[2]
+
+
+def grava_eixos_da_mao(nodes, s, names, lado, thumb1, middle1):
+    lateral, palma, eixo = eixos_da_mao(lado, thumb1, middle1)
+    n = nodes[s['joints'][names.index(lado + 'Hand')]]
+    n['extras'] = {**n.get('extras', {}), 'lateral': lateral.tolist(), 'palma': palma.tolist()}
+    return eixo
 
 
 def pose_dedos(j, s, P, J, W, ibm, amount):
@@ -171,6 +184,12 @@ def rig(src, dst, relatorio=False):
             # escultura com os dedos colados: sem pontas separadas não há como achar os dedos
             if criar: raise ValueError(f'{lado}: só {len(sel)} dedos encontrados (persistências {persistencias})')
             saida[lado] = {'mantido': f'dedos colados na escultura ({len(sel)} pontas): rig anterior mantido nesta mão', 'persistenciasCm': persistencias}
+            # mesmo mantendo os ossos, a palma e o eixo de cada falange passam a ser os corretos
+            t1 = nodes[s['joints'][dedo_ids['Thumb'][0]]].get('translation', [0, 0, 0]); m1 = nodes[s['joints'][dedo_ids['Middle'][0]]].get('translation', [0, 0, 0])
+            eixo = grava_eixos_da_mao(nodes, s, names, lado, t1, m1)
+            for f in DEDOS:
+                for seg, jid in enumerate(dedo_ids[f]):
+                    n = nodes[s['joints'][jid]]; n['extras'] = {**n.get('extras', {}), 'dedo': True, 'segmento': seg, 'eixoFlexao': eixo.tolist(), 'anguloFlexao': (ANGULOS['Thumb'] if f == 'Thumb' else ANGULOS['outros'])[seg]}
             continue
         # base de cada dedo = nível em que ele encosta pela primeira vez em outro dedo (o vão mais alto)
         conteudo = {r: {r} for r in sel}; contato = {r: {} for r in sel}
@@ -234,7 +253,7 @@ def rig(src, dst, relatorio=False):
         share[:, 0] = np.maximum(share[:, 0], 1 - share[:, 1:].sum(1)); share[~alc, :] = 0; share[~alc, 0] = 1
         share /= share.sum(1, keepdims=True)
         # nós, IBMs, extras: rotação identidade no espaço da mão; a mesa calcula o eixo por Thumb1/Middle1
-        eixo = eixo_runtime(lado, juntas_lado['Thumb'][0], juntas_lado['Middle'][0])
+        eixo = grava_eixos_da_mao(nodes, s, names, lado, juntas_lado['Thumb'][0], juntas_lado['Middle'][0])
         for f in DEDOS:
             anterior = np.zeros(3)
             for seg, (jid, loc) in enumerate(zip(dedo_ids[f], juntas_lado[f])):

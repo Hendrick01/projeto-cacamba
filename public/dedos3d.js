@@ -8,14 +8,20 @@ export function preparaDedos(raiz) {
     const medio = raiz.getObjectByName(`${lado}HandMiddle1`);
     const polegar = raiz.getObjectByName(`${lado}HandThumb1`);
     if (!osso || !medio || !polegar) continue;
-    const lateral = polegar.position.clone().sub(medio.position); lateral.y = 0; lateral.normalize();
-    const palma = lateral.clone().cross(Y).multiplyScalar(lado === 'Left' ? 1 : -1).normalize();
+    // O arquivo preparado (scripts/rig_dedos.py) grava no osso da mão para onde
+    // a palma e a lateral do polegar apontam; sem isso, deduz das juntas.
+    const ex = osso.userData || {};
+    const lateral = ex.lateral ? new THREE.Vector3().fromArray(ex.lateral).normalize()
+      : polegar.position.clone().sub(medio.position).setY(0).normalize();
+    const palma = ex.palma ? new THREE.Vector3().fromArray(ex.palma).normalize()
+      : lateral.clone().cross(Y).multiplyScalar(lado === 'Left' ? 1 : -1).normalize();
     const eixo = Y.clone().cross(palma).normalize();
     const mao = { osso, palma, lateral, lado, juntas: [], valor: 0 }; maos[lado] = mao;
     osso.traverse((b) => {
       if (!b.isBone || !b.userData.dedo) return;
       const thumb = b.name.includes('Thumb'), seg = b.userData.segmento || 0;
-      const j = { osso: b, base: b.quaternion.clone(), eixo: eixo.clone(),
+      const eixoDoOsso = b.userData.eixoFlexao ? new THREE.Vector3().fromArray(b.userData.eixoFlexao).normalize() : eixo.clone();
+      const j = { osso: b, base: b.quaternion.clone(), eixo: eixoDoOsso,
         angulo: (thumb ? [0.90, 0.45, 0.25] : [1.10, 1.45, 0.80])[seg], thumb, seg, mao };
       juntas.push(j); mao.juntas.push(j);
     });

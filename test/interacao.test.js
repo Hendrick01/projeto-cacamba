@@ -85,8 +85,11 @@ for (const slug of ['matheus', 'junior', 'dri', 'esterex', 'gabizinsky', 'lyly',
           assert.ok(p.y >= -0.002, `pé abaixo do chão: ${p.y.toFixed(3)}`);
         }
       }
-      // o alvo fica além do braço (o resto do caminho a carta voa): basta a mão ir bem na direção dele
-      assert.ok(maisPerto < repouso.distanceTo(alvo) - 0.08, `${tipo}: a mão direita não foi ao alvo (de ${repouso.distanceTo(alvo).toFixed(2)} chegou a ${maisPerto.toFixed(2)})`);
+      // o alvo fica além do braço (o resto do caminho a carta voa): a mão vai até onde o braço
+      // alcança (resolveBraco estica até 98,5 % de úmero + antebraço) ou, se sobra folga, aproxima 8 cm
+      const ombro = world(osso('RightArm')), braco = ombro.distanceTo(world(osso('RightForeArm'))) + world(osso('RightForeArm')).distanceTo(repouso);
+      const limite = Math.max(repouso.distanceTo(alvo) - 0.08, ombro.distanceTo(alvo) - braco * 0.985 + 0.01);
+      assert.ok(maisPerto < limite, `${tipo}: a mão direita não foi ao alvo (de ${repouso.distanceTo(alvo).toFixed(2)} chegou a ${maisPerto.toFixed(2)}, limite ${limite.toFixed(2)})`);
       assert.ok(viuCarta, `${tipo}: a carta nunca apareceu`);
       assert.equal(m.interacao.evento, null, `${tipo}: gesto não terminou`);
       assert.equal(carta.visible, false, `${tipo}: carta ficou visível`);
