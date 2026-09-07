@@ -217,21 +217,31 @@ Os oito GLBs desta revisão agora têm 54 ossos: os 24 originais mais 30 de
 dedos (cinco dedos × três segmentos × duas mãos). O texto histórico abaixo
 que descreve a ausência de dedos se refere à versão anterior.
 
-As malhas, a contagem de triângulos e as texturas foram mantidas. O preparo
-usa marcos específicos de cada personagem e redistribui somente a influência
-da mão; não é um rigger universal nem uma retopologia anatômica. Há um clip
-`dedosTeste` para ferramentas externas. No jogo, `dedos3d.js` controla a
-flexão diretamente, mantendo os clips de corpo existentes.
+As malhas, a contagem de triângulos e as texturas foram mantidas. Desde
+07/09/2026 o preparo acha os dedos **na própria malha**: mede a distância ao
+punho sobre a superfície da mão, toma as cinco pontas mais persistentes, põe
+os ossos no eixo central de cada dedo (juntas a 0/45/76 % do comprimento) e
+reparte só a influência da mão ao longo dele. Numa mão esculpida sem vãos
+entre os dedos ("luva") não há pontas para achar: o script avisa e deixa
+aquela mão como estava. Há um clip `dedosTeste` para ferramentas externas. No
+jogo, `dedos3d.js` controla a flexão diretamente (ele deriva a normal da
+palma de `Thumb1` e `Middle1`, por isso o script põe `Thumb1` no plano das
+bases dos outros dedos), mantendo os clips de corpo existentes.
 
 Abra `provador.html`, escolha um personagem em **da mesa…** e mova **Flexão
-dos dedos** de 0% a 100%, conferindo ambos os lados. A mesa usa 60% quando há
+dos dedos** de 0% a 100%, conferindo ambos os lados. A mesa usa 62% quando há
 cartas. Conferir visualmente punhos, eventuais dedos fundidos e contato com o
 leque antes de publicar: as verificações numéricas não atestam anatomia ou
 ausência de interpenetração.
 
-Para reproduzir sobre uma cópia ORIGINAL, ainda sem os novos ossos:
+Para reproduzir (aceita o arquivo de 24 ossos ou um já rigado, que é
+refeito; só NumPy):
 
 ```bash
-python scripts/rig_dedos.py original.glb preparado.glb --slug matheus
-python scripts/verifica_rig.py
+python3 scripts/rig_dedos.py original.glb preparado.glb --relatorio
+python scripts/verifica_rig.py   # precisa de SciPy
 ```
+
+O `--relatorio` imprime, por mão, as persistências das pontas (a 6ª mostra a
+folga), vértices e comprimento de cada dedo e o estiramento das arestas da
+mão na flexão da mesa, antes e depois.
