@@ -33,3 +33,9 @@ test('dois leques calculam insercao pela fileira antes do X',()=>{
 test('entrada invalida nao gera NaN',()=>{
  for(const n of [NaN,Infinity,-1]) {assert.ok(Number.isFinite(layoutMao2D(n).passo));assert.ok(Number.isFinite(layoutMao3D({quantidade:n}).escala));}
 });
+test('3D landscape uses available width instead of stacking 14-24 cards', () => {
+ for(const n of [14,20,24]) {
+  const p=layoutMao3D({quantidade:n,largura:844,altura:390,fov:55});
+  assert.equal(p.fileiras,1);assert.ok(p.passo/p.unidade>=28);
+ }
+});

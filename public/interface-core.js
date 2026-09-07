@@ -20,7 +20,7 @@ export function layoutMao3D({ quantidade, largura = 375, altura = 812, fov = 72,
   const unidade = alturaVisivel / altura, larguraVisivel = largura * unidade;
   const larguraCard = Math.min(100, Math.max(62, largura * 0.16));
   const alturaCard = larguraCard * cartaA / cartaL;
-  const maxFila = Math.max(2, Math.min(13, Math.floor((largura - 36 - larguraCard) / 28) + 1));
+  const maxFila = Math.max(2, Math.min(40, Math.floor((largura - 36 - larguraCard) / 28) + 1));
   const fileiras = Math.max(1, Math.ceil(n / maxFila));
   const porFila = Math.max(1, Math.ceil(n / fileiras));
   const passoPx = porFila > 1 ? Math.min(larguraCard * 0.64, (largura - 36 - larguraCard) / (porFila - 1)) : 0;
