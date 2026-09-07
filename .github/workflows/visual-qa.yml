@@ -1,0 +1,28 @@
+name: Visual 3D - regressao sem alterar rig
+on:
+  pull_request:
+    paths:
+      - 'public/*visual*'
+      - 'public/3d.html'
+      - 'public/provador.html'
+      - 'test/visual3d*'
+      - '.github/workflows/visual-qa.yml'
+permissions:
+  contents: read
+jobs:
+  regressao:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Testes da camada visual com o Three.js versionado
+        run: node --test test/visual3d-core.test.js test/visual3d-scene.test.js
+      - name: Suite completa do projeto
+        run: npm test
+      - name: Seguranca HTTP e WebSocket
+        run: npm run test:security
