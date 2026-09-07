@@ -3,6 +3,35 @@ const $ = id => document.getElementById(id);
 export function configuraInterface() {
   document.documentElement.dataset.interface = '2026-09-07-r1';
   for (const el of document.querySelectorAll('[data-interface-version]')) el.textContent = VERSAO_INTERFACE;
+  // Balcoes de fundo podem transbordar; apenas assentos reais geram aviso.
+  const assentos = $('opponents'), hint = $('opponents-hint');
+  if (assentos && hint) {
+    let frame = 0;
+    const verificar = () => {
+      frame = 0;
+      const box = assentos.getBoundingClientRect();
+      if (!box.width) return;
+      let cortados = 0;
+      for (const el of assentos.querySelectorAll(':scope > .assento')) {
+        const r = el.getBoundingClientRect();
+        if (r.left < box.left - 1 || r.right > box.right + 1) cortados++;
+      }
+      const oculto = cortados === 0;
+      if (hint.hidden !== oculto) hint.hidden = oculto;
+      if (cortados) {
+        const texto = `${cortados} assento(s) na borda - toque para ver os detalhes`;
+        if (hint.textContent !== texto) hint.textContent = texto;
+      }
+    };
+    const agendar = () => { if (!frame) frame = requestAnimationFrame(verificar); };
+    const observer = new MutationObserver(agendar);
+    observer.observe(assentos,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
+    observer.observe(hint,{attributes:true,attributeFilter:['hidden']});
+    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(agendar) : null;
+    resize?.observe(assentos);
+    window.addEventListener('resize',agendar);
+    window.addEventListener('pagehide',()=>{observer.disconnect();resize?.disconnect();cancelAnimationFrame(frame);window.removeEventListener('resize',agendar);},{once:true});
+  }
   const nome = $('name-input'), codigo = $('code-input');
   nome?.addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-create')?.click(); });
   codigo?.addEventListener('input', () => { codigo.value = codigo.value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 4); });
