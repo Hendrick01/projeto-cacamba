@@ -1338,7 +1338,13 @@ function sincronizaMao() {
   sincronizaMaos();
   if (maos.esq && maos.dir) {
     const { escala,baseY,dist,larguraLeque } = plano;
-    maos.esq.visible = maos.dir.visible = n > 0;
+    // A direita SÓ EXISTE PARA ESCOLHER: aparece na sua vez e na fase de jogar.
+    // Na hora de puxar do monte ela não tem o que fazer no leque, e parada ali
+    // só rouba a faixa de leitura das cartas. O desenho 2D de reserva continua
+    // com as duas, que lá elas são o par que segura o leque.
+    const escolhendo = minhaVez && view.phase === 'play';
+    maos.esq.visible = n > 0;
+    maos.dir.visible = n > 0 && (!maos.tridi || escolhendo);
     if (maos.tridi) {
       // O leque converge num ponto abaixo dele (é o pivô do arco). É ali que a
       // pinça da mão tem de cair: a carta entra entre o polegar e os dedos.
@@ -1370,9 +1376,7 @@ function sincronizaMao() {
       // atrás do plano das cartas. Mede, recua e MEDE DE NOVO — sem a segunda
       // medida não se sabe se o recuo bastou, e era isso que faltava.
       maos.medida = recuaAteSoOPolegarAparecer(maos.esq, -dist);
-      // A DIREITA fica fora do quadro fora da sua vez: parada, ela só rouba a
-      // faixa de leitura das cartas. Na sua vez, entra pela direita do leque.
-      if (minhaVez) {
+      if (escolhendo) {
         // e entra em PINÇA, não espalmada: ela existe para pegar a carta, então
         // é essa a mão que o rig ainda comanda (a esquerda vem posada do
         // arquivo). Sem laço por quadro, a troca é imediata.
@@ -1410,11 +1414,7 @@ function sincronizaMao() {
         const m = medeAMao(maos.dir, -dist);
         const frenteDoLeque = -dist + (n - 1) * 0.0006;
         if (m && m.fundo < frenteDoLeque) maos.dir.position.z += frenteDoLeque - m.fundo + 0.002;
-      } else {
-        definePosePrimeiraPessoa(maos.rig, 'Right', 'repouso');
-        atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);
-        maos.dir.position.set(larguraLeque * 1.4, baseY - 2 * escala, -dist); maos.dir.scale.setScalar(escalaDaMao);
-      }
+      } else definePosePrimeiraPessoa(maos.rig, 'Right', 'repouso');   // escondida: nem posição, nem pose a manter
     } else {
       // o desenho 2D de reserva: entra pela borda de baixo, nas pontas do leque
       const x = larguraLeque * .5 + .03;

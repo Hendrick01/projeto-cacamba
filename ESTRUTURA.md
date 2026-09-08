@@ -655,13 +655,15 @@ Blender e mede a malha já deformada pelo esqueleto):
   espessura do leque** — 12 cartas (o motor distribui 12) de 0,3 mm sobre os
   185 mm da mão; no plano, a borda de baixo na **linha dos nós**, que é onde o
   canto do leque encosta na mão, e o leque subindo dali;
-* **o polegar** tem dois movimentos em eixos diferentes: *varrer* por cima da
-  palma até pousar sobre o retângulo da carta (no eixo de flexão gravado no
-  próprio osso pelo gerador do rig) e *levantar* até a **última falange inteira**
-  passar à frente — medida pelo vértice mais ATRASADO dela, não pelo mais
-  avançado: pela ponta, a busca parava assim que a unha assomava e o que
+* **o polegar** tem uma conta só: passar à frente do leque, com a **última
+  falange inteira** — medida pelo vértice mais ATRASADO dela, não pelo mais
+  avançado. Pela ponta, a busca parava assim que a unha assomava e o que
   aparecia sobre as cartas era um calombo, não um dedão (77 vértices à frente
-  contra 16). Usar um eixo só o deixava com cara de quebrado; e a rotação se
+  contra 16). Havia uma segunda conta — puxar a ponta para dentro do retângulo
+  da carta — e ela fazia o polegar CRUZAR para o meio do leque, varrendo a
+  palma; um polegar que segura leque fica **do lado de fora**, deitado junto à
+  borda, que é o que se vê em qualquer mão com cartas. Sem esse termo ele sobe
+  pelo próprio lado, e o fechamento cai de 201 para 63 graus. Usar um eixo só o deixava com cara de quebrado; e a rotação se
   reparte pelas três juntas, porque 111° concentrados na base rasgavam a pele da
   tenar.
 
@@ -698,8 +700,10 @@ dizia que estava certo — palma para a câmera, polegar à direita, lateralidad
 conferida pelos ossos — e ainda assim o olho lia errado. Quem resolve é a
 inclinação, porque é ela que conta de que ombro a mão vem.
 
-**A esquerda segura, a direita ESCOLHE.** A direita só entra na sua vez (fora
-dela fica fora do quadro) e vai para a carta selecionada — ou para a última,
+**A esquerda segura, a direita ESCOLHE.** A direita só aparece na sua vez E na
+fase de jogar — na hora de puxar do monte ela não tem o que fazer no leque, e
+parada ali só rouba a faixa de leitura das cartas. Ela vai para a carta
+selecionada — ou para a última,
 enquanto não há escolha —, com a pinça no **canto de cima à direita** dela: é o
 canto que fica exposto num leque, porque cada carta cobre a anterior pela
 esquerda, e é ele que joga o corpo da mão para fora do leque em vez de cobrir

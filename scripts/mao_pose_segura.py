@@ -177,12 +177,15 @@ def eixos_de(osso):
 
 
 def custo_do_polegar():
-    """Uma conta só, nas mesmas unidades: o quanto a ponta está fora do retângulo
-    mais o quanto lhe falta de profundidade para vencer a espessura do leque."""
+    """O polegar só tem uma conta a cumprir: PASSAR À FRENTE do leque.
+
+    Antes havia uma segunda — puxar a ponta para dentro do retângulo da carta —
+    e era ela que fazia o polegar CRUZAR para o meio do leque, varrendo a palma.
+    Um polegar que segura leque fica do lado de fora, deitado junto à borda; é o
+    que se vê em qualquer mão com cartas. Sem esse termo, ele sobe pelo próprio
+    lado e é o que se quer."""
     E = estado()
-    p = E[PONTA_POL][:, :2].mean(0)
-    fora = math.hypot(max(0.0, abs(p[0] - centroU) - (LARG / 2 - args.margem)),
-                      max(0.0, abs(p[1] - centroV) - (ALT / 2 - args.margem)))
+    fora = 0.0
     alvo = E[NAO_POLEGAR][:, 2].max() + ESPESSURA + args.pele
     # A última falange INTEIRA, não só a pontinha dela. Medindo o polegar todo,
     # a busca cumpria a conta empurrando a BASE para a frente e deixando a ponta
