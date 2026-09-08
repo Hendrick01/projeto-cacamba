@@ -43,6 +43,8 @@ const MIME = {
   '.webp': 'image/webp',
   '.woff2': 'font/woff2',
   '.glb': 'model/gltf-binary',
+  // a licença OFL acompanha as fontes: quem baixa a fonte tem direito a ela
+  '.txt': 'text/plain; charset=utf-8',
 };
 
 // Cabeçalhos de segurança do que sai daqui. A CSP diz ao navegador de onde a
@@ -152,6 +154,11 @@ const server = http.createServer((req, res) => {
     if (root === __dirname && !full.startsWith(path.join(__dirname, 'shared') + path.sep)) continue;
     if (fs.existsSync(full) && fs.statSync(full).isFile() && fs.realpathSync(full).startsWith(root + path.sep)) {
       const ext = path.extname(full);
+      // Só sai daqui o que o jogo serve de verdade. `public/` guarda, ao lado
+      // da arte, o README do elenco e os geradores em Python que a desenham —
+      // e com o octet-stream de reserva eles eram baixáveis por quem pedisse o
+      // caminho. Não é segredo, mas também não é para servir.
+      if (!MIME[ext]) continue;
       const stat = fs.statSync(full);
       // ETag de tamanho + mtime. Sem ele, `no-cache` significava baixar tudo de
       // novo a cada abertura: o elenco sozinho são 32 SVGs e ~850 KB de disco.
@@ -174,7 +181,7 @@ const server = http.createServer((req, res) => {
       const arte = file.startsWith('/assets/') || file.startsWith('/fonts/')
         || (file.startsWith('/models/') && !file.endsWith('lista.json'));
       const cabecalho = {
-        'Content-Type': MIME[ext] || 'application/octet-stream',
+        'Content-Type': MIME[ext],
         'Cache-Control': arte ? 'private, max-age=300, must-revalidate' : 'no-cache',
         ETag: etag,
         Vary: 'Accept-Encoding',

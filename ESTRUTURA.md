@@ -1649,6 +1649,12 @@ O processo encerra limpo em `SIGTERM`/`SIGINT`, que é como a hospedagem o para.
 
 ### Estáticos
 
+Sai daqui **só o que tem tipo conhecido** (a tabela `MIME`): o `octet-stream`
+de reserva fazia de `public/` uma pasta aberta, e ao lado da arte moram o
+README do elenco e os geradores em Python que a desenham. Não são segredo, mas
+também não são para servir. A licença OFL das fontes continua acessível — quem
+baixa a fonte tem direito a ela.
+
 Cada resposta leva um **ETag** de tamanho + mtime, e um `If-None-Match` que
 bate vira **304 sem corpo**. Sem ele, o `Cache-Control: no-cache` significava
 baixar tudo outra vez a cada abertura — e só o elenco são 32 SVGs.
