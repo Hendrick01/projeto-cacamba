@@ -19,7 +19,7 @@ terceiros com identidade própria — o critério é o mesmo do elenco em SVG.
 | Altura | em metros. Um arquivo que traz o nó `Cabeca` (passou pelo preparo) é mostrado na escala dele; se além disso tem esqueleto (rigado e sentado), entra na **escala do elenco**, ×1,2 — a mesa é de desenho (cartas de 42 cm, bonecos com a cabeça a 1,55 m sentados) e uma pessoa de tamanho real ficava pequena e baixa atrás da borda. Sem o nó, a mesa **normaliza** para ~1,55 m. Mantenha as proporções entre os oito |
 | Origem | no **chão, no eixo do corpo** (y = 0; x e z = 0 no tronco). A mesa põe a origem no assento e só corrige a altura — não centraliza em x/z, porque num modelo sentado as pernas vão para a frente e a caixa engana |
 | Frente | olhando para **+Z**. A mesa vira o personagem para a mesa |
-| Pose | **sentado**, mãos à frente na altura do peito (é onde o leque de cartas entra: ~1,02 m do chão, 0,17 m à frente) |
+| Pose | **sentado segurando um leque de cartas com as duas mãos**, na altura do peito (é onde o leque da mesa entra). Desde 07/09/2026 é assim que o elenco é esculpido: o modelo já vem posado, sem esqueleto, e a mesa não mexe em braços nem dedos |
 | Polígonos | até ~30 mil triângulos por personagem (o trio de teste de 2026-09-04 veio com 25–30 mil e roda; o contorno do elenco desenha cada malha duas vezes, então menos é melhor no celular); texturas até 1024×1024 |
 | Materiais | cor chapada, como o elenco. PBR simples (`baseColor`, com ou sem textura, sem metal): a mesa troca pelo sombreamento dela em três degraus, com contorno (veja abaixo). Normal map, se vier, fica: dobras e mechas assadas de uma escultura entram nos degraus sem custar triângulos |
 
@@ -211,14 +211,41 @@ elenco em SVG. Metal e rugosidade são ignorados. Numa malha com esqueleto
 (skin) o sombreamento entra, mas o contorno não (a casca não acompanharia os
 ossos). No provador, **estilo: original** mostra o material do arquivo como
 veio, para comparar.
-## Atualização de 06/09/2026: articulação dos dedos
+## Atualização de 07/09/2026: o elenco vem esculpido já sentado
 
-Os oito GLBs desta revisão agora têm 54 ossos: os 24 originais mais 30 de
-dedos (cinco dedos × três segmentos × duas mãos). O texto histórico abaixo
-que descreve a ausência de dedos se refere à versão anterior.
+Os oito GLBs desta revisão são **malhas estáticas, sem esqueleto**: cada
+personagem foi gerado já sentado, cotovelos apoiados, segurando o leque com as
+duas mãos — a pose que o jogo mostra. Foi a saída depois de duas tentativas de
+articular as esculturas anteriores (rig de dedos por geometria e enxerto de uma
+mão modelada à parte): mão esculpida sem vãos entre os dedos não dobra sem
+rasgar, e braço movido por cinemática não convence.
 
-As malhas, a contagem de triângulos e as texturas foram mantidas. Desde
-07/09/2026 o preparo acha os dedos **na própria malha**: mede a distância ao
+Como preparar um modelo novo (imagem do personagem sentado, sem mesa nem banco,
+no gerador 3D; exportar GLB sem rig):
+
+```bash
+python3 scripts/prepara_sentado.py ~/Downloads/<nome>.glb public/models/<slug>.glb
+```
+
+Ele normaliza a altura sentada para 1,45 m, põe os pés no chão, reduz para 32
+mil triângulos, encolhe as texturas e mede as mãos na malha (a saliência mais à
+frente entre 58% e 75% da altura — abaixo disso os joelhos enganam) para
+ancorar `MaoEsq`/`MaoDir` na pinça, onde o pé do leque encosta.
+
+**Se quiser articular** (braço que compra e descarta, dedos que fecham), há o
+caminho pelo Blender: `scripts/sentado.sh <fonte.glb> public/models/<slug>.glb`
+monta um esqueleto da cintura para cima com dedos (`scripts/rig_sentado.py`),
+grava os eixos da palma e passa pelo preparo. Um rig ajustado à mão no Blender
+entra com `--de-blender`. Com esqueleto no arquivo, a mesa volta a mover braços
+e dedos sozinha; sem ele, a carta simplesmente voa.
+
+O texto histórico abaixo descreve o fluxo antigo, de esculturas em pé rigadas
+por fora.
+
+### Histórico: o rig de dedos das esculturas em pé (06–07/09/2026)
+
+As malhas, a contagem de triângulos e as texturas eram mantidas. O preparo
+achava os dedos **na própria malha**: media a distância ao
 punho sobre a superfície da mão, toma as cinco pontas mais persistentes, põe
 os ossos no eixo central de cada dedo (juntas a 0/45/76 % do comprimento) e
 reparte só a influência da mão ao longo dele. Numa mão esculpida sem vãos

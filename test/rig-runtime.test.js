@@ -1,33 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { GLTFLoader } from '../public/vendor/GLTFLoader.js';
-import { encaixaModelo } from '../public/modelo3d.js';
-import { atualizaDedos } from '../public/dedos3d.js';
 
-// Compatibilidade do carregador de arquivos com Node; não simula WebGL.
-globalThis.ProgressEvent ||= class ProgressEvent extends Event {
- constructor(type, values = {}) { super(type); Object.assign(this, values); }
-};
-
-for (const slug of ['matheus','junior','dri','esterex','gabizinsky','lyly','mafra-kitty','mufasa']) {
- test(`${slug}: GLTFLoader reconhece os 30 dedos e anima sem mover ossos do corpo`, async () => {
-  const bytes=fs.readFileSync(new URL(`../public/models/${slug}.glb`,import.meta.url));
-  const len=bytes.readUInt32LE(12);const json=JSON.parse(bytes.toString('utf8',20,20+len));
-  // Teste em Node não decodifica imagens; mantém malha, skin e clips reais.
-  delete json.images;delete json.textures;delete json.materials;
-  for(const mesh of json.meshes)for(const p of mesh.primitives)delete p.material;
-  const binary=bytes.subarray(28+len);json.buffers[0].uri=`data:application/octet-stream;base64,${binary.toString('base64')}`;
-  const gltf=await new Promise((resolve,reject)=>new GLTFLoader().parse(JSON.stringify(json),'',resolve,reject));
-  const m=encaixaModelo(gltf,slug,{estilo:'original',avisa:false});
-  assert.equal(m.dedos.juntas.length,30);assert.equal(m.sentado,true);
-  const arm=m.raiz.getObjectByName('RightForeArm');const before=arm.quaternion.clone();
-  m.dedos.alvo=.6;atualizaDedos(m.dedos,.016,true);
-  assert.ok(m.dedos.juntas.every(({osso,base})=>osso.quaternion.angleTo(base)>.05));
-  assert.ok(arm.quaternion.angleTo(before)<1e-7);
-  m.dedos.alvo=0;atualizaDedos(m.dedos,.016,true);
-  assert.ok(m.dedos.juntas.every(({osso,base})=>osso.quaternion.angleTo(base)<1e-7));
-  assert.ok(m.materiais.every(mat=>!mat.transparent));
-  m.mixer?.stopAllAction();
- });
+// O elenco 3D é esculpido JÁ SENTADO segurando as cartas (scripts/prepara_sentado.py):
+// malha estática, sem esqueleto, com os nós que a mesa procura. Este teste lê o .glb
+// como arquivo — não carrega three.js nem simula WebGL.
+for (const slug of ['matheus', 'junior', 'dri', 'esterex', 'gabizinsky', 'lyly', 'mafra-kitty', 'mufasa']) {
+  test(`${slug}: arquivo no contrato da mesa — sentado, sem esqueleto e leve`, () => {
+    const bytes = fs.readFileSync(new URL(`../public/models/${slug}.glb`, import.meta.url));
+    const len = bytes.readUInt32LE(12);
+    const json = JSON.parse(bytes.toString('utf8', 20, 20 + len));
+    assert.ok(!json.skins?.length, 'o arquivo veio com esqueleto');
+    assert.ok(!json.animations?.length, 'o arquivo veio com clips');
+    const nomes = json.nodes.map((n) => n.name);
+    for (const n of ['Cabeca', 'MaoEsq', 'MaoDir']) assert.ok(nomes.includes(n), `sem o nó ${n}`);
+    const tris = json.meshes.reduce((t, m) => t + m.primitives.reduce((s, p) => s + json.accessors[p.indices].count / 3, 0), 0);
+    assert.ok(tris <= 33000, `${tris} triângulos — acima do orçamento da mesa`);
+    assert.ok(bytes.length < 2.6e6, `${(bytes.length / 1048576).toFixed(2)} MB — pesado para o celular`);
+  });
 }
