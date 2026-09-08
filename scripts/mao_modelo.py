@@ -1,5 +1,5 @@
 """Gera a mão cartoon do elenco (malha única e fechada, 16 ossos, pesos por bone heat).
-Uso: Blender --background --python scripts/mao_modelo.py -- saida.glb [--tris 2400]
+Uso: Blender --background --python scripts/mao_modelo.py -- saida.glb [--tris 2400] [--lado esq|dir]
 Espaço canônico da mão ESQUERDA, em unidades de "comprimento da mão" (punho → ponta do
 médio = 1): dedos para +Y, polegar para +X, palma voltada para +Z, punho na origem, com
 um punho de 0.12 entrando em −Y para esconder a costura na manga. Ossos: Hand e
@@ -11,16 +11,28 @@ from mathutils import Vector, Matrix
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 ap = argparse.ArgumentParser(); ap.add_argument('saida'); ap.add_argument('--tris', type=int, default=2400); ap.add_argument('--render', default=None)
+ap.add_argument('--lado', choices=('esq', 'dir'), default='esq',
+                help='esq (o espaço canônico) ou dir, que espelha em x. Espelhar aqui, e não com '
+                     'escala negativa na cena, é o que mantém as normais e o sentido das faces')
 args = ap.parse_args(argv)
+
+# `Left`/`Right` no nome do osso: é por `<lado>Hand` que o controlador da primeira
+# pessoa (public/primeira-pessoa-maos.js) acha a mão, e os dois lados convivem na
+# mesma cena. Os dedos levam o prefixo junto para não colidirem entre si.
+LADO = 'Left' if args.lado == 'esq' else 'Right'
+ESP = 1 if args.lado == 'esq' else -1
 
 # dedo: (x da base, y da base, comprimento, raio); polegar com direção própria
 DEDOS = {
-    'Index':  (-0.175, 0.50, 0.42, 0.048),
-    'Middle': (-0.058, 0.53, 0.47, 0.050),
-    'Ring':   ( 0.060, 0.51, 0.43, 0.047),
-    'Pinky':  ( 0.175, 0.45, 0.33, 0.042),
+    'Index':  (-0.175 * ESP, 0.50, 0.42, 0.048),
+    'Middle': (-0.058 * ESP, 0.53, 0.47, 0.050),
+    'Ring':   ( 0.060 * ESP, 0.51, 0.43, 0.047),
+    'Pinky':  ( 0.175 * ESP, 0.45, 0.33, 0.042),
 }
-POLEGAR = {'base': Vector((0.22, 0.15, 0.03)), 'dir': Vector((0.70, 0.62, 0.35)).normalized(), 'comp': 0.36, 'raio': 0.058}
+# Polegar mais longo e nascendo mais alto que o desenho original: com a base
+# baixa e apontando para fora, nem no giro máximo a ponta alcançava o indicador
+# (0,78 → 0,55 no melhor caso) e a pinça na carta não fechava.
+POLEGAR = {'base': Vector((0.185 * ESP, 0.21, 0.02)), 'dir': Vector((0.52 * ESP, 0.80, 0.30)).normalized(), 'comp': 0.46, 'raio': 0.058}
 JUNTAS = (0.0, 0.45, 0.76)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -51,7 +63,7 @@ bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.10, depth=0.30, locati
 punho = bpy.context.object; punho.name = 'punho'; punho.rotation_euler = (math.pi / 2, 0, 0); punho.scale = (1.55, 1.0, 0.75)
 partes.append(punho)
 # monte do polegar
-bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=0.11, location=(0.17, 0.14, 0.0))
+bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=0.11, location=(0.17 * ESP, 0.14, 0.0))
 monte = bpy.context.object; monte.name = 'monte'; monte.scale = (1.1, 1.3, 0.8); partes.append(monte)
 
 for nome, (x, y, comp, raio) in DEDOS.items():
@@ -79,15 +91,25 @@ def osso(nome, head, tail, pai=None):
     b = arm_data.edit_bones.new(nome); b.head = head; b.tail = tail
     if pai: b.parent = arm_data.edit_bones[pai]
     return b
-osso('Hand', Vector((0, 0, 0)), Vector((0, 0.5, 0)))
+osso(f'{LADO}Hand', Vector((0, 0, 0)), Vector((0, 0.5, 0)))
 def cadeia(nome, base, direcao, comp):
     pontos = [base + direcao * (comp * t) for t in (*JUNTAS, 1.0)]
-    pai = 'Hand'
+    pai = f'{LADO}Hand'
     for k in range(3):
-        osso(f'{nome}{k + 1}', pontos[k], pontos[k + 1], pai); pai = f'{nome}{k + 1}'
+        osso(f'{LADO}{nome}{k + 1}', pontos[k], pontos[k + 1], pai); pai = f'{LADO}{nome}{k + 1}'
 for nome, (x, y, comp, raio) in DEDOS.items(): cadeia(nome, Vector((x, y, 0)), Vector((0, 1, 0)), comp)
 cadeia('Thumb', POLEGAR['base'], POLEGAR['dir'], POLEGAR['comp'])
 bpy.ops.object.mode_set(mode='OBJECT')
+
+# OPOSIÇÃO DO POLEGAR. Os outros dedos dobram em torno do X local do osso, que é
+# o padrão do controlador. O polegar não: flexioná-lo no mesmo eixo só o afasta
+# da mão. A primeira falange precisa girar em torno de um eixo que o leve POR
+# CIMA da palma, ao encontro dos dedos — é o que fecha a pinça na carta.
+# O eixo saiu de uma varredura: entre 288 direções, esta é a que mais aproxima
+# a ponta do polegar da ponta do indicador (0,78 → 0,55 em unidades de mão).
+# Vai no `extras` do osso, que o GLTFLoader entrega em `userData.eixoFlexao` —
+# o contrato que primeira-pessoa-maos.js já lê.
+arm_data.bones[f'{LADO}Thumb1']['eixoFlexao'] = [-0.259, 0.0, 0.966 * ESP]
 
 # pesos: como a geometria é nossa, cada vértice vai para o eixo de dedo mais próximo,
 # repartido pelas falanges conforme a posição ao longo dele (mesmo esquema do rig_dedos)
@@ -96,7 +118,7 @@ def smooth(x): x = max(0.0, min(1.0, x)); return x * x * (3 - 2 * x)
 def rampa(a, centro, meia): return smooth((a - centro + meia) / (2 * meia))
 eixos = {nome: (Vector((x, y, 0)), Vector((0, 1, 0)), comp, raio) for nome, (x, y, comp, raio) in DEDOS.items()}
 eixos['Thumb'] = (POLEGAR['base'], POLEGAR['dir'], POLEGAR['comp'], POLEGAR['raio'])
-grupos = {n: mao.vertex_groups.new(name=n) for n in ['Hand'] + [f'{d}{k}' for d in eixos for k in (1, 2, 3)]}
+grupos = {n: mao.vertex_groups.new(name=n) for n in [f'{LADO}Hand'] + [f'{LADO}{d}{k}' for d in eixos for k in (1, 2, 3)]}
 for v in mao.data.vertices:
     p = v.co; melhor = None
     for nome, (base, dirv, comp, raio) in eixos.items():
@@ -109,10 +131,10 @@ for v in mao.data.vertices:
         s2, s3 = rampa(a, JUNTAS[1], 0.11), rampa(a, JUNTAS[2], 0.11)
         seg = [1 - s2, s2 - s3, s3]; parte_mao = 0.5 * (1 - rampa(a, 0.15, 0.15))
         if folga > 0.03: parte_mao = max(parte_mao, min(1.0, (folga - 0.03) / 0.09))  # pele da palma perto da base
-        for k in range(3): pesos[f'{nome}{k + 1}'] = seg[k] * (1 - parte_mao)
-        pesos['Hand'] = parte_mao
+        for k in range(3): pesos[f'{LADO}{nome}{k + 1}'] = seg[k] * (1 - parte_mao)
+        pesos[f'{LADO}Hand'] = parte_mao
     else:
-        pesos['Hand'] = 1.0
+        pesos[f'{LADO}Hand'] = 1.0
     tot = sum(pesos.values())
     for n, w in pesos.items():
         if w > 1e-4: grupos[n].add([v.index], w / tot, 'REPLACE')
@@ -134,5 +156,6 @@ if args.render:
 
 bpy.ops.object.select_all(action='DESELECT'); mao.select_set(True); arm.select_set(True)
 bpy.ops.export_scene.gltf(filepath=args.saida, export_format='GLB', use_selection=True, export_yup=False, export_skins=True,
-                          export_apply=True, export_animations=False, export_materials='NONE', export_texcoords=False)
+                          export_apply=True, export_animations=False, export_materials='NONE', export_texcoords=False,
+                          export_extras=True)   # leva o `eixoFlexao` do polegar para o nó
 print('gravado', args.saida)

@@ -35,7 +35,10 @@ def enxuga(src, dst):
     for m in j.get('meshes', []):
         prims = []
         for pr in m['primitives']:
-            attrs = {k: g.read(v) for k, v in pr['attributes'].items() if k not in FORA}
+            # guarda o tipo de componente junto: JOINTS_0 é índice inteiro e
+            # WEIGHTS_0 pode vir normalizado. Reescrever tudo como float32
+            # gerava um arquivo MAIOR e um JOINTS_0 inválido.
+            attrs = {k: (g.read(v), j['accessors'][v]) for k, v in pr['attributes'].items() if k not in FORA}
             idx = g.read(pr['indices']) if 'indices' in pr else None
             alvos = [{k: g.read(v) for k, v in t.items() if k not in FORA} for t in pr.get('targets', [])]
             prims.append((pr, attrs, idx, alvos))
@@ -59,14 +62,15 @@ def enxuga(src, dst):
 
     # binário novo, do zero
     g.bin = bytearray(); j['bufferViews'] = []; j['accessors'] = []
-    def poe(arr, tipo, comp, alvo=None):
+    def poe(arr, tipo, comp, alvo=None, normalizado=None):
         i = g.add(arr, tipo, comp)
         if alvo: j['bufferViews'][j['accessors'][i]['bufferView']]['target'] = alvo
+        if normalizado: j['accessors'][i]['normalized'] = True
         return i
     for prims in malhas:
         for pr, attrs, idx, alvos in prims:
-            pr['attributes'] = {k: poe(v, 'VEC3' if v.shape[1] == 3 else 'VEC2' if v.shape[1] == 2 else 'VEC4', 5126, 34962)
-                                for k, v in attrs.items()}
+            pr['attributes'] = {k: poe(v, a0['type'], a0['componentType'], 34962, a0.get('normalized'))
+                                for k, (v, a0) in attrs.items()}
             if idx is not None:
                 # 16 bits quando o maior índice cabe: metade do espaço
                 curto = int(idx.max()) < 65536
@@ -74,6 +78,7 @@ def enxuga(src, dst):
                 j['accessors'][pr['indices']].pop('min', None); j['accessors'][pr['indices']].pop('max', None)
             if alvos:
                 pr['targets'] = [{k: poe(v, 'VEC3', 5126, 34962) for k, v in t.items()} for t in alvos]
+            del attrs
     for i, (dados, mime) in imagens.items():
         g.bin.extend(b'\0' * ((-len(g.bin)) % 4)); off = len(g.bin); g.bin.extend(dados)
         j['bufferViews'].append({'buffer': 0, 'byteOffset': off, 'byteLength': len(dados)})
