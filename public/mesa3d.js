@@ -1105,7 +1105,7 @@ const maos = { esq: null, dir: null, pele: null, slug: null, tridi: false, rig: 
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const EIXO_Z = new THREE.Vector3(0, 0, 1);
-const _qMao = new THREE.Quaternion();
+const _qMao = new THREE.Quaternion(), _qGiro = new THREE.Quaternion(), _vPonta = new THREE.Vector3();
 // a mesma inclinação das mãos desenhadas da mesa 2D (`maos.esq.rotation.z = -.42`)
 const INCLINA_MAO = 0.42;
 function encaixaNaPinca(mao, lado, alvo, escala, inclina) {
@@ -1403,17 +1403,49 @@ function sincronizaMao() {
         const meiaL = CARTA_L * aCarta.escala * 0.5, meiaA = CARTA_A * aCarta.escala * 0.5;
         const cos = Math.cos(aCarta.giro), sen = Math.sin(aCarta.giro);
         const sobe = meiaL * sen + meiaA * cos + (iEscolhida >= 0 ? 14 * plano.unidade : 0);
-        _qMao.setFromAxisAngle(EIXO_Z, aCarta.giro + INCLINA_MAO);
-        if (!encaixaPeloPlano(maos.dir, _v1.set(aCarta.x + meiaL * cos - meiaA * sen, aCarta.y + sobe, aCarta.z), _qMao, escalaDaMao))
+        // A ORIENTAÇÃO SAI DO POLEGAR. Numa mão que alcança pela direita, o
+        // polegar fica POR CIMA da carta — e, para uma mão direita com os dedos
+        // apontando para a esquerda, isso só acontece com a palma virada para
+        // longe da câmera: é o dorso da própria mão que se vê ao esticar o
+        // braço. Com a palma para a câmera o polegar cai embaixo e a mão lê de
+        // cabeça para baixo. Meia volta em Y vira a palma; o quarto de volta em
+        // Z deita a mão, dedos para o leque.
+        _qMao.setFromAxisAngle(EIXO_Y, Math.PI);
+        _qGiro.setFromAxisAngle(EIXO_Z, Math.PI / 2 + aCarta.giro);
+        _qMao.premultiply(_qGiro);
+        const alvoX = aCarta.x + meiaL * cos - meiaA * sen, alvoY = aCarta.y + sobe;
+        if (!encaixaPeloPlano(maos.dir, _v1.set(alvoX, alvoY, aCarta.z), _qMao, escalaDaMao))
           encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escalaDaMao, 2.0);
         // e vem para a FRENTE do leque inteiro. No plano da carta escolhida os
         // dedos ficavam atrás dela mas na frente das vizinhas, e furavam a face
         // delas — o leque é um arco, não um plano só. Quem escolhe passa a mão
         // por cima das cartas, e o quanto é medida: o ponto mais atrás da malha
         // deformada tem de passar da carta mais à frente do leque.
+        //
+        // Aproximar a mão da câmera a afasta do centro da tela, e ela saía de
+        // cima da carta. O alvo anda junto, na mesma proporção: assim o ponto
+        // da pinça continua no MESMO RAIO DE VISÃO — sobre a carta, só mais
+        // perto. O grupo da mão acompanha a câmera, então a câmera está na
+        // origem dele e a conta é uma regra de três.
         const m = medeAMao(maos.dir, -dist);
         const frenteDoLeque = -dist + (n - 1) * 0.0006;
-        if (m && m.fundo < frenteDoLeque) maos.dir.position.z += frenteDoLeque - m.fundo + 0.002;
+        let k = 1;
+        if (m && m.fundo < frenteDoLeque) {
+          const zNovo = aCarta.z + (frenteDoLeque - m.fundo) + 0.002; k = zNovo / aCarta.z;
+          encaixaPeloPlano(maos.dir, _v1.set(alvoX * k, alvoY * k, zNovo), _qMao, escalaDaMao);
+        }
+        // e quem encosta na carta é a PONTA DO INDICADOR, não a origem do
+        // plano: o contrato marca o centro de uma carta SEGURADA, e numa mão
+        // aberta isso cai no meio dos dedos — a mão ficava flutuando ao lado do
+        // leque. Escorrega x e y até a ponta cair no canto da carta; o z fica
+        // como a medida da folga deixou.
+        const pontaDoDedo = maos.dir.getObjectByName('RightIndex3');
+        if (pontaDoDedo) {
+          maos.dir.parent.worldToLocal(pontaDoDedo.getWorldPosition(_vPonta));
+          maos.dir.position.x += alvoX * k - _vPonta.x;
+          maos.dir.position.y += alvoY * k - _vPonta.y;
+          maos.dir.updateWorldMatrix(true, true);
+        }
       } else definePosePrimeiraPessoa(maos.rig, 'Right', 'repouso');   // escondida: nem posição, nem pose a manter
     } else {
       // o desenho 2D de reserva: entra pela borda de baixo, nas pontas do leque

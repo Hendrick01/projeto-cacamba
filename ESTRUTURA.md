@@ -710,11 +710,22 @@ esquerda, e é ele que joga o corpo da mão para fora do leque em vez de cobrir
 as vizinhas. Ela também tem o seu `PlanoDaCarta` (`mao_pose_segura.py --aberta`
 grava só o quadro, sem posar) e a mesma inclinação da esquerda, espelhada.
 
+A **orientação sai do polegar**: numa mão que alcança pela direita ele fica por
+cima da carta, e para uma mão direita com os dedos apontando para a esquerda
+isso só acontece com a palma virada para longe da câmera — é o dorso da própria
+mão que se vê ao esticar o braço. Com a palma para a câmera, como a esquerda, o
+polegar cai embaixo e a mão lê de cabeça para baixo (visto na tela, 08/09/2026).
+
 E vem para a **frente do leque inteiro**, por medida: no plano da carta
 escolhida os dedos ficavam atrás dela mas na frente das vizinhas e furavam a
 face delas — o leque é um arco, não um plano só. `medeAMao` passou a devolver
 também o ponto mais ATRÁS da malha deformada, e a mão avança até esse ponto
-passar da carta mais à frente.
+passar da carta mais à frente. Aproximar da câmera afasta do centro da tela, e
+a mão saía de cima da carta: o alvo anda junto, na mesma proporção, e o ponto da
+pinça fica no MESMO RAIO DE VISÃO. Por fim, quem encosta na carta é a **ponta do
+indicador**, não a origem do plano — o contrato marca o centro de uma carta
+SEGURADA, e numa mão aberta isso cai no meio dos dedos, o que deixava a mão
+flutuando ao lado do leque.
 
 Duas tentativas anteriores erraram por não pensar nas duas mãos como um PAR: o
 encaixe antigo, por eixo de pinça com um giro de 2,0 rad escolhido a esmo, a
