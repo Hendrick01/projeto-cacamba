@@ -1718,7 +1718,8 @@ async function sincroniza(primeira) {
     // O resto da leitura vem da câmera (mais alta, em `alturaDoOlho`) e do
     // visor de jogos, que abre no toque.
     jogosNaMesa.clear();
-    let meuJogoZ = Infinity;   // a borda mais funda dos MEUS jogos, para a barra não sentar em cima
+    let meuJogoZ = Infinity;    // a borda mais funda dos MEUS jogos, para a barra não sentar em cima
+    let meuJogoPertoZ = -Infinity;  // e a mais perto de você, a de baixo na tela
     const todos = [view.players.find((p) => p.id === me()), ...outros].filter(Boolean);
     for (const p of todos) {
       if (!p.melds?.length) continue;
@@ -1801,7 +1802,10 @@ async function sincroniza(primeira) {
           frente.scale.set(f, 1, f);
         }
         jogosNaMesa.add(frente);
-        if (meu) meuJogoZ = Math.min(meuJogoZ, raio - (alt * escalaJogo) / 2 - 0.03);
+        if (meu) {
+          meuJogoZ = Math.min(meuJogoZ, raio - (alt * escalaJogo) / 2 - 0.03);
+          meuJogoPertoZ = Math.max(meuJogoPertoZ, raio + (alt * escalaJogo) / 2);
+        }
         if (linha.some(({ meld }) => !jogosVistos.has(meld.id))) novas.push(frente);
       });
       // jogo novo de quem acabou de baixar: a linha inteira voa do assento
@@ -1829,8 +1833,18 @@ async function sincroniza(primeira) {
         // houve quadro nenhum, e sem isso a câmera ainda olha no horizonte
         camera.lookAt(camera.position.x * 0.25, MESA_TOPO + 0.12, -0.35);
         camera.updateMatrixWorld();
-        const p = new THREE.Vector3(0, MESA_TOPO, meuJogoZ).project(camera);
-        fundo = Math.max(fundo, innerHeight - (-p.y * 0.5 + 0.5) * innerHeight + 10);
+        const naTela = (z) => {
+          const p = new THREE.Vector3(0, MESA_TOPO, z).project(camera);
+          return (-p.y * 0.5 + 0.5) * innerHeight;
+        };
+        // Se os seus jogos terminam ACIMA da barra, ela fica onde estava
+        // (encostada no leque, que é onde a mão a alcança). Só quando eles
+        // descem até a faixa da barra é que ela sobe para o outro lado deles —
+        // e nunca a ponto de tapar o monte e o descarte.
+        if (naTela(meuJogoPertoZ) > innerHeight - fundo - 46) {
+          const teto = innerHeight - naTela(0.2) - 46;
+          fundo = Math.max(fundo, Math.min(teto, innerHeight - naTela(meuJogoZ) + 10));
+        }
       }
       document.body.style.setProperty('--acao-fundo', `${Math.round(Math.min(innerHeight * 0.6, fundo))}px`);
     }
@@ -1961,11 +1975,13 @@ function ajustaCameraParaAssentos(total) {
   const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
   let z = OLHO.z;
   // Recua só o necessário para o corpo de cada vizinho caber (folga de 22 cm;
-  // o rótulo do nome pode cortar), e nunca além de 2,6 m: em pé, com sete na
-  // mesa, recuar para caber quem senta ao seu lado mostrava o pé da mesa e
-  // deixava todo mundo miúdo — os das pontas ficam de fora do quadro.
+  // o rótulo do nome pode cortar) e **nunca além de 1,95 m**: era 2,6 m, e
+  // com a mesa cheia isso jogava a câmera longe demais — "muito longe também
+  // dificulta para entender o jogo que está na mesa" (usuário, 08/09/2026).
+  // Um pouco de recuo basta; quem senta nas pontas fica de fora do quadro, e
+  // é o rodízio do turno que os traz para o meio.
   for (let i=0;i<total;i++) { const p=posicaoDoAssento(i,total); z=Math.max(z, p.z + (Math.abs(p.x)+0.22)/tanH); }
-  camera.position.z=Math.min(2.6, z); camera.position.y=alturaDoOlho(camera.position.z);
+  camera.position.z=Math.min(1.95, z); camera.position.y=alturaDoOlho(camera.position.z);
 }
 function encaixaTela() {
   const w = innerWidth; const h = innerHeight;
