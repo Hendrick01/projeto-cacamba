@@ -21,7 +21,7 @@ import { MESA, ESCALA_CARTA_MAO, conectaLeque, arrumaLeque, atualizaInteracao, a
 import { iluminaSala, criaMesa, criaSala } from './cenario3d.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
-import { planBaixada, isJoker, rankLabel, cardLabel } from '/shared/engine.js';
+import { planBaixada, isJoker, rankLabel, cardLabel, layoffOption, layoffEnds } from '/shared/engine.js';
 import { SLUGS, personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
 import { layoutMao3D, indiceInsercao3D } from '/interface-core.js';
@@ -159,7 +159,9 @@ const MESA_RAIO = 1.15;          // o feltro; o aro vai a 1,2
 // adversários a roda vai a 1,8 m e a câmera recua para caber todos.
 const raioDosAssentos = (total) => Math.max(MESA.assento, (total - 1) * 0.30);
 const ESCALA_TAMPO = 0.55;       // monte, descarte e jogos, em relação à carta da mão
-const OLHO = { x: 0, y: 1.2, z: 1.35 };   // a sua cabeça, sentada na sua cadeira
+// a sua cabeça, na sua cadeira: a distância é daqui, a ALTURA sai da
+// inclinação (`alturaDoOlho`, lá embaixo) para a carta deitada sempre ler
+const OLHO = { x: 0, z: 1.35 };
 
 const foco = iluminaSala(scene, renderer, { compacto });
 scene.add(criaSala());
@@ -1295,6 +1297,7 @@ const raycaster = new THREE.Raycaster();
 const ponteiro = new THREE.Vector2();
 let layoutDaMao = null;
 let arrasto3d = null;
+let toqueNoJogo = null;
 const LIMIAR_ARRASTO = 10;
 
 // converte o X do dedo para o X do espaço da câmera, na distância do leque —
@@ -1313,7 +1316,12 @@ canvas.addEventListener('pointerdown', (e) => {
   const hits = raycaster.intersectObjects([...cartasDaMao.values()], false).sort((a,b) => b.object.renderOrder - a.object.renderOrder);
   if (hits.length) {
     arrasto3d = { id: hits[0].object.userData.cardId, x0: e.clientX, y0: e.clientY, ativo: false };
+    return;
   }
+  // toque num jogo do feltro: abre o visor naquele jogador. É o caminho para
+  // ler carta por carta numa mesa cheia — e para encaixar sem sair da 3D.
+  const noJogo = raycaster.intersectObjects(jogosNaMesa.children, true).find((h) => h.object.userData.jogo);
+  if (noJogo) toqueNoJogo = { dono: noJogo.object.userData.jogo.dono, x0: e.clientX, y0: e.clientY };
 });
 
 window.addEventListener('pointermove', (e) => {
@@ -1332,6 +1340,11 @@ window.addEventListener('pointermove', (e) => {
 });
 
 window.addEventListener('pointerup', (e) => {
+  if (toqueNoJogo) {
+    const { dono, x0, y0 } = toqueNoJogo;
+    toqueNoJogo = null;
+    if (Math.hypot(e.clientX - x0, e.clientY - y0) < LIMIAR_ARRASTO) { abreVisor(dono); return; }
+  }
   if (!arrasto3d) return;
   const { id, ativo } = arrasto3d;
   arrasto3d = null;
@@ -1354,7 +1367,7 @@ window.addEventListener('pointerup', (e) => {
   ordemManual = ordem;
   sincronizaMao();
 });
-window.addEventListener('pointercancel', () => { arrasto3d = null; sincronizaMao(); });
+window.addEventListener('pointercancel', () => { arrasto3d = null; toqueNoJogo = null; sincronizaMao(); });
 
 // leve paralaxe: a cabeça mexe um pouco com o dedo/mouse, como quem se inclina
 let olharX = 0;
@@ -1391,6 +1404,12 @@ function montaBotoes() {
   if (view.phase === 'roundEnd' || view.phase === 'gameEnd') {
     barra.appendChild(botao('Ver o placar na mesa normal', 'primario', () => { location.href = '/'; }));
     return;
+  }
+  // o visor de jogos sempre à mão: na mesa cheia é por ele que se lê carta por
+  // carta, e com uma carta escolhida é por ele que se encaixa
+  if (view.players.some((p) => p.melds?.length)) {
+    const comCarta = selecionadas.size === 1 && view.turnId === me() && view.phase === 'play';
+    barra.appendChild(botao(comCarta ? '🃏 Encaixar num jogo' : '🃏 Ver os jogos', comCarta ? 'primario' : 'normal', () => abreVisor(null)));
   }
   // compra fora da vez: a mesma regra da mesa normal (carta fresca e
   // comprável no meio, fase de puxar, não é a sua vez)
@@ -1431,6 +1450,133 @@ function montaBotoes() {
       selecionadas.clear();
     }));
   }
+}
+
+// ---------------------------------------------------------------------------
+// Visor de jogos: o toque num jogo do feltro abre a mesa inteira em tamanho de
+// leitura — e é ali que dá para encaixar e trocar pelo coringa.
+//
+// Numa mesa de oito com todo mundo baixado são umas sessenta cartas em 4 m² de
+// feltro: nenhum arranjo faz todas caberem legíveis ao mesmo tempo, e erguer
+// carta está proibido (decisão do usuário, 08/09/2026). Então o feltro fica
+// com a VISÃO DE CONJUNTO — quem baixou o quê, de quem é cada bloco — e a
+// leitura fina (e a jogada) vem daqui, sem mandar o jogador para a mesa 2D.
+// ---------------------------------------------------------------------------
+
+const visor = document.createElement('div');
+visor.className = 'visor-jogos';
+visor.hidden = true;
+visor.innerHTML = '<div class="visor-caixa" role="dialog" aria-label="Jogos na mesa">'
+  + '<header><strong>Jogos na mesa</strong><button class="visor-x" type="button">fechar</button></header>'
+  + '<div class="visor-corpo"></div></div>';
+document.body.appendChild(visor);
+visor.addEventListener('click', (e) => {
+  if (e.target === visor || e.target.classList.contains('visor-x')) fechaVisor();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !visor.hidden) fechaVisor(); });
+
+let visorEm = null;   // id de quem está em foco, ou null quando fechado
+
+function fechaVisor() { visor.hidden = true; visorEm = null; }
+function abreVisor(donoId) {
+  visorEm = donoId || view?.players.find((p) => p.melds?.length)?.id || null;
+  desenhaVisor();
+  visor.hidden = false;
+}
+
+// a carta do visor é a MESMA arte do tampo: o canvas da textura, redesenhado
+// no tamanho de leitura (nada de segunda fonte de verdade para o desenho)
+function cartaDoVisor(card) {
+  const c = document.createElement('canvas');
+  c.className = 'visor-carta';
+  c.width = 132; c.height = 185;
+  const fonte = materialDaCarta(card).map?.image;
+  if (fonte) c.getContext('2d').drawImage(fonte, 0, 0, c.width, c.height);
+  return c;
+}
+
+function desenhaVisor() {
+  const corpo = visor.querySelector('.visor-corpo');
+  corpo.textContent = '';
+  const comJogos = (view?.players || []).filter((p) => p.melds?.length);
+  if (!comJogos.length) {
+    const p = document.createElement('p');
+    p.className = 'visor-vazio';
+    p.textContent = 'Ninguém baixou nada ainda.';
+    corpo.appendChild(p);
+    return;
+  }
+  const minhaVez = view.turnId === me() && view.phase === 'play';
+  const selecionada = selecionadas.size === 1
+    ? (view.you?.hand || []).find((c) => c.id === [...selecionadas][0]) : null;
+  const coringaNaMao = selecionada && isJoker(selecionada) ? selecionada : null;
+
+  for (const p of comJogos) {
+    const bloco = document.createElement('section');
+    bloco.className = 'visor-jogador' + (p.id === visorEm ? ' foco' : '');
+    bloco.style.setProperty('--cor', CORES_DE_ASSENTO[assentoDe(p.id) % CORES_DE_ASSENTO.length]);
+    const titulo = document.createElement('h3');
+    titulo.textContent = p.id === me() ? 'Você' : p.name;
+    bloco.appendChild(titulo);
+
+    for (const meld of p.melds) {
+      const linha = document.createElement('div');
+      linha.className = 'visor-jogo';
+      const cartas = document.createElement('div');
+      cartas.className = 'visor-cartas';
+      for (const card of meld.cards) {
+        const alvo = document.createElement('div');
+        alvo.className = 'visor-slot';
+        alvo.appendChild(cartaDoVisor(card));
+        // coringa na mão: ele entra no lugar de QUALQUER carta da sequência
+        // baixada e a trocada vem para a sua mão (regra do usuário, 07/09)
+        if (minhaVez && coringaNaMao && meld.type === 's' && !meld.cards.some(isJoker) && !isJoker(card)) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'visor-acao';
+          b.textContent = 'trocar pelo coringa';
+          b.onclick = () => {
+            sendAction({ a: 'trocarPorCoringa', meldId: meld.id, cardId: card.id, coringaId: coringaNaMao.id });
+            selecionadas.clear(); fechaVisor(); sincronizaMao(); montaBotoes();
+          };
+          alvo.appendChild(b);
+        }
+        cartas.appendChild(alvo);
+      }
+      linha.appendChild(cartas);
+      // encaixe: a mesma pergunta da mesa 2D quando a carta serve nas duas
+      // pontas — aqui ela vira dois botões, que é mais rápido no dedo
+      if (minhaVez && selecionada && layoffOption(selecionada, meld)) {
+        const pontas = meld.type === 's' ? layoffEnds(selecionada, meld) : [];
+        const acoes = document.createElement('div');
+        acoes.className = 'visor-encaixes';
+        const manda = (end) => {
+          sendAction({ a: 'layoff', cardId: selecionada.id, meldId: meld.id, ...(end ? { end } : {}) });
+          selecionadas.clear(); fechaVisor(); sincronizaMao(); montaBotoes();
+        };
+        if (pontas.length > 1) {
+          for (const end of pontas) {
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'visor-acao forte';
+            b.textContent = end === 'lo' ? `encaixar ${cardLabel(selecionada)} embaixo` : `encaixar ${cardLabel(selecionada)} em cima`;
+            b.onclick = () => manda(end);
+            acoes.appendChild(b);
+          }
+        } else {
+          const b = document.createElement('button');
+          b.type = 'button'; b.className = 'visor-acao forte';
+          b.textContent = `encaixar ${cardLabel(selecionada)} aqui`;
+          b.onclick = () => manda(pontas[0] || null);
+          acoes.appendChild(b);
+        }
+        linha.appendChild(acoes);
+      }
+      bloco.appendChild(linha);
+    }
+    corpo.appendChild(bloco);
+  }
+  const foco = corpo.querySelector('.foco');
+  if (foco) foco.scrollIntoView({ block: 'nearest' });
 }
 
 // ---------------------------------------------------------------------------
@@ -1558,81 +1704,139 @@ async function sincroniza(primeira) {
       }
     }
 
-    // Jogos baixados: fileiras de cartas DEITADAS na frente de quem baixou,
-    // sobrepostas como as minis da mesa 2D e um pouco erguidas para a câmera
-    // (decisão do usuário, 2026-09-04). Ver os jogos da mesa é metade do
-    // planejamento; antes ficavam de pé porque a 17° deitadas eram lascas.
+    // Jogos baixados: cartas DEITADAS no feltro na frente de quem baixou
+    // (decisão do usuário, 2026-09-04 e de novo em 08/09: nada de erguer,
+    // flutuar ou inclinar carta). Ver os jogos da mesa é metade do
+    // planejamento, então o que dá leitura aqui é outra coisa:
+    //   * toda carta fica VIRADA PARA A CÂMERA. Antes cada fileira girava
+    //     junto com a cadeira do dono, e a sua saía de cabeça para baixo.
+    //   * a carta do tampo cresceu (ESCALA_TAMPO cheia) e o passo abriu de
+    //     8 para 10,5 cm, que é a fatia onde mora o índice do canto.
+    //   * cada jogador ganha um TAPETE na cor da sua banqueta: com a mesa
+    //     cheia os jogos viravam uma sopa de cartas sem dono (queixa do
+    //     usuário, 08/09/2026).
+    //   * quem baixa muito QUEBRA EM LINHAS em vez de encolher tudo.
+    // O resto da leitura vem da câmera (mais alta, em `alturaDoOlho`) e do
+    // visor de jogos, que abre no toque.
     jogosNaMesa.clear();
+    let meuJogoZ = Infinity;   // a borda mais funda dos MEUS jogos, para a barra não sentar em cima
     const todos = [view.players.find((p) => p.id === me()), ...outros].filter(Boolean);
     for (const p of todos) {
       if (!p.melds?.length) continue;
       const meu = p.id === me();
       const idx = outros.indexOf(p);
       const pos = meu ? { x: 0, z: MESA.assento, ang: Math.PI } : posicaoDoAssento(idx, outros.length);
-      const frente = new THREE.Group();
       // Os jogos ficam num ANEL em volta das pilhas do centro, cada um na
-      // frente da própria cadeira: a fileira da frente a 0,78 m do centro, a
-      // de trás (mesa cheia) mais para dentro, a 0,52. Os seus, junto da sua
-      // borda. Antes ficavam onde caíssem da posição do assento, e o monte
-      // se enfiava no meio deles.
+      // frente da própria cadeira: a fileira da frente a 0,72 m do centro, a
+      // de trás (mesa cheia) mais para dentro. Os SEUS vêm bem para dentro:
+      // na sua beirada eles caíam no rodapé, onde mora o seu leque.
       const fundo = !meu && outros.length > 4 && idx % 2 === 1;
-      // Os SEUS jogos vêm bem para dentro (0,40 e não 0,72). Na sua beirada
-      // eles caíam no rodapé da tela — justo a faixa onde mora o seu leque —,
-      // e numa janela deitada a mão em primeira pessoa tapava o que você mesmo
-      // tinha baixado (queixa do usuário, 08/09/2026). A 0,40 m eles sobem
-      // acima da mão e ainda param a 14 cm do monte e do descarte, que ocupam
-      // até 0,16 m do centro.
-      const raioJogos = meu ? 0.40 : fundo ? 0.52 : 0.78;
-      frente.position.set(Math.sin(pos.ang) * raioJogos, MESA_TOPO, -Math.cos(pos.ang) * raioJogos);
-      frente.rotation.y = -pos.ang;
+      const raioJogos = meu ? 0.38 : fundo ? 0.48 : 0.72;
+      // O giro do conjunto acompanha a cadeira do dono (é o que diz de quem é
+      // o jogo), mas limitado a ±35°: além disso a carta deitada vira texto de
+      // lado. A sua fileira não gira — ela é lida de frente.
+      const giro = meu ? 0 : Math.max(-0.61, Math.min(0.61, -pos.ang));
+      const escalaJogo = meu ? 0.72 : 1;   // a sua é a mais perto da câmera
 
-      const passoCarta = 0.08;
-      const vaoEntreJogos = 0.07;
-      const larguras = p.melds.map((m) => (m.cards.length - 1) * passoCarta + CARTA_L * ESCALA_TAMPO * 0.85);
-      const total = larguras.reduce((a, b) => a + b + vaoEntreJogos, -vaoEntreJogos);
-      let x = -total / 2;
+      const passoCarta = 0.105;
+      const vaoEntreJogos = 0.14;
+      const cartaLarg = CARTA_L * ESCALA_TAMPO;
+      const larguras = p.melds.map((m) => (m.cards.length - 1) * passoCarta + cartaLarg);
+      // quanto cabe numa linha: o vão até o vizinho do anel
+      const vao = meu || outros.length < 2 ? 1.15 : Math.max(0.5, raioJogos * (2 * (camera.aspect < 1 ? 0.58 : 0.96) / Math.max(1, outros.length - 1)) * 1.7);
+      const limite = Math.min(1.15, vao) / escalaJogo;
+      // Uma linha por vez, quebrando quando estoura. Encolher a fileira
+      // inteira (o que se fazia antes) era o que sumia com as cartas de quem
+      // baixava três jogos; a segunda linha vai para DENTRO da mesa, na
+      // direção do centro, onde há feltro sobrando.
+      const maxLinhas = fundo ? 1 : 2;
+      const linhas = [[]]; const largs = [0];
       p.melds.forEach((meld, mi) => {
-        meld.cards.forEach((card, ci) => {
-          const carta = new THREE.Mesh(geoCarta, materialDaCarta(card));
-          carta.castShadow = true;
-          carta.scale.setScalar(ESCALA_TAMPO * 0.85);
-          carta.rotation.x = -Math.PI / 2 + 0.025;
-          carta.position.set(
-            x + CARTA_L * ESCALA_TAMPO * 0.425 + ci * passoCarta,
-            0.009 + ci * 0.001,
-            ci * 0.01,
-          );
-          frente.add(carta);
-        });
-        x += larguras[mi] + vaoEntreJogos;
+        const k = linhas.length - 1;
+        if (largs[k] > 0 && largs[k] + vaoEntreJogos + larguras[mi] > limite && linhas.length < maxLinhas) {
+          linhas.push([]); largs.push(0);
+        }
+        const j = linhas.length - 1;
+        linhas[j].push({ meld, larg: larguras[mi] });
+        largs[j] += (largs[j] ? vaoEntreJogos : 0) + larguras[mi];
       });
-      const sombra = sombraDeContato(total + 0.15, 0.35);
-      sombra.position.set(0, 0.004, 0.03);
-      frente.add(sombra);
-      // mesa cheia de jogos: encolhe o conjunto em vez de estourar o feltro —
-      // e, com vizinhos no anel, cabe no vão entre eles (nunca abaixo de 0,45)
-      const vao = meu || outros.length < 2 ? 1.3 : Math.max(0.45, raioJogos * (2 * (camera.aspect < 1 ? 0.58 : 0.96) / Math.max(1, outros.length - 1)) * 1.7);
-      const limite = Math.min(1.3, vao);
-      // Os seus jogos saem menores (0,72): são os mais perto da câmera e, no
-      // tamanho dos outros, a fileira ficava funda demais para caber entre as
-      // pilhas e o leque. Encolhida, ela continua a maior da tela.
-      const fator = Math.min(meu ? 0.72 : 1, limite / total);
-      if (fator < 1) frente.scale.set(fator, 1, fator);
-      jogosNaMesa.add(frente);
-      // jogo novo de quem acabou de baixar: a fileira inteira voa do assento
+
+      const cor = new THREE.Color(CORES_DE_ASSENTO[assentoDe(p.id) % CORES_DE_ASSENTO.length]);
+      const novas = [];
+      linhas.forEach((linha, k) => {
+        const raio = raioJogos - k * 0.24;
+        const frente = new THREE.Group();
+        frente.position.set(Math.sin(pos.ang) * raio, MESA_TOPO, -Math.cos(pos.ang) * raio);
+        frente.rotation.y = giro;
+        const total = largs[k];
+        // o tapete do dono: a borda na cor da banqueta dele e o miolo escuro,
+        // que é o que separa um jogo do outro quando a mesa enche
+        const alt = CARTA_A * ESCALA_TAMPO;
+        for (const [dl, dp, material, y] of [
+          [total + 0.13, alt + 0.11, new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.5, depthWrite: false }), 0.004],
+          [total + 0.08, alt + 0.06, new THREE.MeshBasicMaterial({ color: 0x0a2419, transparent: true, opacity: 0.55, depthWrite: false }), 0.005],
+        ]) {
+          const t = new THREE.Mesh(geoSombra, material);
+          t.rotation.x = -Math.PI / 2;
+          t.scale.set(dl, dp, 1);
+          t.position.set(0, y, 0);
+          frente.add(t);
+        }
+        let x = -total / 2;
+        for (const { meld, larg } of linha) {
+          meld.cards.forEach((card, ci) => {
+            const carta = new THREE.Mesh(geoCarta, materialDaCarta(card));
+            carta.castShadow = true;
+            carta.scale.setScalar(ESCALA_TAMPO);
+            // deitada no feltro (o 0,025 é só a sombra da borda), e virada
+            // para a câmera: o giro do conjunto é desfeito na carta
+            carta.rotation.set(-Math.PI / 2 + 0.025, 0, 0);
+            carta.position.set(x + cartaLarg / 2 + ci * passoCarta, 0.008 + ci * 0.001, ci * 0.006);
+            carta.userData.jogo = { dono: p.id, meldId: meld.id };
+            frente.add(carta);
+          });
+          x += larg + vaoEntreJogos;
+        }
+        if (escalaJogo !== 1 || total > limite) {
+          const f = escalaJogo * Math.min(1, limite / total);
+          frente.scale.set(f, 1, f);
+        }
+        jogosNaMesa.add(frente);
+        if (meu) meuJogoZ = Math.min(meuJogoZ, raio - (alt * escalaJogo) / 2 - 0.03);
+        if (linha.some(({ meld }) => !jogosVistos.has(meld.id))) novas.push(frente);
+      });
+      // jogo novo de quem acabou de baixar: a linha inteira voa do assento
       // dele (ou da frente da sua cadeira) até o lugar — o grupo, não carta
       // por carta, que é o gesto de quem põe o jogo na mesa
-      const temNovo = p.melds.some((m) => !jogosVistos.has(m.id));
-      if (temNovo && baixadaDe === p.id && !semMovimento) {
+      if (novas.length && baixadaDe === p.id && !semMovimento) {
         const a = assentos.get(p.id);
         const origem = a ? lequeDe(a) : new THREE.Vector3(0, MESA_TOPO + 0.3, 1.2);
-        voa(frente, origem, frente.position.clone(), { dur: 340, atraso: temGesto(a) ? 635 : 120, arco: 0.015, deAtual: a?.assento?.modelo ? () => pontoDaMaoAtiva(a) : null });
+        for (const frente of novas) {
+          voa(frente, origem, frente.position.clone(), { dur: 340, atraso: temGesto(a) ? 635 : 120, arco: 0.015, deAtual: a?.assento?.modelo ? () => pontoDaMaoAtiva(a) : null });
+        }
       }
       for (const m of p.melds) jogosVistos.add(m.id);
     }
 
     sincronizaMao();
+    // A barra de ações sobe acima dos SEUS jogos: com eles na beirada, os
+    // botões (que são HTML, por cima da cena) sentavam bem no meio das cartas
+    // que você acabou de baixar.
+    {
+      const base = parseFloat(document.body.style.getPropertyValue('--hand-height')) || 160;
+      let fundo = base + 14;
+      if (meuJogoZ < Infinity) {
+        // a mira é a mesma do laço de desenho: na PRIMEIRA sincronia ainda não
+        // houve quadro nenhum, e sem isso a câmera ainda olha no horizonte
+        camera.lookAt(camera.position.x * 0.25, MESA_TOPO + 0.12, -0.35);
+        camera.updateMatrixWorld();
+        const p = new THREE.Vector3(0, MESA_TOPO, meuJogoZ).project(camera);
+        fundo = Math.max(fundo, innerHeight - (-p.y * 0.5 + 0.5) * innerHeight + 10);
+      }
+      document.body.style.setProperty('--acao-fundo', `${Math.round(Math.min(innerHeight * 0.6, fundo))}px`);
+    }
     montaBotoes();
+    if (!visor.hidden) desenhaVisor();   // com o visor aberto, ele segue a mesa
 
     // aviso da vez
     if (view.phase === 'draw' || view.phase === 'play') {
@@ -1739,6 +1943,21 @@ function reageAoEvento(ev) {
 // O enquadramento depende da tela: em pé (celular), o campo de visão vertical
 // precisa abrir e a câmera recuar, senão o horizontal fica um túnel — fov
 // vertical de 52° numa tela 9:19 dá só ~26° de largura, e a mesa some.
+// A altura do olho SEGUE a distância: o que faz uma carta deitada ler é o
+// ângulo com que a vista bate no feltro, e ele é altura ÷ distância. Com o
+// olho fixo a 1,20 m, a fileira do outro lado da mesa era vista a 11° e virava
+// uma tira de 19 px — e quando a mesa enchia a câmera ainda recuava, piorando.
+// Fixando a INCLINAÇÃO, a mesa cheia sobe o olho junto e todo jogo do anel é
+// visto a ~19°, do jeito de quem se debruça um pouco sobre a mesa para ver.
+// (Erguer a CARTA está proibido — decisão do usuário, 08/09/2026 — então quem
+// se move é a cabeça.)
+// O teto de 1,62 m é o limite de continuar SENTADO à mesa: com sete
+// adversários a câmera recua a 2,6 m e, sem teto, a inclinação viraria uma
+// vista de cima com todo mundo miúdo. Mesa cheia é o caso em que nenhuma
+// câmera dá conta das sessenta cartas — ali quem resolve é o visor de jogos.
+const INCLINACAO = 0.34;                  // tangente do ângulo sobre o tampo
+const ANEL_LONGE = 0.78;                  // a fileira mais distante do anel
+const alturaDoOlho = (z) => Math.min(1.62, MESA_TOPO + (z + ANEL_LONGE) * INCLINACAO);
 function ajustaCameraParaAssentos(total) {
   const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
   let z = OLHO.z;
@@ -1747,7 +1966,7 @@ function ajustaCameraParaAssentos(total) {
   // mesa, recuar para caber quem senta ao seu lado mostrava o pé da mesa e
   // deixava todo mundo miúdo — os das pontas ficam de fora do quadro.
   for (let i=0;i<total;i++) { const p=posicaoDoAssento(i,total); z=Math.max(z, p.z + (Math.abs(p.x)+0.22)/tanH); }
-  camera.position.z=Math.min(2.6, z); camera.position.y=OLHO.y + (total>4?0.12:0);
+  camera.position.z=Math.min(2.6, z); camera.position.y=alturaDoOlho(camera.position.z);
 }
 function encaixaTela() {
   const w = innerWidth; const h = innerHeight;
@@ -1768,7 +1987,8 @@ function encaixaTela() {
   // cabeça a 1,2 m, um pouco à frente da própria cadeira, olhando 12° para
   // baixo, para o meio do tampo. Em pé o campo abre para caber os vizinhos.
   camera.fov = camera.aspect < 1 ? 72 : 55;
-  camera.position.set(OLHO.x, OLHO.y, OLHO.z + (1 - emPe) * 0.15);
+  const z = OLHO.z + (1 - emPe) * 0.15;
+  camera.position.set(OLHO.x, alturaDoOlho(z), z);
   camera.updateProjectionMatrix();
   if(view) ajustaCameraParaAssentos(Math.max(0, view.players.length-1));
 }
@@ -1963,6 +2183,6 @@ if (!sessao) {
 }
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
-window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo };
+window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, abreVisor };
 
 // interface-2026-09-07-r1

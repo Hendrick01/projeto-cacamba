@@ -67,6 +67,7 @@ projeto-caçamba/
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
 | [`test/sobra.mjs`](test/sobra.mjs) | 189 | As três portas da sobra pelo fio: **quatro** jogadores roteirizados (com três é um baralho só, e a quarta carta de cada valor é uma), baixando um jogo por vez para abrir a janela dos encaixes — é dos encaixes que as sobras nascem. A Ana leva uma sobra alheia para a mão e descarta outra, conferindo o estado que volta. Sai com código 2 quando o sorteio não gera sobra: rodar de novo. |
 | [`test/mesa-qa.mjs`](test/mesa-qa.mjs) | 32 | Ferramenta de QA, não teste: cria uma sala com robôs, começa a partida e imprime a sessão para colar em `localStorage` e abrir `/3d.html`. Sem partida em andamento a mesa 3D não desenha ninguém, e era esse o degrau para conferir o elenco na cena. `node test/mesa-qa.mjs [robôs] [porta]`. |
+| [`test/mesa-qa-jogando.mjs`](test/mesa-qa-jogando.mjs) | 45 | O irmão do anterior que também JOGA a minha vez até a mesa encher de jogos baixados: é o degrau para ver a 3D com oito jogadores e todo mundo com jogo na frente, que é onde a leitura das cartas aperta. `node test/mesa-qa-jogando.mjs [robôs] [porta] [turnos]`. |
 | [`test/aliados.mjs`](test/aliados.mjs) | 67 | Ferramenta de QA, não teste: entram numa sala que você criou no navegador e jogam gerando sobras rápido, para conferir a TELA com sobra na mesa. `node test/aliados.mjs CODIGO`. |
 | [`public/mesa3d.js`](public/mesa3d.js) | 1358 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
@@ -505,9 +506,9 @@ O botão **3D** na barra da mesa abre `3d.html`: a MESMA partida, vista da sua
 cadeira — o servidor continua sendo o juiz, e a tela 3D é só outra janela para
 o mesmo estado. Ela entra com a sessão do `localStorage`, recebe as mesmas
 visões e manda as mesmas ações; dá para jogar o ciclo inteiro por ela (puxar,
-baixar com o plano do próprio motor, descartar). Jogadas finas — encaixe,
-troca de coringa, arrumar a mão — continuam na mesa normal, e o botão de
-voltar está sempre à vista.
+baixar com o plano do próprio motor, descartar) e, desde 08/09/2026, também
+**encaixar e trocar pelo coringa** — pelo visor de jogos, logo abaixo. O botão
+de voltar para a mesa normal continua sempre à vista.
 
 O que ela desenha ([`public/mesa3d.js`](public/mesa3d.js)): o salão em neblina
 (a penumbra por distância de verdade), a mesa redonda sob a lâmpada, o elenco
@@ -538,6 +539,44 @@ a ±38°, com cinco, os das pontas saíam do quadro (visto na tela); cabe porque
 as fileiras alternam o raio e na da frente sobram ~0,9 m entre vizinhos.
 Conferido na tela com cinco adversários: todos inteiros, dois arcos, nomes
 completos.
+
+### Ler os jogos baixados (08/09/2026)
+
+Queixa do usuário: "as cartas baixadas na mesa também [são um problema] por
+falta de visibilidade" e "os jogos estão se misturando quando tem vários".
+Duas coisas estavam proibidas: **erguer carta** (flutuar ou inclinar) e mexer
+no que já estava bom. O que restou, e é o que a mesa faz hoje:
+
+* **Toda carta baixada vira para a câmera.** Cada fileira acompanha a cadeira
+  do dono só até ±35°; a SUA não gira. Antes a fileira girava junto com a
+  cadeira e a sua saía de cabeça para baixo — o índice do canto ficava no lado
+  escondido pela carta seguinte.
+* **A carta do tampo cresceu** para `ESCALA_TAMPO` cheia e o passo abriu de 8
+  para 10,5 cm: a fatia visível de cada carta é a do índice.
+* **Cada jogador ganha um tapete** na cor da sua banqueta (`CORES_DE_ASSENTO`),
+  com o miolo escuro. É o que separa os blocos quando a mesa enche.
+* **Quem baixa muito quebra em linhas** em vez de encolher tudo: a segunda vai
+  para dentro da mesa, onde há feltro sobrando (`maxLinhas`).
+* **A altura do olho segue a distância** (`alturaDoOlho`): o que faz uma carta
+  deitada ler é o ângulo com que a vista bate no feltro. Com o olho fixo a
+  1,20 m a fileira do outro lado era vista a 11° e virava uma tira; fixando a
+  inclinação em ~19° (teto de 1,62 m, que é o limite de continuar sentado), a
+  mesa cheia sobe a cabeça junto em vez de piorar.
+* **A barra de ações sobe acima dos seus jogos** (`--acao-fundo`), e em janela
+  deitada **a mão desce** um sexto da carta pela borda (`layoutMao3D`): o
+  índice mora no alto, então ela continua de ler, e o feltro onde ficam os seus
+  jogos aparece.
+
+**O visor de jogos** é o que resolve o caso extremo. Numa mesa de oito com
+todo mundo baixado são ~60 cartas em 4 m² de feltro: nenhum arranjo as faz
+caber legíveis ao mesmo tempo. Então o feltro fica com a visão de conjunto —
+quem baixou o quê, de quem é cada bloco — e **o toque num jogo abre a lista
+inteira** em tamanho de leitura (a mesma arte da carta, redesenhada do canvas
+da textura), agrupada por jogador e com a cor de cada um. Com uma carta
+escolhida na mão, cada jogo ganha o botão de **encaixar** (as duas pontas,
+quando serve nas duas) e, com um coringa escolhido, cada carta de sequência
+baixada ganha **trocar pelo coringa** — as mesmas ações do motor, sem sair da
+3D. O botão `🃏 Ver os jogos` na barra abre o mesmo visor.
 
 **Sombra de verdade, da lâmpada** (2026-09-04): o `SpotLight` projeta um mapa
 PCF suave de 2048 sobre chão, tampo e aro; cartas da mesa, monte, bonecos e

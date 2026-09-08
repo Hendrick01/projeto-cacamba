@@ -41,12 +41,17 @@ export function layoutMao3D({ quantidade, largura = 375, altura = 812, fov = 72,
   const alturaMao = Math.min(altura * 0.34, fileiras * (alturaCard + 15) + 26);
   // Extreme hands compact vertically; all cards retain unique selectable positions.
   const entreFilas = fileiras > 1 ? Math.min(alturaCard + 15, (alturaMao - alturaCard - 20) / (fileiras - 1)) : 0;
+  // Numa janela DEITADA a mão desce até sair um sexto de cada carta pela
+  // borda de baixo — é a mão segurada no colo. O índice da carta mora no alto,
+  // então ela continua inteira de ler, e o que se ganha é a faixa de feltro
+  // onde ficam os SEUS jogos baixados: em pé sobra altura e a mão fica inteira.
+  const margem = altura >= largura ? 18 : -alturaCard * 0.17;
   const posicoes = Array.from({ length: n }, (_, i) => {
     const fila = Math.floor(i / porFila), col = i % porFila;
     const nestaFila = Math.min(porFila, n - fila * porFila), meio = (nestaFila - 1) / 2;
     const dx = col - meio;
     const giro = fileiras === 1 && nestaFila > 1 ? -dx / meio * 0.045 : 0;
-    return { x: dx * passoPx * unidade, y: (-altura / 2 + 18 + alturaCard / 2 + (fileiras - fila - 1) * entreFilas - Math.abs(dx) * 0.4) * unidade,
+    return { x: dx * passoPx * unidade, y: (-altura / 2 + margem + alturaCard / 2 + (fileiras - fila - 1) * entreFilas - Math.abs(dx) * 0.4) * unidade,
       z: -dist, giro, fila, escala: larguraCard * unidade / cartaL };
   });
   return { dist, alturaVisivel, larguraVisivel, unidade, posicoes, passo: passoPx * unidade,

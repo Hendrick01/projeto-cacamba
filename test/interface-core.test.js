@@ -18,8 +18,13 @@ for (const [width,height,fov] of [[320,568,72],[390,844,72],[844,390,55],[1440,9
    const l=layoutMao3D({quantidade:n,largura:width,altura:height,fov});
    for(const p of l.posicoes) {
     const halfWidth=(0.42*Math.cos(p.giro)+0.59*Math.abs(Math.sin(p.giro)))*p.escala/2;
+    const meiaAltura=0.59*p.escala/2;
     assert.ok(Math.abs(p.x)+halfWidth<l.larguraVisivel/2);
-    assert.ok(p.y-0.59*p.escala/2>-l.alturaVisivel/2);
+    // A mão pode descer pela borda de baixo (deitada, ela é segurada no colo
+    // para não tapar os jogos baixados), mas nunca mais que um quarto da
+    // carta — o índice fica no alto e tem de aparecer inteiro.
+    assert.ok(p.y-meiaAltura>-l.alturaVisivel/2-meiaAltura*0.5, 'carta afundou demais na borda');
+    assert.ok(p.y+meiaAltura<l.alturaVisivel/2, 'carta saiu por cima');
     assert.ok(Number.isFinite(p.y)); assert.ok(l.passo>=0);
    }
    assert.equal(l.posicoes.length,n);

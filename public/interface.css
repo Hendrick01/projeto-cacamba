@@ -86,7 +86,9 @@ body.ui-3d .painel strong { color:#f5d28b; }
 body.ui-3d .voltar { border-radius:10px;border:1px solid #d2c59766;background:#0b241dbb;min-height:40px; }
 body.ui-3d .aviso { background:#102f24ed;border:1px solid #c5b46c88;color:#f7edcf;border-radius:12px; }
 body.ui-3d .ui-3d-footer { position:fixed;bottom:max(5px,env(safe-area-inset-bottom));left:12px;font:700 10px sans-serif;color:#e1d9c3;pointer-events:none;opacity:.75;z-index:5; }
-body.ui-3d .action-3d { bottom:calc(var(--hand-height,160px) + 14px)!important; }
+/* acima do leque e, quando você tem jogo baixado, acima dele também (a mesa
+   3D calcula a altura em `--acao-fundo` a cada estado) */
+body.ui-3d .action-3d { bottom:var(--acao-fundo,calc(var(--hand-height,160px) + 14px))!important; }
 @media(max-width:760px) {
  .ui-shell { width:calc(100% - 32px);padding:18px 0; }
  .ui-top { margin-bottom:25px; }.ui-top-right{gap:8px;}.ui-top-right [data-connection]{font-size:.67rem;}
