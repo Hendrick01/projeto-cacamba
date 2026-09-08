@@ -68,11 +68,15 @@ try {
  await a.waitForFunction(()=>[...window.mesa3d.assentos.values()].some(a=>a.assento?.modelo),null,{timeout:60000});
  report.webgl=await a.evaluate(()=>!window.mesa3d.renderer.getContext().isContextLost());assert.ok(report.webgl);
  // Pause only the test frame pump; production animations remain unchanged.
- await a.evaluate(()=>{window.__qaPauseRender=true;const {renderer,scene,camera}=window.mesa3d;renderer.setPixelRatio(1);renderer.render(scene,camera);});
+ // `quadro` e não `renderer.render(scene,camera)`: a sua mão é um segundo
+ // passe, numa cena própria, e o render direto do mundo a deixaria de fora
+ await a.evaluate(()=>{window.__qaPauseRender=true;window.mesa3d.renderer.setPixelRatio(1);window.mesa3d.quadro(performance.now());});
  await a.waitForTimeout(800);await shot(a,'mesa-3d-desktop');
  await a.setViewportSize({width:390,height:844});await a.waitForTimeout(700);
  await a.evaluate(()=>window.mesa3d.quadro(performance.now()+100));await shot(a,'mesa-3d-mobile');
- const n=await a.evaluate(()=>{let n=0;window.mesa3d.scene.traverse(o=>{if(o.userData?.cardId!==undefined&&o.renderOrder>=100)n++;});return n;});
+ // as cartas da mão moram na cena do segundo passe desde que a mão virou
+ // sólido com profundidade própria; procura nas duas
+ const n=await a.evaluate(()=>{let n=0;for(const c of [window.mesa3d.scene,window.mesa3d.cenaMao])c?.traverse(o=>{if(o.userData?.cardId!==undefined&&o.renderOrder>=100)n++;});return n;});
  assert.ok(n>=6);ok('Mesa 3D: WebGL ativo, GLB real carregado e leque em retrato/paisagem');
  assert.deepEqual(report.errors,[]);ok('Nenhuma excecao JavaScript nas telas exercitadas');
 }catch(e){report.failure=e.stack;console.error(e);process.exitCode=1;

@@ -115,6 +115,13 @@ body.ui-3d .action-3d { bottom:var(--acao-fundo,calc(var(--hand-height,160px) + 
    da geladeira) e o piso xadrez aparecendo atrás da mesa. Tudo em CSS: nenhum
    arquivo novo, nada de fora.
 --------------------------------------------------------------------------- */
+/* A faixa sangra 40 px para cada lado do miolo, de propósito: é parede, e
+   parede vai de ponta a ponta. Mas no celular o miolo já ocupa quase a tela
+   toda, e esses 40 px viravam ROLAGEM LATERAL — a Home ficava 414 px de largura
+   numa janela de 390. `clip` corta o que passa da tela sem criar um contêiner
+   de rolagem (o que `hidden` faria, e aí a mão fixa do rodapé se prenderia
+   nele). Visualmente é o que já se queria: a faixa encosta na borda. */
+#screen-home { overflow-x: clip; }
 #screen-home .ui-shell::before {
   content:'';position:absolute;left:-40px;right:-40px;top:64px;height:22px;pointer-events:none;opacity:.55;
   background:
