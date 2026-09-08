@@ -1265,13 +1265,12 @@ function sincronizaMao() {
   if (maos.esq && maos.dir) {
     const { escala,baseY,dist,larguraLeque } = plano;
     maos.esq.visible = maos.dir.visible = n > 0;
-    // As mãos ficam PARA FORA das pontas do leque: é a única faixa livre — as
-    // cartas são desenhadas por cima delas, e trazê-las para dentro do leque
-    // (tentativa de 07/09) só as escondia atrás das cartas.
-    // Elas entram um pouco POR DENTRO da ponta do leque: os dedos cobrem a
-    // beirada da última carta, como quem segura. Para fora, ficavam soltas no
-    // canto — e em pé, metade delas saía do quadro.
-    const x = larguraLeque * .5 - (maos.tridi ? .02 : -.03);
+    // As mãos ENTRAM PELA BORDA DE BAIXO, grandes: só os dedos passam por
+    // cima da ponta do leque e o punho fica fora do quadro (escolha do
+    // usuário, 08/09/2026). No tamanho de antes elas ficavam penduradas nas
+    // pontas do leque, cortadas no punho, e não liam como as SUAS mãos — liam
+    // como duas mãos de boneco soltas no ar.
+    const x = larguraLeque * .5 - (maos.tridi ? .01 : -.03);
     maos.esq.position.set(-x,baseY - .24 * escala,-dist - .03);
     maos.dir.position.set(x,baseY - .24 * escala,-dist - .03);
     if (maos.tridi) {
@@ -1279,11 +1278,11 @@ function sincronizaMao() {
       // olha para −Z, então meia-volta em Y é o que põe as costas da SUA mão
       // para você. São duas mãos de verdade, uma de cada lado: aqui não se
       // espelha com escala negativa, que viraria as normais do avesso.
-      maos.esq.rotation.set(.18,Math.PI,.30); maos.dir.rotation.set(.18,Math.PI,-.30);
-      maos.esq.scale.setScalar(escala * 1.7); maos.dir.scale.setScalar(escala * 1.7);
+      maos.esq.rotation.set(.18,Math.PI,.22); maos.dir.rotation.set(.18,Math.PI,-.22);
+      maos.esq.scale.setScalar(escala * 3.1); maos.dir.scale.setScalar(escala * 3.1);
       // a origem do recorte é a PINÇA (perto das pontas dos dedos) e a mão
-      // desce dali para o punho: sem subir, só o pulso aparecia na borda
-      maos.esq.position.y += .12 * escala; maos.dir.position.y += .12 * escala;
+      // desce dali para o punho — que agora, do tamanho certo, sai pela borda
+      maos.esq.position.y += .02 * escala; maos.dir.position.y += .02 * escala;
     } else {
       maos.esq.rotation.z = -.42; maos.dir.rotation.z = .42;
       maos.esq.scale.set(-escala,escala,1); maos.dir.scale.set(escala,escala,1);
