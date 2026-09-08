@@ -1196,6 +1196,7 @@ function medeAMao(mao, zCarta, passo = 2) {
   const pos = malha.geometry.attributes.position;
   mao.updateWorldMatrix(true, true);
   let recuo = -Infinity, polegarNaFrente = 0, restoNaFrente = 0, maisFundoDoPolegar = -Infinity, lidos = 0;
+  let fundo = Infinity;                       // o ponto mais atrás: é por ele que a mão que ESCOLHE passa à frente do leque
   for (let i = 0; i < pos.count; i += passo) {
     const z = pai.worldToLocal(posicaoDeformada(malha, i, _vm)).z;
     // de que osso é este vértice: o de maior peso
@@ -1205,6 +1206,7 @@ function medeAMao(mao, zCarta, passo = 2) {
       if (w > pesoMax) { pesoMax = w; melhor = idx.getComponent(i, k); }
     }
     lidos++;
+    fundo = Math.min(fundo, z);
     if (doPolegar[melhor]) {
       if (z > zCarta) polegarNaFrente++;
       maisFundoDoPolegar = Math.max(maisFundoDoPolegar, z);
@@ -1213,7 +1215,7 @@ function medeAMao(mao, zCarta, passo = 2) {
       recuo = Math.max(recuo, z - zCarta);
     }
   }
-  return { lidos, recuo: Math.max(0, recuo), polegarNaFrente, restoNaFrente, pontaDoPolegar: maisFundoDoPolegar };
+  return { lidos, recuo: Math.max(0, recuo), polegarNaFrente, restoNaFrente, pontaDoPolegar: maisFundoDoPolegar, fundo };
 }
 
 // Recua a mão até que NADA além do polegar fique à frente do plano das cartas,
@@ -1376,14 +1378,38 @@ function sincronizaMao() {
         // arquivo). Sem laço por quadro, a troca é imediata.
         definePosePrimeiraPessoa(maos.rig, 'Right', 'pinca');
         atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);
-        // e pelo mesmo contrato, espelhando a esquerda: mesma palma para a
-        // câmera, mesma inclinação para o outro lado. Virá-la de costas, como
-        // tentei antes, só trocou um jeito errado por outro — as duas mãos têm
-        // de ler como um PAR, que é o que o desenho 2D faz.
-        _qMao.setFromAxisAngle(EIXO_Z, doMeio.giro + INCLINA_MAO);
-        if (!encaixaPeloPlano(maos.dir, _v1.set(larguraLeque * .5, pinca.y, -dist), _qMao, escalaDaMao))
+        // A DIREITA ESCOLHE A CARTA — quem segura o leque é a esquerda. Ela vai
+        // para a carta selecionada (ou para a última, enquanto não há escolha),
+        // MEIA CARTA acima do centro dela: é pela borda de cima que se puxa uma
+        // carta de dentro do leque, e é ali que a pinça tem de cair. Como o
+        // contrato põe os dedos atrás do plano e o polegar à frente, cair na
+        // carta é a própria pinça — a mão pega a carta em vez de segurar o
+        // leque.
+        //
+        // O quadro é o mesmo da esquerda, com a inclinação para o outro lado.
+        // Virá-la de costas, "como quem estica o braço", só trocou um jeito
+        // errado por outro: as duas têm de ler como um PAR, e é o que o desenho
+        // 2D já fazia.
+        const iEscolhida = hand.findIndex((c) => selecionadas.has(c.id));
+        const aCarta = plano.posicoes[iEscolhida >= 0 ? iEscolhida : n - 1];
+        // no CANTO DE CIMA À DIREITA da carta, não no meio dela: é o canto que
+        // fica exposto num leque (cada carta cobre a anterior pela esquerda), é
+        // por ele que se puxa, e é o que joga o corpo da mão para fora do
+        // leque em vez de cobrir as cartas vizinhas.
+        const meiaL = CARTA_L * aCarta.escala * 0.5, meiaA = CARTA_A * aCarta.escala * 0.5;
+        const cos = Math.cos(aCarta.giro), sen = Math.sin(aCarta.giro);
+        const sobe = meiaL * sen + meiaA * cos + (iEscolhida >= 0 ? 14 * plano.unidade : 0);
+        _qMao.setFromAxisAngle(EIXO_Z, aCarta.giro + INCLINA_MAO);
+        if (!encaixaPeloPlano(maos.dir, _v1.set(aCarta.x + meiaL * cos - meiaA * sen, aCarta.y + sobe, aCarta.z), _qMao, escalaDaMao))
           encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escalaDaMao, 2.0);
-        recuaAteSoOPolegarAparecer(maos.dir, -dist);
+        // e vem para a FRENTE do leque inteiro. No plano da carta escolhida os
+        // dedos ficavam atrás dela mas na frente das vizinhas, e furavam a face
+        // delas — o leque é um arco, não um plano só. Quem escolhe passa a mão
+        // por cima das cartas, e o quanto é medida: o ponto mais atrás da malha
+        // deformada tem de passar da carta mais à frente do leque.
+        const m = medeAMao(maos.dir, -dist);
+        const frenteDoLeque = -dist + (n - 1) * 0.0006;
+        if (m && m.fundo < frenteDoLeque) maos.dir.position.z += frenteDoLeque - m.fundo + 0.002;
       } else {
         definePosePrimeiraPessoa(maos.rig, 'Right', 'repouso');
         atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);

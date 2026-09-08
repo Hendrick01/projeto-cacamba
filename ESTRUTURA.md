@@ -698,15 +698,26 @@ dizia que estava certo — palma para a câmera, polegar à direita, lateralidad
 conferida pelos ossos — e ainda assim o olho lia errado. Quem resolve é a
 inclinação, porque é ela que conta de que ombro a mão vem.
 
-**A direita só entra na sua vez**: fora dela fica fora do quadro. Ela também
-tem o seu `PlanoDaCarta` (`mao_pose_segura.py --aberta` grava só o quadro, sem
-posar) e entra espelhando a esquerda — mesma palma para a câmera, inclinação
-para o outro lado. Duas tentativas anteriores erraram por não pensar nas duas
-como um PAR: o encaixe antigo, por eixo de pinça com um giro de 2,0 rad
-escolhido a esmo, a punha de cabeça para baixo; e virá-la de costas para a
-câmera, "como quem estica o braço", só trocou um jeito errado por outro. É ela
-quem o rig ainda comanda (pose `pinca`) — a esquerda vem posada do arquivo e o
-rig não a toca, senão a pose seria aplicada duas vezes.
+**A esquerda segura, a direita ESCOLHE.** A direita só entra na sua vez (fora
+dela fica fora do quadro) e vai para a carta selecionada — ou para a última,
+enquanto não há escolha —, com a pinça no **canto de cima à direita** dela: é o
+canto que fica exposto num leque, porque cada carta cobre a anterior pela
+esquerda, e é ele que joga o corpo da mão para fora do leque em vez de cobrir
+as vizinhas. Ela também tem o seu `PlanoDaCarta` (`mao_pose_segura.py --aberta`
+grava só o quadro, sem posar) e a mesma inclinação da esquerda, espelhada.
+
+E vem para a **frente do leque inteiro**, por medida: no plano da carta
+escolhida os dedos ficavam atrás dela mas na frente das vizinhas e furavam a
+face delas — o leque é um arco, não um plano só. `medeAMao` passou a devolver
+também o ponto mais ATRÁS da malha deformada, e a mão avança até esse ponto
+passar da carta mais à frente.
+
+Duas tentativas anteriores erraram por não pensar nas duas mãos como um PAR: o
+encaixe antigo, por eixo de pinça com um giro de 2,0 rad escolhido a esmo, a
+punha de cabeça para baixo; e virá-la de costas para a câmera, "como quem
+estica o braço", só trocou um jeito errado por outro. É ela quem o rig ainda
+comanda (pose `pinca`) — a esquerda vem posada do arquivo e o rig não a toca,
+senão a pose seria aplicada duas vezes.
 
 ### Ler os jogos baixados (08/09/2026)
 
