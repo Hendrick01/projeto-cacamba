@@ -657,13 +657,16 @@ Blender e mede a malha já deformada pelo esqueleto):
   canto do leque encosta na mão, e o leque subindo dali;
 * **o polegar** tem dois movimentos em eixos diferentes: *varrer* por cima da
   palma até pousar sobre o retângulo da carta (no eixo de flexão gravado no
-  próprio osso pelo gerador do rig) e *levantar* o tanto de vencer a espessura
-  do leque. Usar um eixo só o deixava com cara de quebrado; e a rotação se
+  próprio osso pelo gerador do rig) e *levantar* até a **última falange inteira**
+  passar à frente — medida pelo vértice mais ATRASADO dela, não pelo mais
+  avançado: pela ponta, a busca parava assim que a unha assomava e o que
+  aparecia sobre as cartas era um calombo, não um dedão (77 vértices à frente
+  contra 16). Usar um eixo só o deixava com cara de quebrado; e a rotação se
   reparte pelas três juntas, porque 111° concentrados na base rasgavam a pele da
   tenar.
 
 O relatório do script termina numa conta que é a mesma que o jogo faz:
-`polegar a frente 16/297 · resto a frente 0/1986`. `test/mao-fp-pose.test.js`
+`polegar a frente 77/297 · resto a frente 0/1986`. `test/mao-fp-pose.test.js`
 refaz essa medida no arquivo entregue, porque as duas metades falham em
 silêncio — sem o nó, a mesa volta a adivinhar; sem a pose nos ossos, o modelo
 chega espalmado. (Exportar do Blender exige `export_rest_position_armature=False`:

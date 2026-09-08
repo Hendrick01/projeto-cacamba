@@ -181,9 +181,13 @@ def custo_do_polegar():
     fora = math.hypot(max(0.0, abs(p[0] - centroU) - (LARG / 2 - args.margem)),
                       max(0.0, abs(p[1] - centroV) - (ALT / 2 - args.margem)))
     alvo = E[NAO_POLEGAR][:, 2].max() + ESPESSURA + args.pele
-    # a PONTA, não o polegar inteiro: medindo o grupo todo a busca cumpria a
-    # conta empurrando a BASE do polegar para a frente e deixando a ponta atrás
-    return fora + max(0.0, alvo - E[PONTA_POL][:, 2].max())
+    # A última falange INTEIRA, não só a pontinha dela. Medindo o polegar todo,
+    # a busca cumpria a conta empurrando a BASE para a frente e deixando a ponta
+    # atrás; medindo o vértice mais avançado da ponta, ela parava assim que a
+    # unha assomava — e o que aparecia sobre as cartas era um calombo, não um
+    # dedão. Pelo vértice mais ATRASADO da falange, ela só para quando a falange
+    # toda passou: é o polegar deitado na carta.
+    return fora + max(0.0, alvo - E[PONTA_POL][:, 2].min())
 
 
 def poe_polegar():
