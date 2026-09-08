@@ -706,8 +706,14 @@ recuo corretivo mede **0**.
 **A esquerda segura pelo MEIO do leque**, não pela ponta: é onde a mão fica
 quando se abre um leque de verdade, e na ponta ela puxava o olho para o canto.
 
-E **inclinada 0,42 rad (24°)**, não a prumo — o mesmo ângulo com que as mãos
-desenhadas entram na mesa 2D. Não é enfeite: uma mão vertical, subindo reta do
+E **entrando pela borda lateral**, não subindo do rodapé. Este foi o achado que
+mais aproximou a mesa da referência que o usuário mandou: nela os dois
+antebraços entram deitados pelos lados, com o leque no meio — o da esquerda de
+baixo à esquerda a 35° da horizontal, o da direita do alto à direita a 15°. O
+jogo não guarda esses ângulos: guarda as DIREÇÕES em que o punho tem de ficar em
+relação à pinça (`BRACO_ESQ`, `BRACO_DIR`), e `anguloDoBraco` mede no próprio
+modelo o giro que as cumpre. Antes disso a mão subia a prumo do meio da tela,
+inclinada só 0,42 rad (24°, o ângulo das mãos desenhadas da mesa 2D). Não é enfeite: uma mão vertical, subindo reta do
 meio da tela, com o polegar à direita, lê como o DORSO de uma mão direita mesmo
 sendo a esquerda ("as duas mãos na imagem são direitas", 08/09/2026). A medida
 dizia que estava certo — palma para a câmera, polegar à direita, lateralidade

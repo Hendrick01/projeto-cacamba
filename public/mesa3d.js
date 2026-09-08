@@ -1164,16 +1164,23 @@ function encaixaPeloPlano(mao, alvo, giro, escala) {
 // que pinça vira tentativa e erro — foi assim que ela apareceu de cabeça para
 // baixo duas vezes.
 const _vBraco = new THREE.Vector3(), _vPlano = new THREE.Vector3(), _qPlano = new THREE.Quaternion();
-function anguloDoBraco(mao, osso, inclina = INCLINA_MAO) {
+function anguloDoBraco(mao, osso, dirX, dirY) {
   const plano = mao.getObjectByName('PlanoDaCarta'), punho = mao.getObjectByName(osso);
   if (!plano || !punho) return 0;
   mao.position.set(0, 0, 0); mao.quaternion.identity(); mao.scale.setScalar(1);
   mao.updateWorldMatrix(true, true);
   plano.getWorldQuaternion(_qPlano).invert();
   punho.getWorldPosition(_vBraco).sub(plano.getWorldPosition(_vPlano)).applyQuaternion(_qPlano);
-  // pedido: acima e à direita, na mesma inclinação com que a mesa deita as mãos
-  return Math.atan2(Math.cos(inclina), Math.sin(inclina)) - Math.atan2(_vBraco.y, _vBraco.x);
+  return Math.atan2(dirY, dirX) - Math.atan2(_vBraco.y, _vBraco.x);
 }
+
+// POR ONDE O BRAÇO ENTRA NO QUADRO. Lidos na referência que o usuário mandou: os
+// dois antebraços entram pelas BORDAS LATERAIS, quase deitados, com o leque
+// entre eles — não sobem do rodapé. O da esquerda vem de baixo à esquerda a 35°
+// da horizontal; o da direita, do alto à direita a 15°. São direções do punho em
+// relação à pinça; o giro que as cumpre sai medido do próprio modelo.
+const BRACO_ESQ = [-Math.cos(0.61), -Math.sin(0.61)];
+const BRACO_DIR = [Math.cos(0.26), Math.sin(0.26)];
 
 // MEDE a mão contra o plano das cartas, vértice a vértice, separando o polegar
 // do resto pelos pesos do esqueleto. Devolve o quanto o resto da mão precisa
@@ -1377,7 +1384,8 @@ function sincronizaMao() {
       // rad, 24 graus — e `mao_pose_segura.py --inclina` sabe dele: é com ele
       // que o script calcula quanta folga o alto do leque precisa para o giro
       // não levantar dedo acima da borda.
-      _qMao.setFromAxisAngle(EIXO_Z, doMeio.giro - INCLINA_MAO);
+      if (maos.anguloEsq === undefined) maos.anguloEsq = anguloDoBraco(maos.esq, 'LeftHand', ...BRACO_ESQ);
+      _qMao.setFromAxisAngle(EIXO_Z, doMeio.giro + maos.anguloEsq);
       if (!encaixaPeloPlano(maos.esq, _v1.set(doMeio.x, doMeio.y, doMeio.z), _qMao, escalaDaMao))
         encaixaNaPinca(maos.esq, 'Left', pinca, escalaDaMao, 1.15);
       // e recua o que a MEDIÇÃO pedir: tudo que não é polegar tem de ficar
@@ -1398,7 +1406,7 @@ function sincronizaMao() {
         const iEscolhida = hand.findIndex((c) => selecionadas.has(c.id));
         const aCarta = plano.posicoes[iEscolhida >= 0 ? iEscolhida : n - 1];
         const sobe = iEscolhida >= 0 ? 14 * plano.unidade : 0;   // a carta escolhida sobe; a mão vai junto
-        if (maos.anguloDaPinca === undefined) maos.anguloDaPinca = anguloDoBraco(maos.dir, 'RightHand');
+        if (maos.anguloDaPinca === undefined) maos.anguloDaPinca = anguloDoBraco(maos.dir, 'RightHand', ...BRACO_DIR);
         _qMao.setFromAxisAngle(EIXO_Z, maos.anguloDaPinca + aCarta.giro);
         if (encaixaPeloPlano(maos.dir, _v1.set(aCarta.x, aCarta.y + sobe, aCarta.z), _qMao, escalaDaMao)) {
           // E A CARTA PINÇADA SAI DO LEQUE, junto com a mão. O leque é um arco:
