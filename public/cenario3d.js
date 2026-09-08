@@ -31,10 +31,19 @@ export function texturaMadeira(rep=1){const t=canvasTex(512,128,(c,w,h)=>{c.fill
 export function texturaFeltro(){return canvasTex(512,512,(c,w,h)=>{const gr=c.createRadialGradient(256,236,40,256,256,270);gr.addColorStop(0,'#2d7250');gr.addColorStop(.6,'#1f5a3d');gr.addColorStop(1,'#123a28');c.fillStyle=gr;c.fillRect(0,0,w,h);
   c.lineWidth=1;for(const [cor,dir] of [['rgba(255,255,255,.04)',1],['rgba(0,0,0,.06)',-1]]){c.strokeStyle=cor;for(let i=-w;i<2*w;i+=5){c.beginPath();c.moveTo(i,0);c.lineTo(i+dir*w,h);c.stroke();}}chuvisco(c,w,h,12,3);});}
 // Parede inteira numa textura de 1,2 m x 3,2 m: azulejo 15 cm até 1,2 m, faixa decorativa, reboco ocre acima.
-function texturaParede(){return canvasTex(512,1024,(c,w,h)=>{const gr=c.createLinearGradient(0,0,0,608);gr.addColorStop(0,'#c58a4c');gr.addColorStop(1,'#e6b26c');c.fillStyle=gr;c.fillRect(0,0,w,608);
-  c.fillStyle='#2f5f8f';c.fillRect(0,606,w,36);c.fillStyle='#e8c66a';for(let x=32;x<w;x+=64){c.beginPath();c.moveTo(x,610);c.lineTo(x+12,624);c.lineTo(x,638);c.lineTo(x-12,624);c.closePath();c.fill();}
-  c.fillStyle='#b9a98c';c.fillRect(0,642,w,h-642);
-  for(let y=642;y<h;y+=48)for(let x=0;x<w;x+=64){const v=((x/64*5+(y-642)/48*3)%7)/7;c.fillStyle=`hsl(40,${28+v*8}%,${84+v*7}%)`;c.fillRect(x+2,y+2,60,44);c.fillStyle='rgba(255,255,255,.4)';c.fillRect(x+2,y+2,60,3);c.fillStyle='rgba(0,0,0,.08)';c.fillRect(x+2,y+42,60,4);}
+function texturaParede(){return canvasTex(512,1024,(c,w,h)=>{
+  // Reboco CLARO em cima e azulejo VERDE embaixo — era ocre saturado com
+  // azulejo creme, e é essa a diferença que fazia a sala não parecer a
+  // referência: no boteco de esquina a parede é caiada, e quem dá a cor é a
+  // lâmpada batendo nela. Parede já colorida some debaixo da luz âmbar e não
+  // sobra contraste para a placa preta nem para a lousa.
+  const gr=c.createLinearGradient(0,0,0,608);gr.addColorStop(0,'#d9cfba');gr.addColorStop(1,'#efe7d6');c.fillStyle=gr;c.fillRect(0,0,w,608);
+  // manchas de caiação: parede caiada nunca é lisa
+  c.globalAlpha=.5;for(let i=0;i<90;i++){const x=(i*137)%w,y=(i*271)%608,r=18+((i*53)%60);c.fillStyle=i%2?'#e7dfcd':'#cfc5ae';c.beginPath();c.ellipse(x,y,r,r*.5,i,0,7);c.fill();}c.globalAlpha=1;
+  // a faixa decorativa entre o reboco e o azulejo
+  c.fillStyle='#1f5f57';c.fillRect(0,606,w,36);c.fillStyle='#e8c66a';for(let x=32;x<w;x+=64){c.beginPath();c.moveTo(x,610);c.lineTo(x+12,624);c.lineTo(x,638);c.lineTo(x-12,624);c.closePath();c.fill();}
+  c.fillStyle='#134940';c.fillRect(0,642,w,h-642);
+  for(let y=642;y<h;y+=48)for(let x=0;x<w;x+=64){const v=((x/64*5+(y-642)/48*3)%7)/7;c.fillStyle=`hsl(${168+v*8},${34+v*10}%,${30+v*7}%)`;c.fillRect(x+2,y+2,60,44);c.fillStyle='rgba(255,255,255,.16)';c.fillRect(x+2,y+2,60,3);c.fillStyle='rgba(0,0,0,.18)';c.fillRect(x+2,y+42,60,4);}
   const suj=c.createLinearGradient(0,h-60,0,h);suj.addColorStop(0,'rgba(60,40,20,0)');suj.addColorStop(1,'rgba(60,40,20,.35)');c.fillStyle=suj;c.fillRect(0,h-60,w,60);chuvisco(c,w,h,6,5);});}
 // Ladrilho xadrez 30 cm: creme e terracota, cada um com o seu tom, rejunte escuro.
 function texturaPiso(){return canvasTex(512,512,(c,w,h)=>{c.fillStyle='#8c7454';c.fillRect(0,0,w,h);for(let y=0;y<4;y++)for(let x=0;x<4;x++){const v=((x*5+y*3)%7)/7;c.fillStyle=(x+y)%2?`hsl(18,${50+v*8}%,${44+v*6}%)`:`hsl(38,${40+v*10}%,${80+v*6}%)`;c.fillRect(x*128+3,y*128+3,122,122);}chuvisco(c,w,h,7,3);});}
@@ -42,12 +51,22 @@ function texturaPiso(){return canvasTex(512,512,(c,w,h)=>{c.fillStyle='#8c7454';
 function texturaEngradado(){return canvasTex(256,256,(c,w,h)=>{c.fillStyle='#f0f0f0';c.fillRect(0,0,w,h);c.fillStyle='rgba(0,0,0,.18)';c.fillRect(0,0,w,14);c.fillRect(0,h-14,w,14);
   for(let i=0;i<5;i++)for(let j=0;j<2;j++){c.fillStyle='#2a2521';c.fillRect(14+i*47,30+j*100,36,74);c.fillStyle='rgba(255,255,255,.22)';c.fillRect(14+i*47,30+j*100,36,6);}});}
 // A rua pela porta: céu de fim de tarde, fachada pêssego da casa em frente, calçada. Sem luz (MeshBasic): é o "estourado" de fora.
-function texturaRua(){return canvasTex(512,512,(c,w,h)=>{const ceu=c.createLinearGradient(0,0,0,200);ceu.addColorStop(0,'#ffd9a4');ceu.addColorStop(1,'#f4a95e');c.fillStyle=ceu;c.fillRect(0,0,w,200);
-  c.fillStyle='#e29a6a';c.fillRect(0,150,w,300);c.fillStyle='#c97f52';c.fillRect(0,150,w,14);c.fillStyle='#3c5f7c';for(const x of [60,340])c.fillRect(x,210,110,140);c.fillStyle='#233b4e';c.fillRect(215,240,80,210);
-  c.fillStyle='#d8c39a';c.fillRect(0,450,w,62);c.fillStyle='#b8a480';c.fillRect(0,504,w,8);
+function texturaRua(){return canvasTex(512,512,(c,w,h)=>{
+  // Fim de tarde AZUL, e não pôr do sol laranja. É o contraste que a
+  // referência tem e que a sala não tinha: dentro é lâmpada âmbar, fora é a
+  // hora azul. Com a rua laranja, dentro e fora viravam a mesma cor e a porta
+  // deixava de ser porta — virava um retângulo mais claro na parede.
+  const ceu=c.createLinearGradient(0,0,0,220);ceu.addColorStop(0,'#4a5b85');ceu.addColorStop(.55,'#7d7fa0');ceu.addColorStop(1,'#d99a76');c.fillStyle=ceu;c.fillRect(0,0,w,220);
+  c.fillStyle='#8a6b58';c.fillRect(0,150,w,300);c.fillStyle='#6d5344';c.fillRect(0,150,w,14);
+  // janelas acesas: os únicos pontos quentes lá fora
+  c.fillStyle='#2c3346';for(const x of [60,340])c.fillRect(x,210,110,140);c.fillStyle='#1c2333';c.fillRect(215,240,80,210);
+  c.fillStyle='#f5c274';for(const [x,y] of [[76,232],[112,232],[356,236],[392,268],[232,262],[262,300]])c.fillRect(x,y,26,30);
+  // poste com a luz acesa, que é o que dá escala à rua
+  c.fillStyle='#20242e';c.fillRect(462,150,8,270);c.fillStyle='#ffd9a0';c.beginPath();c.arc(466,158,16,0,7);c.fill();
+  c.fillStyle='#8f8578';c.fillRect(0,450,w,62);c.fillStyle='#6f6659';c.fillRect(0,504,w,8);
   // O dizer da casa pintado na fachada de frente: é a primeira coisa que se lê
   // pela porta, e amarra o boteco à rua em vez de deixá-la só de pano de fundo.
-  c.fillStyle='#8a5636';c.textAlign='center';c.textBaseline='middle';c.font='700 26px Georgia, serif';
+  c.fillStyle='#e4cba6';c.textAlign='center';c.textBaseline='middle';c.font='700 26px Georgia, serif';
   ['BOA COMPANHIA','SEMPRE CABE','MAIS UMA'].forEach((t,i)=>c.fillText(t,w/2,372+i*30));
   chuvisco(c,w,h,6,9);});}
 function texturaVeneziana(){return canvasTex(128,256,(c,w,h)=>{c.fillStyle='#5a3a1e';c.fillRect(0,0,w,h);for(let y=8;y<h-8;y+=20){const gr=c.createLinearGradient(0,y,0,y+14);gr.addColorStop(0,'#fff0c8');gr.addColorStop(1,'#f7b862');c.fillStyle=gr;c.fillRect(8,y,w-16,14);}});}
@@ -106,9 +125,19 @@ function texturaTela(){return canvasTex(256,160,(c,w,h)=>{const gr=c.createLinea
 export function iluminaSala(scene,renderer,{centro=new T.Vector3(),compacto=false}={}){
   // Fundo e neblina da mesma família âmbar: o longe derrete em dourado, não em cinza.
   scene.background=new T.Color(0xd9955a);scene.fog=new T.Fog(0xd9955a,5,19);
-  scene.add(new T.HemisphereLight(0xffc98f,0x8a4a22,.55));
-  // O sol entra baixo pela frente-esquerda (a rua fica atrás da câmera): banha rostos, parede do fundo e piso. Sem sombra própria.
-  const sol=new T.DirectionalLight(0xffb060,1.4);sol.position.copy(centro).add(new T.Vector3(-4,4.5,4));sol.target.position.copy(centro);scene.add(sol,sol.target);
+  // A luz do salão passa a vir de DENTRO: são as lâmpadas do boteco quicando no
+  // reboco caiado. Antes o grosso vinha de um "sol" laranja de fim de tarde —
+  // o que fazia sentido com um céu laranja, e deixou de fazer quando a rua
+  // virou hora azul. Céu azul com facho laranja no chão é a incoerência que
+  // denuncia cenário montado.
+  scene.add(new T.HemisphereLight(0xffcf9a,0x7a4a28,.95));
+  // O que entra da rua agora é FRIO e fraco, pela frente-esquerda: é o
+  // contraluz azulado que recorta os ombros de quem senta, e o contraste dele
+  // com o âmbar de dentro é o que dá a hora do dia.
+  const rua=new T.DirectionalLight(0xa8bce0,.5);rua.position.copy(centro).add(new T.Vector3(-4,4.5,4));rua.target.position.copy(centro);scene.add(rua,rua.target);
+  // E uma lâmpada de teto quente atrás do balcão, para a parede do fundo não
+  // apagar sem o antigo sol.
+  const salao=new T.DirectionalLight(0xffc07a,.75);salao.position.copy(centro).add(new T.Vector3(1.5,4,-2));salao.target.position.copy(centro);scene.add(salao,salao.target);
   // Um palmo fora do eixo: a pino, o que encosta no tampo não projetava nada.
   const foco=new T.SpotLight(0xffd28c,30,12,.8,.7,2);foco.position.copy(centro).add(new T.Vector3(.3,3.05,.45));foco.target.position.copy(centro).setY(MESA.altura);
   foco.castShadow=true;const n=compacto?1024:2048;foco.shadow.mapSize.set(n,n);foco.shadow.bias=-.0004;foco.shadow.normalBias=.02;foco.shadow.camera.near=1;foco.shadow.camera.far=14;scene.add(foco,foco.target);
@@ -156,7 +185,8 @@ export function criaSala(){const g=new T.Group();
   caixa(g,1.1,.03,.24,-2.15,.015,-6,mat(0x6e6a62,.6));
   const folha=new T.Group();folha.position.set(-2.66,0,-5.9);folha.rotation.y=-1.75;g.add(folha);caixa(folha,.98,2.08,.04,.49,1.04,0,tinta(0x2f6b4f));
   // A mancha de sol no piso, entrando pela porta: um gradiente aditivo, mais barato que uma luz.
-  const luzPorta=canvasTex(128,128,(c,w,h)=>{const gr=c.createLinearGradient(0,0,0,h);gr.addColorStop(0,'rgba(255,200,120,.9)');gr.addColorStop(1,'rgba(255,200,120,0)');c.fillStyle=gr;c.fillRect(0,0,w,h);});
+  // A mancha da rua no piso: azulada e discreta, como a luz que ela virou.
+  const luzPorta=canvasTex(128,128,(c,w,h)=>{const gr=c.createLinearGradient(0,0,0,h);gr.addColorStop(0,'rgba(150,178,226,.75)');gr.addColorStop(1,'rgba(150,178,226,0)');c.fillStyle=gr;c.fillRect(0,0,w,h);});
   plano(g,1.15,2.2,basico({map:luzPorta,transparent:true,blending:T.AdditiveBlending,depthWrite:false,opacity:.45,fog:false}),-2.15,.006,-4.9,0,-Math.PI/2);
   // --- engradados vermelhos e amarelos, empilhados nos dois cantos do fundo ---
   const pilhas=[],pilha=(x,z,n,cor,ry=0)=>{for(let i=0;i<n;i++)pilhas.push({x,y:.15+i*.3,z,ry:ry+(i%2)*.06,cor});};

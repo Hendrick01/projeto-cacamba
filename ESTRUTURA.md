@@ -503,6 +503,31 @@ sentada. A curva segue o arco em que os assentos de trás estão dispostos
 bater com os ~13 px do arco). O miolo é transparente, não recebe toque, e fica
 atrás dos assentos: a cadeira colorida e o nome continuam por cima.
 
+### A parede, o azulejo e a hora do dia
+
+O boteco é **caiado**, o azulejo de meia parede é **verde-petróleo** e lá fora é
+**hora azul**. Antes era o contrário em tudo: reboco ocre saturado, azulejo
+creme e um pôr do sol laranja na porta. Três motivos para a troca:
+
+- parede já colorida some debaixo da luz âmbar, e não sobra contraste para a
+  placa preta nem para a lousa — a cor da parede tem de vir da LÂMPADA, não da
+  tinta;
+- azulejo creme sobre reboco ocre não lê como azulejo, lê como parede listrada;
+- e, o principal, **céu laranja e lâmpada âmbar eram a mesma cor**: a porta
+  deixava de ser porta e virava um retângulo mais claro na parede. Com a rua
+  azul, o contraste dentro/fora é o que dá a hora do dia.
+
+A luz acompanhou: o grosso da iluminação passou a vir de DENTRO (as lâmpadas do
+salão quicando no reboco caiado), e o que entra da rua é um contraluz **frio e
+fraco** que recorta os ombros de quem senta. Manter o antigo "sol" laranja com
+um céu azul seria a incoerência que denuncia cenário montado.
+
+**A mesa normal seguiu junto** — cenário em SVG no `index.html`: a porta agora
+tem a hora azul (o comentário dela já prometia "a luz fria de fora contra a
+quente de dentro", mas o gradiente era laranja: o código passou a cumprir o que
+dizia) e o azulejo virou verde. Lá a parede continua ESCURA, e de propósito: na
+mesa 2D a penumbra da borda é regra, e parede clara brigaria com o feltro.
+
 ### A voz da casa no cenário 3D
 
 O boteco carrega o que a casa diz, e não só o que ela tem. Três coisas na

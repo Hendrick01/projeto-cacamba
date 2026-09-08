@@ -142,9 +142,14 @@
         <stop offset="58%" stop-color="#31200F"/>
         <stop offset="100%" stop-color="#20140A"/>
       </linearGradient>
+      <!-- Hora azul. O comentário da porta, logo abaixo, sempre disse "a luz
+           fria de fora contra a quente de dentro" — mas o gradiente era laranja,
+           e as duas luzes eram a mesma. Agora cumpre o que promete, e bate com a
+           rua da mesa 3D. -->
       <linearGradient id="cRua" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#F7DFA6"/>
-        <stop offset="100%" stop-color="#DFA458"/>
+        <stop offset="0%" stop-color="#6E80AE"/>
+        <stop offset="62%" stop-color="#A08FA6"/>
+        <stop offset="100%" stop-color="#C98F6E"/>
       </linearGradient>
       <linearGradient id="cLadoE" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0%" stop-color="#2A1B12"/>
@@ -163,8 +168,13 @@
 
     <rect width="375" height="330" fill="url(#cParede)"/>
 
-    <!-- azulejo de meia parede, atrás de todo mundo -->
-    <g stroke="#5C3D22" stroke-opacity="0.42" stroke-width="1.2">
+    <!-- Azulejo de meia parede, atrás de todo mundo. Verde-petróleo, o mesmo
+         do boteco em 3D: era marrom sobre marrom e não se lia como azulejo,
+         só como risco na parede. Continua no escuro — aqui a penumbra da borda
+         é regra, e parede clara brigaria com o feltro. -->
+    <rect x="0" y="174" width="375" height="44" fill="#1B4A42" opacity="0.55"/>
+    <rect x="0" y="171" width="375" height="4" fill="#2E7A6A" opacity="0.5"/>
+    <g stroke="#4E9384" stroke-opacity="0.38" stroke-width="1.2">
       <path d="M0 176h375M0 196h375M0 216h375"/>
       <path d="M20 176v40M60 176v40M100 176v40M140 176v40M180 176v40M220 176v40M260 176v40M300 176v40M340 176v40"/>
     </g>
@@ -174,8 +184,9 @@
     <g transform="translate(-4 30) scale(0.62)">
       <rect x="16" y="34" width="86" height="176" rx="4" fill="#241609"/>
       <rect x="22" y="40" width="74" height="164" rx="3" fill="url(#cRua)"/>
-      <path d="M22 150h74v54H22z" fill="#C98F4E" opacity="0.5"/>
-      <g fill="#B9803F" opacity="0.65">
+      <path d="M22 150h74v54H22z" fill="#6B6270" opacity="0.5"/>
+      <!-- as janelas acesas da casa de frente: os únicos pontos quentes lá fora -->
+      <g fill="#F2C14E" opacity="0.75">
         <rect x="30" y="60" width="24" height="34" rx="2"/>
         <rect x="64" y="72" width="22" height="22" rx="2"/>
       </g>
