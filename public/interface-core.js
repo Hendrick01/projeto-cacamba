@@ -18,7 +18,13 @@ export function layoutMao3D({ quantidade, largura = 375, altura = 812, fov = 72,
   const dist = 1.3;
   const alturaVisivel = 2 * dist * Math.tan(clamp(finite(fov, 72), 20, 100) * Math.PI / 360);
   const unidade = alturaVisivel / altura, larguraVisivel = largura * unidade;
-  const larguraCard = Math.min(100, Math.max(62, largura * 0.16));
+  // A carta da mão é medida pela largura da tela, mas com teto na ALTURA. Numa
+  // janela deitada a carta ia ao limite de 100 px e saía com 140 px de pé: com
+  // a inclinação do leque isso comia mais de um quarto do quadro, bem na faixa
+  // onde ficam os jogos baixados da sua beirada (queixa do usuário,
+  // 08/09/2026). Com o teto de 0,11 da altura o leque para em ~24% da tela e
+  // deixa a mesa aparecer. Em pé nada muda: lá quem manda é a largura.
+  const larguraCard = Math.min(100, Math.max(52, Math.min(largura * 0.16, altura * 0.11)));
   const alturaCard = larguraCard * cartaA / cartaL;
   // Quantas cabem numa fileira antes de virar a próxima. Numa tela em pé sobra
   // altura: é melhor abrir uma segunda fileira do que espremer tudo numa só, e
@@ -32,7 +38,7 @@ export function layoutMao3D({ quantidade, largura = 375, altura = 812, fov = 72,
   // uma unha de sobreposição só para o leque não virar uma fileira solta. Com o
   // passo de 0,64 que havia antes, uma mão de 6 cartas já escondia a face das vizinhas.
   const passoPx = porFila > 1 ? Math.min(larguraCard * 0.9, (largura - 36 - larguraCard) / (porFila - 1)) : 0;
-  const alturaMao = Math.min(altura * 0.42, fileiras * (alturaCard + 15) + 26);
+  const alturaMao = Math.min(altura * 0.34, fileiras * (alturaCard + 15) + 26);
   // Extreme hands compact vertically; all cards retain unique selectable positions.
   const entreFilas = fileiras > 1 ? Math.min(alturaCard + 15, (alturaMao - alturaCard - 20) / (fileiras - 1)) : 0;
   const posicoes = Array.from({ length: n }, (_, i) => {

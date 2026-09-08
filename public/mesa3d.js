@@ -1613,7 +1613,11 @@ async function sincroniza(primeira) {
       // e, com vizinhos no anel, cabe no vão entre eles (nunca abaixo de 0,45)
       const vao = meu || outros.length < 2 ? 1.3 : Math.max(0.45, raioJogos * (2 * (camera.aspect < 1 ? 0.58 : 0.96) / Math.max(1, outros.length - 1)) * 1.7);
       const limite = Math.min(1.3, vao);
-      if (total > limite) frente.scale.set(limite / total, 1, limite / total);
+      // Os seus jogos saem menores (0,72): são os mais perto da câmera e, no
+      // tamanho dos outros, a fileira ficava funda demais para caber entre as
+      // pilhas e o leque. Encolhida, ela continua a maior da tela.
+      const fator = Math.min(meu ? 0.72 : 1, limite / total);
+      if (fator < 1) frente.scale.set(fator, 1, fator);
       jogosNaMesa.add(frente);
       // jogo novo de quem acabou de baixar: a fileira inteira voa do assento
       // dele (ou da frente da sua cadeira) até o lugar — o grupo, não carta

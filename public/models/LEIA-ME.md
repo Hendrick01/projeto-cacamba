@@ -325,6 +325,33 @@ grava os eixos da palma e passa pelo preparo. Um rig ajustado à mão no Blender
 entra com `--de-blender`. Com esqueleto no arquivo, a mesa volta a mover braços
 e dedos sozinha; sem ele, a carta simplesmente voa.
 
+### Os enfeites do tampo (`copo.glb`, `pod.glb`)
+
+Não são elenco e **não entram em `lista.json`** — a mesa os carrega pelo nome.
+São o copo e o pod da casa, esculpidos com a marca do jogo (arquivos do
+usuário, 08/09/2026, no lugar do copo de cerveja de cilindro e dos copinhos de
+dose secos que havia em cada assento). Continuam servindo de **escala**: sem um
+objeto de tamanho conhecido no feltro, as cartas flutuam num campo verde.
+
+O que chega do gerador (39 mil triângulos, três texturas de 2 MB) passa por
+
+```bash
+blender --background --python scripts/prepara_enfeite.py -- \
+    fonte.glb public/models/copo.glb --altura 0.30 --triangulos 12000 --textura 512
+```
+
+que costura as costuras de UV, joga fora as normais gravadas (sem isso a
+decimação estilhaça a peça), reduz a malha, deixa só a cor — relevo e
+metal/rugosidade viram números fixos — e entrega a peça **em pé, apoiada em
+y=0, centrada e em metros**. É esse contrato que o teste cobra
+(`test/rig-runtime.test.js`).
+
+Na mesa eles ficam no aro **de trás** do feltro, a 1,02 m do centro: dali estão
+sempre mais longe da câmera do que o monte, o descarte e o anel dos jogos (que
+chega a 0,92 m), e o que está atrás nunca tapa o que está na frente. Foi por
+isso que o copo antigo saiu de 0,78 m — ele ficava em cima da fileira da frente
+dos jogos.
+
 O texto histórico abaixo descreve o fluxo antigo, de esculturas em pé rigadas
 por fora.
 
