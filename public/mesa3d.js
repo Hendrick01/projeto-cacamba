@@ -1170,13 +1170,19 @@ function sincronizaMao() {
     let mesh = cartasDaMao.get(card.id), nova = false;
     if (!mesh) {
       mesh = new THREE.Mesh(geoCarta, materialDaCarta(card).clone());
-      mesh.material.depthTest = false; mesh.material.depthWrite = false;
+      // Profundidade LIGADA. Com ela desligada a carta era sempre desenhada por
+      // cima e o polegar nunca podia passar na frente — era a trapaça que
+      // impedia a mão de parecer que segura. O passe da mão tem z-buffer
+      // próprio, então ligar aqui não deixa a mesa cortar o leque.
+      mesh.material.depthTest = true; mesh.material.depthWrite = true;
       mesh.userData.cardId = card.id; cartasDaMao.set(card.id,mesh); maoGrupo.add(mesh); nova = true;
     }
     cancelarVoo(mesh);
     const p = plano.posicoes[i];
     mesh.visible = true; mesh.renderOrder = 100 + i; mesh.userData.linhaMao = p.fila;
-    mesh.scale.setScalar(p.escala); mesh.position.set(p.x,p.y + (selecionadas.has(card.id) ? 14 * plano.unidade : 0),p.z);
+    // meio milímetro entre uma carta e a seguinte: o layout as devolve todas no
+    // mesmo plano, e com profundidade ligada isso seria briga de z
+    mesh.scale.setScalar(p.escala); mesh.position.set(p.x,p.y + (selecionadas.has(card.id) ? 14 * plano.unidade : 0),p.z + i * 0.0006);
     mesh.rotation.set(0,0,p.giro);
     if (nova && entradaNaMao && !semMovimento) {
       const origem = entradaNaMao === 'meio' ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.06) : topoDoMonte();
@@ -1189,26 +1195,34 @@ function sincronizaMao() {
   if (maos.esq && maos.dir) {
     const { escala,baseY,dist,larguraLeque } = plano;
     maos.esq.visible = maos.dir.visible = n > 0;
-    // As mãos ENTRAM PELA BORDA DE BAIXO, grandes: só os dedos passam por
-    // cima da ponta do leque e o punho fica fora do quadro (escolha do
-    // usuário, 08/09/2026). No tamanho de antes elas ficavam penduradas nas
-    // pontas do leque, cortadas no punho, e não liam como as SUAS mãos — liam
-    // como duas mãos de boneco soltas no ar.
-    const x = larguraLeque * .5 + (maos.tridi ? .06 : .03);
-    maos.esq.position.set(-x,baseY - .24 * escala,-dist - .03);
-    maos.dir.position.set(x,baseY - .24 * escala,-dist - .03);
     if (maos.tridi) {
-      // A mão canônica olha com a palma para +Z e os dedos para +Y. A câmera
-      // olha para −Z: a meia-volta em Y põe as COSTAS da sua mão para você, que
-      // é o que se vê de quem segura um leque. O tombo em Z abre as duas para
-      // fora, como quem apoia o leque entre elas.
-      // Origem no PUNHO, e a mão sobe daí (o recorte antigo tinha a origem na
-      // pinça e descia): quase não há o que deslocar em y, e a escala é a que
-      // deixa a mão do tamanho de uma mão ao lado das cartas.
-      maos.esq.rotation.set(.20, Math.PI, .28); maos.dir.rotation.set(.20, Math.PI, -.28);
-      maos.esq.scale.setScalar(escala * 0.38); maos.dir.scale.setScalar(escala * 0.38);
-      maos.esq.position.y += .30 * escala; maos.dir.position.y += .30 * escala;
+      // A ESQUERDA SEGURA O LEQUE. A mão canônica tem a palma em +Z e os dedos
+      // em +Y; a câmera olha para −Z, então SEM meia-volta a palma fica virada
+      // para você — que é o que se vê de quem segura cartas: a palma e o
+      // polegar por perto, e não as costas da mão. O polegar da esquerda aponta
+      // para +X, ou seja, para dentro do leque.
+      //
+      // A profundidade faz o resto: os dedos ficam ATRÁS do plano das cartas e
+      // o polegar, oposto, vem À FRENTE. É o encaixe que a profundidade
+      // desligada impedia.
+      // O punho vai 4 cm ATRÁS do plano das cartas e os dedos, dobrados, passam
+      // 3,5 cm à frente dele: a carta fica ENTRE a palma e as pontas, que é o
+      // que se chama segurar. Medido no rig: com este tombo em X, a ponta do
+      // médio avança 0,075 e a do polegar 0,054 em relação ao punho.
+      const punho = -dist - 0.04;
+      maos.esq.position.set(-larguraLeque * .5 - .01, baseY - .20 * escala, punho);
+      maos.esq.rotation.set(.42, 0, -.30);
+      maos.esq.scale.setScalar(escala * 0.38);
+      // A DIREITA fica fora do quadro até haver o que fazer: parada, ela só
+      // rouba a faixa de leitura das cartas. Sobe na sua vez.
+      maos.dir.position.set(larguraLeque * .5 + .01, baseY - (minhaVez ? .20 : 1.7) * escala, punho);
+      maos.dir.rotation.set(.42, 0, .30);
+      maos.dir.scale.setScalar(escala * 0.38);
     } else {
+      // o desenho 2D de reserva: entra pela borda de baixo, nas pontas do leque
+      const x = larguraLeque * .5 + .03;
+      maos.esq.position.set(-x,baseY - .24 * escala,-dist - .03);
+      maos.dir.position.set(x,baseY - .24 * escala,-dist - .03);
       maos.esq.rotation.z = -.42; maos.dir.rotation.z = .42;
       maos.esq.scale.set(-escala,escala,1); maos.dir.scale.set(escala,escala,1);
     }
