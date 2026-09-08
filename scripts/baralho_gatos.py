@@ -120,7 +120,13 @@ def sem_moldura(cinza):
             toca = x0 <= 2 or y0 <= 2 or x1 >= w - 2 or y1 >= h - 2
             magro = m.sum() / max(1, (x1 - x0) * (y1 - y0)) < 0.18
             grande = (x1 - x0) > w * 0.5 or (y1 - y0) > h * 0.5
-            if toca and magro and grande:
+            # Um risco reto e comprido não é desenho. A moldura da folha às
+            # vezes chega partida e sobra um traço de 2 px atravessando meia
+            # carta (o Valete de copas tinha dois na base). Nada do baralho é
+            # assim: o bigode é fino mas curto, o cetro é comprido mas grosso.
+            comprido = (x1 - x0) > w * 0.35 and (y1 - y0) <= 4
+            deitado = (y1 - y0) > h * 0.35 and (x1 - x0) <= 4
+            if (toca and magro and grande) or comprido or deitado:
                 cinza[m] = 255
                 mudou = True
         if not mudou:
@@ -130,20 +136,46 @@ def sem_moldura(cinza):
     return (max(0, y0 - f), min(h, y1 + f), max(0, x0 - f), min(w, x1 + f)), cinza
 
 
+# A proporção da carta e a margem de papel em volta do desenho.
+#
+# O corte no contorno do desenho deixava a arte encostando na beirada, e carta
+# de verdade tem respiro: a moldura impressa que eu joguei fora existia também
+# para isso. A margem devolve o respiro, e fixar a PROPORÇÃO junto faz as 56
+# cartas ficarem do mesmo tamanho — cortada no contorno, cada uma saía com uma
+# proporção um pouco diferente, e no leque isso aparece como carta torta.
+PROPORCAO = 64 / 90     # a mesma do `.card` da mesa
+MARGEM = 0.075          # do lado menor, em cada borda
+
+
 def sobre_papel(cinza, vermelho, coringa=False):
-    """A tinta sobre o papel do jogo — sem canal alfa."""
-    alfa = np.clip((255.0 - cinza.astype(np.float32)) / 255.0, 0, 1)[..., None]
-    cor = np.repeat(TINTA[None, None, :], cinza.shape[0], 0).repeat(cinza.shape[1], 1)
-    cor[vermelho] = VERMELHO
-    fundo = degrade(cinza.shape[1], cinza.shape[0],
-                    PAPEL_CORINGA if coringa else PAPEL)
+    """A tinta sobre o papel do jogo, com margem — e sem canal alfa."""
+    ah, aw = cinza.shape
+    # A caixa final tem proporção fixa e uma margem de papel IGUAL nos quatro
+    # lados (medida em pixels, não em porcentagem de cada eixo — senão a margem
+    # de cima fica mais fina que a da lateral). Cresce-se a caixa até o desenho
+    # caber nas duas direções:
+    #   largura útil  = W - 2mW           altura útil = W/P - 2mW
+    m = MARGEM
+    W = int(round(max(aw / (1 - 2*m), ah / (1/PROPORCAO - 2*m))))
+    H = int(round(W / PROPORCAO))
+    x0, y0 = (W - aw) // 2, (H - ah) // 2
+
+    tinta_pad = np.full((H, W), 255, np.uint8)
+    tinta_pad[y0:y0+ah, x0:x0+aw] = cinza
+    verm_pad = np.zeros((H, W), bool)
+    verm_pad[y0:y0+ah, x0:x0+aw] = vermelho
+
+    alfa = np.clip((255.0 - tinta_pad.astype(np.float32)) / 255.0, 0, 1)[..., None]
+    cor = np.repeat(TINTA[None, None, :], H, 0).repeat(W, 1)
+    cor[verm_pad] = VERMELHO
+    fundo = degrade(W, H, PAPEL_CORINGA if coringa else PAPEL)
     return Image.fromarray((fundo * (1 - alfa) + cor * alfa).astype("uint8"))
 
 
 def main(pasta):
     os.makedirs(SAIDA, exist_ok=True)
     os.makedirs(CACHE, exist_ok=True)
-    LARG, QUAL = 208, 82
+    LARG, QUAL = 320, 86
     feitas = []
 
     def grava(cinza, verm, alvo, coringa=False):

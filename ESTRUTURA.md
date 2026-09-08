@@ -70,9 +70,9 @@ projeto-caçamba/
 | [`test/mesa-qa-jogando.mjs`](test/mesa-qa-jogando.mjs) | 45 | O irmão do anterior que também JOGA a minha vez até a mesa encher de jogos baixados: é o degrau para ver a 3D com oito jogadores e todo mundo com jogo na frente, que é onde a leitura das cartas aperta. `node test/mesa-qa-jogando.mjs [robôs] [porta] [turnos]`. |
 | [`test/aliados.mjs`](test/aliados.mjs) | 67 | Ferramenta de QA, não teste: entram numa sala que você criou no navegador e jogam gerando sobras rápido, para conferir a TELA com sobra na mesa. `node test/aliados.mjs CODIGO`. |
 | [`public/baralho.js`](public/baralho.js) | 33 | O mapa do baralho: qual arquivo é qual carta. Importado pelas duas mesas. |
-| [`scripts/baralho_gatos.py`](scripts/baralho_gatos.py) | 201 | Monta as 55 imagens do baralho a partir das folhas desenhadas: corta, tira a moldura impressa, manda pintar o naipe e embute o papel do jogo. |
+| [`scripts/baralho_gatos.py`](scripts/baralho_gatos.py) | 233 | Monta as 55 imagens do baralho a partir das folhas desenhadas: corta, tira a moldura impressa, manda pintar o naipe e embute o papel do jogo. |
 | [`scripts/naipe_vermelho.py`](scripts/naipe_vermelho.py) | 261 | Acha as massas de naipe numa carta de copas ou ouros por FORMA, já que a cor é a mesma do gato. |
-| [`public/mesa3d.js`](public/mesa3d.js) | 2060 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
+| [`public/mesa3d.js`](public/mesa3d.js) | 2116 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`public/vendor/GLTFLoader.js`](public/vendor/GLTFLoader.js) · `BufferGeometryUtils.js` | — | O carregador glTF do three (r170, MIT), vendido com os imports apontados para o `three.module.js` local. Só a mesa 3D usa. |
 | [`public/models/`](public/models/LEIA-ME.md) | — | Os personagens externos, `<slug>.glb`, e o contrato do que cada um precisa ter. `_exemplo.glb` é a prova de caminho. |
@@ -504,6 +504,20 @@ bater com os ~13 px do arco). O miolo é transparente, não recebe toque, e fica
 atrás dos assentos: a cadeira colorida e o nome continuam por cima.
 
 ## A mesa em 3D
+
+A carta em 3D é um retângulo de **canto arredondado**, e não um plano seco. O
+canto podia sair de um recorte por alfa na textura, mas é justamente o alfa que
+fazia o baralho pesar sete vezes mais — então ele sai de geometria
+(`geometriaDeCarta`), que custa três dezenas de triângulos e ainda fica limpo em
+qualquer ângulo, sem o serrilhado que o `alphaTest` deixa. A UV é montada à mão
+porque `ShapeGeometry` mapeia a textura pelas coordenadas do mundo: sem isso a
+arte sairia deslocada e cortada.
+
+A textura usa **anisotropia no máximo que a placa dá**. A carta quase sempre é
+vista de esguelha — deitada no feltro, ou no leque inclinado — e é exatamente aí
+que filtro fraco embola o índice do canto.
+
+
 
 O botão **3D** na barra da mesa abre `3d.html`: a MESMA partida, vista da sua
 cadeira — o servidor continua sendo o juiz, e a tela 3D é só outra janela para
@@ -1142,9 +1156,24 @@ em todos os testes que reprovam os outros. Preferi anotar a exceção a afrouxar
 detector — afrouxar custaria o manto da Dama e a pinta do Rei, que já estão
 certos.
 
+### A margem e a proporção
+
+A carta sai com **margem de papel** em volta do desenho e **proporção fixa**
+(64:90, a mesma do `.card`). As duas coisas vêm do mesmo problema: cortada
+rente ao contorno do desenho, a arte encostava na beirada e cada carta saía com
+uma proporção um pouco diferente — no leque isso aparece como carta torta. A
+moldura impressa que o corte joga fora também servia de respiro, e a margem é o
+que devolve esse respiro. Ela é medida em PIXELS iguais nos quatro lados, não em
+porcentagem de cada eixo, senão a margem de cima sai mais fina que a da lateral.
+
+Some junto qualquer **risco reto e comprido**: a moldura da folha às vezes chega
+partida e sobra um traço de 2 px atravessando meia carta (o Valete de copas
+tinha dois na base). Nada do baralho é assim — o bigode é fino mas curto, o
+cetro é comprido mas grosso.
+
 ### O peso
 
-O baralho inteiro pesa **381 KB** (média de 6,6 KB por carta, a 208 px de
+O baralho inteiro pesa **590 KB** (média de 10,7 KB por carta, a 320 px de
 largura). O caminho até esse número foi medido:
 
 | tentativa | peso |
@@ -1152,7 +1181,8 @@ largura). O caminho até esse número foi medido:
 | WebP com alfa, q92 | 2,6 MB |
 | WebP com alfa, `alpha_quality=60` | 893 KB |
 | folha única 8×7 com alfa | 635 KB |
-| **sem alfa, papel embutido, q82** | **381 KB** |
+| sem alfa, papel embutido, 208 px q82 | 381 KB |
+| **sem alfa, papel embutido, 320 px q86** | **590 KB** |
 
 O canal alfa é o custo: o WebP o grava quase sem perdas, e traço
 antisserrilhado em 55 arquivos não comprime. Tirar o alfa e **embutir o papel**
@@ -1160,6 +1190,11 @@ na imagem resolve — e de quebra a carta fica idêntica à da mesa, porque o
 degradê gravado é o MESMO do `.card`. A folha única não compensou: economiza
 requisições, mas força baixar as 55 de uma vez, e a carta solta carrega sozinha
 quando aparece.
+
+Os 320 px são pela mesa 3D, onde a carta do descarte aparece grande e de perto;
+a mesa normal se contentaria com 208. `LARG` e `QUAL` no topo do
+`main()` do script são a alavanca, e refazer é barato: a máscara de naipe fica
+guardada em `~/.cache/cacamba-baralho/`, então só a compressão roda de novo.
 
 ## A mesa no celular
 

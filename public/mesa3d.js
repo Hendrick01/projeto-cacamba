@@ -278,6 +278,12 @@ function pegaImagem(url) {
 }
 
 const carregador = new THREE.TextureLoader();
+
+// O renderizador nasce dentro de um `try` (placa sem WebGL existe), então quem
+// pergunta pela capacidade dele precisa aguentar não ter renderizador.
+const anisotropiaMax = () => {
+  try { return renderer.capabilities.getMaxAnisotropy(); } catch { return 4; }
+};
 const texturasDeCarta = new Map();  // chave → material
 function chaveDaCarta(card) {
   return chaveDaArte(card);
@@ -292,7 +298,13 @@ function materialDaCarta(card) {
   if (texturasDeCarta.has(chave)) return texturasDeCarta.get(chave);
   const tex = carregador.load(arteDaCarta(card));
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  // Anisotropia no máximo que a placa dá: a carta quase sempre é vista de
+  // esguelha (deitada no feltro, ou no leque inclinado), e é exatamente aí que
+  // filtro fraco embola o índice do canto. `4` era um chute conservador.
+  tex.anisotropy = anisotropiaMax();
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
   // Fora do mapeamento tonal: a carta é desenho, e o mapeamento lavava o
   // vermelho dos naipes para rosa. A luz continua batendo nela — e o Standard
   // com rugosidade média dá o brilho de verniz que a carta plastificada tem.
@@ -319,14 +331,48 @@ function arredondado(ctx, x, y, w, h, r) {
 const materialVerso = (() => {
   const tex = carregador.load(VERSO);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = anisotropiaMax();
   return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0 });
 })();
 
 const materialBorda = new THREE.MeshStandardMaterial({ color: 0xcbc2ae, roughness: 0.85, metalness: 0, toneMapped: true });
 
 const CARTA_L = 0.42; const CARTA_A = 0.59;
-const geoCarta = new THREE.PlaneGeometry(CARTA_L, CARTA_A);
+
+// A carta é um retângulo de CANTO ARREDONDADO, e não um plano seco.
+//
+// O canto podia sair de um recorte por alfa na textura, mas isso obrigaria o
+// baralho inteiro a carregar canal alfa — e é justamente o alfa que fazia o
+// arquivo pesar sete vezes mais. Aqui ele sai de GRAÇA: é geometria, três
+// dezenas de triângulos, e ainda fica com a borda limpa em qualquer ângulo,
+// sem o serrilhado que o `alphaTest` deixa.
+//
+// A UV é montada à mão porque `ShapeGeometry` mapeia a textura pelas
+// coordenadas do mundo: sem isto a carta sairia com a arte deslocada e cortada.
+function geometriaDeCarta(l, a, raio = 0.045) {
+  const forma = new THREE.Shape();
+  const x = l / 2; const y = a / 2; const r = Math.min(raio, x, y);
+  forma.moveTo(-x + r, -y);
+  forma.lineTo(x - r, -y);
+  forma.quadraticCurveTo(x, -y, x, -y + r);
+  forma.lineTo(x, y - r);
+  forma.quadraticCurveTo(x, y, x - r, y);
+  forma.lineTo(-x + r, y);
+  forma.quadraticCurveTo(-x, y, -x, y - r);
+  forma.lineTo(-x, -y + r);
+  forma.quadraticCurveTo(-x, -y, -x + r, -y);
+  const geo = new THREE.ShapeGeometry(forma, 6);
+  const pos = geo.attributes.position;
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    uv[i * 2] = (pos.getX(i) + x) / l;
+    uv[i * 2 + 1] = (pos.getY(i) + y) / a;
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geo;
+}
+
+const geoCarta = geometriaDeCarta(CARTA_L, CARTA_A);
 
 function cartaDeitada(card) {
   const m = new THREE.Mesh(geoCarta, materialDaCarta(card));
@@ -669,7 +715,11 @@ function criaAssento(p) {
     plano, texturas: null,
     mostra(nome) { if (this.texturas) { mRosto.map = this.texturas[nome] || this.texturas.neutra; mRosto.needsUpdate = true; } },
   };
-  carasDoElenco(slug).then((texturas) => {
+  // O rosto desenhado é o RESERVA: só entra quando não há modelo para o slug.
+  // Montá-lo sempre custava três SVGs e três canvas de 640×520 por assento —
+  // uns 4 MB de textura na placa por vizinho — que iam para o lixo assim que o
+  // .glb chegava, e hoje os oito têm modelo.
+  const montaRosto = () => carasDoElenco(slug).then((texturas) => {
     if (assento.modelo) return;
     cara.texturas = texturas;
     cara.mostra('neutra');
@@ -716,7 +766,10 @@ function criaAssento(p) {
       assento.ref.nome.position.y = m.alturaCabeca + 0.26;
       assento.ref.estado.position.y = assento.ref.nome.position.y + 0.155;
     }
-  }).catch((error) => { console.info(`modelo: ${slug} — usando o boneco de reserva (${error.message})`); });
+  }).catch((error) => {
+    console.info(`modelo: ${slug} — usando o boneco de reserva (${error.message})`);
+    montaRosto();
+  });
 
   // sombra de contato: é ela que cola o boneco no chão
   const sombra = new THREE.Mesh(
