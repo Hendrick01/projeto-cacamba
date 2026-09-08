@@ -26,6 +26,7 @@ import { planBaixada, isJoker, cardLabel, layoffOption, layoffEnds } from '/shar
 import { personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
 import { layoutMao3D, indiceInsercao3D } from '/interface-core.js';
+import { criaRigPrimeiraPessoa, definePosePrimeiraPessoa, atualizaRigPrimeiraPessoa } from '/primeira-pessoa-maos.js';
 import { configuraInterface, estadoConexao, ligaControlesVoz } from '/interface.js';
 configuraInterface();
 
@@ -988,8 +989,10 @@ const cenaMao = new THREE.Scene();
 cenaMao.add(maoGrupo);
 // luz própria, suave: a mão está encostada na câmera e o holofote do boteco,
 // que é forte e âmbar, a estouraria
-cenaMao.add(new THREE.AmbientLight(0xffffff, 1.5));
-const luzDaMao = new THREE.DirectionalLight(0xfff0d8, 1.1);
+// clareza suficiente para ler o gesto, sem estourar o tom da pele: com o
+// ambiente em 1,5 a mão saía branca e perdia a cor do personagem
+cenaMao.add(new THREE.AmbientLight(0xffffff, 0.7));
+const luzDaMao = new THREE.DirectionalLight(0xfff0d8, 0.95);
 luzDaMao.position.set(-0.4, 1, 0.8);
 cenaMao.add(luzDaMao);
 // o grupo copia a câmera a cada quadro (era filho dela)
@@ -1085,7 +1088,7 @@ function texturaMao2D(pele) {
   return tex;
 }
 
-const maos = { esq: null, dir: null, pele: null, slug: null, tridi: false };
+const maos = { esq: null, dir: null, pele: null, slug: null, tridi: false, rig: null };
 function poeAMao(lado, objeto) {
   if (maos[lado]) { maoGrupo.remove(maos[lado]); maos[lado].traverse?.((o) => o.material?.dispose?.()); }
   // sólido de verdade: profundidade LIGADA (o passe da mão tem z-buffer próprio).
@@ -1104,15 +1107,15 @@ function poeAMao(lado, objeto) {
   maos[lado] = objeto;
   maoGrupo.add(objeto);
 }
-// As MÃOS DO SEU PERSONAGEM, recortadas da própria escultura
-// (scripts/mao_primeira_pessoa.py). Chegam com a cor nos vértices, sem textura,
-// e recebem a luz do boteco — o desenho 2D chapado era do tempo em que o elenco
-// todo era desenho. Sem o arquivo, o desenho continua sendo o reserva.
-function maosEsculpidas(slug) {
-  return listaDeModelos.then((lista) => {
-    if (!lista.has(slug)) throw new Error('sem modelo');
-    return new Promise((ok, erro) => carregadorGLTF.load(`/models/${slug}-maos.glb`, ok, undefined, erro));
-  });
+// As mãos de primeira pessoa são um VIEWMODEL: uma mão própria, rigada, feita
+// para ser vista de perto (scripts/mao_modelo.py), e não mais o recorte da
+// escultura do personagem — recorte não tem osso, e sem osso não há pinça, nem
+// dedo que se feche na carta. A identidade vem da COR da pele do personagem;
+// manga, relógio e pulseira são o passo seguinte.
+// Sem os arquivos, o desenho 2D chapado continua sendo o reserva.
+function maosDePrimeiraPessoa() {
+  return Promise.all(['esq', 'dir'].map((lado) => new Promise((ok, erro) =>
+    carregadorGLTF.load(`/models/mao-fp-${lado}.glb`, ok, undefined, erro))));
 }
 function sincronizaMaos() {
   const eu = view.players.find((p) => p.id === me());
@@ -1129,17 +1132,25 @@ function sincronizaMaos() {
     mat.color.setScalar(0.94);
     poeAMao(lado, new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.6), mat));
   }
-  maosEsculpidas(slug).then((gltf) => {
+  maosDePrimeiraPessoa().then(([esq, dir]) => {
     if (maos.slug !== slug) return;              // trocou de personagem enquanto carregava
-    for (const [lado, nome] of [['esq', 'Esq'], ['dir', 'Dir']]) {
-      const o = gltf.scene.getObjectByName(nome);
-      if (!o) return;
-      o.removeFromParent();
-      poeAMao(lado, o);
+    const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(pele), roughness: 0.62, metalness: 0 });
+    for (const [lado, gltf] of [['esq', esq], ['dir', dir]]) {
+      const raiz = gltf.scene;
+      raiz.traverse((o) => { if (o.isMesh) { o.material = material; o.frustumCulled = false; } });
+      poeAMao(lado, raiz);
+    }
+    // o rig vê as duas mãos de uma vez: os ossos se chamam Left*/Right*
+    maos.rig = criaRigPrimeiraPessoa(maoGrupo);
+    if (maos.rig) {
+      // a esquerda sustenta o leque; a direita fica de fora até haver ação
+      definePosePrimeiraPessoa(maos.rig, 'Left', 'leque');
+      definePosePrimeiraPessoa(maos.rig, 'Right', 'repouso');
+      atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);
     }
     maos.tridi = true;
     sincronizaMao();
-  }).catch(() => { /* fica o desenho */ });
+  }).catch((erro) => { console.info(`mão de primeira pessoa: ${erro.message} — fica o desenho`); });
 }
 
 function sincronizaMao() {
@@ -1187,15 +1198,16 @@ function sincronizaMao() {
     maos.esq.position.set(-x,baseY - .24 * escala,-dist - .03);
     maos.dir.position.set(x,baseY - .24 * escala,-dist - .03);
     if (maos.tridi) {
-      // A mão recortada está no eixo do personagem (ele olha para +Z); a câmera
-      // olha para −Z, então meia-volta em Y é o que põe as costas da SUA mão
-      // para você. São duas mãos de verdade, uma de cada lado: aqui não se
-      // espelha com escala negativa, que viraria as normais do avesso.
-      maos.esq.rotation.set(.18,Math.PI,.22); maos.dir.rotation.set(.18,Math.PI,-.22);
-      maos.esq.scale.setScalar(escala * 3.1); maos.dir.scale.setScalar(escala * 3.1);
-      // a origem do recorte é a PINÇA (perto das pontas dos dedos) e a mão
-      // desce dali para o punho — que agora, do tamanho certo, sai pela borda
-      maos.esq.position.y += .16 * escala; maos.dir.position.y += .16 * escala;
+      // A mão canônica olha com a palma para +Z e os dedos para +Y. A câmera
+      // olha para −Z: a meia-volta em Y põe as COSTAS da sua mão para você, que
+      // é o que se vê de quem segura um leque. O tombo em Z abre as duas para
+      // fora, como quem apoia o leque entre elas.
+      // Origem no PUNHO, e a mão sobe daí (o recorte antigo tinha a origem na
+      // pinça e descia): quase não há o que deslocar em y, e a escala é a que
+      // deixa a mão do tamanho de uma mão ao lado das cartas.
+      maos.esq.rotation.set(.20, Math.PI, .28); maos.dir.rotation.set(.20, Math.PI, -.28);
+      maos.esq.scale.setScalar(escala * 0.38); maos.dir.scale.setScalar(escala * 0.38);
+      maos.esq.position.y += .30 * escala; maos.dir.position.y += .30 * escala;
     } else {
       maos.esq.rotation.z = -.42; maos.dir.rotation.z = .42;
       maos.esq.scale.set(-escala,escala,1); maos.dir.scale.set(escala,escala,1);
@@ -2087,6 +2099,8 @@ function quadro(t) {
   quadro.n = (quadro.n || 0) + 1;
   if (t - ultimaSombra > (compacto ? 150 : 100)) { renderer.shadowMap.needsUpdate = true; ultimaSombra = t; }
   renderer.render(scene, camera);
+  // os dedos caminham entre as poses (repouso, leque, pinça) no ritmo do quadro
+  if (maos.rig) atualizaRigPrimeiraPessoa(maos.rig, frameMs / 1000, semMovimento);
   // segundo passe: limpa a profundidade e desenha a sua mão por cima do mundo,
   // com profundidade correta entre as cartas e os dedos
   segueACamera();
