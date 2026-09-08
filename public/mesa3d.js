@@ -17,12 +17,13 @@
 // ============================================================================
 
 import * as THREE from './vendor/three.module.js';
+import { arteDaCarta, chaveDaArte, VERSO } from './baralho.js';
 import { MESA, ESCALA_CARTA_MAO, conectaLeque, arrumaLeque, atualizaInteracao, ajustaBanqueta, gestoCarta } from './interacao3d.js';
 import { iluminaSala, criaMesa, criaSala } from './cenario3d.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
-import { planBaixada, isJoker, rankLabel, cardLabel, layoffOption, layoffEnds } from '/shared/engine.js';
-import { SLUGS, personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
+import { planBaixada, isJoker, cardLabel, layoffOption, layoffEnds } from '/shared/engine.js';
+import { personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
 import { layoutMao3D, indiceInsercao3D } from '/interface-core.js';
 import { configuraInterface, estadoConexao, ligaControlesVoz } from '/interface.js';
@@ -255,65 +256,6 @@ function texturaDeCanvas(w, h, desenha) {
   return t;
 }
 
-const SUIT_RED = [false, true, true, false]; // ♠ ♥ ♦ ♣
-
-function desenhaNaipe(ctx, suit, x, y, s, cor) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(s / 100, s / 100);
-  ctx.fillStyle = cor;
-  ctx.beginPath();
-  if (suit === 1) { // copas
-    ctx.moveTo(50, 92);
-    ctx.bezierCurveTo(14, 60, 6, 38, 20, 22);
-    ctx.bezierCurveTo(34, 8, 50, 20, 50, 34);
-    ctx.bezierCurveTo(50, 20, 66, 8, 80, 22);
-    ctx.bezierCurveTo(94, 38, 86, 60, 50, 92);
-  } else if (suit === 2) { // ouros
-    ctx.moveTo(50, 4); ctx.lineTo(88, 50); ctx.lineTo(50, 96); ctx.lineTo(12, 50);
-  } else if (suit === 0) { // espadas
-    ctx.moveTo(50, 6);
-    ctx.bezierCurveTo(66, 26, 88, 42, 88, 60);
-    ctx.bezierCurveTo(88, 76, 68, 82, 56, 72);
-    ctx.bezierCurveTo(58, 84, 64, 90, 70, 94);
-    ctx.lineTo(30, 94);
-    ctx.bezierCurveTo(36, 90, 42, 84, 44, 72);
-    ctx.bezierCurveTo(32, 82, 12, 76, 12, 60);
-    ctx.bezierCurveTo(12, 42, 34, 26, 50, 6);
-  } else { // paus
-    ctx.arc(50, 30, 17, 0, Math.PI * 2);
-    ctx.moveTo(29 + 17, 58); ctx.arc(29, 58, 17, 0, Math.PI * 2);
-    ctx.moveTo(71 + 17, 58); ctx.arc(71, 58, 17, 0, Math.PI * 2);
-    ctx.moveTo(56, 94); ctx.lineTo(44, 94);
-    ctx.bezierCurveTo(50, 82, 50, 70, 47, 60);
-    ctx.lineTo(53, 60);
-    ctx.bezierCurveTo(50, 70, 50, 82, 56, 94);
-  }
-  ctx.fill();
-  ctx.restore();
-}
-
-// mesmo arranjo do cliente normal: um naipe por unidade
-const ARRANJO_PIPS = {
-  2: [[50, 8], [50, 92]],
-  3: [[50, 8], [50, 50], [50, 92]],
-  4: [[26, 8], [74, 8], [26, 92], [74, 92]],
-  5: [[26, 8], [74, 8], [50, 50], [26, 92], [74, 92]],
-  6: [[26, 8], [74, 8], [26, 50], [74, 50], [26, 92], [74, 92]],
-  7: [[26, 8], [74, 8], [50, 29], [26, 50], [74, 50], [26, 92], [74, 92]],
-  8: [[26, 8], [74, 8], [50, 29], [26, 50], [74, 50], [50, 71], [26, 92], [74, 92]],
-  9: [[26, 6], [74, 6], [26, 35], [74, 35], [50, 50], [26, 65], [74, 65], [26, 94], [74, 94]],
-  10: [[26, 6], [74, 6], [50, 20], [26, 35], [74, 35], [26, 65], [74, 65], [50, 80], [26, 94], [74, 94]],
-};
-
-// mesma conta do cliente normal, para o MESMO rosto cair na mesma carta
-function figuraDaCarta(card) {
-  if (isJoker(card) || card.rank < 11) return null;
-  const n = SLUGS.length;
-  const casa = (card.rank - 11) * 4 + card.suit;
-  return SLUGS[(casa + Math.floor(casa / n) * 2) % n];
-}
-
 const imagens = new Map();     // url → HTMLImageElement (carregada)
 function pegaImagem(url) {
   if (imagens.has(url)) return imagens.get(url);
@@ -335,105 +277,30 @@ function pegaImagem(url) {
   return prom;
 }
 
+const carregador = new THREE.TextureLoader();
 const texturasDeCarta = new Map();  // chave → material
 function chaveDaCarta(card) {
-  return isJoker(card) ? 'joker' : `${card.rank}:${card.suit}`;
+  return chaveDaArte(card);
 }
 
+// A face da carta é a MESMA arte da mesa normal, do mesmo arquivo. Antes ela
+// era desenhada aqui no canvas, naipe por naipe — duas versões do mesmo baralho
+// que divergiam a cada ajuste. Agora as duas mesas leem /assets/baralho/, e o
+// que a pessoa vira na mão é exatamente o que ela vê deitado no feltro.
 function materialDaCarta(card) {
   const chave = chaveDaCarta(card);
   if (texturasDeCarta.has(chave)) return texturasDeCarta.get(chave);
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 358;
-  const ctx = c.getContext('2d');
-  desenhaFrente(ctx, card);
-  const tex = new THREE.CanvasTexture(c);
+  const tex = carregador.load(arteDaCarta(card));
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   // Fora do mapeamento tonal: a carta é desenho, e o mapeamento lavava o
   // vermelho dos naipes para rosa. A luz continua batendo nela — e o Standard
   // com rugosidade média dá o brilho de verniz que a carta plastificada tem.
-  // alphaTest: os cantos arredondados do desenho viram cantos de verdade
-  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: true, alphaTest: 0.5 });
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex, roughness: 0.88, metalness: 0, toneMapped: true,
+  });
   texturasDeCarta.set(chave, mat);
-  // O retrato das figuras chega depois (a imagem é assíncrona): desenha de
-  // novo por cima quando carregar.
-  const slug = figuraDaCarta(card);
-  if (slug) {
-    pegaImagem(`/assets/personagens/${slug}-avatar.svg`).then((img) => {
-      const lado = 150;
-      ctx.drawImage(img, (256 - lado) / 2, 358 * 0.52 - lado / 2, lado, lado);
-      tex.needsUpdate = true;
-    }).catch(() => { /* a carta continua legível com seus índices */ });
-  }
   return mat;
-}
-
-function desenhaFrente(ctx, card) {
-  const W = 256; const H = 358;
-  const joker = isJoker(card);
-  arredondado(ctx, 0, 0, W, H, 22);
-  const g = ctx.createLinearGradient(0, 0, 40, H);
-  if (joker) {
-    g.addColorStop(0, '#ffdc85'); g.addColorStop(0.42, '#f2c14e'); g.addColorStop(1, '#c9a24e');
-  } else {
-    g.addColorStop(0, '#fffdf6'); g.addColorStop(0.46, '#f5f1e6'); g.addColorStop(1, '#ded6c3');
-  }
-  ctx.fillStyle = g;
-  ctx.fill();
-  // um fio escuro na borda: separa a carta do feltro e da carta de baixo
-  ctx.strokeStyle = 'rgba(70,52,34,0.42)'; ctx.lineWidth = 5;
-  arredondado(ctx, 2.5, 2.5, W - 5, H - 5, 20); ctx.stroke();
-
-  const cor = joker ? '#33240a' : (SUIT_RED[card.suit] ? '#c93a3a' : '#232a33');
-  const rank = joker ? 'C' : rankLabel(card.rank);
-
-  // os dois cantos, o de baixo de cabeça para baixo
-  for (const virado of [false, true]) {
-    ctx.save();
-    if (virado) { ctx.translate(W, H); ctx.rotate(Math.PI); }
-    ctx.fillStyle = cor;
-    ctx.font = '900 44px Nunito, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(rank, 30, 46);
-    if (joker) desenhaGorro(ctx, 12, 54, 38, cor);
-    else desenhaNaipe(ctx, card.suit, 12, 54, 38, cor);
-    ctx.restore();
-  }
-
-  if (joker) {
-    desenhaGorro(ctx, 58, 110, 140, cor);
-  } else if (card.rank === 1) {
-    desenhaNaipe(ctx, card.suit, 78, 118, 100, cor);
-  } else if (ARRANJO_PIPS[card.rank]) {
-    // área central com folga dos cantos, como no cliente normal
-    const x0 = W * 0.21; const x1 = W * 0.79;
-    const y0 = H * 0.15; const y1 = H * 0.85;
-    for (const [px, py] of ARRANJO_PIPS[card.rank]) {
-      const x = x0 + ((x1 - x0) * px) / 100;
-      const y = y0 + ((y1 - y0) * py) / 100;
-      ctx.save();
-      if (py > 50) { ctx.translate(x, y); ctx.rotate(Math.PI); ctx.translate(-x, -y); }
-      desenhaNaipe(ctx, card.suit, x - 21, y - 21, 42, cor);
-      ctx.restore();
-    }
-  }
-  // figuras: o retrato entra assíncrono, em materialDaCarta
-}
-
-function desenhaGorro(ctx, x, y, s, cor) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(s / 100, s / 100);
-  ctx.fillStyle = cor;
-  ctx.beginPath();
-  ctx.moveTo(16, 74); ctx.lineTo(25, 33); ctx.lineTo(39, 55); ctx.lineTo(50, 25);
-  ctx.lineTo(61, 55); ctx.lineTo(75, 33); ctx.lineTo(84, 74);
-  ctx.closePath(); ctx.fill();
-  for (const [cx, cy] of [[25, 26], [50, 18], [75, 26]]) {
-    ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
 }
 
 function arredondado(ctx, x, y, w, h, r) {
@@ -447,25 +314,15 @@ function arredondado(ctx, x, y, w, h, r) {
 }
 
 // o verso: madeira com trama âmbar, o mesmo material da mesa normal
+// O verso: o mesmo arquivo que a mesa normal usa no monte e no leque dos
+// adversários.
 const materialVerso = (() => {
-  const tex = texturaDeCanvas(128, 180, (ctx) => {
-    arredondado(ctx, 0, 0, 128, 180, 12);
-    const g = ctx.createLinearGradient(0, 0, 30, 180);
-    g.addColorStop(0, '#7a4a2b'); g.addColorStop(0.58, '#4a2c19'); g.addColorStop(1, '#33200f');
-    ctx.fillStyle = g; ctx.fill();
-    ctx.strokeStyle = 'rgba(242,193,78,0.16)';
-    ctx.lineWidth = 3;
-    for (let i = -180; i < 180; i += 12) {
-      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + 180, 180); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(i + 180, 0); ctx.lineTo(i, 180); ctx.stroke();
-    }
-    ctx.strokeStyle = '#f5f1e6';
-    ctx.lineWidth = 8;
-    arredondado(ctx, 4, 4, 120, 172, 10);
-    ctx.stroke();
-  });
-  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88, metalness: 0, toneMapped: true, alphaTest: 0.5 });
+  const tex = carregador.load(VERSO);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0 });
 })();
+
 const materialBorda = new THREE.MeshStandardMaterial({ color: 0xcbc2ae, roughness: 0.85, metalness: 0, toneMapped: true });
 
 const CARTA_L = 0.42; const CARTA_A = 0.59;
@@ -1181,13 +1038,16 @@ function poeAMao(lado, objeto) {
   // sólido de verdade: profundidade LIGADA (o passe da mão tem z-buffer próprio).
   // A malha chapada do desenho continua sem escrever profundidade, que é o que
   // um plano transparente quer.
-  // A mão fica POR CIMA do leque (renderOrder acima do das cartas): na
-  // referência os dedos passam à frente das cartas, e é isso que faz o leque
-  // parecer segurado em vez de colado na tela. Sólido de verdade: profundidade
-  // LIGADA (o passe da mão tem z-buffer próprio); a malha chapada do desenho
-  // continua sem escrever profundidade, que é o que um plano transparente quer.
-  objeto.traverse((o) => { if (o.isMesh) { o.material.depthTest = true; o.material.depthWrite = !o.material.transparent; o.renderOrder = 200; } });
-  objeto.renderOrder = 200;
+  // A mão fica ATRÁS do leque (renderOrder abaixo do das cartas). Por cima,
+  // como estava, os dedos cobriam a face das cartas e o corte do recorte
+  // aparecia inteiro no meio da mão — "as mãos estão por cima das cartas e mal
+  // cortadas" (usuário, 08/09/2026). Atrás, a carta esconde o corte e o que
+  // sobra à vista são os dedos nas pontas do leque, que é o que se quer.
+  // Sólido de verdade: profundidade LIGADA (o passe da mão tem z-buffer
+  // próprio); a malha chapada do desenho continua sem escrever profundidade,
+  // que é o que um plano transparente quer.
+  objeto.traverse((o) => { if (o.isMesh) { o.material.depthTest = true; o.material.depthWrite = !o.material.transparent; o.renderOrder = 60; } });
+  objeto.renderOrder = 60;
   maos[lado] = objeto;
   maoGrupo.add(objeto);
 }

@@ -2,6 +2,7 @@
 // Caçamba — cliente (celular): telas, mesa e interação com o servidor
 // ============================================================================
 
+import { arteDaCarta } from './baralho.js';
 import {
   planBaixada, layoffOption, layoffEnds, removableCards, SUITS, SUIT_NAMES, SUIT_RED, rankLabel,
   isJoker, JOKER_LABEL, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
@@ -464,6 +465,20 @@ function cardEl(card, mini = false) {
   // Os dois cantos são o mesmo desenho; o de baixo é o de cima girado meia
   // volta, como em qualquer baralho — é o que faz a carta ler como carta e
   // não como etiqueta.
+  // A carta inteira é a arte: papel, índice do canto e cena já vêm desenhados
+  // no arquivo. A miniatura NÃO — em 30x42 o índice impresso fica com 3 px e
+  // some, então lá continua valendo o desenho esquemático de sempre (valor no
+  // canto e um naipe no meio), que é o que deixa um jogo baixado legível.
+  if (!mini) {
+    const arte = document.createElement('img');
+    arte.className = 'arte';
+    arte.src = arteDaCarta(card);
+    arte.alt = '';
+    arte.decoding = 'async';
+    el.append(arte);
+    return el;
+  }
+
   const figura = figuraDaCarta(card);
   if (figura) {
     // O retrato entra NO LUGAR do naipe do meio: quem diz o naipe da figura é

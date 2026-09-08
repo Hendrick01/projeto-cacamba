@@ -57,7 +57,7 @@ projeto-caçamba/
 | Arquivo | Linhas | O que faz |
 |---|---:|---|
 | [`shared/engine.js`](shared/engine.js) | 1314 | Todas as regras do jogo, sem nenhum I/O: baralho com coringas, busca de contratos, encaixes, troca do coringa, pontuação, estado da partida, visão por jogador e a heurística do bot. |
-| [`public/client.js`](public/client.js) | 1879 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
+| [`public/client.js`](public/client.js) | 2032 | Cliente: conecta e reconecta, desenha as telas (início, lobby, mesa), monta mão/jogos/descarte, traduz eventos em avisos e envia ações. Reimporta o motor só para **dicas de interface** — nunca reimplementa regra. |
 | [`server.js`](server.js) | 656 | Servidor HTTP dos arquivos estáticos + WebSocket. Guarda as salas, é o **juiz autoritativo** (só ele altera o estado) e dá ritmo humano aos bots. |
 | [`public/style.css`](public/style.css) | 1123 | O salão, a mesa e as peças: variáveis de luz na `:root`, feltro em perspectiva, assentos, leque e animações. Mobile-first, com a mesa virando coluna centrada em tela grande. |
 | [`test/engine.test.js`](test/engine.test.js) | 919 | Testes do motor com `node:test`, incluindo as regras de baixar (jogo extra, carta puxada da mesa) e 30 partidas completas com RNG semeado e a conferência de que cada rodada recomeça com o baralho inteiro. |
@@ -69,7 +69,10 @@ projeto-caçamba/
 | [`test/mesa-qa.mjs`](test/mesa-qa.mjs) | 32 | Ferramenta de QA, não teste: cria uma sala com robôs, começa a partida e imprime a sessão para colar em `localStorage` e abrir `/3d.html`. Sem partida em andamento a mesa 3D não desenha ninguém, e era esse o degrau para conferir o elenco na cena. `node test/mesa-qa.mjs [robôs] [porta]`. |
 | [`test/mesa-qa-jogando.mjs`](test/mesa-qa-jogando.mjs) | 45 | O irmão do anterior que também JOGA a minha vez até a mesa encher de jogos baixados: é o degrau para ver a 3D com oito jogadores e todo mundo com jogo na frente, que é onde a leitura das cartas aperta. `node test/mesa-qa-jogando.mjs [robôs] [porta] [turnos]`. |
 | [`test/aliados.mjs`](test/aliados.mjs) | 67 | Ferramenta de QA, não teste: entram numa sala que você criou no navegador e jogam gerando sobras rápido, para conferir a TELA com sobra na mesa. `node test/aliados.mjs CODIGO`. |
-| [`public/mesa3d.js`](public/mesa3d.js) | 1358 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
+| [`public/baralho.js`](public/baralho.js) | 33 | O mapa do baralho: qual arquivo é qual carta. Importado pelas duas mesas. |
+| [`scripts/baralho_gatos.py`](scripts/baralho_gatos.py) | 201 | Monta as 55 imagens do baralho a partir das folhas desenhadas: corta, tira a moldura impressa, manda pintar o naipe e embute o papel do jogo. |
+| [`scripts/naipe_vermelho.py`](scripts/naipe_vermelho.py) | 261 | Acha as massas de naipe numa carta de copas ou ouros por FORMA, já que a cor é a mesma do gato. |
+| [`public/mesa3d.js`](public/mesa3d.js) | 2060 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`public/vendor/GLTFLoader.js`](public/vendor/GLTFLoader.js) · `BufferGeometryUtils.js` | — | O carregador glTF do three (r170, MIT), vendido com os imports apontados para o `three.module.js` local. Só a mesa 3D usa. |
 | [`public/models/`](public/models/LEIA-ME.md) | — | Os personagens externos, `<slug>.glb`, e o contrato do que cada um precisa ter. `_exemplo.glb` é a prova de caminho. |
@@ -1082,6 +1085,81 @@ Duas armadilhas que custaram e ficam registradas:
   tela 9:19 dão ~26° de largura). O fov e o recuo da câmera saem da proporção
   da tela (`encaixaTela`), e o leque é dimensionado pela largura visível
   calculada da câmera de verdade.
+
+## O baralho
+
+As 56 cartas são **arte pronta**, não desenho de código: 55 imagens em
+`public/assets/baralho/` (52 cartas, 2 coringas e o verso), montadas por
+[`scripts/baralho_gatos.py`](scripts/baralho_gatos.py) a partir das folhas
+originais. O baralho é de gatos em traço de tinta: o bicho é contorno — o papel
+é o pelo dele — e o naipe é a única massa cheia da carta.
+
+[`public/baralho.js`](public/baralho.js) é só o mapa de nome de arquivo, e vive
+em `public/` porque **as duas mesas leem o mesmo arquivo**: a normal põe a
+imagem dentro do `.card`, a 3D usa como textura. Antes cada uma desenhava o
+próprio baralho — um em SVG, outro em canvas — e os dois divergiam a cada
+ajuste; hoje o que a pessoa vira na mão é exatamente o que ela vê deitado no
+feltro. O nome sai do par naipe+valor do próprio motor (`0-13.webp` é o Rei de
+espadas), então não há tabela de-para para desatualizar.
+
+**O coringa** é o único com escolha: são quatro por baralho e a arte traz dois
+desenhos (o gato na bola e o gato no monociclo). Alternam pelo id da carta, que
+é estável na rodada — os dois aparecem na mesa e nenhum troca de figura na sua
+mão no meio do jogo.
+
+**A miniatura não usa a arte.** Em 30×42 px o índice impresso fica com 3 px e
+some, então o jogo baixado continua com o desenho esquemático de sempre (valor
+no canto, um naipe no meio). Carta de mesa é para ler, não para admirar.
+
+### O naipe vermelho
+
+A arte chega toda preta, e copas e ouros precisam do naipe vermelho com o traço
+preto. Separar um do outro **não é questão de cor** — os dois usam a mesma
+tinta — e sim de forma. O método está em
+[`scripts/naipe_vermelho.py`](scripts/naipe_vermelho.py) e foi construído
+medindo, não chutando:
+
+- o **molde** sai da própria carta: o naipe do índice, que é limpo e nunca
+  encosta em nada. Ele é escolhido pela POSIÇÃO (é o glifo de baixo), e não pelo
+  tamanho — no Rei de ouros o "K" é maior que o losango, e escolher pelo maior
+  fazia o detector sair pintando a letra de vermelho;
+- o molde entra nas **duas rotações**, senão o índice do canto de baixo (que é o
+  de cima girado meia volta) fica preto nas 26 cartas;
+- a semelhança de forma sozinha **não separa**: numa varredura das 26 cartas o
+  coração mais torto marcou 0,685 e a pinta do manto da Dama, 0,679 — não existe
+  corte entre os dois. Quem separa é o **tamanho**: todo impostor mede de 8 a 18
+  px e todo naipe mede 32 ou mais, e isso é construção da carta, não sorte — o
+  naipe do índice é o menor naipe que existe nela;
+- o naipe que o gato **segura** não é componente próprio (no Ás de copas, gato e
+  coração são uma massa só de 211×227). Para esses vale correlação dentro da
+  massa, com prova de forma depois: abre-se a janela para tirar o traço fino e
+  compara-se o caroço com o molde **também aberto** — comparar caroço arredondado
+  com molde de cantos vivos reprovava justamente OUROS.
+
+Sobrou **uma** exceção anotada no baralho inteiro: o lobo do gorro do Valete de
+copas é uma gota cheia, do tamanho de um coração e quase da mesma forma, e passa
+em todos os testes que reprovam os outros. Preferi anotar a exceção a afrouxar o
+detector — afrouxar custaria o manto da Dama e a pinta do Rei, que já estão
+certos.
+
+### O peso
+
+O baralho inteiro pesa **381 KB** (média de 6,6 KB por carta, a 208 px de
+largura). O caminho até esse número foi medido:
+
+| tentativa | peso |
+|---|---|
+| WebP com alfa, q92 | 2,6 MB |
+| WebP com alfa, `alpha_quality=60` | 893 KB |
+| folha única 8×7 com alfa | 635 KB |
+| **sem alfa, papel embutido, q82** | **381 KB** |
+
+O canal alfa é o custo: o WebP o grava quase sem perdas, e traço
+antisserrilhado em 55 arquivos não comprime. Tirar o alfa e **embutir o papel**
+na imagem resolve — e de quebra a carta fica idêntica à da mesa, porque o
+degradê gravado é o MESMO do `.card`. A folha única não compensou: economiza
+requisições, mas força baixar as 55 de uma vez, e a carta solta carrega sozinha
+quando aparece.
 
 ## A mesa no celular
 
