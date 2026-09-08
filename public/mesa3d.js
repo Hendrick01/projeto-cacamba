@@ -894,7 +894,10 @@ function criaAssento(p) {
       assento.ref.contagem.scale.set(0.13, 0.05, 1);
       atualizaInteracao(m, 0, { parado: true });
       assento.ref.bocaBase = bocas.aberta.position.clone();   // a boca está no grupo, e gira com o corpo no quadro
-      assento.ref.nome.position.y = m.alturaCabeca + 0.34;
+      // o nome (e a placa de estado sobre ele) descem para a cabeça do modelo:
+      // a altura do boneco de código deixava os dois no teto do boteco
+      assento.ref.nome.position.y = m.alturaCabeca + 0.26;
+      assento.ref.estado.position.y = assento.ref.nome.position.y + 0.155;
     }
   }).catch((error) => { console.info(`modelo: ${slug} — usando o boneco de reserva (${error.message})`); });
 
@@ -944,6 +947,16 @@ function criaAssento(p) {
   nome.scale.set(0.46, 0.124, 1);
   grupo.add(nome);
 
+  // A placa de estado, logo acima do nome (referência do Capote: sobre a
+  // cabeça de cada um está escrito se ele está JOGANDO, se é o PRÓXIMO ou o
+  // que acabou de fazer). Numa escultura sem esqueleto é ela que conta o
+  // turno — o corpo só vira e se inclina.
+  const estado = rotulo('', 'rgba(207,138,42,0.95)', '#fff6e2');
+  estado.position.y = nome.position.y + 0.17;
+  estado.scale.set(0.36, 0.098, 1);
+  estado.visible = false;
+  grupo.add(estado);
+
   // copinhos de bar no tampo, à direita de cada um (referência do Capote), e
   // o foco da vez no TAMPO, na frente da cadeira (no chão ficaria escondido
   // sob a mesa). Os dois ficam num grupo próprio, na CENA, preso à beirada do
@@ -967,7 +980,7 @@ function criaAssento(p) {
   scene.add(naBeirada);
 
   scene.add(grupo);
-  const ref = { grupo, corpo, materiais, bocas, cara, leque, contagem, nome, focoVez, naBeirada, cadeira, pulo: 0, caraAte: 0, assento, tAnterior: 0, lequeBase: leque.position.clone(), bocaBase: null, giroAlvo: 0 };
+  const ref = { grupo, corpo, materiais, bocas, cara, leque, contagem, nome, estado, focoVez, naBeirada, cadeira, pulo: 0, caraAte: 0, assento, tAnterior: 0, lequeBase: leque.position.clone(), bocaBase: null, giroAlvo: 0, aviso: null, avisoAte: 0 };
   assento.ref = ref;
   return ref;
 }
@@ -1401,6 +1414,8 @@ async function sincroniza(primeira) {
       }
       a.leque.visible = p.handCount > 0;
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
+      a.proximo = view.players[(view.players.findIndex((q) => q.id === view.turnId) + 1) % view.players.length]?.id === p.id
+        && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
       minhaVez = view.turnId === me() && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
       a.apagado = (p.desistiu || (!p.isBot && !p.connected));
       for (const m of a.materiais) {
@@ -1558,10 +1573,10 @@ async function sincroniza(primeira) {
   }
 }
 
-function trocaRotulo(sprite, texto) {
-  if (sprite.userData.texto === texto) return;
-  sprite.userData.texto = texto;
-  const novo = rotulo(texto, 'rgba(27,17,11,0.9)', '#f2c14e');
+function trocaRotulo(sprite, texto, corFundo = 'rgba(27,17,11,0.9)', corTexto = '#f2c14e') {
+  if (sprite.userData.texto === texto && sprite.userData.cor === corFundo) return;
+  sprite.userData.texto = texto; sprite.userData.cor = corFundo;
+  const novo = rotulo(texto, corFundo, corTexto);
   // A textura de antes vai embora: cada troca criava um canvas de 256×72 na
   // GPU e nunca soltava — contagem de cartas e monte trocam a cada jogada, e
   // numa partida de sete rodadas isso virava um vazamento lento no celular.
@@ -1609,6 +1624,13 @@ function reageAoEvento(ev) {
   }
   if (ev.e === 'baixou' && !semMovimento) baixadaDe = ev.p;
   if (ev.e === 'discard' && !semMovimento) descarteDe = ev.p;
+  // o verbo do lance na placa de quem o fez, por um instante — é o "JOGOU" da
+  // referência, e o único jeito de saber o que um vizinho fez sem ler o toast
+  {
+    const VERBOS = { draw: 'COMPROU', buy: 'COMPROU', tomouSobra: 'PEGOU A SOBRA', discard: 'DESCARTOU', baixou: 'BAIXOU', layoff: 'ENCAIXOU', claim: 'PEDIU O MEIO' };
+    const dele = ev.p ? assentos.get(ev.p) : null;
+    if (dele && VERBOS[ev.e]) { dele.aviso = VERBOS[ev.e]; dele.avisoAte = performance.now() + 1800; }
+  }
   const alvo = ev.p || ev.winnerId;
   const a = alvo ? assentos.get(alvo) : null;
   if (!a) return;
@@ -1801,6 +1823,15 @@ function quadro(t) {
     // foco da vez
     const alvo = a.naVez ? 0.4 + Math.sin(t / 500) * 0.12 : 0;
     a.focoVez.material.opacity += (alvo - a.focoVez.material.opacity) * 0.1;
+    // a placa de estado: o verbo do último lance manda enquanto dura; depois
+    // volta a dizer de quem é a vez. Some quando não há nada a dizer.
+    {
+      if (a.avisoAte && t > a.avisoAte) { a.aviso = null; a.avisoAte = 0; }
+      const texto = a.aviso || (a.apagado ? 'FORA' : a.naVez ? 'JOGANDO' : a.proximo ? 'PRÓXIMO' : '');
+      const cor = a.aviso ? 'rgba(58,102,74,0.95)' : a.naVez ? 'rgba(207,138,42,0.95)' : 'rgba(27,17,11,0.8)';
+      a.estado.visible = !!texto;
+      if (texto) trocaRotulo(a.estado, texto, cor, '#fff6e2');
+    }
   }
 
   // a carta do meio chega girando e assenta no lugar de pé

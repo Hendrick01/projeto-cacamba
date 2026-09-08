@@ -1,8 +1,9 @@
 """Prepara um modelo já SENTADO segurando cartas (Meshy, sem rig) para a mesa.
-Uso: python3 scripts/prepara_sentado.py entrada.glb saida.glb [--altura 1.45] [--cabeca 0.85] [--tri 32000]
+Uso: python3 scripts/prepara_sentado.py entrada.glb saida.glb [--altura 1.45] [--cabeca 0.91] [--tri 32000]
 Roda test/modelo-prepara.mjs duas vezes: a primeira normaliza (altura, pés no chão, texturas,
 triângulos); daí mede onde estão as mãos (a saliência mais à frente entre 42 % e 62 % da altura)
-e a segunda injeta MaoEsq/MaoDir nessa posição e Cabeca na fração pedida. Só NumPy.
+e a segunda injeta MaoEsq/MaoDir nessa posição e Cabeca na fração pedida. Depois mede o
+ASSENTO na malha e injeta o nó `Assento`. Só NumPy.
 """
 import argparse, subprocess, sys, tempfile
 from pathlib import Path
@@ -29,6 +30,37 @@ def maos_de(path):
     alvo = pinca + np.array([0, -0.035, -0.01]); desl = alvo - (esq + dir_) / 2
     return esq + desl, dir_ + desl, alt
 
+def assento_de(path):
+    """Onde a escultura encosta na cadeira: a maior superfície VOLTADA PARA BAIXO
+    entre 25 % e 52 % da altura — as nádegas e a face de baixo das coxas. A caixa
+    da malha não serve (as pernas vão para a frente e o quadril fica atrás dela), e
+    o ponto mais baixo do tronco cai na barra de uma saia. Devolve (x, y, z) do
+    centro dessa superfície, ponderado pela área."""
+    g = GLB(path); j = g.j
+    P, F, base = [], [], 0
+    for n in j['nodes']:
+        if 'mesh' not in n: continue
+        esc = np.array(n.get('scale', [1, 1, 1]), float); desl = np.array(n.get('translation', [0, 0, 0]), float)
+        for pr in j['meshes'][n['mesh']]['primitives']:
+            v = g.read(pr['attributes']['POSITION']).astype(float) * esc + desl
+            P.append(v); F.append(g.read(pr['indices']).astype(int).reshape(-1, 3) + base); base += len(v)
+    P = np.vstack(P); F = np.vstack(F)
+    lo, hi = P.min(0), P.max(0); alt = hi[1] - lo[1]
+    A, B, C = P[F[:, 0]], P[F[:, 1]], P[F[:, 2]]
+    N = np.cross(B - A, C - A); area = np.linalg.norm(N, axis=1) / 2
+    dir_y = N[:, 1] / np.maximum(1e-12, np.linalg.norm(N, axis=1))
+    cen = (A + B + C) / 3
+    m = (dir_y < -0.7) & (cen[:, 1] > lo[1] + 0.25 * alt) & (cen[:, 1] < lo[1] + 0.52 * alt)
+    if m.sum() < 20: return np.array([0.0, 0.34 * alt, -0.08 * alt])
+    c, a = cen[m], area[m]
+    # a faixa de 2 cm com mais área é o plano do assento; a barra da saia e o
+    # pé do banco ficam em faixas menores
+    bins = np.arange(c[:, 1].min(), c[:, 1].max() + 0.02, 0.02)
+    h, _ = np.histogram(c[:, 1], bins=bins, weights=a)
+    k = int(h.argmax()); faixa = (c[:, 1] >= bins[k] - 0.02) & (c[:, 1] <= bins[k] + 0.04)
+    cc, aa = c[faixa], a[faixa]
+    return (cc * aa[:, None]).sum(0) / aa.sum()
+
 def prepara(src, dst, altura, cabeca, tri):
     with tempfile.TemporaryDirectory() as tmp:
         meio = Path(tmp) / 'meio.glb'
@@ -37,15 +69,20 @@ def prepara(src, dst, altura, cabeca, tri):
         maos = '%.3f,%.3f,%.3f' % ((esq[0] - dir_[0]) / 2, (esq[1] + dir_[1]) / 2, (esq[2] + dir_[2]) / 2)
         r = subprocess.run(['node', str(PREPARA), src, dst, '--tri', str(tri), '--altura', str(altura), '--cabeca', str(cabeca), '--maos', maos], check=True, capture_output=True, text=True)
     # o prepara simetriza as mãos (±x); as mãos de um modelo posado raramente são simétricas
+    sen = assento_de(dst)
     g = GLB(dst)
     for n in g.j['nodes']:
         if n['name'] == 'MaoEsq': n['translation'] = [round(float(v), 4) for v in esq]
         if n['name'] == 'MaoDir': n['translation'] = [round(float(v), 4) for v in dir_]
+    # o nó `Assento`: sem esqueleto não há osso do quadril, e é por ele que a
+    # mesa põe a cadeira EMBAIXO de quem senta, e não atrás
+    g.j['nodes'].append({'name': 'Assento', 'translation': [round(float(v), 4) for v in sen]})
+    g.j['scenes'][0]['nodes'].append(len(g.j['nodes']) - 1)
     g.write(dst)
-    print('%s: altura %.2f m, mãos esq %s, dir %s (a %.0f%% da altura, %.0f cm entre elas)' % (Path(dst).name, alt, np.round(esq, 2).tolist(), np.round(dir_, 2).tolist(), 100 * (esq[1] + dir_[1]) / 2 / alt, 100 * abs(esq[0] - dir_[0])))
+    print('%s: altura %.2f m, mãos esq %s, dir %s (a %.0f%% da altura, %.0f cm entre elas), assento a %.0f cm do chão e %.0f cm atrás da origem' % (Path(dst).name, alt, np.round(esq, 2).tolist(), np.round(dir_, 2).tolist(), 100 * (esq[1] + dir_[1]) / 2 / alt, 100 * abs(esq[0] - dir_[0]), 100 * sen[1], -100 * sen[2]))
     print(r.stdout.strip().splitlines()[-1][:160])
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('src'); ap.add_argument('dst')
-    ap.add_argument('--altura', type=float, default=1.45); ap.add_argument('--cabeca', type=float, default=0.85); ap.add_argument('--tri', type=int, default=32000)
+    ap.add_argument('--altura', type=float, default=1.45); ap.add_argument('--cabeca', type=float, default=0.91); ap.add_argument('--tri', type=int, default=32000)
     a = ap.parse_args(); prepara(a.src, a.dst, a.altura, a.cabeca, a.tri)

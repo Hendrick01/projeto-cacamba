@@ -10,7 +10,7 @@
 
 import * as THREE from './vendor/three.module.js';
 import { preparaDedos } from './dedos3d.js';
-import { preparaInteracao } from './interacao3d.js';
+import { preparaInteracao, MESA } from './interacao3d.js';
 
 // Do chão ao topo da cabeça, sentado. Modelo cru é normalizado para isso.
 export const ALTURA_SENTADO = 1.55;
@@ -77,6 +77,34 @@ function materialDoElenco(m) {
 // liga o que o modelo trouxer — nós `Cabeca`/`MaoEsq`/`MaoDir`, morphs
 // `feliz`/`bravo`/`bocaAberta`, clips `idle`/`feliz`/`bravo`. Devolve o que a
 // cena precisa para animar.
+// O quanto este corpo precisa recuar para não entrar na madeira do tampo. A
+// cadeira fica no raio `MESA.assento` com +Z apontando para o centro, então um
+// vértice do modelo está a `hypot(x, MESA.assento - z)` do eixo da mesa. Só
+// interessa a fatia de 5 cm em volta do tampo: acima dela estão as mãos (que
+// devem MESMO passar por cima da mesa) e abaixo, os joelhos (que entram por
+// baixo). Devolve metros, no máximo 10 cm.
+//
+// A conta é sobre o FELTRO, não sobre o aro de madeira: um vestido que encosta
+// na beirada do aro fica escondido pelo próprio corpo, e exigir folga até o aro
+// afastava a Lyly 14 cm da mesa — muito mais visível que o encosto que evitava.
+const RAIO_TAMPO = MESA.raio + 0.01;
+function recuoDoTampo(raiz) {
+  let recuo = 0;
+  const v = new THREE.Vector3();
+  raiz.traverse((o) => {
+    if (!o.isMesh || o.isSkinnedMesh) return;   // com esqueleto, a geometria crua não é a pose
+    const pos = o.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      if (v.y < MESA.altura - 0.03 || v.y > MESA.altura + 0.02) continue;
+      const folga = RAIO_TAMPO * RAIO_TAMPO - v.x * v.x;
+      if (folga <= 0) continue;
+      recuo = Math.max(recuo, Math.sqrt(folga) - (MESA.assento - v.z));
+    }
+  });
+  return Math.min(0.10, Math.max(0, recuo));
+}
+
 export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = {}) {
   const raiz = gltf.scene;
   // `precise`: mede vértice a vértice. A caixa rápida usa o boundingBox da
@@ -99,6 +127,13 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
   // as matrizes ainda são as de antes da escala: sem isto, a cabeça e as mãos
   // sairiam nas medidas originais do arquivo
   raiz.updateMatrixWorld(true);
+  // Ninguém atravessa o tampo. Cada escultura senta com as pernas onde o
+  // artista pôs, e a roda de cadeiras é a mesma para todos: numa saia comprida
+  // ou num joelho mais alto, o feltro passava por dentro do pano. Mede quem
+  // cai na fatia da madeira e empurra o corpo para trás só o necessário — o
+  // recuo entra ANTES de medir cabeça, mãos e assento, para tudo andar junto.
+  const recuo = preparado ? recuoDoTampo(raiz) : 0;
+  if (recuo > 0) { raiz.position.z -= recuo; raiz.updateMatrixWorld(true); }
 
   const materiais = [];
   const morfos = {};
@@ -152,6 +187,10 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
   const alturaCabeca = cabeca ? posDe(cabeca).y : ALTURA_SENTADO * 0.88;
   const maoEsq = posDe(no('MaoEsq'), null), maoDir = posDe(no('MaoDir'), null);
   const posLeque = maoEsq && maoDir ? maoEsq.clone().add(maoDir).multiplyScalar(0.5) : new THREE.Vector3(0, 1.02, 0.17);
+  // Onde a escultura encosta na cadeira. Numa malha SEM esqueleto não há osso
+  // do quadril, e a caixa engana (as pernas vão para a frente, o quadril fica
+  // atrás dela): o preparo mede o plano na malha e grava o nó `Assento`.
+  const posAssento = posDe(no('Assento'), null);
 
   let mixer = null; const acoes = {};
   if (gltf.animations?.length) {
@@ -168,8 +207,8 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
   }
   if (avisa) console.info(`modelo: ${slug} carregado (altura ${alturaOriginal.toFixed(2)}${preparado ? ', escala do arquivo' : ` → ${ALTURA_SENTADO}`})`);
   const cabecaAnimada = gltf.animations?.some(a => a.name === 'idle' && a.tracks.some(t => t.name === 'Head.quaternion'));
-  const modelo = { dedos: preparaDedos(raiz), raiz, materiais, morfos, mixer, acoes, cabecaAnimada, alturaCabeca, posLeque, alturaOriginal, escala, caixa, sentado: preparado && temEsqueleto };
-  if (modelo.dedos.juntas.length) preparaInteracao(modelo);
+  const modelo = { dedos: preparaDedos(raiz), raiz, materiais, morfos, mixer, acoes, cabecaAnimada, alturaCabeca, posLeque, posAssento, alturaOriginal, escala, caixa, sentado: preparado && temEsqueleto, estatico: preparado && !temEsqueleto, recuo };
+  if (modelo.dedos.juntas.length || modelo.estatico) preparaInteracao(modelo);
   return modelo;
 }
 
@@ -242,7 +281,13 @@ export function confereModelo(gltf, m) {
   const no = (nome) => !!m.raiz.getObjectByName(nome);
   item(no('Cabeca') ? true : null, no('Cabeca') ? `Nó Cabeca a ${cm(m.alturaCabeca)} do chão` : `Sem nó Cabeca: a boca da fala e o nome ficam a ${cm(m.alturaCabeca)} (88% da altura)`);
   const maos = no('MaoEsq') && no('MaoDir');
-  item(m.interacao ? true : maos ? true : null, m.interacao ? 'Cartas ligadas à pinça da mão; braços acompanham compra, descarte e baixada' : maos ? `Nós MaoEsq/MaoDir: leque a ${cm(m.posLeque.y)} do chão` : 'Sem MaoEsq/MaoDir: o leque fica na posição padrão (1,02 m; 0,17 m à frente)');
+  const bracos = m.interacao && !m.interacao.estatico;
+  item(bracos || maos ? true : null, bracos ? 'Cartas ligadas à pinça da mão; braços acompanham compra, descarte e baixada'
+    : maos ? `Nós MaoEsq/MaoDir: leque a ${cm(m.posLeque.y)} do chão. Sem esqueleto, a atuação é do corpo inteiro (vira para quem joga, respira, chega para a frente na vez) e a carta voa`
+    : 'Sem MaoEsq/MaoDir: o leque fica na posição padrão (1,02 m; 0,17 m à frente)');
+  item(m.recuo ? null : true, m.recuo ? `Recuado ${cm(m.recuo)} para não entrar na madeira do tampo (joelho ou roupa alcançava a beirada)` : 'Não encosta na madeira do tampo: senta no raio da roda de cadeiras');
+  item(m.posAssento ? true : null, m.posAssento ? `Nó Assento a ${cm(m.posAssento.y)} do chão e ${cm(-m.posAssento.z)} atrás da origem: a cadeira vai para debaixo do quadril`
+    : no('Cabeca') ? 'Sem nó Assento: a cadeira fica onde a caixa manda — passe pelo prepara_sentado.py' : 'Sem nó Assento (a cadeira usa o osso do quadril)');
 
   item(m.dedos?.juntas.length ? true : null, m.dedos?.juntas.length ? `${m.dedos.juntas.length} ossos de dedos: use o controle de flexão para conferir as duas mãos` : 'Sem articulação dos dedos');
   for (const nome of ['feliz', 'bravo', 'bocaAberta']) {

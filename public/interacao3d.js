@@ -1,12 +1,18 @@
 // ============================================================================
 // Caçamba — o corpo do personagem em jogo: postura, leque, gestos e cadeira
 //
-// A pose SENTADA vem assada no .glb (test/modelo-senta.mjs): tronco, pernas,
-// braços e mãos em volta do leque. Este módulo não a refaz — só corrige o
-// que a assadura deixou (o tronco torcido ~50°), pendura o leque na palma da
-// mão esquerda, move o braço direito nos gestos de comprar/descartar/baixar
-// e vira a cabeça para quem está jogando. Tudo em cima da pose do arquivo,
-// que é a que o dono do projeto aprovou no provador.
+// Há DOIS elencos possíveis, e este módulo atende os dois:
+//
+// 1. **Com esqueleto** (test/modelo-senta.mjs): a pose sentada vem assada no
+//    .glb. Aqui só se corrige o que a assadura deixou (o tronco torcido ~50°),
+//    pendura-se o leque na palma esquerda, move-se o braço direito nos gestos
+//    de comprar/descartar/baixar e vira-se a cabeça para quem joga.
+// 2. **Escultura estática** (scripts/prepara_sentado.py, o elenco de
+//    07/09/2026): malha só, já sentada e com as mãos em pinça. Não há osso
+//    nenhum para mover, então a atuação é do CORPO INTEIRO — é o que a
+//    referência do Capote mostra de longe e o que se lê numa mesa de celular:
+//    o tronco vira para quem está jogando, respira, e na própria vez inclina
+//    para a frente e levanta o leque para olhar as cartas.
 // ============================================================================
 import * as T from './vendor/three.module.js';
 import { atualizaDedos } from './dedos3d.js';
@@ -16,10 +22,15 @@ import { atualizaDedos } from './dedos3d.js';
 // cotovelos alcançam a borda. `folgaQuadril` é a distância do osso do quadril
 // ao assento na pose assada (senta.mjs: --folga 0.16 até o osso, menos os 5 cm
 // da almofada). `assento` é o raio mínimo da roda de cadeiras.
-export const MESA = Object.freeze({ altura: 0.76, raio: 1.15, assento: 1.45, folgaQuadril: 0.11 });
+// `assento` é o raio da roda de cadeiras. 1,34 m encosta a barriga na borda do
+// tampo (raio 1,15 + aro): é assim na referência do Capote — joelhos por baixo
+// do tampo, mãos e leque SOBRE a madeira. A 1,45 sobrava um palmo de chão
+// entre a mesa e cada um, e as cartas ficavam boiando fora do tampo.
+export const MESA = Object.freeze({ altura: 0.76, raio: 1.15, assento: 1.34, folgaQuadril: 0.11 });
 // O tamanho da carta na mão de um modelo, em relação à carta de 42×59 cm da
-// mesa: 0,26 dá 11×15 cm — maior que uma carta de verdade, como no desenho.
-export const ESCALA_CARTA_MAO = 0.26;
+// mesa: 0,21 dá 8,8×12,4 cm. Era 0,26 (11×15 cm) e o leque tampava o queixo —
+// na referência dá para ler a cara de quem está jogando por cima das cartas.
+export const ESCALA_CARTA_MAO = 0.21;
 
 const v = () => new T.Vector3();
 const q = () => new T.Quaternion();
@@ -119,6 +130,14 @@ export function preparaInteracao(m) {
   // Endireitar o tronco sem poder levar as mãos de volta deixaria os braços
   // apontando para o lado: rig sem os dois braços fica com o tronco do arquivo.
   if (!i.bracos.Left || !i.bracos.Right) i.alinha = i.desalinha = null;
+  // Escultura sem esqueleto: nada a girar por dentro. Guarda o repouso da
+  // raiz — é sobre ele que o corpo inteiro vira, respira e se inclina.
+  i.estatico = !i.bracos.Left && !i.bracos.Right;
+  if (i.estatico) {
+    i.repousoRaiz = raiz.position.clone();
+    i.giroBase = raiz.rotation.y;
+    i.giro = 0; i.vez = 0;
+  }
   if (i.bracos.Left?.dedos) i.pegaEsq = pontoNaMao(i.bracos.Left.dedos, PEGA.leque);
   if (i.bracos.Right?.dedos) i.pegaDir = pontoNaMao(i.bracos.Right.dedos, PEGA.carta);
   m.interacao = i;
@@ -136,6 +155,7 @@ export function conectaLeque(m, leque, carta = null) {
   leque.removeFromParent(); i.ancora.add(leque);
   leque.position.set(0, 0.035, 0.01); leque.rotation.set(-0.28, 0, 0); leque.scale.setScalar(1);
   if (!i.bracos.Left) { const p = m.posLeque.clone(); m.raiz.parent?.localToWorld(p); i.ancora.position.copy(m.raiz.worldToLocal(p)); }
+  i.ancoraBase = i.ancora.position.clone();
   if (carta) {
     carta.visible = false; carta.removeFromParent();
     const b = i.bracos.Right;
@@ -145,6 +165,10 @@ export function conectaLeque(m, leque, carta = null) {
       carta.position.copy(i.pegaDir);
       const y = Y.clone(), z = b.dedos.palma.clone(), x = y.clone().cross(z).normalize(); z.copy(x).cross(y).normalize();
       carta.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, z));
+    } else if (i.estatico) {
+      // sem osso de mão, a carta que voa sai da PINÇA: pendurada na raiz ela
+      // partiria da origem do modelo, que é o chão entre os pés
+      i.ancora.add(carta); carta.position.set(0, 0.02, 0.04); carta.rotation.set(-0.28, 0, 0);
     } else m.raiz.add(carta);
   }
 }
@@ -191,10 +215,35 @@ export function gestoCarta(m, tipo, destino) {
   return true;
 }
 
-export function atualizaInteracao(m, dt, { flexao = 0.62, flexaoDir = 0.3, parado = false, olhar = 0 } = {}) {
+// A atuação de uma escultura sem esqueleto: tudo acontece na raiz. Os três
+// gestos vêm da referência do Capote — o corpo vira para quem está jogando, o
+// peito sobe e desce parado, e quem está na vez chega para a frente e levanta
+// o leque para conferir a mão. Nada disso pede osso, e é o que se enxerga de
+// uma mesa inteira num celular.
+const RESPIRO = 0.008;      // metros de sobe-e-desce
+const CHEGADA = 0.055;      // metros para a frente na própria vez
+const LEQUE_NA_VEZ = 0.06;  // metros que o leque sobe na própria vez
+function atuaCorpoInteiro(m, i, dt, { parado, olhar, suaVez }) {
+  const suave = parado ? 1 : 1 - Math.exp(-dt * 4);
+  i.giro += (T.MathUtils.clamp(olhar, -0.5, 0.5) * 0.75 - i.giro) * suave;
+  i.vez += ((suaVez ? 1 : 0) - i.vez) * suave;
+  const r = m.raiz;
+  r.rotation.y = i.giroBase + i.giro;
+  // chega para a frente NO EIXO DO CORPO (a raiz já está virada), para a
+  // inclinação valer também quando ele está olhando para o lado
+  const c = Math.cos(i.giro), sn = Math.sin(i.giro), avanca = i.vez * CHEGADA;
+  r.position.set(i.repousoRaiz.x + sn * avanca, i.repousoRaiz.y + (parado ? 0 : Math.sin(i.tempo * 1.7) * RESPIRO), i.repousoRaiz.z + c * avanca);
+  // o leque mora na âncora: sobe um pouco e deita para o dono na própria vez
+  // (antes de `conectaLeque` ainda não há âncora com base — o corpo já atua)
+  if (i.ancoraBase) i.ancora.position.y = i.ancoraBase.y + i.vez * LEQUE_NA_VEZ;
+  if (i.leque) i.leque.rotation.x = -0.28 - i.vez * 0.22;
+}
+
+export function atualizaInteracao(m, dt, { flexao = 0.62, flexaoDir = 0.3, parado = false, olhar = 0, suaVez = false } = {}) {
   const i = m.interacao;
   if (!i) { m.dedos.alvo = flexao; atualizaDedos(m.dedos, dt, parado); return; }
   i.tempo += parado ? 0 : dt;
+  if (i.estatico) { atuaCorpoInteiro(m, i, dt, { parado, olhar, suaVez }); m.raiz.updateWorldMatrix(true, true); return; }
   m.raiz.updateWorldMatrix(true, true);
   // tronco endireitado, cabeça devolvida e virada para quem joga
   if (i.alinha && i.spine) giraSobreOCru(i, m, i.spine, 'spine', i.alinha);
@@ -242,12 +291,19 @@ export function atualizaInteracao(m, dt, { flexao = 0.62, flexaoDir = 0.3, parad
 // assento na pose assada, então é ele que dita a altura — e não a roupa, que
 // numa saia desce muito abaixo das coxas e deixava a cadeira lá embaixo.
 export function ajustaBanqueta(m, banco) {
-  const hips = m.raiz.getObjectByName('Hips');
-  if (!hips) return;
-  m.raiz.updateWorldMatrix(true, true);
-  const h = m.raiz.worldToLocal(wp(hips));
-  banco.position.set(h.x, 0, h.z - 0.045);
-  const topo = h.y + m.raiz.position.y - MESA.folgaQuadril;
   const base = banco.userData.alturaAssento || 0.5;
+  let x, z, topo;
+  const hips = m.raiz.getObjectByName('Hips');
+  if (hips) {
+    m.raiz.updateWorldMatrix(true, true);
+    const h = m.raiz.worldToLocal(wp(hips));
+    x = h.x; z = h.z - 0.045; topo = h.y + m.raiz.position.y - MESA.folgaQuadril;
+  } else if (m.posAssento) {
+    // Escultura estática: `Assento` é o plano medido na malha (a face de baixo
+    // das nádegas), já no espaço do assento. A cadeira vai EXATAMENTE ali —
+    // pela caixa ela caía 15 a 20 cm à frente e o personagem sentava no ar.
+    x = m.posAssento.x; z = m.posAssento.z; topo = m.posAssento.y;
+  } else return;
+  banco.position.set(x, 0, z);
   banco.scale.set(1, T.MathUtils.clamp(topo / base, 0.85, 1.3), 1);
 }

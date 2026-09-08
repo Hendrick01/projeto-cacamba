@@ -788,6 +788,45 @@ mede o desvio da cabeça em relação ao próprio repouso, tira só a guinada e
 mantém o olhar para baixo. `window.mesa3d` expõe assentos, cena e câmera
 para medir do console, como o provador.
 
+**O elenco esculpido sentado, e o que a mesa anima nele** (2026-09-07): o
+usuário refez os oito no gerador 3D **já sentados e com as mãos em pinça**,
+sem esqueleto, depois de duas tentativas de articular as esculturas anteriores
+(rig de dedos por geometria, enxerto de mão modelada à parte). `scripts/
+prepara_sentado.py` normaliza cada um para 1,45 m sentado, 32 mil triângulos e
+texturas de 1024 px, e mede na malha os três nós do contrato: `Cabeca` (91% da
+altura — a 85% caía no pescoço), `MaoEsq`/`MaoDir` na pinça e, novo, `Assento`
+— a maior superfície voltada PARA BAIXO entre 25% e 52% da altura, que é onde
+o corpo encosta na cadeira. Sem esqueleto não há osso do quadril, e pela caixa
+a cadeira caía 15 a 20 cm à frente: o personagem sentava no ar, com a cadeira
+atrás dele.
+
+Sem osso, a atuação passou a ser do **corpo inteiro**, em `interacao3d.js`
+(`atuaCorpoInteiro`), a partir da gravação de Capote que o usuário mandou como
+referência: respiro de ±8 mm, o tronco virando até 0,37 rad para quem está
+jogando, e na própria vez o corpo chegando 5,5 cm para a frente com o leque
+5 cm mais alto e mais deitado para si — que é o gesto que a referência mostra
+quando chega a vez de alguém. Compra e descarte não movem braço (não há
+braço): a carta voa da pinça. Com esqueleto no arquivo, o caminho antigo
+(braços por cinemática, dedos, cabeça) volta inteiro; `i.estatico` separa os
+dois.
+
+Da mesma referência veio a **placa de estado** sobre a cabeça: acima do nome,
+diz JOGANDO (âmbar) ou PRÓXIMO, e por 1,8 s o verbo do lance de quem acabou de
+jogar (COMPROU, DESCARTOU, BAIXOU, ENCAIXOU, PEGOU A SOBRA, PEDIU O MEIO). Numa
+escultura parada é ela que conta o turno.
+
+A roda de cadeiras encolheu de 1,45 m para **1,34 m** (`MESA.assento`): a
+barriga na beirada do tampo, joelhos por baixo e o leque por cima da madeira,
+como na referência — a 1,45 sobrava um palmo de chão entre a mesa e cada um e
+as cartas boiavam fora do tampo. Como isso aproxima todo mundo, `encaixaModelo`
+ganhou um **recuo automático**: mede quem alcança a fatia do tampo nesse raio e
+empurra o corpo para trás só o necessário (até 10 cm; a Lyly, de vestido
+comprido, recua 8 cm, os outros sete, nada). A conta é sobre o feltro e não
+sobre o aro de madeira — exigir folga até o aro afastava a Lyly 14 cm, mais
+visível que o encosto que evitava. A carta na mão de um modelo caiu de 0,26
+para 0,21 da carta da mesa (8,8 × 12,4 cm): a 0,26 o leque tampava o queixo, e
+na referência dá para ler a cara de quem joga por cima das cartas.
+
 O que ela **ainda não tem**, conferido no código em 2026-09-04: cartas sem
 espessura e de face única (a espessura real seria invisível nesta escala; a
 sombra é o que dá volume), e nada de sobras, troca de coringa, encaixe ou

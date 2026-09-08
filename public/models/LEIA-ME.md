@@ -228,9 +228,48 @@ python3 scripts/prepara_sentado.py ~/Downloads/<nome>.glb public/models/<slug>.g
 ```
 
 Ele normaliza a altura sentada para 1,45 m, põe os pés no chão, reduz para 32
-mil triângulos, encolhe as texturas e mede as mãos na malha (a saliência mais à
-frente entre 58% e 75% da altura — abaixo disso os joelhos enganam) para
-ancorar `MaoEsq`/`MaoDir` na pinça, onde o pé do leque encosta.
+mil triângulos, encolhe as texturas e mede na malha:
+
+- as **mãos** (a saliência mais à frente entre 58% e 75% da altura — abaixo
+  disso os joelhos enganam), para ancorar `MaoEsq`/`MaoDir` na pinça, onde o pé
+  do leque encosta;
+- o **assento**: a maior superfície voltada para baixo entre 25% e 52% da
+  altura (as nádegas e a face de baixo das coxas). Vira o nó `Assento`, e é por
+  ele que a mesa põe a cadeira EMBAIXO de quem senta. Pela caixa a cadeira caía
+  15 a 20 cm à frente — o personagem sentava no ar, com a cadeira atrás dele.
+
+| Nó | Para quê |
+|---|---|
+| `Assento` | o plano em que o corpo encosta na cadeira. Sem esqueleto não há osso do quadril; com esqueleto, `Hips` continua mandando |
+
+### O que a mesa anima numa escultura sem esqueleto
+
+Não há osso para mover, então a atuação é do **corpo inteiro** — e é assim que
+a referência (Capote) se lê de longe, que é como se joga no celular:
+
+| Quando | O que acontece |
+|---|---|
+| sempre | respiro de ±8 mm, dessincronizado |
+| alguém joga | o tronco vira até 0,37 rad na direção de quem está jogando |
+| a vez é dele | chega 5,5 cm para a frente, levanta o leque 6 cm e o deita um pouco mais para si |
+| um lance qualquer | a placa sobre a cabeça diz o verbo (COMPROU, DESCARTOU, BAIXOU, ENCAIXOU) por 1,8 s; fora disso diz JOGANDO ou PRÓXIMO |
+
+Compra e descarte **não** movem o braço (não há braço): a carta voa da pinça
+até o meio da mesa. Com esqueleto no arquivo, `interacao3d.js` volta a resolver
+braços e dedos e o gesto reaparece.
+
+### A roda de cadeiras e o tampo
+
+As cadeiras ficam a **1,34 m** do centro (`MESA.assento`), com a barriga na
+beirada do tampo (feltro de raio 1,15 m mais o aro): joelhos por baixo, mãos e
+leque por cima da madeira, como na referência. A 1,45 m sobrava um palmo de
+chão entre a mesa e cada um, e as cartas boiavam fora do tampo.
+
+Como cada escultura senta do seu jeito, `encaixaModelo` mede quem alcança a
+**fatia do tampo** nesse raio e **recua** o corpo só o necessário (até 10 cm) —
+é o que impede o feltro de passar por dentro de um vestido comprido. O provador
+diz quanto recuou. As cartas na mão de um modelo são 0,21 da carta da mesa
+(8,8 × 12,4 cm): a 0,26 o leque tampava o queixo.
 
 **Se quiser articular** (braço que compra e descarta, dedos que fecham), há o
 caminho pelo Blender: `scripts/sentado.sh <fonte.glb> public/models/<slug>.glb`
