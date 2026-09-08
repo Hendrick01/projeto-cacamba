@@ -1069,8 +1069,29 @@ let minhaVez = false;
 // ---------------------------------------------------------------------------
 
 const maoGrupo = new THREE.Group();
-camera.add(maoGrupo);
 scene.add(camera);
+// A sua mão mora numa CENA À PARTE, desenhada num segundo passe com o
+// z-buffer limpo. Ela está a 1,3 m do olho e a beirada do tampo a 48 cm: pelo
+// mundo, a mesa passaria na frente das cartas. Antes isso se resolvia com
+// `depthTest: false`, que serve a carta chapada mas destrói um sólido — a mão
+// esculpida saía como um amontoado de cacos, com as costas desenhadas por cima
+// da palma. Com passe próprio, cada coisa da mão se ordena entre si e o
+// conjunto continua por cima do mundo.
+const cenaMao = new THREE.Scene();
+cenaMao.add(maoGrupo);
+// luz própria, suave: a mão está encostada na câmera e o holofote do boteco,
+// que é forte e âmbar, a estouraria
+cenaMao.add(new THREE.AmbientLight(0xffffff, 1.5));
+const luzDaMao = new THREE.DirectionalLight(0xfff0d8, 1.1);
+luzDaMao.position.set(-0.4, 1, 0.8);
+cenaMao.add(luzDaMao);
+// o grupo copia a câmera a cada quadro (era filho dela)
+function segueACamera() {
+  camera.updateMatrixWorld();
+  maoGrupo.position.copy(camera.position);
+  maoGrupo.quaternion.copy(camera.quaternion);
+  maoGrupo.updateMatrixWorld(true);
+}
 
 const cartasDaMao = new Map();  // cardId → mesh
 let selecionadas = new Set();
@@ -1157,25 +1178,53 @@ function texturaMao2D(pele) {
   return tex;
 }
 
-const maos = { esq: null, dir: null, pele: null };
+const maos = { esq: null, dir: null, pele: null, slug: null, tridi: false };
+function poeAMao(lado, objeto) {
+  if (maos[lado]) { maoGrupo.remove(maos[lado]); maos[lado].traverse?.((o) => o.material?.dispose?.()); }
+  // sólido de verdade: profundidade LIGADA (o passe da mão tem z-buffer próprio).
+  // A malha chapada do desenho continua sem escrever profundidade, que é o que
+  // um plano transparente quer.
+  objeto.traverse((o) => { if (o.isMesh) { o.material.depthTest = true; o.material.depthWrite = !o.material.transparent; o.renderOrder = 19; } });
+  objeto.renderOrder = 19;
+  maos[lado] = objeto;
+  maoGrupo.add(objeto);
+}
+// As MÃOS DO SEU PERSONAGEM, recortadas da própria escultura
+// (scripts/mao_primeira_pessoa.py). Chegam com a cor nos vértices, sem textura,
+// e recebem a luz do boteco — o desenho 2D chapado era do tempo em que o elenco
+// todo era desenho. Sem o arquivo, o desenho continua sendo o reserva.
+function maosEsculpidas(slug) {
+  return listaDeModelos.then((lista) => {
+    if (!lista.has(slug)) throw new Error('sem modelo');
+    return new Promise((ok, erro) => carregadorGLTF.load(`/models/${slug}-maos.glb`, ok, undefined, erro));
+  });
+}
 function sincronizaMaos() {
   const eu = view.players.find((p) => p.id === me());
   if (!eu) return;
-  const pele = peleDe(personagemDe(eu));
-  if (pele === maos.pele) return;
-  maos.pele = pele;
+  const slug = personagemDe(eu);
+  const pele = peleDe(slug);
+  if (slug === maos.slug && pele === maos.pele) return;
+  maos.pele = pele; maos.slug = slug; maos.tridi = false;
   for (const lado of ['esq', 'dir']) {
-    if (maos[lado]) maoGrupo.remove(maos[lado]);
     // desenho, como o elenco: sem sombreamento, só o escurecimento fixo
     const mat = new THREE.MeshBasicMaterial({
       map: texturaMao2D(pele), transparent: true, depthWrite: false, toneMapped: false,
     });
     mat.color.setScalar(0.94);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.6), mat);
-    maos[lado] = m;
-    m.material.depthTest = false; m.renderOrder = 19;   // as mãos, como o leque: por cima do tampo
-    maoGrupo.add(m);
+    poeAMao(lado, new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.6), mat));
   }
+  maosEsculpidas(slug).then((gltf) => {
+    if (maos.slug !== slug) return;              // trocou de personagem enquanto carregava
+    for (const [lado, nome] of [['esq', 'Esq'], ['dir', 'Dir']]) {
+      const o = gltf.scene.getObjectByName(nome);
+      if (!o) return;
+      o.removeFromParent();
+      poeAMao(lado, o);
+    }
+    maos.tridi = true;
+    sincronizaMao();
+  }).catch(() => { /* fica o desenho */ });
 }
 
 function sincronizaMao() {
@@ -1205,7 +1254,7 @@ function sincronizaMao() {
     mesh.rotation.set(0,0,p.giro);
     if (nova && entradaNaMao && !semMovimento) {
       const origem = entradaNaMao === 'meio' ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.06) : topoDoMonte();
-      maoGrupo.updateWorldMatrix(true,true);
+      segueACamera();
       voa(mesh,noEspacoDaMao(origem),mesh.position.clone(),{dur:400,arco:0.04});
     }
   });
@@ -1214,10 +1263,26 @@ function sincronizaMao() {
   if (maos.esq && maos.dir) {
     const { escala,baseY,dist,larguraLeque } = plano;
     maos.esq.visible = maos.dir.visible = n > 0;
-    maos.esq.position.set(-larguraLeque * .5 - .03,baseY - .24 * escala,-dist - .03);
-    maos.dir.position.set(larguraLeque * .5 + .03,baseY - .24 * escala,-dist - .03);
-    maos.esq.rotation.z = -.42; maos.dir.rotation.z = .42;
-    maos.esq.scale.set(-escala,escala,1); maos.dir.scale.set(escala,escala,1);
+    // As mãos ficam PARA FORA das pontas do leque: é a única faixa livre — as
+    // cartas são desenhadas por cima delas, e trazê-las para dentro do leque
+    // (tentativa de 07/09) só as escondia atrás das cartas.
+    const x = larguraLeque * .5 + .03;
+    maos.esq.position.set(-x,baseY - .24 * escala,-dist - .03);
+    maos.dir.position.set(x,baseY - .24 * escala,-dist - .03);
+    if (maos.tridi) {
+      // A mão recortada está no eixo do personagem (ele olha para +Z); a câmera
+      // olha para −Z, então meia-volta em Y é o que põe as costas da SUA mão
+      // para você. São duas mãos de verdade, uma de cada lado: aqui não se
+      // espelha com escala negativa, que viraria as normais do avesso.
+      maos.esq.rotation.set(.18,Math.PI,.30); maos.dir.rotation.set(.18,Math.PI,-.30);
+      maos.esq.scale.setScalar(escala * 1.7); maos.dir.scale.setScalar(escala * 1.7);
+      // a origem do recorte é a PINÇA (perto das pontas dos dedos) e a mão
+      // desce dali para o punho: sem subir, só o pulso aparecia na borda
+      maos.esq.position.y += .30 * escala; maos.dir.position.y += .30 * escala;
+    } else {
+      maos.esq.rotation.z = -.42; maos.dir.rotation.z = .42;
+      maos.esq.scale.set(-escala,escala,1); maos.dir.scale.set(escala,escala,1);
+    }
   }
 }
 
@@ -1240,6 +1305,7 @@ function dedoParaXDoLeque(clientX) {
 canvas.addEventListener('pointerdown', (e) => {
   ponteiro.x = (e.clientX / innerWidth) * 2 - 1;
   ponteiro.y = -(e.clientY / innerHeight) * 2 + 1;
+  segueACamera();
   raycaster.setFromCamera(ponteiro, camera);
   const hits = raycaster.intersectObjects([...cartasDaMao.values()], false).sort((a,b) => b.object.renderOrder - a.object.renderOrder);
   if (hits.length) {
@@ -1860,6 +1926,13 @@ function quadro(t) {
   quadro.n = (quadro.n || 0) + 1;
   if (t - ultimaSombra > (compacto ? 150 : 100)) { renderer.shadowMap.needsUpdate = true; ultimaSombra = t; }
   renderer.render(scene, camera);
+  // segundo passe: limpa a profundidade e desenha a sua mão por cima do mundo,
+  // com profundidade correta entre as cartas e os dedos
+  segueACamera();
+  renderer.autoClear = false;
+  renderer.clearDepth();
+  renderer.render(cenaMao, camera);
+  renderer.autoClear = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1877,6 +1950,6 @@ if (!sessao) {
 }
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
-window.mesa3d = { assentos, scene, camera, renderer, quadro };
+window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo };
 
 // interface-2026-09-07-r1

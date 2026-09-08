@@ -826,6 +826,32 @@ a carta partir no meio do gesto do braço. Sem braço, virou tempo parado. O
 atraso agora depende de haver gesto (`temGesto`, em `mesa3d.js`): 90 ms e
 120 ms para escultura estática.
 
+**As suas mãos passam a ser as do seu personagem** (2026-09-07): nas pontas do
+leque havia dois desenhos 2D chapados, do tempo em que o elenco todo era
+desenho. `scripts/mao_primeira_pessoa.py` recorta as mãos da própria escultura
+— crescendo pela superfície a partir de `MaoEsq`/`MaoDir`, limitado a 11,5 cm
+em linha reta (o tamanho de uma mão: nas esculturas em que as duas se tocam a
+superfície passa de uma para a outra) — e grava `public/models/<slug>-maos.glb`
+com os nós `Esq`/`Dir`, 35 a 95 kB, sem textura: a cor vai em `COLOR_0`, porque
+o atlas do gerador espalha os triângulos da mão pelo mapa inteiro. Só o arquivo
+do SEU personagem é baixado; sem ele, o desenho continua sendo o reserva.
+
+Isso obrigou a mudar o desenho: **a mão virou um segundo passe**. Ela está a
+1,3 m do olho e a beirada do tampo a 48 cm, então pelo mundo a mesa passaria na
+frente das cartas; antes isso se resolvia com `depthTest: false`, que serve a
+uma carta chapada mas destrói um sólido — a mão saía como um amontoado de
+cacos, com as costas desenhadas por cima da palma. Agora `maoGrupo` mora numa
+cena própria (`cenaMao`, com luz suave: o holofote âmbar do boteco estouraria
+uma mão encostada na câmera), que é desenhada depois do mundo com
+`clearDepth()`. Ela deixou de ser filha da câmera, então `segueACamera()` copia
+a posição e a rotação a cada quadro — e antes de cada raio de toque.
+
+As mãos ficam PARA FORA das pontas do leque: é a única faixa livre, já que as
+cartas são desenhadas por cima delas. Trazê-las para dentro (tentativa do mesmo
+dia) só as escondia atrás das cartas. Para a mão aparecer como na referência —
+apoiada na mesa, segurando as cartas — o leque teria de encolher e sair da
+faixa de baixo, o que é mudança de `layoutMao3D` (`interface-core.js`).
+
 Da mesma referência veio a **placa de estado** sobre a cabeça: acima do nome,
 diz JOGANDO (âmbar) ou PRÓXIMO, e por 1,8 s o verbo do lance de quem acabou de
 jogar (COMPROU, DESCARTOU, BAIXOU, ENCAIXOU, PEGOU A SOBRA, PEDIU O MEIO). Numa

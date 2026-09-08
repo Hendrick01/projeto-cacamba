@@ -266,6 +266,29 @@ até o meio da mesa, e **sem espera** — os 520 ms (descarte) e 635 ms (baixada
 de atraso existiam para a carta sair da mão no meio do gesto do braço. Com esqueleto no arquivo, `interacao3d.js` volta a resolver
 braços e dedos e o gesto reaparece.
 
+### As suas mãos, na primeira pessoa
+
+Na mesa você vê as SUAS mãos nas pontas do leque. Elas são recortadas da sua
+própria escultura:
+
+```bash
+python3 scripts/mao_primeira_pessoa.py public/models/<slug>.glb public/models/<slug>-maos.glb
+```
+
+O recorte cresce pela **superfície** a partir do nó `MaoEsq`/`MaoDir` (pelo ar
+não serve: a outra mão está a 10 cm e o peito a 20) e é limitado a 11,5 cm em
+linha reta, que é o tamanho de uma mão — nas esculturas em que as duas mãos se
+tocam, a superfície passa de uma para a outra. Sai um `.glb` de 35 a 95 kB com
+os nós `Esq` e `Dir`, sem textura: a cor de cada vértice é lida do mapa e
+gravada em `COLOR_0`, porque o atlas do gerador espalha os triângulos da mão
+pelo mapa inteiro e não haveria o que recortar.
+
+Sem esse arquivo a mesa usa o desenho 2D chapado de antes. **A mesa desenha a
+sua mão num segundo passe, com o z-buffer limpo**: ela está a 1,3 m do olho e a
+beirada do tampo a 48 cm, então pelo mundo a mesa passaria na frente. Com
+`depthTest: false` — que servia à carta chapada — um sólido sai como um
+amontoado de cacos, com as costas desenhadas por cima da palma.
+
 ### A roda de cadeiras e o tampo
 
 As cadeiras ficam a **1,34 m** do centro (`MESA.assento`), com a barriga na
