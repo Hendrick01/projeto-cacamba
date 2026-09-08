@@ -20,10 +20,18 @@ export function layoutMao3D({ quantidade, largura = 375, altura = 812, fov = 72,
   const unidade = alturaVisivel / altura, larguraVisivel = largura * unidade;
   const larguraCard = Math.min(100, Math.max(62, largura * 0.16));
   const alturaCard = larguraCard * cartaA / cartaL;
-  const maxFila = Math.max(2, Math.min(40, Math.floor((largura - 36 - larguraCard) / 28) + 1));
+  // Quantas cabem numa fileira antes de virar a próxima. Numa tela em pé sobra
+  // altura: é melhor abrir uma segunda fileira do que espremer tudo numa só, e
+  // o passo mínimo é quase a carta inteira. Deitada (paisagem) a altura é o que
+  // falta — ali a fileira única continua, com as cartas mais juntas.
+  const passoMin = altura >= largura ? larguraCard * 0.8 : 28;
+  const maxFila = Math.max(2, Math.min(40, Math.floor((largura - 36 - larguraCard) / passoMin) + 1));
   const fileiras = Math.max(1, Math.ceil(n / maxFila));
   const porFila = Math.max(1, Math.ceil(n / fileiras));
-  const passoPx = porFila > 1 ? Math.min(larguraCard * 0.64, (largura - 36 - larguraCard) / (porFila - 1)) : 0;
+  // Passo quase da largura da carta: sobrando espaço elas ficam lado a lado, com
+  // uma unha de sobreposição só para o leque não virar uma fileira solta. Com o
+  // passo de 0,64 que havia antes, uma mão de 6 cartas já escondia a face das vizinhas.
+  const passoPx = porFila > 1 ? Math.min(larguraCard * 0.9, (largura - 36 - larguraCard) / (porFila - 1)) : 0;
   const alturaMao = Math.min(altura * 0.42, fileiras * (alturaCard + 15) + 26);
   // Extreme hands compact vertically; all cards retain unique selectable positions.
   const entreFilas = fileiras > 1 ? Math.min(alturaCard + 15, (alturaMao - alturaCard - 20) / (fileiras - 1)) : 0;

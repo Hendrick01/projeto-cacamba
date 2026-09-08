@@ -454,6 +454,9 @@ export function createGame(players, opts = {}) {
     phase: 'lobby',
     discardFresh: false, // o topo do descarte acabou de ser descartado (comprável)
     claims: [],          // ids de quem pediu para comprar fora da vez
+    queimadas: [],       // cartas queimadas por quem abriu a rodada: fora do jogo
+    queimaDe: null,      // quem ainda pode queimar (só quem abre, na 1ª jogada)
+    compraDaVez: null,   // { p, cardId, turnNo } da carta puxada do monte agora
     reshuffles: 0,
     lastRound: null,     // { winnerId|null, scores: {pid: pts}, reason }
     rnd: opts.rnd || Math.random,
@@ -524,8 +527,17 @@ export function startRound(state) {
   }
   state.discard = [state.deck.pop()];
   delete state.discard[0].by;   // carta virada do monte não é descarte de ninguém
-  state.turn = state.round % state.players.length;
+  // Quem começa: a primeira rodada é do anfitrião (quem criou a sala, sempre o
+  // primeiro da lista); as seguintes são de quem venceu a rodada anterior.
+  // Rodada esgotada sem vencedor cai no rodízio de antes.
+  const vencedor = state.lastRound?.winnerId
+    ? state.players.findIndex((p) => p.id === state.lastRound.winnerId)
+    : -1;
+  state.turn = state.round === 0 ? 0 : (vencedor >= 0 ? vencedor : state.round % state.players.length);
   state.turnNo = 0;
+  state.queimadas = [];                            // cartas fora do jogo (não voltam na remexida)
+  state.queimaDe = state.players[state.turn].id;   // só quem abre a rodada pode queimar
+  state.compraDaVez = null;
   state.phase = 'draw';
   state.discardFresh = false; // carta virada do monte não é "comprável" fora da vez
   state.claims = [];
@@ -668,10 +680,48 @@ export function actDraw(state, playerId, source) {
     if (!ensureDeck(state, events)) return endRoundDead(state, events);
     const card = state.deck.pop();
     player.hand.push(card);
+    // Guardado para a queima: só a carta puxada AGORA, do monte, pode ser
+    // queimada — e nunca a que veio do meio, que o jogador escolheu vendo.
+    state.compraDaVez = { p: playerId, cardId: card.id, turnNo: state.turnNo };
     events.push({ e: 'draw', p: playerId, source: 'deck' });
   }
 
   state.phase = 'play';
+  return events;
+}
+
+// Quem ABRE a rodada pode recusar a primeira carta que puxa do monte: ela sai
+// do jogo (ninguém pega, nem volta na remexida do monte) e ele puxa outra. Uma
+// vez só, na primeira jogada da rodada. Regra da casa (2026-09-07).
+export function podeQueimar(state, playerId) {
+  return state.phase === 'play'
+    && state.queimaDe === playerId
+    && state.players[state.turn]?.id === playerId
+    && state.compraDaVez?.p === playerId
+    && state.compraDaVez.turnNo === state.turnNo;
+}
+
+export function actQueimar(state, playerId) {
+  if (state.phase !== 'play') fail('Puxe uma carta antes de queimar.');
+  const player = state.players[state.turn];
+  if (player.id !== playerId) fail('Não é a sua vez.');
+  if (state.queimaDe !== playerId) fail('Só quem abre a rodada queima, e só na primeira jogada dela.');
+  if (state.compraDaVez?.p !== playerId || state.compraDaVez.turnNo !== state.turnNo) {
+    fail('Só dá para queimar a carta que você acabou de puxar do monte.');
+  }
+  const card = player.hand.find((cc) => cc.id === state.compraDaVez.cardId);
+  if (!card) fail('Essa carta já saiu da sua mão.');
+
+  player.hand = player.hand.filter((cc) => cc.id !== card.id);
+  state.queimadas.push(card);
+  state.queimaDe = null;      // uma vez só
+  state.compraDaVez = null;
+  const events = [{ e: 'queimou', p: playerId }];
+  // A carta queimada some do jogo; a segunda compra é do monte, como a primeira.
+  if (!ensureDeck(state, events)) return endRoundDead(state, events);
+  const nova = state.deck.pop();
+  player.hand.push(nova);
+  events.push({ e: 'draw', p: playerId, source: 'deck' });
   return events;
 }
 
@@ -873,6 +923,35 @@ export function actLayoff(state, playerId, cardId, meldId, end = null, pegarCori
   return events;
 }
 
+// Coringa da mão ENTRANDO num jogo já baixado, no lugar de uma carta qualquer.
+// Regra da casa (2026-09-07): a sequência não muda de tamanho nem de valores —
+// o coringa passa a fazer o papel da carta que sai, e ela vem para a mão. Antes
+// só dava para pegar as pontas (esticar com o coringa e tirar a sobra), o que
+// deixava o meio da sequência intocável.
+export function actTrocarPorCoringa(state, playerId, meldId, cardId, coringaId = null) {
+  if (state.phase !== 'play') fail('Puxe uma carta antes de mexer na mesa.');
+  const player = state.players[state.turn];
+  if (player.id !== playerId) fail('Não é a sua vez.');
+  const meld = meldById(state, meldId);
+  if (!meld) fail('Esse jogo não está na mesa.');
+  if (meld.type !== 's') fail('O coringa só vale em sequência.');
+  if (meld.cards.filter(isJoker).length >= MAX_JOKERS_PER_SEQ) fail('Essa sequência já tem coringa.');
+  const coringa = coringaId != null
+    ? player.hand.find((c) => c.id === coringaId && isJoker(c))
+    : player.hand.find(isJoker);
+  if (!coringa) fail('Você não tem coringa na mão.');
+  const idx = meld.cards.findIndex((c) => c.id === cardId);
+  if (idx < 0) fail('Essa carta não está nesse jogo.');
+  if (isJoker(meld.cards[idx])) fail('Coringa não substitui coringa.');
+
+  const saiu = meld.cards[idx];
+  meld.cards[idx] = coringa;
+  player.hand = player.hand.filter((cc) => cc.id !== coringa.id);
+  player.hand.push(saiu);
+  // A mão não encurta (sai coringa, entra carta), então isto nunca bate.
+  return [{ e: 'trocouPorCoringa', p: playerId, meldId: meld.id, card: { ...saiu }, deQuem: meld.ownerId }];
+}
+
 // Já pode trocar coringa? A ÚNICA restrição do jogo é ser a vez do jogador,
 // checada em actSwapJoker junto com as demais jogadas. Não precisa ter baixado
 // o próprio contrato: quem ainda está montando a mão também pode resgatar o
@@ -1029,6 +1108,8 @@ function advanceTurn(state) {
   state.phase = 'draw';
   state.discardFresh = true;
   state.claims = [];
+  state.queimaDe = null;   // a queima é só na primeira jogada da rodada
+  state.compraDaVez = null;
 }
 
 // Avança para a próxima rodada (chamado pelo anfitrião na tela de placar)
@@ -1073,6 +1154,9 @@ export function viewFor(state, playerId) {
           baixados: me.baixados,
           remaining: state.round >= 0 ? contractRemaining(state, me) : null,
           podeTrocarCoringa: podeTrocarCoringa(state, me),
+          // Queimar a primeira carta: o motor já responde se cabe agora, com a
+          // regra inteira (quem abriu a rodada, primeira jogada, carta do monte).
+          podeQueimar: podeQueimar(state, me.id),
         }
       : null,
     players: state.players.map((p) => ({
@@ -1344,6 +1428,8 @@ export function applyAction(state, playerId, action) {
     case 'discard': return actDiscard(state, playerId, action.cardId);
     case 'meldDiscard': return actMeldDiscard(state, playerId, action.meldId, action.cardId);
     case 'tomarSobra': return actTomarSobra(state, playerId, action.meldId, action.cardId);
+    case 'trocarPorCoringa': return actTrocarPorCoringa(state, playerId, action.meldId, action.cardId, action.coringaId ?? null);
+    case 'queimar': return actQueimar(state, playerId);
     default: fail('Ação desconhecida.');
   }
 }

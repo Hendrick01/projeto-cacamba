@@ -6,7 +6,7 @@ import {
   actLayoff, actDiscard, actMeldDiscard, actTomarSobra, actClaim, actUnclaim, actNextRound, applyAction,
   botNextAction, botWantsCard, mulberry32, viewFor, allMelds, playerById,
   podeComprarDoDescarte, isJoker, topoDoDescarte, sobrasNaMesa, sobraFechaJogo,
-  coringaLiberadoPeloEncaixe,
+  coringaLiberadoPeloEncaixe, actTrocarPorCoringa, actQueimar,
   decksParaJogadores, conferirBaralho, cartasNecessarias, DEFAULT_OPTS,
 } from '../shared/engine.js';
 
@@ -1007,4 +1007,103 @@ test('a sobra para a mão respeita vez, fase e o que está sobrando', () => {
   b.melds.push({ id: 9106, type: 't', rank: 9, ownerId: b.id, cards: [c('9', '♠'), c('9', '♥'), c('9', '♦')] });
   assert.throws(() => actTomarSobra(state, a.id, 9106, b.melds[1].cards[0].id), /não está sobrando/);
   assert.throws(() => actTomarSobra(state, a.id, 424242, alvo.id), /não está na mesa/);
+});
+
+test('coringa da mão ocupa o lugar de QUALQUER carta da sequência, não só das pontas', () => {
+  const state = freshGame();
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+  const coringa = J();
+  a.hand.push(coringa);
+  const meio = c('10', '♥');
+  b.melds = [{ id: 9201, type: 's', suit: 1, ownerId: b.id,
+    values: [8, 9, 10, 11], cards: [c('8', '♥'), c('9', '♥'), meio, c('J', '♥')] }];
+  const maoAntes = a.hand.length;
+  const ev = applyAction(state, a.id, { a: 'trocarPorCoringa', meldId: 9201, cardId: meio.id, coringaId: coringa.id });
+  assert.equal(ev[0].e, 'trocouPorCoringa');
+  assert.equal(ev[0].deQuem, b.id);
+  assert.equal(b.melds[0].cards.length, 4, 'a sequência continua com 4 cartas');
+  assert.deepEqual(b.melds[0].values, [8, 9, 10, 11], 'os valores não mudam');
+  assert.ok(isJoker(b.melds[0].cards[2]), 'o coringa ficou no lugar do 10♥');
+  assert.ok(a.hand.some((x) => x.id === meio.id), 'o 10♥ veio para a mão');
+  assert.ok(!a.hand.some((x) => x.id === coringa.id), 'o coringa saiu da mão');
+  assert.equal(a.hand.length, maoAntes, 'a mão não encurta: é troca');
+  assert.equal(state.phase, 'play', 'não passou a vez');
+});
+
+test('a troca pelo coringa recusa trinca, sequência com coringa, carta de fora e mão sem coringa', () => {
+  const state = freshGame();
+  const [a, b] = state.players;
+  state.turn = state.players.indexOf(a);
+  actDraw(state, a.id, 'deck');
+  const trinca = { id: 9202, type: 't', rank: 5, ownerId: b.id,
+    cards: [c('5', '♠'), c('5', '♥'), c('5', '♦')] };
+  const comCoringa = { id: 9203, type: 's', suit: 0, ownerId: b.id,
+    values: [3, 4, 5, 6], cards: [c('3', '♠'), J(), c('5', '♠'), c('6', '♠')] };
+  const limpa = { id: 9204, type: 's', suit: 2, ownerId: b.id,
+    values: [2, 3, 4, 5], cards: [c('2', '♦'), c('3', '♦'), c('4', '♦'), c('5', '♦')] };
+  b.melds = [trinca, comCoringa, limpa];
+  const fora = c('9', '♦');
+  a.hand = a.hand.filter((x) => !isJoker(x));
+  assert.throws(() => actTrocarPorCoringa(state, a.id, 9204, limpa.cards[0].id), /coringa na mão/i);
+  a.hand.push(J());
+  assert.throws(() => actTrocarPorCoringa(state, a.id, 9202, trinca.cards[0].id), /sequência/i);
+  assert.throws(() => actTrocarPorCoringa(state, a.id, 9203, comCoringa.cards[0].id), /já tem coringa/i);
+  assert.throws(() => actTrocarPorCoringa(state, a.id, 9204, fora.id), /não está nesse jogo/i);
+  assert.throws(() => actTrocarPorCoringa(state, b.id, 9204, limpa.cards[0].id), /sua vez/i);
+  assert.equal(limpa.cards.length, 4, 'nada mudou na mesa depois das recusas');
+});
+
+test('a 1ª rodada começa no anfitrião; as seguintes, em quem venceu a anterior', () => {
+  const state = freshGame();
+  assert.equal(state.players[state.turn].id, state.players[0].id, 'a primeira é de quem criou a sala');
+  const caio = state.players[2];
+  state.phase = 'roundEnd';
+  state.lastRound = { winnerId: caio.id, scores: {}, reason: 'bateu' };
+  startRound(state);
+  assert.equal(state.players[state.turn].id, caio.id, 'quem bateu abre a rodada seguinte');
+  // rodada morta (sem vencedor) não trava a mesa: volta ao rodízio
+  state.phase = 'roundEnd';
+  state.lastRound = { winnerId: null, scores: {}, reason: 'esgotado' };
+  startRound(state);
+  assert.ok(state.players[state.turn], 'a rodada seguinte tem quem comece');
+});
+
+test('quem abre a rodada queima a carta do monte uma vez e ela sai do jogo', () => {
+  const state = freshGame();
+  const abre = state.players[state.turn];
+  const antes = abre.hand.length;
+  actDraw(state, abre.id, 'deck');
+  const puxada = state.compraDaVez.cardId;
+  assert.equal(viewFor(state, abre.id).you.podeQueimar, true, 'a opção aparece para quem abriu');
+  const ev = applyAction(state, abre.id, { a: 'queimar' });
+  assert.equal(ev[0].e, 'queimou');
+  assert.ok(!abre.hand.some((x) => x.id === puxada), 'a carta queimada saiu da mão');
+  assert.ok(state.queimadas.some((x) => x.id === puxada), 'e foi para fora do jogo');
+  assert.ok(!state.deck.some((x) => x.id === puxada) && !state.discard.some((x) => x.id === puxada),
+    'a queimada não volta para o monte nem para o meio');
+  assert.equal(abre.hand.length, antes + 1, 'no lugar dela veio outra do monte');
+  assert.equal(state.phase, 'play', 'continua na mesma jogada');
+  assert.equal(viewFor(state, abre.id).you.podeQueimar, false, 'e é uma vez só');
+  assert.throws(() => actQueimar(state, abre.id), /abre a rodada/i);
+});
+
+test('a queima é só de quem abre, na 1ª jogada, e nunca da carta do meio', () => {
+  const state = freshGame();
+  const abre = state.players[state.turn];
+  const outro = state.players[(state.turn + 1) % state.players.length];
+  actDraw(state, abre.id, 'deck');
+  assert.throws(() => actQueimar(state, outro.id), /sua vez/i);
+  actDiscard(state, abre.id, abre.hand[0].id);
+  const segundo = state.players[state.turn];
+  actDraw(state, segundo.id, 'deck');
+  assert.equal(viewFor(state, segundo.id).you.podeQueimar, false, 'o segundo a jogar não queima');
+  assert.throws(() => actQueimar(state, segundo.id), /abre a rodada/i);
+
+  const outra = freshGame(7);
+  const abre2 = outra.players[outra.turn];
+  actDraw(outra, abre2.id, 'discard');
+  assert.equal(viewFor(outra, abre2.id).you.podeQueimar, false);
+  assert.throws(() => actQueimar(outra, abre2.id), /do monte/i);
 });

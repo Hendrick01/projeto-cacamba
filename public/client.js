@@ -1050,6 +1050,27 @@ function decorateMeld(el, meld) {
     }
   }
 
+  // Coringa escolhido na mão: ele pode ocupar o lugar de QUALQUER carta de uma
+  // sequência já baixada — não só das pontas — e a carta sai para a mão. Quem
+  // escolhe qual é o toque na carta; o toque no jogo inteiro continua sendo o
+  // encaixe pela ponta.
+  if (selected.size === 1) {
+    const escolhida = view.you.hand.find((c) => c.id === [...selected][0]);
+    if (escolhida && isJoker(escolhida) && meld.type === 's' && !meld.cards.some(isJoker)) {
+      for (const ce of el.children) {
+        const alvo = meld.cards.find((x) => x.id === Number(ce.dataset.cardId));
+        if (!alvo || isJoker(alvo)) continue;
+        ce.classList.add('puxavel');
+        ce.title = `Trocar ${cardText(alvo)} pelo seu coringa`;
+        ce.onclick = (e) => {
+          e.stopPropagation();
+          sendAction({ a: 'trocarPorCoringa', meldId: meld.id, cardId: alvo.id, coringaId: escolhida.id });
+          selected.clear();
+        };
+      }
+    }
+  }
+
   // Encaixar não exige mais ter baixado o contrato.
   if (selected.size === 1) {
     const card = view.you.hand.find((c) => c.id === [...selected][0]);
@@ -1424,6 +1445,9 @@ function renderActions() {
   // O botão fica sempre clicável: sem o contrato pronto, o toque explica o que
   // falta em vez de morrer num botão desabilitado e mudo.
   const playable = playing ? contractPlayable() : null;
+  // Queimar: só para quem abriu a rodada, na primeira jogada, e só a carta que
+  // acabou de vir do monte — quem responde é o motor.
+  $('btn-queimar').hidden = !(view.you?.podeQueimar && !meldDiscardMode);
   $('btn-baixar').hidden = !(playing && !meldDiscardMode);
   $('btn-baixar').textContent = contratoCumprido() ? 'Baixar jogo extra' : 'Baixar jogo';
   $('btn-baixar').classList.toggle('soft-disabled', playable === null);
@@ -1451,6 +1475,7 @@ $('discard-pile').onclick = () => {
   sendAction({ a: 'draw', source: 'discard' });
 };
 $('btn-draw-deck').onclick = () => sendAction({ a: 'draw', source: 'deck' });
+$('btn-queimar').onclick = () => sendAction({ a: 'queimar' });
 $('btn-draw-discard').onclick = () => sendAction({ a: 'draw', source: 'discard' });
 $('btn-claim').onclick = () => {
   const claimed = view.claims.includes(me());

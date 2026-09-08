@@ -412,9 +412,11 @@ function scheduleBots(room) {
   // Janela maior quando há carta comprável (dá tempo do humano pedir).
   // Humano caído: espera generosa na primeira ação; depois ritmo de bot.
   const buyWindow = game.phase === 'draw' && game.discardFresh && podeComprarDoDescarte(game);
+  // Ritmo do robô: rápido demais a mesa parecia um caixa eletrônico, com as
+  // jogadas dos outros acontecendo antes de dar tempo de ler o que houve.
   const delay = away
-    ? (currentPlayer.awayActed ? 1000 : AWAY_TAKEOVER_MS)
-    : (buyWindow ? 2200 : 700 + Math.random() * 500);
+    ? (currentPlayer.awayActed ? 1400 : AWAY_TAKEOVER_MS)
+    : (buyWindow ? 3200 : 1500 + Math.random() * 1300);
 
   room.botTimer = setTimeout(() => {
     room.botTimer = null;

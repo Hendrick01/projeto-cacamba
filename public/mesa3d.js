@@ -871,7 +871,9 @@ function criaAssento(p) {
     corpo.visible = false;
     grupo.add(m.raiz);
     grupo.scale.setScalar(1);   // tamanho real: a mesa é de gente de verdade
-    if (m.sentado) ajustaBanqueta(m, cadeira);   // a banqueta cresce com quem senta nela
+    // a cadeira vai para debaixo de quem senta nela: pelo osso do quadril num
+    // modelo rigado, pelo nó `Assento` numa escultura estática
+    if (m.sentado || m.estatico) ajustaBanqueta(m, cadeira);
     // a boca da fala sai da cabeça do boneco e vai para a do modelo (sem
     // morph `bocaAberta`, é a elipse escura pendurada no nó `Cabeca`)
     bocas.aberta.removeFromParent();
@@ -1325,6 +1327,11 @@ function montaBotoes() {
     }
     return;
   }
+  // quem abre a rodada pode recusar a primeira carta do monte: ela sai do jogo
+  // e ele puxa outra, uma vez só
+  if (view.you.podeQueimar) {
+    barra.appendChild(botao('Queimar e puxar outra', 'normal', () => sendAction({ a: 'queimar' })));
+  }
   // fase de jogar: baixar (o plano vem do mesmo motor) e descartar
   const ids = selecionadas.size ? [...selecionadas] : null;
   const plano = view.you.remaining
@@ -1772,7 +1779,7 @@ function quadro(t) {
       const m = a.assento.modelo;
       const dt = a.tAnterior ? Math.min(0.05, (t - a.tAnterior) / 1000) : 0; a.tAnterior = t;
       if (m.mixer && !semMovimento) m.mixer.update(dt);
-      atualizaInteracao(m, dt, { flexao: a.leque.visible ? 0.68 : 0, parado: semMovimento, olhar: a.giroAlvo });
+      atualizaInteracao(m, dt, { flexao: a.leque.visible ? 0.68 : 0, parado: semMovimento, olhar: a.giroAlvo, suaVez: !!a.naVez });
       if (m.morfos.bocaAberta) {
         const nvm = voz.nivel(id);
         m.morfos.bocaAberta.malha.morphTargetInfluences[m.morfos.bocaAberta.indice] = Math.min(1, nvm * 2.2);
