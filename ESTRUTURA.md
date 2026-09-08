@@ -690,18 +690,23 @@ recuo corretivo mede **0**.
 **A esquerda segura pelo MEIO do leque**, não pela ponta: é onde a mão fica
 quando se abre um leque de verdade, e na ponta ela puxava o olho para o canto.
 
-**A direita só entra para jogar**: fora da sua vez fica fora do quadro; na sua
-vez entra pela ponta direita do leque e em **pinça**, que é o gesto de quem vai
-pegar a carta. É ela quem o rig ainda comanda — a esquerda vem posada e o rig
-não a toca, senão a pose seria aplicada duas vezes. Ela também tem o seu
-`PlanoDaCarta` (`mao_pose_segura.py --aberta` grava só o quadro, sem posar):
-sem ele o encaixe antigo a punha **de cabeça para baixo**. Alcançar é o mesmo
-contrato com duas voltas: meia volta em Y põe a palma para longe da câmera — ao
-esticar o braço quem se vê é o dorso da própria mão — e um quarto de volta em Z
-deita a mão, apontando os dedos para o leque e deixando o polegar por cima.
-Conferido na tela: normal da palma `(0, −0,33, −0,94)` (de costas para a
-câmera), dedos `(−1, −0,07, 0,03)` (para o leque) e o polegar acima do
-indicador.
+E **inclinada 0,42 rad (24°)**, não a prumo — o mesmo ângulo com que as mãos
+desenhadas entram na mesa 2D. Não é enfeite: uma mão vertical, subindo reta do
+meio da tela, com o polegar à direita, lê como o DORSO de uma mão direita mesmo
+sendo a esquerda ("as duas mãos na imagem são direitas", 08/09/2026). A medida
+dizia que estava certo — palma para a câmera, polegar à direita, lateralidade
+conferida pelos ossos — e ainda assim o olho lia errado. Quem resolve é a
+inclinação, porque é ela que conta de que ombro a mão vem.
+
+**A direita só entra na sua vez**: fora dela fica fora do quadro. Ela também
+tem o seu `PlanoDaCarta` (`mao_pose_segura.py --aberta` grava só o quadro, sem
+posar) e entra espelhando a esquerda — mesma palma para a câmera, inclinação
+para o outro lado. Duas tentativas anteriores erraram por não pensar nas duas
+como um PAR: o encaixe antigo, por eixo de pinça com um giro de 2,0 rad
+escolhido a esmo, a punha de cabeça para baixo; e virá-la de costas para a
+câmera, "como quem estica o braço", só trocou um jeito errado por outro. É ela
+quem o rig ainda comanda (pose `pinca`) — a esquerda vem posada do arquivo e o
+rig não a toca, senão a pose seria aplicada duas vezes.
 
 ### Ler os jogos baixados (08/09/2026)
 

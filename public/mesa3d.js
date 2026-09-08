@@ -1105,7 +1105,9 @@ const maos = { esq: null, dir: null, pele: null, slug: null, tridi: false, rig: 
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const EIXO_Z = new THREE.Vector3(0, 0, 1);
-const _qMao = new THREE.Quaternion(), _qGiro = new THREE.Quaternion();
+const _qMao = new THREE.Quaternion();
+// a mesma inclinação das mãos desenhadas da mesa 2D (`maos.esq.rotation.z = -.42`)
+const INCLINA_MAO = 0.42;
 function encaixaNaPinca(mao, lado, alvo, escala, inclina) {
   const polegar = mao.getObjectByName(`${lado}Thumb3`), dedo = mao.getObjectByName(`${lado}Index2`);
   const dedos = mao.getObjectByName(`${lado}Middle3`);
@@ -1352,7 +1354,14 @@ function sincronizaMao() {
       // então encaixar o plano no lugar da carta acerta tamanho, lugar e ângulo
       // de uma vez. Sem o nó no arquivo, cai no encaixe antigo, por pinça.
       const doMeio = plano.posicoes[Math.floor((n - 1) / 2)];
-      _qMao.setFromAxisAngle(EIXO_Z, doMeio.giro);
+      // e INCLINADA, não a prumo. A mão de verdade não sobe reta do meio da
+      // tela: ela vem do ombro, e é essa inclinação que faz o olho ler de que
+      // lado a mão é. Sem ela, uma mão vertical com o polegar à direita lê como
+      // dorso de mão DIREITA, mesmo sendo a esquerda ("as duas mãos na imagem
+      // são direitas", 08/09/2026). O ângulo é o mesmo que o desenho 2D já usa
+      // nas mãos da mesa normal — ±0,42 rad, 24 graus — para as duas telas
+      // contarem a mesma história.
+      _qMao.setFromAxisAngle(EIXO_Z, doMeio.giro - INCLINA_MAO);
       if (!encaixaPeloPlano(maos.esq, _v1.set(doMeio.x, doMeio.y, doMeio.z), _qMao, escalaDaMao))
         encaixaNaPinca(maos.esq, 'Left', pinca, escalaDaMao, 1.15);
       // e recua o que a MEDIÇÃO pedir: tudo que não é polegar tem de ficar
@@ -1367,16 +1376,11 @@ function sincronizaMao() {
         // arquivo). Sem laço por quadro, a troca é imediata.
         definePosePrimeiraPessoa(maos.rig, 'Right', 'pinca');
         atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);
-        // e pelo mesmo contrato, não mais pelo eixo de pinça com um giro
-        // escolhido a esmo — era esse giro que a deixava de cabeça para baixo.
-        // Ela entra pela direita ALCANÇANDO o leque, e isso são duas voltas
-        // sobre o quadro do modelo: meia volta em Y põe a palma para longe da
-        // câmera (é o dorso da própria mão que se vê ao esticar o braço) e um
-        // quarto de volta em Z deita a mão, apontando os dedos para o leque e
-        // deixando o polegar por cima.
-        _qMao.setFromAxisAngle(EIXO_Y, Math.PI);
-        _qGiro.setFromAxisAngle(EIXO_Z, Math.PI / 2 + doMeio.giro);
-        _qMao.premultiply(_qGiro);
+        // e pelo mesmo contrato, espelhando a esquerda: mesma palma para a
+        // câmera, mesma inclinação para o outro lado. Virá-la de costas, como
+        // tentei antes, só trocou um jeito errado por outro — as duas mãos têm
+        // de ler como um PAR, que é o que o desenho 2D faz.
+        _qMao.setFromAxisAngle(EIXO_Z, doMeio.giro + INCLINA_MAO);
         if (!encaixaPeloPlano(maos.dir, _v1.set(larguraLeque * .5, pinca.y, -dist), _qMao, escalaDaMao))
           encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escalaDaMao, 2.0);
         recuaAteSoOPolegarAparecer(maos.dir, -dist);
