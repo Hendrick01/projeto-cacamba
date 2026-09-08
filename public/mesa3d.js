@@ -1134,6 +1134,54 @@ function encaixaNaPinca(mao, lado, alvo, escala, inclina) {
   return true;
 }
 
+// MEDE a mão contra o plano das cartas, vértice a vértice, separando o polegar
+// do resto pelos pesos do esqueleto. Devolve o quanto o resto da mão precisa
+// RECUAR para ficar inteiro atrás das cartas, e quanto do polegar sobra à
+// frente depois disso. Sem estimativa: é a malha deformada de verdade
+// (`getVertexPosition` aplica o esqueleto) medida no espaço do grupo da mão.
+const _vm = new THREE.Vector3();
+function medeAMao(mao, zCarta, passo = 2) {
+  let malha = null; mao.traverse((o) => { if (o.isSkinnedMesh) malha = o; });
+  if (!malha) return null;
+  const pai = mao.parent;
+  const ossos = malha.skeleton.bones;
+  const doPolegar = ossos.map((b) => /Thumb/.test(b.name));
+  const idx = malha.geometry.attributes.skinIndex, peso = malha.geometry.attributes.skinWeight;
+  const pos = malha.geometry.attributes.position;
+  mao.updateWorldMatrix(true, true);
+  let recuo = -Infinity, polegarNaFrente = 0, restoNaFrente = 0, maisFundoDoPolegar = -Infinity, lidos = 0;
+  for (let i = 0; i < pos.count; i += passo) {
+    malha.getVertexPosition(i, _vm);
+    const z = pai.worldToLocal(_vm.applyMatrix4(malha.matrixWorld)).z;
+    // de que osso é este vértice: o de maior peso
+    let melhor = 0, pesoMax = -1;
+    for (let k = 0; k < 4; k++) {
+      const w = peso.getComponent(i, k);
+      if (w > pesoMax) { pesoMax = w; melhor = idx.getComponent(i, k); }
+    }
+    lidos++;
+    if (doPolegar[melhor]) {
+      if (z > zCarta) polegarNaFrente++;
+      maisFundoDoPolegar = Math.max(maisFundoDoPolegar, z);
+    } else {
+      if (z > zCarta) restoNaFrente++;
+      recuo = Math.max(recuo, z - zCarta);
+    }
+  }
+  return { lidos, recuo: Math.max(0, recuo), polegarNaFrente, restoNaFrente, pontaDoPolegar: maisFundoDoPolegar };
+}
+
+// Recua a mão até que NADA além do polegar fique à frente do plano das cartas,
+// e devolve a medida final. O recuo é uma translação, então uma passada já
+// resolve; a segunda medida existe para PROVAR que resolveu — e para dizer
+// quanto do polegar sobrou à mostra, que é o ponto do gesto.
+function recuaAteSoOPolegarAparecer(mao, zCarta) {
+  let m = medeAMao(mao, zCarta);
+  if (!m) return null;
+  if (m.recuo > 0) { mao.position.z -= m.recuo + 0.002; mao.updateWorldMatrix(true, true); m = medeAMao(mao, zCarta); }
+  return m;
+}
+
 function poeAMao(lado, objeto) {
   if (maos[lado]) { maoGrupo.remove(maos[lado]); maos[lado].traverse?.((o) => o.material?.dispose?.()); }
   // sólido de verdade: profundidade LIGADA (o passe da mão tem z-buffer próprio).
@@ -1243,12 +1291,24 @@ function sincronizaMao() {
     if (maos.tridi) {
       // O leque converge num ponto abaixo dele (é o pivô do arco). É ali que a
       // pinça da mão tem de cair: a carta entra entre o polegar e os dedos.
+      // ESCALA PELA ANATOMIA, não por tentativa: uma carta de baralho tem 63 mm
+      // de largura e uma mão adulta, 185 mm do punho à ponta do médio — 2,94
+      // larguras de carta. Como o modelo canônico tem exatamente esse
+      // comprimento igual a 1, a escala sai da conta. Com o 0,38 que estava
+      // aqui a mão media 1,1 largura de carta: um terço do tamanho.
+      const escalaDaMao = 2.94 * CARTA_L * escala;
       const pinca = new THREE.Vector3(-.045, baseY + CARTA_A * escala * 0.16, -dist);
-      encaixaNaPinca(maos.esq, 'Left', pinca, escala * 0.38, 1.15);
+      encaixaNaPinca(maos.esq, 'Left', pinca, escalaDaMao, 1.15);
+      // e recua o que a MEDIÇÃO pedir: tudo que não é polegar tem de ficar
+      // atrás do plano das cartas. Mede, recua e MEDE DE NOVO — sem a segunda
+      // medida não se sabe se o recuo bastou, e era isso que faltava.
+      maos.medida = recuaAteSoOPolegarAparecer(maos.esq, -dist);
       // A DIREITA fica fora do quadro fora da sua vez: parada, ela só rouba a
       // faixa de leitura das cartas. Na sua vez, entra pela direita do leque.
-      if (minhaVez) encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escala * 0.38, 2.0);
-      else { maos.dir.position.set(larguraLeque, baseY - 2 * escala, -dist); maos.dir.scale.setScalar(escala * 0.38); }
+      if (minhaVez) {
+        encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escalaDaMao, 2.0);
+        recuaAteSoOPolegarAparecer(maos.dir, -dist);
+      } else { maos.dir.position.set(larguraLeque * 1.4, baseY - 2 * escala, -dist); maos.dir.scale.setScalar(escalaDaMao); }
     } else {
       // o desenho 2D de reserva: entra pela borda de baixo, nas pontas do leque
       const x = larguraLeque * .5 + .03;
@@ -2170,6 +2230,6 @@ if (!sessao) {
 }
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
-window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, abreVisor };
+window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, abreVisor, maos, encaixaNaPinca, medeAMao };
 
 // interface-2026-09-07-r1
