@@ -72,6 +72,8 @@ projeto-caçamba/
 | [`public/baralho.js`](public/baralho.js) | 33 | O mapa do baralho: qual arquivo é qual carta. Importado pelas duas mesas. |
 | [`scripts/baralho_gatos.py`](scripts/baralho_gatos.py) | 233 | Monta as 55 imagens do baralho a partir das folhas desenhadas: corta, tira a moldura impressa, manda pintar o naipe e embute o papel do jogo. |
 | [`scripts/naipe_vermelho.py`](scripts/naipe_vermelho.py) | 261 | Acha as massas de naipe numa carta de copas ou ouros por FORMA, já que a cor é a mesma do gato. |
+| [`scripts/mao_para_posar.py`](scripts/mao_para_posar.py) | 138 | Monta o `.blend` em que a mão de primeira pessoa é posada, e refaz os pesos do rig por difusão de calor (o conversor prendia metade da malha a um osso só). |
+| [`scripts/mao_pose_segura.py`](scripts/mao_pose_segura.py) | 330 | Acha a pose que segura a carta MEDINDO a malha deformada contra o plano dela, e grava o nó `PlanoDaCarta` que a mesa 3D usa para alinhar o leque. |
 | [`public/mesa3d.js`](public/mesa3d.js) | 2116 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`public/vendor/GLTFLoader.js`](public/vendor/GLTFLoader.js) · `BufferGeometryUtils.js` | — | O carregador glTF do three (r170, MIT), vendido com os imports apontados para o `three.module.js` local. Só a mesa 3D usa. |
@@ -585,9 +587,9 @@ O que ela desenha ([`public/mesa3d.js`](public/mesa3d.js)): o salão em neblina
 sentado em volta **segurando o leque de cartas viradas**, o monte como caixa
 com altura proporcional ao baralho, o descarte e os jogos baixados **em pé**
 sobre o feltro (a carta que cai gira no ar), a sua mão em leque com **as suas
-mãos segurando** — uma textura só, desenhada com os mesmos traços das mãos da
-mesa 2D e espelhada para o outro lado (`texturaMao2D`), no tom de pele do seu
-personagem. Reações (boca feliz/brava, pulo) respondem aos mesmos eventos da
+mãos segurando** — desde 08/09/2026 mãos de verdade, rigadas e posadas (logo
+abaixo); o desenho chapado da mesa 2D (`texturaMao2D`) ficou de reserva, para
+quando o `.glb` não carrega. Reações (boca feliz/brava, pulo) respondem aos mesmos eventos da
 mesa normal.
 
 **A câmera senta à mesa, inclinada sobre o tampo** (`encaixaTela`,
@@ -609,6 +611,83 @@ a ±38°, com cinco, os das pontas saíam do quadro (visto na tela); cabe porque
 as fileiras alternam o raio e na da frente sobram ~0,9 m entre vizinhos.
 Conferido na tela com cinco adversários: todos inteiros, dois arcos, nomes
 completos.
+
+### A sua mão em primeira pessoa (08/09/2026)
+
+A mão que segura o leque é um modelo rigado, e **vem posada do arquivo**
+(`public/models/mao-fp-esq.glb`). Não é escolha de gosto: é o único jeito de
+cumprir o que se pede à vista — **o polegar cruzando na frente das cartas e os
+outros quatro dedos fechados atrás** — de um jeito que dê para conferir por
+medida em vez de por opinião.
+
+**Por que não posar no jogo.** A primeira tentativa foi essa: o jogo procurava
+o eixo da pinça entre dois ossos, apontava esse eixo para a câmera e ADIVINHAVA
+o giro que sobrava. Daí saíram as duas queixas: "as mãos estão viradas ao
+contrário" e "a mão ainda atravessa o leque e não causa sensação nenhuma de que
+esteja pegando as cartas". Medindo, o motivo apareceu: na pose de dedos quase
+retos a ponta do polegar ficava **16,3 cm ATRÁS** do ponto mais avançado do
+resto da mão, e girar não mudava nada (o giro era em torno do eixo da
+profundidade, que preserva o z de todo vértice). Nenhum plano separava o
+polegar do resto porque **não havia folga entre eles**. Quem tinha de mudar era
+a pose.
+
+**O contrato.** O modelo traz um nó `PlanoDaCarta`: origem no centro da carta
+que a mão segura, **+Z na normal da palma** (o lado por onde o polegar cruza) e
+**+Y na direção em que a carta sobe**. `encaixaPeloPlano` resolve `M = A · P⁻¹`
+— se `P` é o plano no espaço da mão e `A` é onde a carta está na tela, a mão vai
+para `M`. Não sobra nenhum grau de liberdade para adivinhar. A carta do modelo
+tem a largura de uma carta de verdade na escala da mão, então o mesmo encaixe
+acerta tamanho, lugar e giro de uma vez.
+
+**A pose, e de onde sai cada número** (`scripts/mao_pose_segura.py`, que roda no
+Blender e mede a malha já deformada pelo esqueleto):
+
+* **o quadro** sai da própria mão: a normal é a do plano que melhor cabe nos
+  vértices da palma (SVD), virada para o lado em que o polegar vive; o "para
+  cima" é o eixo punho→nó do médio;
+* **quanto cada dedo fecha**: nem "até encostar" (para com 12°, mão ainda
+  espalmada) nem "até o polegar não cobrir mais" (não para nunca — vai ao punho
+  fechado). O que separa uma mão espalmada de uma mão que segura é para onde a
+  ponta do dedo aponta: reta, aponta AO LONGO da carta; enrolada, ATRAVÉS dela.
+  O ângulo reto entre as duas direções é o ponto de virada — **30° na base de
+  cada dedo, 95° somando as três falanges**;
+* **onde a carta fica**: na profundidade, encostada nos dedos mais **meia
+  espessura do leque** — 12 cartas (o motor distribui 12) de 0,3 mm sobre os
+  185 mm da mão; no plano, a borda de baixo na **linha dos nós**, que é onde o
+  canto do leque encosta na mão, e o leque subindo dali;
+* **o polegar** tem dois movimentos em eixos diferentes: *varrer* por cima da
+  palma até pousar sobre o retângulo da carta (no eixo de flexão gravado no
+  próprio osso pelo gerador do rig) e *levantar* o tanto de vencer a espessura
+  do leque. Usar um eixo só o deixava com cara de quebrado; e a rotação se
+  reparte pelas três juntas, porque 111° concentrados na base rasgavam a pele da
+  tenar.
+
+O relatório do script termina numa conta que é a mesma que o jogo faz:
+`polegar a frente 16/297 · resto a frente 0/1986`. `test/mao-fp-pose.test.js`
+refaz essa medida no arquivo entregue, porque as duas metades falham em
+silêncio — sem o nó, a mesa volta a adivinhar; sem a pose nos ossos, o modelo
+chega espalmado. (Exportar do Blender exige `export_rest_position_armature=False`:
+com o padrão, o glTF sai na posição de repouso.)
+
+**Os pesos do rig foram refeitos.** O conversor tinha pesado por proximidade:
+1.602 dos 2.283 vértices presos a UM osso com peso 1, e a costura entre polegar
+e palma num degrau seco de 0,5/0,5. Qualquer oposição do polegar abria ali uma
+aba de pele esticada — parecia defeito de pose e era do rig. A difusão de calor
+do Blender (`mao_para_posar.py`) reparte cada vértice entre os ossos que o
+alcançam: 1.602 → 739.
+
+**E o medidor do jogo estava errado.** `medeAMao` compunha o vértice com
+`getVertexPosition` e multiplicava pela `matrixWorld` — mas aquele método
+devolve no espaço do VÍNCULO, e o vínculo é capturado no carregamento, com a mão
+ainda fora do grupo. O erro crescia com a transformação da mão: meio metro de
+sobra, que o jogo "corrigia" empurrando a mão para trás. Hoje a posição é
+composta osso a osso (`posicaoDeformada`), a mesma conta que a GPU faz, e o
+recuo corretivo mede **0**.
+
+**A direita só entra para jogar**: fora da sua vez fica fora do quadro; na sua
+vez entra pela ponta direita do leque e em **pinça**, que é o gesto de quem vai
+pegar a carta. É ela quem o rig ainda comanda — a esquerda vem posada e o rig
+não a toca, senão a pose seria aplicada duas vezes.
 
 ### Ler os jogos baixados (08/09/2026)
 

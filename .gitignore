@@ -34,3 +34,8 @@ public/assets/personagens/elenco-teste-*.png
 # evidências do smoke de interface (o CI as sobe como artefato)
 molde-mao.png
 qa-interface/
+
+# molde e pose da mão de primeira pessoa: arquivos de trabalho do Blender,
+# refeitos pelos scripts (mao_para_posar.py / mao_pose_segura.py)
+mao-para-posar.blend*
+mao-posada.blend*

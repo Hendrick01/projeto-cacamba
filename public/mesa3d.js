@@ -1134,12 +1134,56 @@ function encaixaNaPinca(mao, lado, alvo, escala, inclina) {
   return true;
 }
 
+// ENCAIXA PELO CONTRATO. `PlanoDaCarta` é um nó gravado dentro do próprio
+// modelo (scripts/mao_pose_segura.py): a origem é o centro da carta que a mão
+// segura, o +Z é a normal da palma — o lado por onde o polegar cruza — e o +Y é
+// a direção em que a carta sobe. Alinhar a mão a ele é o que tira o palpite:
+// antes o jogo procurava um eixo de pinça entre dois ossos e ADIVINHAVA o giro
+// que sobrava, e era daí que saíam as mãos viradas ao contrário e furando o
+// leque. Aqui a conta é direta: se P é o plano no espaço da mão e A é onde a
+// carta está na tela, a mão vai para M = A · P⁻¹.
+const _mA = new THREE.Matrix4(), _mP = new THREE.Matrix4(), _qA = new THREE.Quaternion(), _eA = new THREE.Euler();
+const _escala = new THREE.Vector3();
+function encaixaPeloPlano(mao, alvo, giro, escala) {
+  const plano = mao.getObjectByName('PlanoDaCarta');
+  if (!plano) return false;
+  mao.position.set(0, 0, 0); mao.quaternion.identity(); mao.scale.setScalar(1);
+  mao.updateWorldMatrix(true, true);
+  _mP.copy(mao.parent.matrixWorld).invert().multiply(plano.matrixWorld);
+  _qA.setFromEuler(_eA.set(0, 0, giro));
+  _mA.compose(alvo, _qA, _escala.set(escala, escala, escala));   // vetor próprio: `alvo` costuma vir de um temporário
+  mao.matrix.copy(_mA.multiply(_mP.invert()));
+  mao.matrix.decompose(mao.position, mao.quaternion, mao.scale);
+  mao.updateWorldMatrix(true, true);
+  return true;
+}
+
 // MEDE a mão contra o plano das cartas, vértice a vértice, separando o polegar
 // do resto pelos pesos do esqueleto. Devolve o quanto o resto da mão precisa
 // RECUAR para ficar inteiro atrás das cartas, e quanto do polegar sobra à
 // frente depois disso. Sem estimativa: é a malha deformada de verdade
 // (`getVertexPosition` aplica o esqueleto) medida no espaço do grupo da mão.
-const _vm = new THREE.Vector3();
+const _vm = new THREE.Vector3(), _base = new THREE.Vector3(), _mOsso = new THREE.Matrix4(), _peso = new THREE.Vector3();
+// Compõe o vértice deformado À MÃO, pelos ossos. O `getVertexPosition` do
+// three.js devolve no espaço do BIND — e o bind foi capturado no carregamento,
+// com a mão ainda fora do grupo — então multiplicar o resultado pela
+// `matrixWorld` de agora dava um erro que crescia com a transformação da mão:
+// meio metro de sobra, que o jogo "corrigia" empurrando a mão para trás. Aqui a
+// conta é a mesma que a GPU faz, e não depende de quando o bind foi tirado.
+function posicaoDeformada(malha, i, alvo) {
+  const { bones, boneInverses } = malha.skeleton;
+  const idx = malha.geometry.attributes.skinIndex, peso = malha.geometry.attributes.skinWeight;
+  _base.fromBufferAttribute(malha.geometry.attributes.position, i);
+  alvo.set(0, 0, 0);
+  for (let k = 0; k < 4; k++) {
+    const w = peso.getComponent(i, k);
+    if (!w) continue;
+    const b = idx.getComponent(i, k);
+    _mOsso.multiplyMatrices(bones[b].matrixWorld, boneInverses[b]);
+    alvo.addScaledVector(_peso.copy(_base).applyMatrix4(_mOsso), w);
+  }
+  return alvo;
+}
 function medeAMao(mao, zCarta, passo = 2) {
   let malha = null; mao.traverse((o) => { if (o.isSkinnedMesh) malha = o; });
   if (!malha) return null;
@@ -1151,8 +1195,7 @@ function medeAMao(mao, zCarta, passo = 2) {
   mao.updateWorldMatrix(true, true);
   let recuo = -Infinity, polegarNaFrente = 0, restoNaFrente = 0, maisFundoDoPolegar = -Infinity, lidos = 0;
   for (let i = 0; i < pos.count; i += passo) {
-    malha.getVertexPosition(i, _vm);
-    const z = pai.worldToLocal(_vm.applyMatrix4(malha.matrixWorld)).z;
+    const z = pai.worldToLocal(posicaoDeformada(malha, i, _vm)).z;
     // de que osso é este vértice: o de maior peso
     let melhor = 0, pesoMax = -1;
     for (let k = 0; k < 4; k++) {
@@ -1236,8 +1279,12 @@ function sincronizaMaos() {
     // o rig vê as duas mãos de uma vez: os ossos se chamam Left*/Right*
     maos.rig = criaRigPrimeiraPessoa(maoGrupo);
     if (maos.rig) {
-      // a esquerda sustenta o leque; a direita fica de fora até haver ação
-      definePosePrimeiraPessoa(maos.rig, 'Left', 'leque');
+      // A ESQUERDA SAI POSADA DO ARQUIVO e o rig não a toca: a pose foi medida
+      // em scripts/mao_pose_segura.py (dedos enrolados 95 graus somando as três
+      // falanges, polegar cruzando à frente) e `atualizaRigPrimeiraPessoa`
+      // escreve `base × pose` em cada junta — aplicar `leque` por cima dobraria
+      // tudo duas vezes. A direita continua no rig, que é ela quem gesticula.
+      maos.rig.Left = null;
       definePosePrimeiraPessoa(maos.rig, 'Right', 'repouso');
       atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);
     }
@@ -1298,7 +1345,14 @@ function sincronizaMao() {
       // aqui a mão media 1,1 largura de carta: um terço do tamanho.
       const escalaDaMao = 2.94 * CARTA_L * escala;
       const pinca = new THREE.Vector3(-.045, baseY + CARTA_A * escala * 0.16, -dist);
-      encaixaNaPinca(maos.esq, 'Left', pinca, escalaDaMao, 1.15);
+      // a esquerda segura a carta da PONTA do leque, e é o contrato do modelo
+      // que diz como: a carta do modelo tem a mesma largura da carta da tela
+      // (0,341 de mão × 2,94 larguras = 1 largura de carta), então encaixar o
+      // plano no lugar da carta põe a mão no tamanho e no ângulo certos de uma
+      // vez. Sem o nó no arquivo, cai no encaixe antigo, por pinça.
+      const daPonta = plano.posicoes[0];
+      if (!encaixaPeloPlano(maos.esq, _v1.set(daPonta.x, daPonta.y, daPonta.z), daPonta.giro, escalaDaMao))
+        encaixaNaPinca(maos.esq, 'Left', pinca, escalaDaMao, 1.15);
       // e recua o que a MEDIÇÃO pedir: tudo que não é polegar tem de ficar
       // atrás do plano das cartas. Mede, recua e MEDE DE NOVO — sem a segunda
       // medida não se sabe se o recuo bastou, e era isso que faltava.
@@ -1306,9 +1360,18 @@ function sincronizaMao() {
       // A DIREITA fica fora do quadro fora da sua vez: parada, ela só rouba a
       // faixa de leitura das cartas. Na sua vez, entra pela direita do leque.
       if (minhaVez) {
+        // e entra em PINÇA, não espalmada: ela existe para pegar a carta, então
+        // é essa a mão que o rig ainda comanda (a esquerda vem posada do
+        // arquivo). Sem laço por quadro, a troca é imediata.
+        definePosePrimeiraPessoa(maos.rig, 'Right', 'pinca');
+        atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);
         encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escalaDaMao, 2.0);
         recuaAteSoOPolegarAparecer(maos.dir, -dist);
-      } else { maos.dir.position.set(larguraLeque * 1.4, baseY - 2 * escala, -dist); maos.dir.scale.setScalar(escalaDaMao); }
+      } else {
+        definePosePrimeiraPessoa(maos.rig, 'Right', 'repouso');
+        atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);
+        maos.dir.position.set(larguraLeque * 1.4, baseY - 2 * escala, -dist); maos.dir.scale.setScalar(escalaDaMao);
+      }
     } else {
       // o desenho 2D de reserva: entra pela borda de baixo, nas pontas do leque
       const x = larguraLeque * .5 + .03;
