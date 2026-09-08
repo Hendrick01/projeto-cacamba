@@ -101,12 +101,16 @@ test('encaixe em sequência: só nas pontas, sem passar do ás', () => {
   assert.ok(layoffOption(c('10', '♦'), topMeld));
 });
 
-test('encaixe em trinca: mesmo valor, naipe repetido inclusive', () => {
+test('encaixe em trinca: mesmo valor e só naipe que já está no jogo', () => {
   const meld = { id: 3, type: 't', rank: 9, cards: [c('9', '♠'), c('9', '♥'), c('9', '♦')], ownerId: 'x' };
-  assert.ok(layoffOption(c('9', '♣'), meld), 'naipe que falta');
-  assert.ok(layoffOption(c('9', '♠'), meld), 'naipe repetido também dá continuidade');
+  assert.equal(layoffOption(c('9', '♣'), meld), null, 'naipe de fora não entra');
+  assert.ok(layoffOption(c('9', '♠'), meld), 'naipe repetido dá continuidade');
+  assert.ok(layoffOption(c('9', '♥'), meld) && layoffOption(c('9', '♦'), meld), 'os três naipes do jogo valem');
   assert.equal(layoffOption(c('8', '♠'), meld), null, 'valor diferente, não');
   assert.equal(layoffOption(J(), meld), null, 'coringa não entra em trinca');
+  // sem limite de adições: a quarta e a quinta carta continuam entrando
+  meld.cards.push(c('9', '♠'), c('9', '♥'));
+  assert.ok(layoffOption(c('9', '♦'), meld), 'não há teto de cartas na trinca');
   // Quem exige naipes diferentes é a FORMAÇÃO da trinca, não o encaixe
   assert.equal(findContractMelds([c('9', '♠'), c('9', '♥'), c('9', '♥')], 1, 0), null);
 });
@@ -506,7 +510,8 @@ test('descartar de um jogo com sobra em vez da mão', () => {
   const state = freshGame();
   const p = state.players[state.turn];
   actDraw(state, p.id, 'deck');
-  p.hand = [c('7', '♠'), c('7', '♥'), c('7', '♦'), c('Q', '♠'), c('Q', '♥'), c('Q', '♣'), c('7', '♣'), c('9', '♦')];
+  // o 7 extra repete um naipe do jogo: naipe de fora não encaixa mais em trinca
+  p.hand = [c('7', '♠'), c('7', '♥'), c('7', '♦'), c('Q', '♠'), c('Q', '♥'), c('Q', '♣'), c('7', '♠'), c('9', '♦')];
   actBaixar(state, p.id, p.hand.slice(0, 6).map((x) => x.id));
   const meld = p.melds.find((m) => m.rank === 7);
   actLayoff(state, p.id, p.hand.find((x) => x.rank === 7).id, meld.id); // trinca vira 4 cartas
@@ -648,8 +653,8 @@ test('encaixe vale antes do contrato, mas não pode encurtar a mão até bater',
     cards: [c('5', '♠'), c('5', '♥'), c('5', '♦')],
   }];
 
-  // Sem ter baixado nada, o encaixe agora vale
-  a.hand = [c('5', '♣'), c('2', '♥'), c('9', '♦'), c('J', '♠')];
+  // Sem ter baixado nada, o encaixe agora vale (naipe que já está na trinca)
+  a.hand = [c('5', '♥'), c('2', '♥'), c('9', '♦'), c('J', '♠')];
   assert.equal(a.baixou, false);
   const ev = actLayoff(state, a.id, a.hand[0].id, 8001);
   assert.equal(ev[0].e, 'layoff');
@@ -661,7 +666,7 @@ test('encaixe vale antes do contrato, mas não pode encurtar a mão até bater',
     id: 8002, type: 't', rank: 9, ownerId: b.id,
     cards: [c('9', '♠'), c('9', '♥'), c('9', '♣')],
   });
-  a.hand = [c('9', '♦'), c('2', '♥')];
+  a.hand = [c('9', '♥'), c('2', '♥')];
   assert.throws(() => actLayoff(state, a.id, a.hand[0].id, 8002), /Guarde pelo menos duas cartas/);
   assert.equal(a.hand.length, 2);
 });

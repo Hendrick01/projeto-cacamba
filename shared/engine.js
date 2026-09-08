@@ -343,9 +343,10 @@ export function layoffOption(card, meld, coringasRemovidos = 0, preferredEnd = n
   if (meld.type === 't') {
     // Trinca é só com carta real: o coringa vale apenas para sequência.
     if (isJoker(card) || card.rank !== meld.rank) return null;
-    // Naipe repetido vale. Quem exige naipes diferentes é a FORMAÇÃO da trinca
-    // (regra do contrato); dar continuidade a uma que já está na mesa é outra
-    // coisa — numa trinca Q♠ Q♦ Q♣ entra outro Q♣.
+    // Só naipe que JÁ compõe a trinca (regra do usuário, 2026-09-07): numa
+    // trinca de copas, espadas e ouros entra outra de copas, espadas ou ouros —
+    // nunca a de paus, que é naipe de fora. Repetir naipe pode, sem limite.
+    if (!meld.cards.some((c) => c.suit === card.suit)) return null;
     return { kind: 't' };
   }
   const lo = meld.values[0];

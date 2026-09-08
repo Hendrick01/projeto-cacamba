@@ -101,3 +101,42 @@ body.ui-3d .action-3d { bottom:calc(var(--hand-height,160px) + 14px)!important; 
 }
 @media(max-width:360px){.ui-top-right [data-connection]{display:none;}.ui-hero h1{font-size:2.7rem;}.ui-stats{gap:12px;}#screen-game .topbar{flex-wrap:wrap;}#screen-game .topbar-btns{margin-left:auto;}}
 @media(prefers-reduced-motion:reduce){.ui-shell *,#screen-game .hand .card{animation:none!important;transition:none!important;}}
+
+/* ---------------------------------------------------------------------------
+   Cara do muquifão — a Home veste o mesmo boteco da mesa 3D: faixa de azulejo
+   na parede, o nome do jogo num cartaz pintado à mão (como o "CERVEJA GELADA"
+   da geladeira) e o piso xadrez aparecendo atrás da mesa. Tudo em CSS: nenhum
+   arquivo novo, nada de fora.
+--------------------------------------------------------------------------- */
+#screen-home .ui-shell::before {
+  content:'';position:absolute;left:-40px;right:-40px;top:64px;height:22px;pointer-events:none;opacity:.55;
+  background:
+    repeating-linear-gradient(135deg,#1d4f74 0 8px,#0000 8px 16px),
+    repeating-linear-gradient(45deg,#1d4f74 0 8px,#0000 8px 16px),
+    linear-gradient(#efe3c6,#d8c7a1);
+  border-top:1px solid #0004;border-bottom:1px solid #0004;
+}
+#screen-home .ui-hero h1 {
+  display:inline-block;position:relative;margin-top:6px;padding:.3em .55em .36em;
+  background:linear-gradient(158deg,#22452f,#15302a 70%);
+  border:2px solid var(--ui-gold);border-radius:16px;transform:rotate(-1.1deg);
+  box-shadow:0 16px 34px #0007,inset 0 1px #ffffff1a;
+}
+#screen-home .ui-hero h1::after {
+  content:'';position:absolute;inset:7px;border:1px dashed #f6cc7859;border-radius:10px;pointer-events:none;
+}
+#screen-home .ui-eyebrow::before { content:'★ ';color:var(--ui-gold); }
+#screen-home .ui-stage {
+  background:
+    linear-gradient(#12322a 0 52%,#12322a00 84%),
+    repeating-conic-gradient(#8d4231 0 25%,#e6d6b6 0 50%) bottom left/36px 36px;
+  border-radius:0 0 18px 18px;
+}
+#screen-home .ui-stage::after { content:'CAÇAMBA · TODA SEXTA NO MUQUIFÃO'; }
+@media(max-width:900px){
+  #screen-home .ui-shell::before { top:58px;height:16px; }
+  #screen-home .ui-hero h1 { transform:none;padding:.26em .42em .3em;border-radius:13px; }
+  /* no celular o palco vira uma figura solta ao lado do texto: sem o piso, que
+     ali viraria um retângulo por cima das palavras */
+  #screen-home .ui-stage { background:none;border-radius:0; }
+}
