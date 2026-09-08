@@ -17,3 +17,15 @@ Thumbs.db
 *.swp
 __pycache__/
 *.pyc
+
+# Rasterizações do elenco: são DERIVADAS do SVG, saem em um comando
+# (`python3 public/assets/personagens/_geradores/rasterizar.py <nome>` ou
+# `--elenco`) e o jogo nunca as pede — ele usa o SVG. Ficavam 10,7 MB no
+# repositório e em todo deploy. As folhas de EVIDÊNCIA que o README cita
+# (`-previa`, `-teste-oculos`, `-teste-barba`…) não saem de script nenhum e
+# continuam versionadas.
+public/assets/personagens/*@[123]x.png
+public/assets/personagens/*-256.png
+public/assets/personagens/*-teste-tamanho-pequeno.png
+public/assets/personagens/elenco-*personagens.png
+public/assets/personagens/elenco-teste-*.png

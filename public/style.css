@@ -886,12 +886,16 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
   pointer-events: none;
 }
 
-.card.mini { width: 30px; height: 42px; border-radius: 5px; box-shadow: 0 3px 7px -2px rgba(0, 0, 0, 0.7); }
-.card.mini .idx { font-size: 0.62rem; top: 2px; left: 3px; }
-/* 30x42 não comporta três marcas, e nos jogos baixados as minis ainda se
+/* A mini cresceu de 30x42 para 42x58 (08/09/2026): a 30 px o índice do canto
+   ficava com 10 px e os jogos da mesa eram uma tira de manchas — "na visão
+   menor ainda não foi feito", disse o usuário depois de a mesa 3D ganhar
+   leitura. É a mesma conta de lá: o que precisa aparecer é o índice. */
+.card.mini { width: 42px; height: 58px; border-radius: 6px; box-shadow: 0 3px 7px -2px rgba(0, 0, 0, 0.7); }
+.card.mini .idx { font-size: 0.82rem; top: 2px; left: 4px; }
+/* Nem a mini maior comporta três marcas, e nos jogos baixados elas ainda se
    sobrepõem: fica o canto de cima e o naipe do meio, e o canto espelhado sai. */
 .card.mini .idx:last-child { display: none; }
-.card.mini .pip { width: 40%; height: 40%; }
+.card.mini .pip { width: 42%; height: 42%; }
 
 /* Meus jogos na mesa */
 
@@ -902,9 +906,14 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
   overflow-x: auto; min-height: 10px;
   scroll-snap-type: x proximity;
 }
+/* Cada jogador é um BLOCO com a barra da sua cor à esquerda — a mesma leitura
+   do visor da mesa 3D. Com quatro pessoas baixadas, sem ela os jogos viravam
+   uma fileira só e não dava para dizer de quem era cada um. */
 .grupo-jogos {
   display: flex; flex-direction: column; gap: 3px;
   flex-shrink: 0; scroll-snap-align: start;
+  border-left: 3px solid var(--anel, var(--sage));
+  padding-left: 7px;
 }
 .grupo-jogos .dono {
   font-size: 0.62rem; font-weight: 900;
@@ -921,7 +930,7 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
   border-top-color: rgba(242, 193, 78, 0.22);
   flex-shrink: 0;
 }
-.meld .card.mini { margin-left: -12px; }
+.meld .card.mini { margin-left: -16px; }
 .meld .card.mini:first-child { margin-left: 0; }
 .meld.droppable { border-color: var(--gold); box-shadow: 0 0 10px rgba(233, 185, 78, 0.4); cursor: pointer; }
 

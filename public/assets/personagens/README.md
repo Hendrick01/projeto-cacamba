@@ -783,6 +783,18 @@ talho da saia dela justifica existir.
 
 ## 11 · Arquivos
 
+**O que é versionado e o que é derivado.** Só os **SVG** (os masters) e as
+folhas de **evidência** que este README cita ficam no repositório. Toda
+rasterização — `@1x/@2x/@3x`, `-256`, `-teste-tamanho-pequeno` e as folhas de
+conjunto do elenco — sai do SVG em um comando e está no `.gitignore` desde
+08/09/2026: eram 10,7 MB parados no repositório e em todo deploy, e o jogo
+nunca as pede (ele usa o SVG). Para tê-las de volta na sua máquina:
+
+```bash
+python3 _geradores/rasterizar.py <nome>     # os PNGs de uma personagem
+python3 _geradores/rasterizar.py --elenco   # as folhas de conjunto
+```
+
 Para cada personagem:
 
 ```
@@ -796,6 +808,9 @@ Para cada personagem:
 <nome>-previa.png                    folha de decisões e testes
 <nome>-teste-tamanho-pequeno.png     figura em 64/96/128/192/288 px
 ```
+
+Dos que estão nessa lista, só os `.svg` e o `-previa.png` estão no repositório;
+o resto é gerado (veja acima).
 
 Closes: `gabizinsky-anel.svg`, `matheus-pulso.svg`, `mafra-kitty-estampa.svg`,
 `junior-cristal.svg`, `lyly-piercing.svg`, `mufasa-prata.svg` (os quatro últimos
