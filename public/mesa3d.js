@@ -1130,7 +1130,7 @@ function sincronizaMao() {
     // usuário, 08/09/2026). No tamanho de antes elas ficavam penduradas nas
     // pontas do leque, cortadas no punho, e não liam como as SUAS mãos — liam
     // como duas mãos de boneco soltas no ar.
-    const x = larguraLeque * .5 - (maos.tridi ? .01 : -.03);
+    const x = larguraLeque * .5 + (maos.tridi ? .06 : .03);
     maos.esq.position.set(-x,baseY - .24 * escala,-dist - .03);
     maos.dir.position.set(x,baseY - .24 * escala,-dist - .03);
     if (maos.tridi) {
@@ -1142,7 +1142,7 @@ function sincronizaMao() {
       maos.esq.scale.setScalar(escala * 3.1); maos.dir.scale.setScalar(escala * 3.1);
       // a origem do recorte é a PINÇA (perto das pontas dos dedos) e a mão
       // desce dali para o punho — que agora, do tamanho certo, sai pela borda
-      maos.esq.position.y += .02 * escala; maos.dir.position.y += .02 * escala;
+      maos.esq.position.y += .16 * escala; maos.dir.position.y += .16 * escala;
     } else {
       maos.esq.rotation.z = -.42; maos.dir.rotation.z = .42;
       maos.esq.scale.set(-escala,escala,1); maos.dir.scale.set(escala,escala,1);
