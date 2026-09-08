@@ -239,48 +239,6 @@ function texturaMadeira(repeticoes) {
 
 scene.add(criaMesa());
 
-// vidro barato, compartilhado pelo copo e pelos copinhos de cada assento
-const materialVidro = new THREE.MeshStandardMaterial({
-  color: 0xdfe8e6, transparent: true, opacity: 0.32, roughness: 0.12, metalness: 0.08, side: THREE.DoubleSide, depthWrite: false,
-});
-
-// Objetos de escala no tampo: sem eles as cartas flutuam num campo verde —
-// é o copo que diz o tamanho da carta (referência: os copinhos e fichas do
-// Capote). Ficam ATRÁS das pilhas, um de cada lado: em pé a meia-abertura
-// horizontal da câmera é ~20°, e na beirada lateral (±1,5 m) saíam do quadro —
-// a ±1 m e −1 m de profundidade cabem, e ficam fora do caminho dos jogos
-// baixados, que ocupam a faixa entre −0,8 e +0,6. Vidro barato:
-// sem passe de transmissão, que pesa em celular; a transparência simples e o
-// dedo de bebida âmbar dentro bastam para ler como copo.
-{
-  const objetos = new THREE.Group();
-  const cortica = new THREE.MeshStandardMaterial({ color: 0xa8865a, roughness: 0.92, metalness: 0 });
-  const portaCopos = (x, z) => {
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.008, 24), cortica);
-    m.position.set(x, MESA_TOPO + 0.004, z);
-    m.castShadow = true; m.receiveShadow = true;
-    objetos.add(m);
-    return m;
-  };
-  portaCopos(0.55, -0.55);
-  portaCopos(-0.55, -0.55);
-  const vidro = materialVidro;
-  const copo = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.044, 0.13, 20, 1, true), vidro);
-  copo.position.set(0.55, MESA_TOPO + 0.008 + 0.065, -0.55);
-  copo.castShadow = true;
-  const fundoCopo = new THREE.Mesh(new THREE.CircleGeometry(0.044, 20), vidro);
-  fundoCopo.rotation.x = -Math.PI / 2;
-  fundoCopo.position.set(0.55, MESA_TOPO + 0.009, -0.55);
-  const bebida = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.047, 0.042, 0.045, 20),
-    new THREE.MeshStandardMaterial({ color: 0xc9822a, transparent: true, opacity: 0.9, roughness: 0.25, metalness: 0 }),
-  );
-  bebida.position.set(0.55, MESA_TOPO + 0.009 + 0.0225, -0.55);
-  bebida.castShadow = true;
-  objetos.add(copo, fundoCopo, bebida);
-  scene.add(objetos);
-}
-
 // ---------------------------------------------------------------------------
 // Texturas desenhadas: cartas, rótulos
 // ---------------------------------------------------------------------------
@@ -957,18 +915,13 @@ function criaAssento(p) {
   estado.visible = false;
   grupo.add(estado);
 
-  // copinhos de bar no tampo, à direita de cada um (referência do Capote), e
-  // o foco da vez no TAMPO, na frente da cadeira (no chão ficaria escondido
-  // sob a mesa). Os dois ficam num grupo próprio, na CENA, preso à beirada do
-  // feltro na direção da cadeira (a sincronia o põe lá): dentro do grupo do
-  // assento eles herdariam a escala 0,8 do boneco de reserva e afundariam no
-  // tampo enquanto o modelo não chega.
+  // O foco da vez no TAMPO, na frente da cadeira (no chão ficaria escondido
+  // sob a mesa). Fica num grupo próprio, na CENA, preso à beirada do feltro na
+  // direção da cadeira (a sincronia o põe lá): dentro do grupo do assento ele
+  // herdaria a escala 0,8 do boneco de reserva e afundaria no tampo enquanto o
+  // modelo não chega. Os copinhos de dose que ficavam ao lado saíram
+  // (decisão do usuário, 08/09/2026): eram vidro seco na frente dos jogos.
   const naBeirada = new THREE.Group();
-  for (const [cx, cz] of [[0.3, 0.12], [0.38, 0.2]]) {
-    const copinho = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.06, 12, 1, true), materialVidro);
-    copinho.position.set(cx, MESA_TOPO + 0.03, cz);
-    naBeirada.add(copinho);
-  }
   const focoVez = new THREE.Mesh(
     new THREE.CircleGeometry(0.24, 24),
     new THREE.MeshBasicMaterial({ color: 0xf2c14e, transparent: true, opacity: 0, depthWrite: false }),
@@ -1050,6 +1003,48 @@ const descarte = (() => {
 
 const jogosNaMesa = new THREE.Group();
 scene.add(jogosNaMesa);
+
+// ---------------------------------------------------------------------------
+// Os enfeites do tampo: o copo e o pod da casa, esculpidos e com a marca do
+// jogo (arquivos do usuário, 08/09/2026, no lugar do copo de cerveja de
+// cilindro e dos copinhos de dose secos). Eles seguem servindo de ESCALA — sem
+// um objeto de tamanho conhecido no feltro as cartas flutuam num campo verde —
+// mas agora sem custar visão: moram no aro DE TRÁS, a 1,02 m do centro, atrás
+// de tudo o que se lê na mesa. O monte e o descarte estão no meio e o anel dos
+// jogos chega no máximo a 0,92 m; quem está mais longe da câmera nunca tapa
+// quem está na frente, e a folga ainda deixa a fileira mais externa livre. O
+// copo antigo ficava a 0,78 m — em cima da fileira da frente dos jogos.
+// Se o arquivo não carregar, a mesa segue sem eles.
+// ---------------------------------------------------------------------------
+{
+  const RAIO_ENFEITE = 1.02;
+  const cortica = new THREE.MeshStandardMaterial({ color: 0xa8865a, roughness: 0.92, metalness: 0 });
+  const enfeites = [
+    { arquivo: 'copo', ang: -0.60, giro: 0.5, sombra: 0.2, portaCopos: true },
+    { arquivo: 'pod', ang: 0.52, giro: -0.75, sombra: 0.1, portaCopos: false },
+  ];
+  for (const e of enfeites) {
+    const x = Math.sin(e.ang) * RAIO_ENFEITE;
+    const z = -Math.cos(e.ang) * RAIO_ENFEITE;
+    const base = sombraDeContato(e.sombra, e.sombra * 0.8);
+    base.position.x = x; base.position.z = z;
+    scene.add(base);
+    if (e.portaCopos) {
+      const disco = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.008, 24), cortica);
+      disco.position.set(x, MESA_TOPO + 0.004, z);
+      disco.castShadow = true; disco.receiveShadow = true;
+      scene.add(disco);
+    }
+    carregadorGLTF.load(`/models/${e.arquivo}.glb`, (gltf) => {
+      const obj = gltf.scene;
+      // vêm preparados em metros, apoiados no zero (scripts/prepara_enfeite.py)
+      obj.position.set(x, MESA_TOPO + (e.portaCopos ? 0.008 : 0.001), z);
+      obj.rotation.y = e.giro;
+      obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      scene.add(obj);
+    }, undefined, () => { /* sem enfeite, a mesa continua */ });
+  }
+}
 
 // O sinal da SUA vez, no tampo: o mesmo disco âmbar que pulsa embaixo do
 // adversário da vez, aqui na sua beirada do feltro. Antes a sua vez era só o
@@ -1184,8 +1179,13 @@ function poeAMao(lado, objeto) {
   // sólido de verdade: profundidade LIGADA (o passe da mão tem z-buffer próprio).
   // A malha chapada do desenho continua sem escrever profundidade, que é o que
   // um plano transparente quer.
-  objeto.traverse((o) => { if (o.isMesh) { o.material.depthTest = true; o.material.depthWrite = !o.material.transparent; o.renderOrder = 19; } });
-  objeto.renderOrder = 19;
+  // A mão fica POR CIMA do leque (renderOrder acima do das cartas): na
+  // referência os dedos passam à frente das cartas, e é isso que faz o leque
+  // parecer segurado em vez de colado na tela. Sólido de verdade: profundidade
+  // LIGADA (o passe da mão tem z-buffer próprio); a malha chapada do desenho
+  // continua sem escrever profundidade, que é o que um plano transparente quer.
+  objeto.traverse((o) => { if (o.isMesh) { o.material.depthTest = true; o.material.depthWrite = !o.material.transparent; o.renderOrder = 200; } });
+  objeto.renderOrder = 200;
   maos[lado] = objeto;
   maoGrupo.add(objeto);
 }
@@ -1266,7 +1266,10 @@ function sincronizaMao() {
     // As mãos ficam PARA FORA das pontas do leque: é a única faixa livre — as
     // cartas são desenhadas por cima delas, e trazê-las para dentro do leque
     // (tentativa de 07/09) só as escondia atrás das cartas.
-    const x = larguraLeque * .5 + .03;
+    // Elas entram um pouco POR DENTRO da ponta do leque: os dedos cobrem a
+    // beirada da última carta, como quem segura. Para fora, ficavam soltas no
+    // canto — e em pé, metade delas saía do quadro.
+    const x = larguraLeque * .5 - (maos.tridi ? .02 : -.03);
     maos.esq.position.set(-x,baseY - .24 * escala,-dist - .03);
     maos.dir.position.set(x,baseY - .24 * escala,-dist - .03);
     if (maos.tridi) {
@@ -1278,7 +1281,7 @@ function sincronizaMao() {
       maos.esq.scale.setScalar(escala * 1.7); maos.dir.scale.setScalar(escala * 1.7);
       // a origem do recorte é a PINÇA (perto das pontas dos dedos) e a mão
       // desce dali para o punho: sem subir, só o pulso aparecia na borda
-      maos.esq.position.y += .30 * escala; maos.dir.position.y += .30 * escala;
+      maos.esq.position.y += .12 * escala; maos.dir.position.y += .12 * escala;
     } else {
       maos.esq.rotation.z = -.42; maos.dir.rotation.z = .42;
       maos.esq.scale.set(-escala,escala,1); maos.dir.scale.set(escala,escala,1);
@@ -1573,7 +1576,13 @@ async function sincroniza(primeira) {
       // borda. Antes ficavam onde caíssem da posição do assento, e o monte
       // se enfiava no meio deles.
       const fundo = !meu && outros.length > 4 && idx % 2 === 1;
-      const raioJogos = meu ? 0.72 : fundo ? 0.52 : 0.78;
+      // Os SEUS jogos vêm bem para dentro (0,40 e não 0,72). Na sua beirada
+      // eles caíam no rodapé da tela — justo a faixa onde mora o seu leque —,
+      // e numa janela deitada a mão em primeira pessoa tapava o que você mesmo
+      // tinha baixado (queixa do usuário, 08/09/2026). A 0,40 m eles sobem
+      // acima da mão e ainda param a 14 cm do monte e do descarte, que ocupam
+      // até 0,16 m do centro.
+      const raioJogos = meu ? 0.40 : fundo ? 0.52 : 0.78;
       frente.position.set(Math.sin(pos.ang) * raioJogos, MESA_TOPO, -Math.cos(pos.ang) * raioJogos);
       frente.rotation.y = -pos.ang;
 

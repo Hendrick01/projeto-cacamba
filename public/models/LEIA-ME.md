@@ -278,10 +278,26 @@ python3 scripts/mao_primeira_pessoa.py public/models/<slug>.glb public/models/<s
 O recorte cresce pela **superfície** a partir do nó `MaoEsq`/`MaoDir` (pelo ar
 não serve: a outra mão está a 10 cm e o peito a 20) e é limitado a 11,5 cm em
 linha reta, que é o tamanho de uma mão — nas esculturas em que as duas mãos se
-tocam, a superfície passa de uma para a outra. Sai um `.glb` de 35 a 95 kB com
-os nós `Esq` e `Dir`, sem textura: a cor de cada vértice é lida do mapa e
-gravada em `COLOR_0`, porque o atlas do gerador espalha os triângulos da mão
-pelo mapa inteiro e não haveria o que recortar.
+tocam, a superfície passa de uma para a outra. Depois vêm dois acabamentos, sem
+os quais a mão sai **falhada**:
+
+- **aparo**: caem as farpas (triângulos com duas arestas livres) e mais dois
+  anéis a partir da borda. O corte é uma esfera em volta da pinça e atravessa o
+  punho de viés, deixando uma tira fina de antebraço que o refino vira uma
+  língua pendurada;
+- **refino** (subdivisão de Loop, `--refino`): a mão herda ~800 triângulos de um
+  corpo decimado a 32 mil e, do tamanho que aparece na tela, isso lê como
+  origami. Cada passo multiplica por quatro e aproxima a superfície limite; o
+  script para em 5.000 triângulos por mão, então quem já veio denso não refina.
+
+Sai um `.glb` de 60 a 160 kB com os nós `Esq` e `Dir`, sem textura: a cor de
+cada vértice é lida do mapa e gravada em `COLOR_0`, porque o atlas do gerador
+espalha os triângulos da mão pelo mapa inteiro e não haveria o que recortar.
+
+As mãos entram um pouco por DENTRO da ponta do leque e são desenhadas POR CIMA
+das cartas (`renderOrder` acima do delas): os dedos cobrem a beirada da última
+carta, como quem segura o leque. Para fora ficavam soltas no canto, e em pé
+metade saía do quadro.
 
 Sem esse arquivo a mesa usa o desenho 2D chapado de antes. **A mesa desenha a
 sua mão num segundo passe, com o z-buffer limpo**: ela está a 1,3 m do olho e a

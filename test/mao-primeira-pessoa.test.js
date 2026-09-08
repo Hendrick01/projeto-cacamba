@@ -15,7 +15,7 @@ for (const slug of ELENCO) {
   test(`${slug}: as duas mãos da primeira pessoa`, async () => {
     const caminho = new URL(`../public/models/${slug}-maos.glb`, import.meta.url);
     assert.ok(fs.existsSync(caminho), 'falta o arquivo — rode scripts/mao_primeira_pessoa.py');
-    assert.ok(fs.statSync(caminho).size < 220 * 1024, `${(fs.statSync(caminho).size / 1024).toFixed(0)} kB: pesado para carregar junto com a partida`);
+    assert.ok(fs.statSync(caminho).size < 280 * 1024, `${(fs.statSync(caminho).size / 1024).toFixed(0)} kB: pesado para carregar junto com a partida`);
 
     const gltf = await carregaCPU(`${slug}-maos`);
     for (const nome of ['Esq', 'Dir']) {
@@ -25,7 +25,7 @@ for (const slug of ELENCO) {
       assert.ok(g.attributes.color, 'sem COLOR_0: a mão sairia branca');
       assert.ok(g.attributes.normal, 'sem NORMAL: a mão sairia facetada');
       const tri = g.index.count / 3;
-      assert.ok(tri > 200 && tri < 4000, `${tri} triângulos`);
+      assert.ok(tri > 900 && tri < 5000, `${tri} triângulos`);
       // tamanho de mão, e a origem no ponto da pinça (é por ela que a mesa a
       // encosta na ponta do leque), com a palma para baixo dela
       const c = new T.Box3().setFromObject(o).getSize(new T.Vector3());

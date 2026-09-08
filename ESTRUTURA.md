@@ -836,6 +836,13 @@ com os nós `Esq`/`Dir`, 35 a 95 kB, sem textura: a cor vai em `COLOR_0`, porque
 o atlas do gerador espalha os triângulos da mão pelo mapa inteiro. Só o arquivo
 do SEU personagem é baixado; sem ele, o desenho continua sendo o reserva.
 
+O primeiro recorte saiu **falhado**: a mão herdava ~800 triângulos de um corpo
+decimado a 32 mil e lia como origami, com uma língua pendurada onde a esfera do
+corte atravessava o punho de viés. O script ganhou dois acabamentos — aparo das
+farpas mais dois anéis de erosão da borda, e refino por subdivisão de Loop até
+5.000 triângulos por mão (quem já veio denso não refina). Os arquivos foram de
+35–95 kB para 60–160 kB, o que é pouco ao lado de 1,7 MB por adversário.
+
 Isso obrigou a mudar o desenho: **a mão virou um segundo passe**. Ela está a
 1,3 m do olho e a beirada do tampo a 48 cm, então pelo mundo a mesa passaria na
 frente das cartas; antes isso se resolvia com `depthTest: false`, que serve a
@@ -846,11 +853,13 @@ uma mão encostada na câmera), que é desenhada depois do mundo com
 `clearDepth()`. Ela deixou de ser filha da câmera, então `segueACamera()` copia
 a posição e a rotação a cada quadro — e antes de cada raio de toque.
 
-As mãos ficam PARA FORA das pontas do leque: é a única faixa livre, já que as
-cartas são desenhadas por cima delas. Trazê-las para dentro (tentativa do mesmo
-dia) só as escondia atrás das cartas. Para a mão aparecer como na referência —
-apoiada na mesa, segurando as cartas — o leque teria de encolher e sair da
-faixa de baixo, o que é mudança de `layoutMao3D` (`interface-core.js`).
+As mãos entram 2 cm por DENTRO da ponta do leque e são desenhadas POR CIMA das
+cartas (`renderOrder` 200, acima do 100+i delas): os dedos cobrem a beirada da
+última carta, como quem segura o leque. Para fora — a primeira tentativa —
+ficavam soltas no canto e, em pé, metade saía do quadro; para dentro demais,
+tampavam os naipes. Para a mão aparecer como na referência — apoiada na mesa,
+segurando as cartas de baixo — o leque teria de encolher e sair da faixa de
+baixo, o que é mudança de `layoutMao3D` (`interface-core.js`).
 
 Da mesma referência veio a **placa de estado** sobre a cabeça: acima do nome,
 diz JOGANDO (âmbar) ou PRÓXIMO, e por 1,8 s o verbo do lance de quem acabou de
