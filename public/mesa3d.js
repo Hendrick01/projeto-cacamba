@@ -26,7 +26,6 @@ import { planBaixada, isJoker, cardLabel, layoffOption, layoffEnds } from '/shar
 import { personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
 import { layoutMao3D, indiceInsercao3D } from '/interface-core.js';
-import { criaRigPrimeiraPessoa, definePosePrimeiraPessoa, atualizaRigPrimeiraPessoa } from '/primeira-pessoa-maos.js';
 import { configuraInterface, estadoConexao, ligaControlesVoz } from '/interface.js';
 configuraInterface();
 
@@ -1088,7 +1087,7 @@ function texturaMao2D(pele) {
   return tex;
 }
 
-const maos = { esq: null, dir: null, pele: null, slug: null, tridi: false, rig: null };
+const maos = { esq: null, dir: null, pele: null, slug: null, tridi: false };
 // ENCAIXA A MÃO NO LEQUE, em vez de adivinhar onde ela vai.
 //
 // A conta é invertida: primeiro se MEDE a pinça na própria mão — o meio entre a
@@ -1158,6 +1157,22 @@ function encaixaPeloPlano(mao, alvo, giro, escala) {
   mao.matrix.decompose(mao.position, mao.quaternion, mao.scale);
   mao.updateWorldMatrix(true, true);
   return true;
+}
+
+// De onde o BRAÇO vem, medido no próprio modelo: devolve o giro que põe o punho
+// na direção pedida em relação ao plano do contrato. Sem isto, orientar a mão
+// que pinça vira tentativa e erro — foi assim que ela apareceu de cabeça para
+// baixo duas vezes.
+const _vBraco = new THREE.Vector3(), _vPlano = new THREE.Vector3(), _qPlano = new THREE.Quaternion();
+function anguloDoBraco(mao, osso, inclina = INCLINA_MAO) {
+  const plano = mao.getObjectByName('PlanoDaCarta'), punho = mao.getObjectByName(osso);
+  if (!plano || !punho) return 0;
+  mao.position.set(0, 0, 0); mao.quaternion.identity(); mao.scale.setScalar(1);
+  mao.updateWorldMatrix(true, true);
+  plano.getWorldQuaternion(_qPlano).invert();
+  punho.getWorldPosition(_vBraco).sub(plano.getWorldPosition(_vPlano)).applyQuaternion(_qPlano);
+  // pedido: acima e à direita, na mesma inclinação com que a mesa deita as mãos
+  return Math.atan2(Math.cos(inclina), Math.sin(inclina)) - Math.atan2(_vBraco.y, _vBraco.x);
 }
 
 // MEDE a mão contra o plano das cartas, vértice a vértice, separando o polegar
@@ -1280,18 +1295,10 @@ function sincronizaMaos() {
       raiz.traverse((o) => { if (o.isMesh) { o.material = material; o.frustumCulled = false; } });
       poeAMao(lado, raiz);
     }
-    // o rig vê as duas mãos de uma vez: os ossos se chamam Left*/Right*
-    maos.rig = criaRigPrimeiraPessoa(maoGrupo);
-    if (maos.rig) {
-      // A ESQUERDA SAI POSADA DO ARQUIVO e o rig não a toca: a pose foi medida
-      // em scripts/mao_pose_segura.py (dedos enrolados 95 graus somando as três
-      // falanges, polegar cruzando à frente) e `atualizaRigPrimeiraPessoa`
-      // escreve `base × pose` em cada junta — aplicar `leque` por cima dobraria
-      // tudo duas vezes. A direita continua no rig, que é ela quem gesticula.
-      maos.rig.Left = null;
-      definePosePrimeiraPessoa(maos.rig, 'Right', 'repouso');
-      atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);
-    }
+    // AS DUAS VÊM POSADAS DO ARQUIVO e o rig não toca em nenhuma: as poses
+    // foram medidas em scripts/mao_pose_segura.py (a esquerda segurando, a
+    // direita em pinça) e `atualizaRigPrimeiraPessoa` escreve `base × pose` em
+    // cada junta — aplicar uma pose por cima dobraria tudo duas vezes.
     maos.tridi = true;
     sincronizaMao();
   }).catch((erro) => { console.info(`mão de primeira pessoa: ${erro.message} — fica o desenho`); });
@@ -1378,79 +1385,39 @@ function sincronizaMao() {
       // medida não se sabe se o recuo bastou, e era isso que faltava.
       maos.medida = recuaAteSoOPolegarAparecer(maos.esq, -dist);
       if (escolhendo) {
-        // e entra em PINÇA, não espalmada: ela existe para pegar a carta, então
-        // é essa a mão que o rig ainda comanda (a esquerda vem posada do
-        // arquivo). Sem laço por quadro, a troca é imediata.
-        definePosePrimeiraPessoa(maos.rig, 'Right', 'pinca');
-        atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);
-        // A DIREITA ESCOLHE A CARTA — quem segura o leque é a esquerda. Ela vai
-        // para a carta selecionada (ou para a última, enquanto não há escolha),
-        // MEIA CARTA acima do centro dela: é pela borda de cima que se puxa uma
-        // carta de dentro do leque, e é ali que a pinça tem de cair. Como o
-        // contrato põe os dedos atrás do plano e o polegar à frente, cair na
-        // carta é a própria pinça — a mão pega a carta em vez de segurar o
-        // leque.
+        // A DIREITA VEM POSADA EM PINÇA (mao_pose_segura.py --pinca): indicador
+        // atrás da carta, polegar à frente, com uma espessura de leque de folga
+        // entre as pontas — a carta cabe ali —, e os outros três dedos soltos.
+        // O contrato marca a carta que ela pinça, com a pinça na BORDA DE CIMA,
+        // então o alvo é o centro da carta escolhida e o resto se encaixa.
         //
-        // O quadro é o mesmo da esquerda, com a inclinação para o outro lado.
-        // Virá-la de costas, "como quem estica o braço", só trocou um jeito
-        // errado por outro: as duas têm de ler como um PAR, e é o que o desenho
-        // 2D já fazia.
+        // Só falta de onde o braço vem, e isso também é medida: o punho fica
+        // acima e à direita da pinça, na mesma inclinação das duas mãos. O
+        // ângulo sai de para onde o punho aponta no quadro do próprio modelo —
+        // orientar essa mão no olho já a deixou de cabeça para baixo duas vezes.
         const iEscolhida = hand.findIndex((c) => selecionadas.has(c.id));
         const aCarta = plano.posicoes[iEscolhida >= 0 ? iEscolhida : n - 1];
-        // no CANTO DE CIMA À DIREITA da carta, não no meio dela: é o canto que
-        // fica exposto num leque (cada carta cobre a anterior pela esquerda), é
-        // por ele que se puxa, e é o que joga o corpo da mão para fora do
-        // leque em vez de cobrir as cartas vizinhas.
-        const meiaL = CARTA_L * aCarta.escala * 0.5, meiaA = CARTA_A * aCarta.escala * 0.5;
-        const cos = Math.cos(aCarta.giro), sen = Math.sin(aCarta.giro);
-        const sobe = meiaL * sen + meiaA * cos + (iEscolhida >= 0 ? 14 * plano.unidade : 0);
-        // A ORIENTAÇÃO SAI DO POLEGAR. Numa mão que alcança pela direita, o
-        // polegar fica POR CIMA da carta — e, para uma mão direita com os dedos
-        // apontando para a esquerda, isso só acontece com a palma virada para
-        // longe da câmera: é o dorso da própria mão que se vê ao esticar o
-        // braço. Com a palma para a câmera o polegar cai embaixo e a mão lê de
-        // cabeça para baixo. Meia volta em Y vira a palma; o quarto de volta em
-        // Z deita a mão. E mais a mesma inclinação da esquerda, para os dedos
-        // apontarem para BAIXO e a mão descer sobre o leque — é assim que se
-        // puxa uma carta de dentro de um leque, pela borda de cima, e é o gesto
-        // da referência que o usuário mandou em 08/09/2026.
-        _qMao.setFromAxisAngle(EIXO_Y, Math.PI);
-        _qGiro.setFromAxisAngle(EIXO_Z, Math.PI / 2 + INCLINA_MAO + aCarta.giro);
-        _qMao.premultiply(_qGiro);
-        const alvoX = aCarta.x + meiaL * cos - meiaA * sen, alvoY = aCarta.y + sobe;
-        if (!encaixaPeloPlano(maos.dir, _v1.set(alvoX, alvoY, aCarta.z), _qMao, escalaDaMao))
-          encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escalaDaMao, 2.0);
-        // e vem para a FRENTE do leque inteiro. No plano da carta escolhida os
-        // dedos ficavam atrás dela mas na frente das vizinhas, e furavam a face
-        // delas — o leque é um arco, não um plano só. Quem escolhe passa a mão
-        // por cima das cartas, e o quanto é medida: o ponto mais atrás da malha
-        // deformada tem de passar da carta mais à frente do leque.
-        //
-        // Aproximar a mão da câmera a afasta do centro da tela, e ela saía de
-        // cima da carta. O alvo anda junto, na mesma proporção: assim o ponto
-        // da pinça continua no MESMO RAIO DE VISÃO — sobre a carta, só mais
-        // perto. O grupo da mão acompanha a câmera, então a câmera está na
-        // origem dele e a conta é uma regra de três.
-        const m = medeAMao(maos.dir, -dist);
-        const frenteDoLeque = -dist + (n - 1) * 0.0006;
-        let k = 1;
-        if (m && m.fundo < frenteDoLeque) {
-          const zNovo = aCarta.z + (frenteDoLeque - m.fundo) + 0.002; k = zNovo / aCarta.z;
-          encaixaPeloPlano(maos.dir, _v1.set(alvoX * k, alvoY * k, zNovo), _qMao, escalaDaMao);
-        }
-        // e quem encosta na carta é a PONTA DO INDICADOR, não a origem do
-        // plano: o contrato marca o centro de uma carta SEGURADA, e numa mão
-        // aberta isso cai no meio dos dedos — a mão ficava flutuando ao lado do
-        // leque. Escorrega x e y até a ponta cair no canto da carta; o z fica
-        // como a medida da folga deixou.
-        const pontaDoDedo = maos.dir.getObjectByName('RightIndex3');
-        if (pontaDoDedo) {
-          maos.dir.parent.worldToLocal(pontaDoDedo.getWorldPosition(_vPonta));
-          maos.dir.position.x += alvoX * k - _vPonta.x;
-          maos.dir.position.y += alvoY * k - _vPonta.y;
-          maos.dir.updateWorldMatrix(true, true);
-        }
-      } else definePosePrimeiraPessoa(maos.rig, 'Right', 'repouso');   // escondida: nem posição, nem pose a manter
+        const sobe = iEscolhida >= 0 ? 14 * plano.unidade : 0;   // a carta escolhida sobe; a mão vai junto
+        if (maos.anguloDaPinca === undefined) maos.anguloDaPinca = anguloDoBraco(maos.dir, 'RightHand');
+        _qMao.setFromAxisAngle(EIXO_Z, maos.anguloDaPinca + aCarta.giro);
+        if (encaixaPeloPlano(maos.dir, _v1.set(aCarta.x, aCarta.y + sobe, aCarta.z), _qMao, escalaDaMao)) {
+          // E A CARTA PINÇADA SAI DO LEQUE, junto com a mão. O leque é um arco:
+          // com a pinça no plano da carta escolhida, o indicador fica atrás
+          // DELA mas na frente das vizinhas, e fura a face delas. Levar só a mão
+          // para a frente desfaria a pinça — a carta ficaria atrás das duas
+          // pontas. As duas andam juntas, que é o gesto de puxar a carta para
+          // fora. Aproximar da câmera afasta do centro da tela, então o alvo
+          // anda na mesma proporção e tudo fica no MESMO RAIO DE VISÃO: a carta
+          // só cresce um pouco, como quem a traz para perto.
+          const m = medeAMao(maos.dir, -dist), frenteDoLeque = -dist + (n - 1) * 0.0006;
+          if (m && m.fundo < frenteDoLeque) {
+            const zNovo = aCarta.z + (frenteDoLeque - m.fundo) + 0.002, k = zNovo / aCarta.z;
+            encaixaPeloPlano(maos.dir, _v1.set(aCarta.x * k, (aCarta.y + sobe) * k, zNovo), _qMao, escalaDaMao);
+            const puxada = cartasDaMao.get(hand[iEscolhida >= 0 ? iEscolhida : n - 1].id);
+            if (puxada) puxada.position.set(aCarta.x * k, (aCarta.y + sobe) * k, zNovo);
+          }
+        } else encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escalaDaMao, 2.0);
+      }
     } else {
       // o desenho 2D de reserva: entra pela borda de baixo, nas pontas do leque
       const x = larguraLeque * .5 + .03;
@@ -2347,7 +2314,6 @@ function quadro(t) {
   if (t - ultimaSombra > (compacto ? 150 : 100)) { renderer.shadowMap.needsUpdate = true; ultimaSombra = t; }
   renderer.render(scene, camera);
   // os dedos caminham entre as poses (repouso, leque, pinça) no ritmo do quadro
-  if (maos.rig) atualizaRigPrimeiraPessoa(maos.rig, frameMs / 1000, semMovimento);
   // segundo passe: limpa a profundidade e desenha a sua mão por cima do mundo,
   // com profundidade correta entre as cartas e os dedos
   segueACamera();

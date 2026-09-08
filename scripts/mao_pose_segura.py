@@ -47,6 +47,8 @@ ap.add_argument('--glb'); ap.add_argument('--blend')
 ap.add_argument('--contato', type=float, default=0.005, help='quão perto do plano da palma a ponta do dedo tem de chegar')
 ap.add_argument('--margem', type=float, default=0.012, help='folga entre a ponta do dedo e a borda da carta')
 ap.add_argument('--cartas', type=int, default=12, help='cartas na mão (o motor distribui 12): é a espessura do leque')
+ap.add_argument('--pinca', action='store_true',
+                help='posa a mão que PEGA: indicador atrás da carta, polegar à frente, os outros soltos')
 ap.add_argument('--aberta', action='store_true',
                 help='não posa: só grava o quadro da mão aberta. É o que a mão que JOGA precisa — '
                      'ela não segura leque, mas o jogo ainda tem de saber para onde a palma dela olha')
@@ -205,15 +207,16 @@ def custo_do_polegar():
     return fora + 10.0 * max(0.0, alvo - E[PONTA_POL][:, 2].min())
 
 
-def poe_polegar():
+def poe_polegar(custo=None):
     """Desce o custo girando as três juntas, um passo por vez, sempre na junta e
     no eixo que mais ajudam. Repartir importa: 111 graus só na base rasgavam a
     pele da tenar — e é assim que a mão trabalha, a junta do punho faz a maior
     parte da oposição mas não faz sozinha."""
+    custo = custo or custo_do_polegar
     for osso in pol: osso.rotation_quaternion = (1, 0, 0, 0)
     bpy.context.view_layer.update()
     usado = {o.name: 0.0 for o in pol}
-    atual = custo_do_polegar()
+    atual = custo()
     while atual > 0:
         melhor = None
         for osso in pol:
@@ -221,7 +224,7 @@ def poe_polegar():
             for eixoGiro in eixos_de(osso):
                 for sentido in (1.0, -1.0):
                     gira_no_mundo(osso, eixoGiro, sentido * args.passo)
-                    d = custo_do_polegar()
+                    d = custo()
                     gira_no_mundo(osso, eixoGiro, -sentido * args.passo)
                     if d < atual - 1e-9 and (melhor is None or d < melhor[0]):
                         melhor = (d, osso, eixoGiro, sentido)
@@ -280,12 +283,49 @@ def carta_no_plano():
     centroV = float(np.array(apoio[:]) @ EIXOS[:, 1]) + ALT / 2 - args.margem
 
 
-carta_no_plano()
+if args.pinca:
+    # A MÃO QUE PEGA A CARTA. Não segura leque: pinça uma carta pela borda de
+    # cima, com o indicador ATRÁS e o polegar À FRENTE, como quem puxa uma carta
+    # de dentro do leque. Os outros três ficam soltos — é o que se vê numa mão
+    # que pega, e o que a referência mostra.
+    # os outros três ficam no fechamento que o laço de cima já mediu — meio
+    # enrolados, como uma mão relaxada. Esticados, eles varriam o leque inteiro
+    # e cobriam as cartas do meio (visto na tela).
+    ossos = [arm.pose.bones[f'{LADO}Index{k}'] for k in (1, 2, 3)]
+    ponta = DONO[f'{LADO}Index3']
+    ang, melhorAng, melhorD = 0.0, 0.0, -1e9
+    while ang <= args.limite:                  # o indicador enrola até o ponto de retorno
+        fecha(ossos, SINAL * ang)
+        d = estado()[ponta][:, 2].max()
+        if d < melhorD: break
+        melhorAng, melhorD, ang = ang, d, ang + args.passo
+    fecha(ossos, SINAL * melhorAng)
+
+    def custo_da_pinca():
+        """O polegar vem ao encontro do indicador até sobrar entre as duas pontas
+        exatamente a espessura do leque: é a carta que cabe ali."""
+        E = estado()
+        return abs(float(np.linalg.norm(E[PONTA_POL].mean(0) - E[ponta].mean(0))) - ESPESSURA)
+
+    girado, resta = poe_polegar(custo_da_pinca)
+    E = estado()
+    # o quadro fica como está. Virá-lo para o polegar ficar do lado "da frente"
+    # só troca o rótulo — a geometria é a mesma — e põe o CORPO da mão entre a
+    # câmera e a carta, cobrindo a carta que ela acabou de puxar (visto na tela).
+    pinca = (E[PONTA_POL].mean(0) + E[ponta].mean(0)) / 2      # o ponto em que a carta é presa
+    centroU, centroV = float(pinca[0]), float(pinca[1]) - (ALT / 2 - args.margem)
+    centroN = float(pinca[2])
+    print('PINCA: indicador a %.0f graus, polegar a %.0f; folga entre as pontas %.4f (leque: %.4f)'
+          % (math.degrees(melhorAng), math.degrees(girado),
+             float(np.linalg.norm(E[PONTA_POL].mean(0) - E[ponta].mean(0))), ESPESSURA))
+    fechado = melhorAng
+else:
+    carta_no_plano()
 
 # e fecham mais, enquanto as pontas espiarem por cima do leque. Com a carta
 # afundada até a base do polegar, o ângulo reto sozinho já não basta: sobra dedo
 # acima da borda de cima, e no jogo, onde o leque é um arco, sobra mais ainda.
-if not args.aberta:
+if not args.aberta and not args.pinca:
     # a mesa põe a mão INCLINADA (0,42 rad, o mesmo ângulo do desenho 2D) e o
     # leque continua em pé: girar a mão levanta o dedo da ponta acima do que ele
     # mede aqui. Quanto, é conta e não palpite — metade da largura dos dedos
@@ -302,7 +342,7 @@ if not args.aberta:
         carta_no_plano()
     print('  fechados a %.0f graus para as pontas nao espiarem por cima do leque' % math.degrees(fechado))
 
-girado, resta = (0.0, 0.0) if args.aberta else poe_polegar()
+if not args.pinca: girado, resta = (0.0, 0.0) if args.aberta else poe_polegar()
 
 E = estado()
 restoMax = float(E[NAO_POLEGAR][:, 2].max())
@@ -312,7 +352,7 @@ altoDosDedos = float(E[DEDOS_TODOS][:, 1].max())
 uPolegar = (float(pontaPolegar[:, 0].min()), float(pontaPolegar[:, 0].max()))
 piso, teto = float(pontaPolegar[:, 1].min()), float(pontaPolegar[:, 1].max())
 sobra = (altoDosDedos - piso) - (ALT - 2 * args.margem)
-centroN = restoMax + ESPESSURA / 2
+if not args.pinca: centroN = restoMax + ESPESSURA / 2
 centro = Vector((EIXOS @ np.array([centroU, centroV, centroN])))
 relatorio = [(d, math.degrees(fechado), None, 0.0) for d in DEDOS]
 relatorio.append(('Thumb', math.degrees(girado), resta <= 0, polMax))

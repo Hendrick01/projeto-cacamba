@@ -714,7 +714,27 @@ dizia que estava certo — palma para a câmera, polegar à direita, lateralidad
 conferida pelos ossos — e ainda assim o olho lia errado. Quem resolve é a
 inclinação, porque é ela que conta de que ombro a mão vem.
 
-**A esquerda segura, a direita ESCOLHE.** A direita só aparece na sua vez E na
+**A esquerda segura, a direita PINÇA.** A direita também vem posada do arquivo,
+por `mao_pose_segura.py --pinca`: o indicador enrola até o ponto de retorno, o
+polegar vem ao encontro dele até sobrar entre as duas pontas **exatamente a
+espessura do leque** (0,0194 medidos contra 0,0195 de 12 cartas — a carta cabe
+ali), e os outros três ficam no mesmo fechamento dos dedos que seguram, meio
+enrolados; esticados, varriam o leque inteiro e cobriam as cartas do meio. O
+contrato marca a carta pinçada, com a pinça na BORDA DE CIMA, então o alvo é o
+centro da carta escolhida e o resto se encaixa.
+
+E a **carta sai do leque junto com a mão**. O leque é um arco: com a pinça no
+plano da carta escolhida, o indicador fica atrás DELA mas na frente das
+vizinhas e fura a face delas; levar só a mão para a frente desfaria a pinça.
+As duas andam juntas — que é o gesto de puxar a carta para fora, o da referência
+— e o alvo anda na mesma proporção do avanço, para tudo ficar no mesmo raio de
+visão.
+
+O rig de tempo de execução (`primeira-pessoa-maos.js`) deixou de ser usado pela
+mesa: com as duas mãos posadas no arquivo, aplicar uma pose por cima dobraria
+tudo duas vezes.
+
+**A direita ESCOLHE.** A direita só aparece na sua vez E na
 fase de jogar — na hora de puxar do monte ela não tem o que fazer no leque, e
 parada ali só rouba a faixa de leitura das cartas. Ela vai para a carta
 selecionada — ou para a última,

@@ -76,16 +76,32 @@ test('a mão esquerda vem posada e traz o plano da carta', async () => {
   assert.ok(pontaDoPolegar > 0.01, `polegar só ${(pontaDoPolegar * 1000).toFixed(0)} milésimos à frente: some na espessura do leque`);
 });
 
-test('a mão direita fica rigada e aberta, que é como ela joga', async () => {
+test('a mão direita vem posada em pinça, que é como ela pega a carta', async () => {
   const gltf = await carregaCPU('mao-fp-dir');
+  gltf.scene.updateMatrixWorld(true);
   let malha = null;
   gltf.scene.traverse((o) => { if (o.isSkinnedMesh) malha = o; });
-  assert.ok(malha, 'sem esqueleto: é o rig que faz a pinça na hora de pegar a carta');
-  // ela não segura leque, mas precisa do mesmo contrato: é por ele que a mesa
-  // sabe para onde a palma olha. Sem o nó, o encaixe antigo a punha de cabeça
+  assert.ok(malha, 'sem esqueleto: sem osso não há pinça');
+  // o mesmo contrato da esquerda: é por ele que a mesa sabe para onde a palma
+  // olha e de onde o braço vem. Sem o nó, o encaixe antigo a punha de cabeça
   // para baixo ("a outra mão está ao contrário", 08/09/2026)
   assert.ok(gltf.scene.getObjectByName('PlanoDaCarta'), 'sem PlanoDaCarta: a mesa volta a adivinhar a orientação');
-  const nomes = malha.skeleton.bones.map((b) => b.name);
-  for (const junta of ['RightHand', 'RightThumb3', 'RightIndex2'])
-    assert.ok(nomes.includes(junta), `sem o osso ${junta}, que primeira-pessoa-maos.js procura`);
+
+  // e a pinça tem de ESTAR FECHADA no arquivo: polegar e indicador a uma
+  // espessura de leque um do outro, com o plano da carta entre os dois
+  const p = gltf.scene.getObjectByName('PlanoDaCarta');
+  const centro = p.getWorldPosition(new T.Vector3());
+  const normal = new T.Vector3(0, 0, 1).applyQuaternion(p.getWorldQuaternion(new T.Quaternion()));
+  const media = (osso) => {
+    const pts = deformados(malha).filter((v) => v.osso === osso);
+    return pts.reduce((a, v) => a.add(v.p), new T.Vector3()).multiplyScalar(1 / pts.length);
+  };
+  const polegar = media('RightThumb3'), indicador = media('RightIndex3');
+  const folga = polegar.distanceTo(indicador);
+  assert.ok(folga < 0.06, `${folga.toFixed(3)} entre as pontas: a mão não está pinçando`);
+  // a carta passa ENTRE as duas pontas — uma de cada lado do plano. Qual delas
+  // fica na frente é da pose e da orientação que a mesa dá; o que o contrato
+  // garante é que existe uma carta ali no meio
+  const dPol = polegar.clone().sub(centro).dot(normal), dInd = indicador.clone().sub(centro).dot(normal);
+  assert.ok(dPol * dInd < 0, `a carta não passa entre as pontas (polegar ${dPol.toFixed(3)}, indicador ${dInd.toFixed(3)})`);
 });
