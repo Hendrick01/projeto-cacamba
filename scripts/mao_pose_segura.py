@@ -47,6 +47,9 @@ ap.add_argument('--glb'); ap.add_argument('--blend')
 ap.add_argument('--contato', type=float, default=0.005, help='quão perto do plano da palma a ponta do dedo tem de chegar')
 ap.add_argument('--margem', type=float, default=0.012, help='folga entre a ponta do dedo e a borda da carta')
 ap.add_argument('--cartas', type=int, default=12, help='cartas na mão (o motor distribui 12): é a espessura do leque')
+ap.add_argument('--aberta', action='store_true',
+                help='não posa: só grava o quadro da mão aberta. É o que a mão que JOGA precisa — '
+                     'ela não segura leque, mas o jogo ainda tem de saber para onde a palma dela olha')
 ap.add_argument('--junta', type=float, default=math.radians(45), help='rotação máxima em cada junta do polegar')
 ap.add_argument('--pele', type=float, default=0.005, help='folga de pele entre a ponta do polegar e a face da frente')
 ap.add_argument('--passoDedo', type=float, default=math.radians(6), help='resolução da busca do fechamento')
@@ -243,6 +246,8 @@ while fechado <= args.limite:
     if max(aponta_ao_longo(d) for d in DEDOS) <= 0: break   # já aponta através
     fechado += args.passoDedo
 poe_dedos(fechado)
+if args.aberta: fechado = 0.0
+poe_dedos(fechado)
 print('FECHAMENTO: %.0f graus na base de cada dedo (%.0f somando as tres falanges);'
       ' a ultima falange faz %.0f graus com a subida da carta' %
       (math.degrees(fechado), math.degrees(fechado) * sum(PROP),
@@ -263,7 +268,7 @@ def carta_no_plano():
 
 
 carta_no_plano()
-girado, resta = poe_polegar()
+girado, resta = (0.0, 0.0) if args.aberta else poe_polegar()
 
 E = estado()
 restoMax = float(E[NAO_POLEGAR][:, 2].max())
@@ -307,7 +312,8 @@ for nome, graus, ok, d in relatorio:
           '' if ok is None else ('  cruzou para a frente' if ok else '  NAO ALCANCOU a frente')))
 print('MEDIDA: polegar a frente %d/%d · resto a frente %d/%d' %
       (polegarFrente, len(POLEGAR), restoFrente, len(NAO_POLEGAR)))
-print('CRITERIO: %s' % ('CUMPRIDO' if restoFrente == 0 and polegarFrente > 0 else 'NAO CUMPRIDO'))
+print('CRITERIO: %s' % ('mao aberta: so o quadro, sem pose a cumprir' if args.aberta
+                        else 'CUMPRIDO' if restoFrente == 0 and polegarFrente > 0 else 'NAO CUMPRIDO'))
 
 if args.blend: bpy.ops.wm.save_as_mainfile(filepath=bpy.path.abspath(args.blend))
 if args.glb:

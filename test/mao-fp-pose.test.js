@@ -76,11 +76,15 @@ test('a mão esquerda vem posada e traz o plano da carta', async () => {
   assert.ok(pontaDoPolegar > 0.01, `polegar só ${(pontaDoPolegar * 1000).toFixed(0)} milésimos à frente: some na espessura do leque`);
 });
 
-test('a mão direita fica rigada, que é como ela joga', async () => {
+test('a mão direita fica rigada e aberta, que é como ela joga', async () => {
   const gltf = await carregaCPU('mao-fp-dir');
   let malha = null;
   gltf.scene.traverse((o) => { if (o.isSkinnedMesh) malha = o; });
   assert.ok(malha, 'sem esqueleto: é o rig que faz a pinça na hora de pegar a carta');
+  // ela não segura leque, mas precisa do mesmo contrato: é por ele que a mesa
+  // sabe para onde a palma olha. Sem o nó, o encaixe antigo a punha de cabeça
+  // para baixo ("a outra mão está ao contrário", 08/09/2026)
+  assert.ok(gltf.scene.getObjectByName('PlanoDaCarta'), 'sem PlanoDaCarta: a mesa volta a adivinhar a orientação');
   const nomes = malha.skeleton.bones.map((b) => b.name);
   for (const junta of ['RightHand', 'RightThumb3', 'RightIndex2'])
     assert.ok(nomes.includes(junta), `sem o osso ${junta}, que primeira-pessoa-maos.js procura`);

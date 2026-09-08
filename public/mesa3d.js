@@ -1105,6 +1105,7 @@ const maos = { esq: null, dir: null, pele: null, slug: null, tridi: false, rig: 
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const EIXO_Z = new THREE.Vector3(0, 0, 1);
+const _qMao = new THREE.Quaternion(), _qGiro = new THREE.Quaternion();
 function encaixaNaPinca(mao, lado, alvo, escala, inclina) {
   const polegar = mao.getObjectByName(`${lado}Thumb3`), dedo = mao.getObjectByName(`${lado}Index2`);
   const dedos = mao.getObjectByName(`${lado}Middle3`);
@@ -1142,16 +1143,15 @@ function encaixaNaPinca(mao, lado, alvo, escala, inclina) {
 // que sobrava, e era daí que saíam as mãos viradas ao contrário e furando o
 // leque. Aqui a conta é direta: se P é o plano no espaço da mão e A é onde a
 // carta está na tela, a mão vai para M = A · P⁻¹.
-const _mA = new THREE.Matrix4(), _mP = new THREE.Matrix4(), _qA = new THREE.Quaternion(), _eA = new THREE.Euler();
-const _escala = new THREE.Vector3();
+const _mA = new THREE.Matrix4(), _mP = new THREE.Matrix4(), _escala = new THREE.Vector3();
+const EIXO_Y = new THREE.Vector3(0, 1, 0);
 function encaixaPeloPlano(mao, alvo, giro, escala) {
   const plano = mao.getObjectByName('PlanoDaCarta');
   if (!plano) return false;
   mao.position.set(0, 0, 0); mao.quaternion.identity(); mao.scale.setScalar(1);
   mao.updateWorldMatrix(true, true);
   _mP.copy(mao.parent.matrixWorld).invert().multiply(plano.matrixWorld);
-  _qA.setFromEuler(_eA.set(0, 0, giro));
-  _mA.compose(alvo, _qA, _escala.set(escala, escala, escala));   // vetor próprio: `alvo` costuma vir de um temporário
+  _mA.compose(alvo, giro, _escala.set(escala, escala, escala));   // vetor próprio: `alvo` costuma vir de um temporário
   mao.matrix.copy(_mA.multiply(_mP.invert()));
   mao.matrix.decompose(mao.position, mao.quaternion, mao.scale);
   mao.updateWorldMatrix(true, true);
@@ -1345,13 +1345,15 @@ function sincronizaMao() {
       // aqui a mão media 1,1 largura de carta: um terço do tamanho.
       const escalaDaMao = 2.94 * CARTA_L * escala;
       const pinca = new THREE.Vector3(-.045, baseY + CARTA_A * escala * 0.16, -dist);
-      // a esquerda segura a carta da PONTA do leque, e é o contrato do modelo
-      // que diz como: a carta do modelo tem a mesma largura da carta da tela
-      // (0,341 de mão × 2,94 larguras = 1 largura de carta), então encaixar o
-      // plano no lugar da carta põe a mão no tamanho e no ângulo certos de uma
-      // vez. Sem o nó no arquivo, cai no encaixe antigo, por pinça.
-      const daPonta = plano.posicoes[0];
-      if (!encaixaPeloPlano(maos.esq, _v1.set(daPonta.x, daPonta.y, daPonta.z), daPonta.giro, escalaDaMao))
+      // a esquerda segura a carta do MEIO do leque — é onde a mão fica quando
+      // se abre um leque de verdade, e na ponta ela puxava o olho para o canto.
+      // O contrato do modelo diz o resto: a carta do modelo tem a mesma largura
+      // da carta da tela (0,341 de mão × 2,94 larguras = 1 largura de carta),
+      // então encaixar o plano no lugar da carta acerta tamanho, lugar e ângulo
+      // de uma vez. Sem o nó no arquivo, cai no encaixe antigo, por pinça.
+      const doMeio = plano.posicoes[Math.floor((n - 1) / 2)];
+      _qMao.setFromAxisAngle(EIXO_Z, doMeio.giro);
+      if (!encaixaPeloPlano(maos.esq, _v1.set(doMeio.x, doMeio.y, doMeio.z), _qMao, escalaDaMao))
         encaixaNaPinca(maos.esq, 'Left', pinca, escalaDaMao, 1.15);
       // e recua o que a MEDIÇÃO pedir: tudo que não é polegar tem de ficar
       // atrás do plano das cartas. Mede, recua e MEDE DE NOVO — sem a segunda
@@ -1365,7 +1367,18 @@ function sincronizaMao() {
         // arquivo). Sem laço por quadro, a troca é imediata.
         definePosePrimeiraPessoa(maos.rig, 'Right', 'pinca');
         atualizaRigPrimeiraPessoa(maos.rig, 0.016, true);
-        encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escalaDaMao, 2.0);
+        // e pelo mesmo contrato, não mais pelo eixo de pinça com um giro
+        // escolhido a esmo — era esse giro que a deixava de cabeça para baixo.
+        // Ela entra pela direita ALCANÇANDO o leque, e isso são duas voltas
+        // sobre o quadro do modelo: meia volta em Y põe a palma para longe da
+        // câmera (é o dorso da própria mão que se vê ao esticar o braço) e um
+        // quarto de volta em Z deita a mão, apontando os dedos para o leque e
+        // deixando o polegar por cima.
+        _qMao.setFromAxisAngle(EIXO_Y, Math.PI);
+        _qGiro.setFromAxisAngle(EIXO_Z, Math.PI / 2 + doMeio.giro);
+        _qMao.premultiply(_qGiro);
+        if (!encaixaPeloPlano(maos.dir, _v1.set(larguraLeque * .5, pinca.y, -dist), _qMao, escalaDaMao))
+          encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escalaDaMao, 2.0);
         recuaAteSoOPolegarAparecer(maos.dir, -dist);
       } else {
         definePosePrimeiraPessoa(maos.rig, 'Right', 'repouso');

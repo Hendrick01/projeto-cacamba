@@ -687,10 +687,21 @@ sobra, que o jogo "corrigia" empurrando a mão para trás. Hoje a posição é
 composta osso a osso (`posicaoDeformada`), a mesma conta que a GPU faz, e o
 recuo corretivo mede **0**.
 
+**A esquerda segura pelo MEIO do leque**, não pela ponta: é onde a mão fica
+quando se abre um leque de verdade, e na ponta ela puxava o olho para o canto.
+
 **A direita só entra para jogar**: fora da sua vez fica fora do quadro; na sua
 vez entra pela ponta direita do leque e em **pinça**, que é o gesto de quem vai
 pegar a carta. É ela quem o rig ainda comanda — a esquerda vem posada e o rig
-não a toca, senão a pose seria aplicada duas vezes.
+não a toca, senão a pose seria aplicada duas vezes. Ela também tem o seu
+`PlanoDaCarta` (`mao_pose_segura.py --aberta` grava só o quadro, sem posar):
+sem ele o encaixe antigo a punha **de cabeça para baixo**. Alcançar é o mesmo
+contrato com duas voltas: meia volta em Y põe a palma para longe da câmera — ao
+esticar o braço quem se vê é o dorso da própria mão — e um quarto de volta em Z
+deita a mão, apontando os dedos para o leque e deixando o polegar por cima.
+Conferido na tela: normal da palma `(0, −0,33, −0,94)` (de costas para a
+câmera), dedos `(−1, −0,07, 0,03)` (para o leque) e o polegar acima do
+indicador.
 
 ### Ler os jogos baixados (08/09/2026)
 
