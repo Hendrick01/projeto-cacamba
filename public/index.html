@@ -137,19 +137,31 @@
        fala (foco no meio, penumbra na borda, halo em quem está no escuro). -->
   <svg class="cenario" viewBox="0 0 375 330" preserveAspectRatio="xMidYMin slice" aria-hidden="true">
     <defs>
+      <!-- A parede da sala de casa: azulejo branco quadriculado. Aqui ele é
+           ESCURO — na mesa 2D a penumbra da borda é regra, e parede clara
+           brigaria com as cartas. É o mesmo azulejo da sala 3D visto no fim de
+           tarde, com a luz já baixa. -->
       <linearGradient id="cParede" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#48301A"/>
-        <stop offset="58%" stop-color="#31200F"/>
-        <stop offset="100%" stop-color="#20140A"/>
+        <stop offset="0%" stop-color="#6E6E64"/>
+        <stop offset="58%" stop-color="#4E4E46"/>
+        <stop offset="100%" stop-color="#2C2C25"/>
       </linearGradient>
+      <pattern id="cAzulejo" width="26" height="26" patternUnits="userSpaceOnUse">
+        <rect width="26" height="26" fill="none"/>
+        <rect x="2.5" y="2.5" width="21" height="21" rx="1"
+              fill="#FFFFFF" fill-opacity="0.10" stroke="#0E0E0C" stroke-opacity="0.55" stroke-width="1.4"/>
+        <rect x="7" y="7" width="12" height="12" fill="#FFFFFF" fill-opacity="0.07"/>
+      </pattern>
       <!-- Hora azul. O comentário da porta, logo abaixo, sempre disse "a luz
            fria de fora contra a quente de dentro" — mas o gradiente era laranja,
            e as duas luzes eram a mesma. Agora cumpre o que promete, e bate com a
            rua da mesa 3D. -->
+      <!-- O corredor pela porta de moldura arredondada: escuro, com o resto de
+           luz no fundo. É o contraponto que dá profundidade à parede. -->
       <linearGradient id="cRua" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#6E80AE"/>
-        <stop offset="62%" stop-color="#A08FA6"/>
-        <stop offset="100%" stop-color="#C98F6E"/>
+        <stop offset="0%" stop-color="#171319"/>
+        <stop offset="70%" stop-color="#241D26"/>
+        <stop offset="100%" stop-color="#38303C"/>
       </linearGradient>
       <linearGradient id="cLadoE" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0%" stop-color="#2A1B12"/>
@@ -167,50 +179,83 @@
     </defs>
 
     <rect width="375" height="330" fill="url(#cParede)"/>
+    <rect width="375" height="330" fill="url(#cAzulejo)"/>
 
-    <!-- Azulejo de meia parede, atrás de todo mundo. Verde-petróleo, o mesmo
-         do boteco em 3D: era marrom sobre marrom e não se lia como azulejo,
-         só como risco na parede. Continua no escuro — aqui a penumbra da borda
-         é regra, e parede clara brigaria com o feltro. -->
-    <rect x="0" y="174" width="375" height="44" fill="#1B4A42" opacity="0.55"/>
-    <rect x="0" y="171" width="375" height="4" fill="#2E7A6A" opacity="0.5"/>
-    <g stroke="#4E9384" stroke-opacity="0.38" stroke-width="1.2">
-      <path d="M0 176h375M0 196h375M0 216h375"/>
-      <path d="M20 176v40M60 176v40M100 176v40M140 176v40M180 176v40M220 176v40M260 176v40M300 176v40M340 176v40"/>
+    <!-- o rodapé de madeira, que impede a parede de flutuar sobre o assoalho -->
+    <rect x="0" y="236" width="375" height="8" fill="#2A1B12" opacity="0.75"/>
+
+    <!-- a porta de moldura arredondada para o corredor. A moldura é de madeira
+         mel, como a da casa; os cantos de cima são arredondados, que é o que
+         faz esta porta ser aquela porta e não um vão qualquer. -->
+    <g transform="translate(28 62)">
+      <path d="M4 178V22a18 18 0 0 1 18-18h30a18 18 0 0 1 18 18v156z"
+            fill="url(#cRua)" stroke="#8A5C30" stroke-width="7" stroke-linejoin="round"/>
+      <rect x="18" y="96" width="26" height="52" fill="#4A2C38" opacity="0.85"/>
+      <rect x="22" y="60" width="18" height="30" fill="#C9BCC4" opacity="0.35"/>
     </g>
 
-    <!-- porta aberta para a rua: a luz fria de fora contra a quente de dentro
-         é o que dá hora do dia à cena -->
-    <g transform="translate(-4 30) scale(0.62)">
-      <rect x="16" y="34" width="86" height="176" rx="4" fill="#241609"/>
-      <rect x="22" y="40" width="74" height="164" rx="3" fill="url(#cRua)"/>
-      <path d="M22 150h74v54H22z" fill="#6B6270" opacity="0.5"/>
-      <!-- as janelas acesas da casa de frente: os únicos pontos quentes lá fora -->
-      <g fill="#F2C14E" opacity="0.75">
-        <rect x="30" y="60" width="24" height="34" rx="2"/>
-        <rect x="64" y="72" width="22" height="22" rx="2"/>
+    <!-- a cristaleira: o móvel que se vê da cadeira, com as taças dentro -->
+    <g transform="translate(232 56)">
+      <rect x="0" y="0" width="96" height="188" rx="4" fill="#241F1A" stroke="#8C6A45" stroke-opacity="0.5" stroke-width="3"/>
+      <rect x="-6" y="-10" width="108" height="14" rx="4" fill="#3A332B" stroke="#8C6A45" stroke-opacity="0.4" stroke-width="2"/>
+      <g stroke="#8C6A45" stroke-opacity="0.45" stroke-width="2">
+        <path d="M6 46h84M6 88h84M6 130h84M6 172h84"/>
+        <path d="M48 6v176"/>
       </g>
-      <rect x="16" y="34" width="86" height="176" rx="4" fill="none" stroke="#8C6A45" stroke-opacity="0.5" stroke-width="4"/>
-    </g>
-
-    <!-- engradados empilhados, à direita -->
-    <g transform="translate(116 44) scale(0.62)" stroke="#2A1B12" stroke-width="4" stroke-linejoin="round">
-      <rect x="286" y="126" width="72" height="46" rx="4" fill="#B0402A"/>
-      <rect x="286" y="172" width="72" height="46" rx="4" fill="#C08F28"/>
-      <rect x="296" y="80" width="62" height="46" rx="4" fill="#9C3622"/>
-      <g stroke="#2A1B12" stroke-opacity="0.4" stroke-width="3">
-        <path d="M298 138h48M298 152h48M298 184h48M298 198h48M306 92h42M306 108h42"/>
+      <!-- as taças: pé, haste e boca, o suficiente para ler como copo -->
+      <g fill="none" stroke="#D8E6EE" stroke-opacity="0.5" stroke-width="2" stroke-linecap="round">
+        <g id="cTaca"><path d="M-5 0h10M0 0v-9M-6 -9a6 7 0 0 0 12 0z"/></g>
+      </g>
+      <g fill="none" stroke="#D8E6EE" stroke-opacity="0.5" stroke-width="2" stroke-linecap="round">
+        <use href="#cTaca" x="16" y="44"/><use href="#cTaca" x="32" y="44"/>
+        <use href="#cTaca" x="62" y="44"/><use href="#cTaca" x="78" y="44"/>
+        <use href="#cTaca" x="16" y="86"/><use href="#cTaca" x="32" y="86"/>
+        <use href="#cTaca" x="62" y="86"/><use href="#cTaca" x="78" y="86"/>
+        <use href="#cTaca" x="16" y="128"/><use href="#cTaca" x="32" y="128"/>
+        <use href="#cTaca" x="62" y="128"/><use href="#cTaca" x="78" y="128"/>
       </g>
     </g>
 
-    <!-- cadeira de plástico vazia, encostada na parede. Ficava no eixo exato da
-         tela, atrás da lâmpada e de quem senta no meio: aparecia recortada, sem
-         as pernas, e lia como bloco âmbar em vez de cadeira. Saiu do eixo e
-         recuou (menor e mais apagada) para voltar a ser fundo. -->
-    <g transform="translate(112 70) scale(0.52)" stroke="#2A1B12" stroke-width="4" fill="#8A6E27" stroke-linejoin="round">
-      <rect x="196" y="128" width="60" height="12" rx="5"/>
-      <rect x="200" y="72" width="52" height="52" rx="8" fill="#7A6021"/>
-      <path d="M204 140v46M248 140v46" stroke-linecap="round"/>
+    <!-- O QUADRO DA CASA. É o mesmo da sala 3D, e é o que faz esta parede ser a
+         parede DESTE jogo: o resto do cômodo é a casa de qualquer um. A espada
+         é a do naipe do baralho. -->
+    <!-- O quadro é a assinatura da casa e não pode viver atrás de uma cabeça,
+         mas também não cabe no alto: ali o cabeçalho da tela o corta. Vai para
+         o VÃO entre dois assentos, que é a única sobra desta faixa. Com a mesa
+         cheia ele some atrás de alguém — a faixa de parede que a mesa 2D
+         mostra é fina, e com oito jogadores não existe lugar livre nela. -->
+    <g transform="translate(92 46)">
+      <rect x="0" y="0" width="82" height="60" rx="3" fill="#16261F" stroke="#4A3020" stroke-width="6"/>
+      <rect x="7" y="7" width="68" height="46" fill="none" stroke="#C9A24E" stroke-opacity="0.75" stroke-width="1.5"/>
+      <text x="41" y="26" text-anchor="middle" font-family="Georgia, serif" font-weight="700"
+            font-size="15" fill="#F4ECD8">CAÇAMBA</text>
+      <g transform="translate(35 30) scale(0.13)" fill="#C9A24E">
+        <path d="M50 10 C 82 34, 88 50, 88 62 C 88 74, 79 81, 70 81 C 61 81, 54 74, 50 65 C 46 74, 39 81, 30 81 C 21 81, 12 74, 12 62 C 12 50, 18 34, 50 10 Z"/>
+        <path d="M44 63 h12 c0 15, 3 24, 8 29 h-28 c5 -5, 8 -14, 8 -29 z"/>
+      </g>
+      <text x="41" y="50" text-anchor="middle" font-family="Georgia, serif"
+            font-size="7" fill="#8FAE9C">A MESA É AQUI</text>
+    </g>
+
+    <!-- os porta-retratos da família, ao lado do quadro -->
+    <g stroke="#4A3020" stroke-width="3" fill="#3A3028">
+      <rect x="98" y="120" width="22" height="28" rx="2"/>
+      <rect x="126" y="126" width="18" height="22" rx="2"/>
+      <rect x="152" y="118" width="20" height="26" rx="2"/>
+    </g>
+
+    <!-- o bambu no cachepô branco, no canto -->
+    <g transform="translate(336 132)">
+      <rect x="-16" y="66" width="32" height="38" rx="3" fill="#3A3831" stroke="#8C6A45" stroke-opacity="0.45" stroke-width="3"/>
+      <g stroke="#5E7A44" stroke-width="3" stroke-linecap="round" fill="none">
+        <path d="M-6 66V12M2 66V4M9 66V22"/>
+      </g>
+      <g fill="#4A6B38">
+        <ellipse cx="-13" cy="26" rx="9" ry="3.5" transform="rotate(-25 -13 26)"/>
+        <ellipse cx="10" cy="16" rx="9" ry="3.5" transform="rotate(20 10 16)"/>
+        <ellipse cx="-9" cy="46" rx="8" ry="3" transform="rotate(-15 -9 46)"/>
+        <ellipse cx="14" cy="38" rx="8" ry="3" transform="rotate(25 14 38)"/>
+      </g>
     </g>
 
     <!-- a lâmpada, a pino sobre a mesa: é ela que explica a luz de toda a tela -->

@@ -408,9 +408,14 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
   border: 15px solid var(--aro);
   border-top-color: var(--aro-luz);
   border-bottom-color: var(--aro-noite);
+  /* MADEIRA, e não mais feltro verde. A mesa 3D virou a mesa de casa (tampo de
+     madeira, pernas palito) e a 2D foi junto: as duas telas mostram a mesma
+     partida, e mostrar duas mesas diferentes é dizer que são dois jogos.
+     O clareado no meio é a luminária batendo no verniz — o mesmo gesto que o
+     feltro tinha, com a cor trocada. As cores são as do tampo em 3D. */
   background:
-    radial-gradient(56% 44% at 50% 66%, rgba(242, 193, 78, 0.14) 0%, rgba(242, 193, 78, 0) 72%),
-    radial-gradient(120% 96% at 50% 22%, var(--felt-luz) 0%, var(--felt) 44%, var(--felt-deep) 100%);
+    radial-gradient(56% 44% at 50% 66%, rgba(255, 226, 164, 0.16) 0%, rgba(255, 226, 164, 0) 72%),
+    radial-gradient(120% 96% at 50% 22%, #c09a6a 0%, #a97c47 44%, #7a5530 100%);
   box-shadow:
     /* fio âmbar onde a madeira encontra o feltro: é a marchetaria da mesa */
     inset 0 2px 0 rgba(242, 193, 78, 0.18),
