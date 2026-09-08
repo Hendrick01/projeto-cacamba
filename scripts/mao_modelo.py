@@ -11,6 +11,9 @@ from mathutils import Vector, Matrix
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 ap = argparse.ArgumentParser(); ap.add_argument('saida'); ap.add_argument('--tris', type=int, default=2400); ap.add_argument('--render', default=None)
+ap.add_argument('--abertura', type=float, default=0.0,
+                help='graus de afastamento entre os dedos. 0 no rig do jogo; ~8 no molde de '
+                     'referência, onde o VÃO entre os dedos precisa aparecer')
 ap.add_argument('--lado', choices=('esq', 'dir'), default='esq',
                 help='esq (o espaço canônico) ou dir, que espelha em x. Espelhar aqui, e não com '
                      'escala negativa na cena, é o que mantém as normais e o sentido das faces')
@@ -66,8 +69,15 @@ partes.append(punho)
 bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=0.11, location=(0.17 * ESP, 0.14, 0.0))
 monte = bpy.context.object; monte.name = 'monte'; monte.scale = (1.1, 1.3, 0.8); partes.append(monte)
 
+# leque dos dedos: cada um se afasta do médio na proporção da distância a ele.
+# Serve ao molde — um rigger (o nosso e o do Meshy) acha os dedos pelos VÃOS, e
+# mão de dedos colados não tem vão nenhum.
+def direcao(x):
+    if not args.abertura: return Vector((0, 1, 0))
+    ang = math.radians(args.abertura) * (x - DEDOS['Middle'][0]) / 0.24
+    return Vector((math.sin(ang), math.cos(ang), 0))
 for nome, (x, y, comp, raio) in DEDOS.items():
-    cilindro(Vector((x, y - 0.06, 0.0)), Vector((0, 1, 0)), comp + 0.06, raio, nome)
+    cilindro(Vector((x, y - 0.06, 0.0)), direcao(x), comp + 0.06, raio, nome)
 cilindro(POLEGAR['base'], POLEGAR['dir'], POLEGAR['comp'], POLEGAR['raio'], 'Thumb')
 
 # funde tudo numa malha fechada e reduz
@@ -97,7 +107,7 @@ def cadeia(nome, base, direcao, comp):
     pai = f'{LADO}Hand'
     for k in range(3):
         osso(f'{LADO}{nome}{k + 1}', pontos[k], pontos[k + 1], pai); pai = f'{LADO}{nome}{k + 1}'
-for nome, (x, y, comp, raio) in DEDOS.items(): cadeia(nome, Vector((x, y, 0)), Vector((0, 1, 0)), comp)
+for nome, (x, y, comp, raio) in DEDOS.items(): cadeia(nome, Vector((x, y, 0)), direcao(x), comp)
 cadeia('Thumb', POLEGAR['base'], POLEGAR['dir'], POLEGAR['comp'])
 bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -116,7 +126,7 @@ arm_data.bones[f'{LADO}Thumb1']['eixoFlexao'] = [-0.259, 0.0, 0.966 * ESP]
 mao.data.validate(); mao.data.update()
 def smooth(x): x = max(0.0, min(1.0, x)); return x * x * (3 - 2 * x)
 def rampa(a, centro, meia): return smooth((a - centro + meia) / (2 * meia))
-eixos = {nome: (Vector((x, y, 0)), Vector((0, 1, 0)), comp, raio) for nome, (x, y, comp, raio) in DEDOS.items()}
+eixos = {nome: (Vector((x, y, 0)), direcao(x), comp, raio) for nome, (x, y, comp, raio) in DEDOS.items()}
 eixos['Thumb'] = (POLEGAR['base'], POLEGAR['dir'], POLEGAR['comp'], POLEGAR['raio'])
 grupos = {n: mao.vertex_groups.new(name=n) for n in [f'{LADO}Hand'] + [f'{LADO}{d}{k}' for d in eixos for k in (1, 2, 3)]}
 for v in mao.data.vertices:
@@ -145,13 +155,17 @@ print('grupos sem peso:', vazios)
 if args.render:
     cena = bpy.context.scene; cena.render.engine = 'BLENDER_WORKBENCH'; cena.render.resolution_x = 900; cena.render.resolution_y = 600
     cena.display.shading.light = 'STUDIO'; cena.display.shading.color_type = 'SINGLE'; cena.display.shading.single_color = (0.85, 0.6, 0.45)
+    # fundo claro: a folha do molde é para ser lida e mandada adiante, e sobre
+    # preto a silhueta some
+    cena.display.shading.background_type = 'VIEWPORT'; cena.display.shading.background_color = (0.97, 0.96, 0.94)
+    cena.render.film_transparent = False
     cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); bpy.context.collection.objects.link(cam); cena.camera = cam
-    cam.data.type = 'ORTHO'; cam.data.ortho_scale = 1.6
-    cam.location = (0.1, 0.45, 3.0); cam.rotation_euler = (0, 0, 0)          # de frente para a palma (+Z)
+    cam.data.type = 'ORTHO'; cam.data.ortho_scale = 2.1   # cabe a mão inteira com folga
+    cam.location = (0.13 * ESP, 0.62, 3.0); cam.rotation_euler = (0, 0, 0)   # de frente para a palma (+Z)
     cena.render.filepath = args.render; bpy.ops.render.render(write_still=True)
-    cam.location = (0.1, 0.45, -3.0); cam.rotation_euler = (math.pi, 0, 0)  # costas da mão
+    cam.location = (0.13 * ESP, 0.62, -3.0); cam.rotation_euler = (0, math.pi, 0)  # costas (gira em Y: os dedos continuam para cima)
     cena.render.filepath = args.render.replace('.png', '-costas.png'); bpy.ops.render.render(write_still=True)
-    cam.location = (3.0, 0.45, 0.0); cam.rotation_euler = (math.pi / 2, 0, math.pi / 2)  # de lado (do polegar)
+    cam.location = (3.0 * ESP, 0.62, 0.0); cam.rotation_euler = (0, math.pi / 2 * ESP, 0)  # de lado, pelo polegar
     cena.render.filepath = args.render.replace('.png', '-lado.png'); bpy.ops.render.render(write_still=True)
 
 bpy.ops.object.select_all(action='DESELECT'); mao.select_set(True); arm.select_set(True)
