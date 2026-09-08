@@ -10,7 +10,7 @@
 
 import * as THREE from './vendor/three.module.js';
 import { preparaDedos } from './dedos3d.js';
-import { preparaInteracao, MESA } from './interacao3d.js';
+import { preparaInteracao, reageCorpo, MESA } from './interacao3d.js';
 
 // Do chão ao topo da cabeça, sentado. Modelo cru é normalizado para isso.
 export const ALTURA_SENTADO = 1.55;
@@ -255,6 +255,9 @@ export function reage(m, nome) {
     mostrou = true;
   }
   if (m.morfos[nome]) { m.morfos[nome].malha.morphTargetInfluences[m.morfos[nome].indice] = 1; mostrou = true; }
+  // Escultura não muda de cara: sem morph nem clip, quem reage é o corpo.
+  // Devolve 'corpo' para o provador poder dizer o que aconteceu.
+  if (!mostrou && reageCorpo(m, nome)) return 'corpo';
   return mostrou;
 }
 
@@ -291,7 +294,8 @@ export function confereModelo(gltf, m) {
 
   item(m.dedos?.juntas.length ? true : null, m.dedos?.juntas.length ? `${m.dedos.juntas.length} ossos de dedos: use o controle de flexão para conferir as duas mãos` : 'Sem articulação dos dedos');
   for (const nome of ['feliz', 'bravo', 'bocaAberta']) {
-    item(m.morfos[nome] ? true : null, (m.morfos[nome] ? 'Morph ' : 'Sem morph ') + nome + (nome === 'bocaAberta' ? (m.morfos[nome] ? ' (a voz move)' : ' (a fala usa a elipse escura)') : ''));
+    const semCara = nome === 'bocaAberta' ? ' (a fala usa a elipse escura)' : m.estatico ? ' (a reação é do corpo: pulo no assento ou balanço com recuo)' : '';
+    item(m.morfos[nome] ? true : null, (m.morfos[nome] ? 'Morph ' : 'Sem morph ') + nome + (m.morfos[nome] ? (nome === 'bocaAberta' ? ' (a voz move)' : '') : semCara));
   }
   const clips = (gltf.animations || []).map((a) => a.name);
   for (const nome of ['idle', 'feliz', 'bravo']) item(clips.includes(nome) ? true : null, (clips.includes(nome) ? 'Clip ' : 'Sem clip ') + nome);

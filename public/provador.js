@@ -249,7 +249,9 @@ for (const nome of ['feliz', 'bravo']) {
   $(`ex-${nome}`).onclick = () => {
     const m = atual?.m; if (!m) return;
     neutro();
-    if (!reage(m, nome)) { dicaEl.innerHTML = `<span class="aviso">Este modelo não tem morph nem clip “${nome}”</span> — a mesa não mostra reação nele.`; return; }
+    const como = reage(m, nome);
+    if (!como) { dicaEl.innerHTML = `<span class="aviso">Este modelo não tem morph nem clip “${nome}”</span> — a mesa não mostra reação nele.`; return; }
+    if (como === 'corpo') dicaEl.textContent = `Sem morph nem clip “${nome}”: a mesa reage com o corpo — é o que os oito esculpidos fazem.`;
     caraAte = performance.now() + 1900;   // a mesa desfaz a cara depois de 1,9 s
   };
 }

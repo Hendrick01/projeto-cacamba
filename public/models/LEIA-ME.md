@@ -253,9 +253,17 @@ a referência (Capote) se lê de longe, que é como se joga no celular:
 | alguém joga | o tronco vira até 0,37 rad na direção de quem está jogando |
 | a vez é dele | chega 5,5 cm para a frente, levanta o leque 6 cm e o deita um pouco mais para si |
 | um lance qualquer | a placa sobre a cabeça diz o verbo (COMPROU, DESCARTOU, BAIXOU, ENCAIXOU) por 1,8 s; fora disso diz JOGANDO ou PRÓXIMO |
+| baixou, bateu, pegou coringa | **reação `feliz`**: dois pulos no assento (4,5 cm) |
+| pediu o meio e não veio | **reação `bravo`**: dois balanços do tronco (0,17 rad) com um palmo de recuo |
+
+As duas últimas só entram **quando o arquivo não traz morph nem clip** com esse
+nome — uma escultura não muda de cara. Com morph `feliz`/`bravo` (ou clip de
+mesmo nome), a cara manda e o corpo não se mexe. No provador, os botões
+**feliz** e **bravo** dizem qual dos dois caminhos aconteceu.
 
 Compra e descarte **não** movem o braço (não há braço): a carta voa da pinça
-até o meio da mesa. Com esqueleto no arquivo, `interacao3d.js` volta a resolver
+até o meio da mesa, e **sem espera** — os 520 ms (descarte) e 635 ms (baixada)
+de atraso existiam para a carta sair da mão no meio do gesto do braço. Com esqueleto no arquivo, `interacao3d.js` volta a resolver
 braços e dedos e o gesto reaparece.
 
 ### A roda de cadeiras e o tampo

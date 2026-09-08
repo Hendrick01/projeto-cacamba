@@ -811,6 +811,21 @@ braço): a carta voa da pinça. Com esqueleto no arquivo, o caminho antigo
 (braços por cinemática, dedos, cabeça) volta inteiro; `i.estatico` separa os
 dois.
 
+**A reação sem cara** (2026-09-07): `reage()` procurava morph e clip, e as
+esculturas não têm nenhum dos dois — quem baixava ou batia não respondia nada.
+Agora, quando não acha, cai em `reageCorpo`: `feliz` dá dois pulos de 4,5 cm no
+assento, `bravo` balança o tronco 0,17 rad e recua 5 cm. As duas nascem e
+morrem no repouso (envelope `sin(pi·u)`), e por isso somam-se ao respiro e à
+chegada da vez sem tranco. `reage()` devolve `'corpo'` nesse caso, e é o que o
+provador mostra ao apertar **feliz**/**bravo**. Com morph ou clip no arquivo, a
+cara continua mandando e o corpo não se mexe.
+
+No mesmo dia, um defeito que a pose estática deixou: os voos de descarte e de
+baixada esperavam 520 ms e 635 ms antes de sair da mão — atraso calibrado para
+a carta partir no meio do gesto do braço. Sem braço, virou tempo parado. O
+atraso agora depende de haver gesto (`temGesto`, em `mesa3d.js`): 90 ms e
+120 ms para escultura estática.
+
 Da mesma referência veio a **placa de estado** sobre a cabeça: acima do nome,
 diz JOGANDO (âmbar) ou PRÓXIMO, e por 1,8 s o verbo do lance de quem acabou de
 jogar (COMPROU, DESCARTOU, BAIXOU, ENCAIXOU, PEGOU A SOBRA, PEDIU O MEIO). Numa

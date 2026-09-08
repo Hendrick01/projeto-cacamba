@@ -223,6 +223,35 @@ export function gestoCarta(m, tipo, destino) {
 const RESPIRO = 0.008;      // metros de sobe-e-desce
 const CHEGADA = 0.055;      // metros para a frente na própria vez
 const LEQUE_NA_VEZ = 0.06;  // metros que o leque sobe na própria vez
+
+// A reação sem morph nem clip. Uma escultura não muda de cara, então quem
+// baixou, bateu ou levou a carta responde com o CORPO: `feliz` pula duas vezes
+// no assento, `bravo` balança a cabeça (aqui, o tronco) e recua um palmo. As
+// duas nascem e morrem no repouso — o envelope `sin(pi·u)` garante isso, e por
+// isso podem somar-se ao respiro e à chegada da vez sem tranco.
+const REACOES = {
+  feliz: { dur: 0.95, batidas: 2, sobe: 0.045, giro: 0.05, recua: 0 },
+  bravo: { dur: 1.05, batidas: 2, sobe: 0.004, giro: 0.17, recua: 0.05 },
+};
+// Marca a reação. Só vale para escultura estática: num modelo com esqueleto o
+// clip (ou o morph) manda, e mexer na raiz brigaria com a cinemática dos braços.
+export function reageCorpo(m, tipo) {
+  const i = m.interacao;
+  if (!i?.estatico || !REACOES[tipo]) return false;
+  i.reacao = { tipo, t: 0 };
+  return true;
+}
+// Devolve {dy, dz, giro} da reação em curso, ou zeros.
+function passoDaReacao(i, dt, parado) {
+  const r = i.reacao;
+  if (!r) return { dy: 0, dz: 0, giro: 0 };
+  const e = REACOES[r.tipo];
+  r.t += parado ? e.dur : dt;
+  const u = r.t / e.dur;
+  if (u >= 1) { i.reacao = null; return { dy: 0, dz: 0, giro: 0 }; }
+  const env = Math.sin(Math.PI * u), onda = Math.sin(2 * Math.PI * e.batidas * u);
+  return { dy: e.sobe * Math.abs(onda) * env, dz: -e.recua * env, giro: e.giro * onda * env };
+}
 function atuaCorpoInteiro(m, i, dt, { parado, olhar, suaVez }) {
   const suave = parado ? 1 : 1 - Math.exp(-dt * 4);
   i.giro += (T.MathUtils.clamp(olhar, -0.5, 0.5) * 0.75 - i.giro) * suave;
@@ -231,8 +260,10 @@ function atuaCorpoInteiro(m, i, dt, { parado, olhar, suaVez }) {
   r.rotation.y = i.giroBase + i.giro;
   // chega para a frente NO EIXO DO CORPO (a raiz já está virada), para a
   // inclinação valer também quando ele está olhando para o lado
-  const c = Math.cos(i.giro), sn = Math.sin(i.giro), avanca = i.vez * CHEGADA;
-  r.position.set(i.repousoRaiz.x + sn * avanca, i.repousoRaiz.y + (parado ? 0 : Math.sin(i.tempo * 1.7) * RESPIRO), i.repousoRaiz.z + c * avanca);
+  const reacao = passoDaReacao(i, dt, parado);
+  r.rotation.y += reacao.giro;
+  const c = Math.cos(i.giro), sn = Math.sin(i.giro), avanca = i.vez * CHEGADA + reacao.dz;
+  r.position.set(i.repousoRaiz.x + sn * avanca, i.repousoRaiz.y + reacao.dy + (parado ? 0 : Math.sin(i.tempo * 1.7) * RESPIRO), i.repousoRaiz.z + c * avanca);
   // o leque mora na âncora: sobe um pouco e deita para o dono na própria vez
   // (antes de `conectaLeque` ainda não há âncora com base — o corpo já atua)
   if (i.ancoraBase) i.ancora.position.y = i.ancoraBase.y + i.vez * LEQUE_NA_VEZ;

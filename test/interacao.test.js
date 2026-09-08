@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from '../public/vendor/three.module.js';
 import { carregaCPU } from '../scripts/modelo-node.mjs';
-import { encaixaModelo, criaBanqueta } from '../public/modelo3d.js';
+import { encaixaModelo, criaBanqueta, reage } from '../public/modelo3d.js';
 import { MESA, atualizaInteracao, conectaLeque, arrumaLeque, gestoCarta, ajustaBanqueta } from '../public/interacao3d.js';
 
 const world = (o) => o.getWorldPosition(new T.Vector3());
@@ -66,6 +66,25 @@ for (const slug of ['matheus', 'junior', 'dri', 'esterex', 'gabizinsky', 'lyly',
     assert.ok(m.interacao.ancora.position.y - lequeAntes > 0.03, 'o leque não subiu na vez dele');
     for (let f = 0; f < 120; f++) atualizaInteracao(m, 1 / 60);
     assert.ok(Math.abs(raiz.position.z - zAntes) < 0.005, 'não voltou ao lugar depois da vez');
+
+    // sem morph nem clip, quem reage é o corpo — e a reação nasce e morre no
+    // repouso, para poder somar-se ao respiro e à chegada da vez sem tranco
+    {
+      atualizaInteracao(m, 1 / 60, { parado: true });
+      const yRepouso = raiz.position.y, zRepouso = raiz.position.z;
+      assert.equal(reage(m, 'feliz'), 'corpo', 'a reação de corpo não entrou');
+      let subiu = 0;
+      for (let f = 0; f < 60; f++) { atualizaInteracao(m, 1 / 60); subiu = Math.max(subiu, raiz.position.y - yRepouso); }
+      assert.ok(subiu > 0.02, `pulo de ${(subiu * 100).toFixed(1)} cm`);
+      assert.equal(reage(m, 'bravo'), 'corpo');
+      let girou = 0, recuou = 0;
+      for (let f = 0; f < 70; f++) { atualizaInteracao(m, 1 / 60); girou = Math.max(girou, Math.abs(raiz.rotation.y)); recuou = Math.max(recuou, zRepouso - raiz.position.z); }
+      assert.ok(girou > 0.08, `balanço de ${girou.toFixed(2)} rad`);
+      assert.ok(recuou > 0.02, `recuo de ${(recuou * 100).toFixed(1)} cm`);
+      // acabou: volta ao repouso (o respiro é o que sobra, em milímetros)
+      for (let f = 0; f < 90; f++) atualizaInteracao(m, 1 / 60, { parado: true });
+      assert.ok(Math.abs(raiz.position.y - yRepouso) < 1e-6 && Math.abs(raiz.rotation.y) < 1e-6, 'não voltou ao repouso depois da reação');
+    }
 
     // ninguém entra no feltro: no raio da roda de cadeiras, nenhum vértice
     // pode cair na fatia do tampo (as mãos passam POR CIMA, os joelhos por

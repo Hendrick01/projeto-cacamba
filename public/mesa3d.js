@@ -1480,7 +1480,7 @@ async function sincroniza(primeira) {
           const a = assentos.get(descarteDe);
           if (a?.assento?.modelo) {
             const destino = face.position.clone();
-            voa(face, destino, destino, { dur: 330, atraso: 520, arco: 0.012,
+            voa(face, destino, destino, { dur: 330, atraso: temGesto(a) ? 520 : 90, arco: 0.012,
               deAtual: () => descarte.grupo.worldToLocal(pontoDaMaoAtiva(a)) });
           } else face.userData.cai = performance.now();
         }
@@ -1547,7 +1547,7 @@ async function sincroniza(primeira) {
       if (temNovo && baixadaDe === p.id && !semMovimento) {
         const a = assentos.get(p.id);
         const origem = a ? lequeDe(a) : new THREE.Vector3(0, MESA_TOPO + 0.3, 1.2);
-        voa(frente, origem, frente.position.clone(), { dur: 340, atraso: a?.assento?.modelo ? 635 : 0, arco: 0.015, deAtual: a?.assento?.modelo ? () => pontoDaMaoAtiva(a) : null });
+        voa(frente, origem, frente.position.clone(), { dur: 340, atraso: temGesto(a) ? 635 : 120, arco: 0.015, deAtual: a?.assento?.modelo ? () => pontoDaMaoAtiva(a) : null });
       }
       for (const m of p.melds) jogosVistos.add(m.id);
     }
@@ -1729,6 +1729,11 @@ function cartaPassageira(escala = 0.42) {
   return m;
 }
 const topoDoMonte = () => new THREE.Vector3(monte.caixa.position.x, monte.caixa.position.y + monte.caixa.scale.y * 0.1 + 0.02, monte.caixa.position.z);
+// Quem TEM gesto de braço: só um modelo com esqueleto. Os voos de descarte e
+// de baixada esperavam meio segundo para a carta sair da mão no meio do gesto;
+// numa escultura estática, que não estende o braço, isso virou tempo parado
+// antes de a carta se mexer.
+const temGesto = (a) => !!a?.assento?.modelo?.interacao && !a.assento.modelo.interacao.estatico;
 const pontoDaMaoAtiva = (a) => { const obj = a.assento?.modelo?.interacao?.carta || a.leque; obj.updateWorldMatrix(true, false); return obj.getWorldPosition(new THREE.Vector3()); };
 const lequeDe = (a) => { const v = new THREE.Vector3(); a.leque.getWorldPosition(v); return v; };
 // A mão está presa à câmera: um ponto do mundo vira ponto do leque por aqui.
