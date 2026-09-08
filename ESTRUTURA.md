@@ -1693,6 +1693,31 @@ Medido numa mesa de 8 jogadores, com todo o elenco na tela:
 | Fontes (Google) | 54 KB | 54 KB |
 | **Total** | **~620 KB** | **181 KB** |
 
+**A mesa 3D é outra conta**: os `.glb` do elenco são o download dominante — um
+por adversário na tela. Em 08/09/2026 uma varredura achou duas gorduras:
+
+- **`TANGENT`**: o gerador entrega os vértices intercalados com uma base de
+  tangentes de 16 bytes, um terço de cada arquivo. Ela só serve para orientar o
+  normal map; sem ela o three.js deriva a base na tela, que é o que a mesa já
+  fazia em toda malha sem tangente. `scripts/enxuga_modelo.py` a remove, grava
+  cada atributo em bloco justo (o intercalado guardava o espaço mesmo depois da
+  remoção), passa o índice para 16 bits e copia adiante só as imagens que algum
+  material aponta. Os oito foram de 13,3 MB para 10,2 MB — **1,7 MB → 1,3 MB
+  por personagem**, sem diferença visível (conferido no provador, lado a lado).
+  O `gltf-transform prune` NÃO serve para isso: ele apaga `Cabeca`, `MaoEsq`,
+  `MaoDir` e `Assento` por "não referenciados".
+- **O rosto 2D montado à toa**: cada assento pedia três SVGs do elenco e
+  rasterizava três canvas de 640×520 (uns 4 MB de textura na placa por vizinho)
+  para o rosto desenhado — que é o RESERVA e ia para o lixo assim que o `.glb`
+  chegava. Hoje os oito têm modelo, então isso era desperdício em toda partida.
+  Agora o rosto só é montado quando o modelo falha ou não existe.
+
+O que ainda dá para ganhar, medido e não feito: `gltf-transform quantize` tira
+mais 22% (1,34 MB → 1,05 MB), mas grava posição e normal em inteiros, e os
+scripts Python do elenco leem esses atributos como float — mexer nisso pede
+acertar `glb_utils` junto. E gzip nos `.glb` renderia 14%, ao custo de CPU e de
+~9 MB de cache em memória no servidor.
+
 **O que foi medido e NÃO compensou**, para ninguém refazer a conta:
 
 - **Converter o elenco para raster no tamanho de uso.** A figura a 112×224 em
