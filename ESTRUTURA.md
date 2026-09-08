@@ -72,8 +72,8 @@ projeto-caçamba/
 | [`public/baralho.js`](public/baralho.js) | 33 | O mapa do baralho: qual arquivo é qual carta. Importado pelas duas mesas. |
 | [`scripts/baralho_gatos.py`](scripts/baralho_gatos.py) | 233 | Monta as 55 imagens do baralho a partir das folhas desenhadas: corta, tira a moldura impressa, manda pintar o naipe e embute o papel do jogo. |
 | [`scripts/naipe_vermelho.py`](scripts/naipe_vermelho.py) | 261 | Acha as massas de naipe numa carta de copas ou ouros por FORMA, já que a cor é a mesma do gato. |
-| [`scripts/mao_para_posar.py`](scripts/mao_para_posar.py) | 138 | Monta o `.blend` em que a mão de primeira pessoa é posada, e refaz os pesos do rig por difusão de calor (o conversor prendia metade da malha a um osso só). |
-| [`scripts/mao_pose_segura.py`](scripts/mao_pose_segura.py) | 330 | Acha a pose que segura a carta MEDINDO a malha deformada contra o plano dela, e grava o nó `PlanoDaCarta` que a mesa 3D usa para alinhar o leque. |
+| [`scripts/mao_para_posar.py`](scripts/mao_para_posar.py) | 138 | Monta o `.blend` em que a mão de primeira pessoa é posada, e refaz os pesos do rig por difusão de calor. **Fora de uso**: a mesa 3D não tem mais mãos. |
+| [`scripts/mao_pose_segura.py`](scripts/mao_pose_segura.py) | 330 | Acha a pose que segura a carta MEDINDO a malha deformada contra o plano dela. **Fora de uso**, pelo mesmo motivo. |
 | [`public/mesa3d.js`](public/mesa3d.js) | 2116 | A cena 3D: conecta com a mesma sessão, desenha salão/mesa/elenco/mão e joga o ciclo básico (puxar, baixar, descartar) pelos mesmos comandos. |
 | [`public/index.html`](public/index.html) | 334 | Esqueleto das quatro telas (`screen-home`, `screen-avatar`, `screen-lobby`, `screen-game`) e do modal genérico. |
 | [`public/vendor/GLTFLoader.js`](public/vendor/GLTFLoader.js) · `BufferGeometryUtils.js` | — | O carregador glTF do three (r170, MIT), vendido com os imports apontados para o `three.module.js` local. Só a mesa 3D usa. |
@@ -586,10 +586,8 @@ O que ela desenha ([`public/mesa3d.js`](public/mesa3d.js)): o salão em neblina
 (a penumbra por distância de verdade), a mesa redonda sob a lâmpada, o elenco
 sentado em volta **segurando o leque de cartas viradas**, o monte como caixa
 com altura proporcional ao baralho, o descarte e os jogos baixados **em pé**
-sobre o feltro (a carta que cai gira no ar), a sua mão em leque com **as suas
-mãos segurando** — desde 08/09/2026 mãos de verdade, rigadas e posadas (logo
-abaixo); o desenho chapado da mesa 2D (`texturaMao2D`) ficou de reserva, para
-quando o `.glb` não carrega. Reações (boca feliz/brava, pulo) respondem aos mesmos eventos da
+sobre o feltro (a carta que cai gira no ar) e a sua mão em leque — **sem mãos**,
+desde 08/09/2026 (logo abaixo). Reações (boca feliz/brava, pulo) respondem aos mesmos eventos da
 mesa normal.
 
 **A câmera senta à mesa, inclinada sobre o tampo** (`encaixaTela`,
@@ -612,169 +610,41 @@ as fileiras alternam o raio e na da frente sobram ~0,9 m entre vizinhos.
 Conferido na tela com cinco adversários: todos inteiros, dois arcos, nomes
 completos.
 
-### A sua mão em primeira pessoa (08/09/2026)
+### Sem mãos na mesa 3D (08/09/2026)
 
-A mão que segura o leque é um modelo rigado, e **vem posada do arquivo**
-(`public/models/mao-fp-esq.glb`). Não é escolha de gosto: é o único jeito de
-cumprir o que se pede à vista — **o polegar cruzando na frente das cartas e os
-outros quatro dedos fechados atrás** — de um jeito que dê para conferir por
-medida em vez de por opinião.
+A mesa 3D mostra **o leque e mais nada** — nem mão rigada, nem desenho de
+reserva. Foi decisão do usuário depois de um dia inteiro de tentativas: *"não
+ficou como a referência enviada"*, *"descarte e remova do arquivo do jogo essas
+mãos em primeira pessoa"*, *"deixe apenas as cartas em leque mesmo"*.
 
-**Por que não posar no jogo.** A primeira tentativa foi essa: o jogo procurava
-o eixo da pinça entre dois ossos, apontava esse eixo para a câmera e ADIVINHAVA
-o giro que sobrava. Daí saíram as duas queixas: "as mãos estão viradas ao
-contrário" e "a mão ainda atravessa o leque e não causa sensação nenhuma de que
-esteja pegando as cartas". Medindo, o motivo apareceu: na pose de dedos quase
-retos a ponta do polegar ficava **16,3 cm ATRÁS** do ponto mais avançado do
-resto da mão, e girar não mudava nada (o giro era em torno do eixo da
-profundidade, que preserva o z de todo vértice). Nenhum plano separava o
-polegar do resto porque **não havia folga entre eles**. Quem tinha de mudar era
-a pose.
+Vale registrar o que se aprendeu, porque o custo já foi pago e o problema pode
+voltar:
 
-**O contrato.** O modelo traz um nó `PlanoDaCarta`: origem no centro da carta
-que a mão segura, **+Z na normal da palma** (o lado por onde o polegar cruza) e
-**+Y na direção em que a carta sobe**. `encaixaPeloPlano` resolve `M = A · P⁻¹`
-— se `P` é o plano no espaço da mão e `A` é onde a carta está na tela, a mão vai
-para `M`. Não sobra nenhum grau de liberdade para adivinhar. A carta do modelo
-tem a largura de uma carta de verdade na escala da mão, então o mesmo encaixe
-acerta tamanho, lugar e giro de uma vez.
+* **posar no jogo não funciona.** Procurar um eixo de pinça entre dois ossos e
+  adivinhar o giro que sobra produziu mãos viradas ao contrário e furando o
+  leque. O que resolve é um nó de contrato dentro do modelo (`PlanoDaCarta`:
+  origem no centro da carta, +Z na normal da palma, +Y na subida) e uma conta
+  direta, `M = A · P⁻¹`, sem grau de liberdade para adivinhar;
+* **pose se acha por medida.** `scripts/mao_pose_segura.py` mede a malha já
+  deformada pelo esqueleto contra o plano da carta e não sai do lugar por
+  opinião: o dedo enrola até a última falange apontar ATRAVÉS da carta; a carta
+  encosta nos dedos mais meia espessura de leque (12 cartas de 0,3 mm sobre os
+  185 mm da mão); o polegar deita na direção em que as cartas sobem; a pinça
+  fecha até sobrar entre as pontas exatamente uma espessura de leque;
+* **dois defeitos que pareciam de pose e eram de outra coisa:** o rig do
+  conversor tinha 1.602 de 2.283 vértices presos a um osso só (difusão de calor
+  resolveu, 1.602 → 739), e `getVertexPosition` do three.js devolve no espaço do
+  VÍNCULO — multiplicar pela `matrixWorld` de depois dava meio metro de erro, que
+  o jogo "corrigia" empurrando a mão para trás;
+* **o que nunca fechou** foi a leitura: mesmo com a lateralidade conferida pelos
+  ossos e a palma virada para a câmera, a composição não bateu com a referência.
+  A diferença estrutural era de onde os braços entram no quadro — pelas bordas
+  laterais na referência, subindo do rodapé no jogo — e nem corrigindo isso a
+  mesa ficou parecida.
 
-**A pose, e de onde sai cada número** (`scripts/mao_pose_segura.py`, que roda no
-Blender e mede a malha já deformada pelo esqueleto):
-
-* **o quadro** sai da própria mão: a normal é a do plano que melhor cabe nos
-  vértices da palma (SVD), virada para o lado em que o polegar vive; o "para
-  cima" é o eixo punho→nó do médio;
-* **quanto cada dedo fecha**: nem "até encostar" (para com 12°, mão ainda
-  espalmada) nem "até o polegar não cobrir mais" (não para nunca — vai ao punho
-  fechado). O que separa uma mão espalmada de uma mão que segura é para onde a
-  ponta do dedo aponta: reta, aponta AO LONGO da carta; enrolada, ATRAVÉS dela.
-  O ângulo reto entre as duas direções é o ponto de virada — **30° na base de
-  cada dedo, 95° somando as três falanges**;
-* **onde a carta fica**: na profundidade, encostada nos dedos mais **meia
-  espessura do leque** — 12 cartas (o motor distribui 12) de 0,3 mm sobre os
-  185 mm da mão; no plano, a borda de baixo na **linha dos nós**, que é onde o
-  canto do leque encosta na mão, e o leque subindo dali;
-* **o polegar** tem duas contas, em ordem: passar à frente do leque, com a
-  **última falange inteira** — medida pelo vértice mais ATRASADO dela, não pelo mais
-  avançado. Pela ponta, a busca parava assim que a unha assomava e o que
-  aparecia sobre as cartas era um calombo, não um dedão (77 vértices à frente
-  contra 16). Havia uma segunda conta — puxar a ponta para dentro do retângulo
-  da carta — e ela fazia o polegar CRUZAR para o meio do leque, varrendo a
-  palma; tirá-la de vez deixava o polegar espetado para fora, na borda. A conta
-  que ficou no lugar dela decide entre poses que já cumprem a profundidade, e
-  vale pouco (0,05 contra 10): a falange fica **deitada sobre as cartas, na
-  direção em que elas sobem** — o polegar acompanha o leque, como na referência
-  que o usuário mandou.
-
-* **onde o leque afunda na mão**: a borda de baixo fica na **base do polegar**,
-  não na linha dos nós. Nos nós, a carta ficava logo acima da ponta do polegar e
-  ele aparecia rente à borda em vez de deitado sobre as cartas.
-
-* **quanta folga o alto precisa**: a mesa põe a mão inclinada 24° e o leque
-  continua em pé, então girar a mão levanta o dedo da ponta acima do que ele
-  mede aqui. Quanto, é conta: metade da largura dos dedos vezes o seno do
-  ângulo — 0,100 sobre os 0,012 de margem. Sem ela sobrava dedo espiando por
-  cima da borda do leque (visto na tela). Tentei antes gravar a inclinação no
-  próprio quadro do contrato: piorou, porque aí a pose inteira passa a valer
-  para uma carta torta. Usar um eixo só o deixava com cara de quebrado; e a rotação se
-  reparte pelas três juntas, porque 111° concentrados na base rasgavam a pele da
-  tenar.
-
-O relatório do script termina numa conta que é a mesma que o jogo faz:
-`polegar a frente 77/297 · resto a frente 0/1986`. `test/mao-fp-pose.test.js`
-refaz essa medida no arquivo entregue, porque as duas metades falham em
-silêncio — sem o nó, a mesa volta a adivinhar; sem a pose nos ossos, o modelo
-chega espalmado. (Exportar do Blender exige `export_rest_position_armature=False`:
-com o padrão, o glTF sai na posição de repouso.)
-
-**Os pesos do rig foram refeitos.** O conversor tinha pesado por proximidade:
-1.602 dos 2.283 vértices presos a UM osso com peso 1, e a costura entre polegar
-e palma num degrau seco de 0,5/0,5. Qualquer oposição do polegar abria ali uma
-aba de pele esticada — parecia defeito de pose e era do rig. A difusão de calor
-do Blender (`mao_para_posar.py`) reparte cada vértice entre os ossos que o
-alcançam: 1.602 → 739.
-
-**E o medidor do jogo estava errado.** `medeAMao` compunha o vértice com
-`getVertexPosition` e multiplicava pela `matrixWorld` — mas aquele método
-devolve no espaço do VÍNCULO, e o vínculo é capturado no carregamento, com a mão
-ainda fora do grupo. O erro crescia com a transformação da mão: meio metro de
-sobra, que o jogo "corrigia" empurrando a mão para trás. Hoje a posição é
-composta osso a osso (`posicaoDeformada`), a mesma conta que a GPU faz, e o
-recuo corretivo mede **0**.
-
-**A esquerda segura pelo MEIO do leque**, não pela ponta: é onde a mão fica
-quando se abre um leque de verdade, e na ponta ela puxava o olho para o canto.
-
-E **entrando pela borda lateral**, não subindo do rodapé. Este foi o achado que
-mais aproximou a mesa da referência que o usuário mandou: nela os dois
-antebraços entram deitados pelos lados, com o leque no meio — o da esquerda de
-baixo à esquerda a 35° da horizontal, o da direita do alto à direita a 15°. O
-jogo não guarda esses ângulos: guarda as DIREÇÕES em que o punho tem de ficar em
-relação à pinça (`BRACO_ESQ`, `BRACO_DIR`), e `anguloDoBraco` mede no próprio
-modelo o giro que as cumpre. Antes disso a mão subia a prumo do meio da tela,
-inclinada só 0,42 rad (24°, o ângulo das mãos desenhadas da mesa 2D). Não é enfeite: uma mão vertical, subindo reta do
-meio da tela, com o polegar à direita, lê como o DORSO de uma mão direita mesmo
-sendo a esquerda ("as duas mãos na imagem são direitas", 08/09/2026). A medida
-dizia que estava certo — palma para a câmera, polegar à direita, lateralidade
-conferida pelos ossos — e ainda assim o olho lia errado. Quem resolve é a
-inclinação, porque é ela que conta de que ombro a mão vem.
-
-**A esquerda segura, a direita PINÇA.** A direita também vem posada do arquivo,
-por `mao_pose_segura.py --pinca`: o indicador enrola até o ponto de retorno, o
-polegar vem ao encontro dele até sobrar entre as duas pontas **exatamente a
-espessura do leque** (0,0194 medidos contra 0,0195 de 12 cartas — a carta cabe
-ali), e os outros três ficam no mesmo fechamento dos dedos que seguram, meio
-enrolados; esticados, varriam o leque inteiro e cobriam as cartas do meio. O
-contrato marca a carta pinçada, com a pinça na BORDA DE CIMA, então o alvo é o
-centro da carta escolhida e o resto se encaixa.
-
-E a **carta sai do leque junto com a mão**. O leque é um arco: com a pinça no
-plano da carta escolhida, o indicador fica atrás DELA mas na frente das
-vizinhas e fura a face delas; levar só a mão para a frente desfaria a pinça.
-As duas andam juntas — que é o gesto de puxar a carta para fora, o da referência
-— e o alvo anda na mesma proporção do avanço, para tudo ficar no mesmo raio de
-visão.
-
-O rig de tempo de execução (`primeira-pessoa-maos.js`) deixou de ser usado pela
-mesa: com as duas mãos posadas no arquivo, aplicar uma pose por cima dobraria
-tudo duas vezes.
-
-**A direita ESCOLHE.** A direita só aparece na sua vez E na
-fase de jogar — na hora de puxar do monte ela não tem o que fazer no leque, e
-parada ali só rouba a faixa de leitura das cartas. Ela vai para a carta
-selecionada — ou para a última,
-enquanto não há escolha —, com a pinça no **canto de cima à direita** dela: é o
-canto que fica exposto num leque, porque cada carta cobre a anterior pela
-esquerda, e é ele que joga o corpo da mão para fora do leque em vez de cobrir
-as vizinhas. Ela também tem o seu `PlanoDaCarta` (`mao_pose_segura.py --aberta`
-grava só o quadro, sem posar) e a mesma inclinação da esquerda, espelhada.
-
-A direita **desce sobre o leque**: os dedos apontam para baixo, na mesma
-inclinação da esquerda, que é como se puxa uma carta de dentro de um leque —
-pela borda de cima. A **orientação sai do polegar**: numa mão que alcança pela
-direita ele fica por cima da carta, e para uma mão direita com os dedos apontando para a esquerda
-isso só acontece com a palma virada para longe da câmera — é o dorso da própria
-mão que se vê ao esticar o braço. Com a palma para a câmera, como a esquerda, o
-polegar cai embaixo e a mão lê de cabeça para baixo (visto na tela, 08/09/2026).
-
-E vem para a **frente do leque inteiro**, por medida: no plano da carta
-escolhida os dedos ficavam atrás dela mas na frente das vizinhas e furavam a
-face delas — o leque é um arco, não um plano só. `medeAMao` passou a devolver
-também o ponto mais ATRÁS da malha deformada, e a mão avança até esse ponto
-passar da carta mais à frente. Aproximar da câmera afasta do centro da tela, e
-a mão saía de cima da carta: o alvo anda junto, na mesma proporção, e o ponto da
-pinça fica no MESMO RAIO DE VISÃO. Por fim, quem encosta na carta é a **ponta do
-indicador**, não a origem do plano — o contrato marca o centro de uma carta
-SEGURADA, e numa mão aberta isso cai no meio dos dedos, o que deixava a mão
-flutuando ao lado do leque.
-
-Duas tentativas anteriores erraram por não pensar nas duas mãos como um PAR: o
-encaixe antigo, por eixo de pinça com um giro de 2,0 rad escolhido a esmo, a
-punha de cabeça para baixo; e virá-la de costas para a câmera, "como quem
-estica o braço", só trocou um jeito errado por outro. É ela quem o rig ainda
-comanda (pose `pinca`) — a esquerda vem posada do arquivo e o rig não a toca,
-senão a pose seria aplicada duas vezes.
+O caminho de volta: `git show ab5aafd` tem o estado final, e os geradores
+continuam no repositório (`scripts/mao_para_posar.py`,
+`scripts/mao_pose_segura.py`), que são a parte cara de refazer.
 
 ### Ler os jogos baixados (08/09/2026)
 
