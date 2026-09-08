@@ -100,10 +100,12 @@ function texturaCorredor(){return canvasTex(256,512,(c,w,h)=>{
 // O dia pela janela: o quintal estourado de luz. Sem sombreamento (MeshBasic),
 // que é como o olho vê uma janela vista de dentro.
 function texturaQuintal(){return canvasTex(256,256,(c,w,h)=>{
-  const gr=c.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#f4f7fa');gr.addColorStop(.55,'#dfe9de');gr.addColorStop(1,'#b9c8ab');
+  // Fim de tarde: o quintal pega o dourado baixo e as folhas ficam contra a
+  // luz. É esta janela que dá a hora da sala — a lâmpada da mesa faz o resto.
+  const gr=c.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#ffe3ac');gr.addColorStop(.5,'#f6c887');gr.addColorStop(1,'#c79a68');
   c.fillStyle=gr;c.fillRect(0,0,w,h);
-  c.fillStyle='#9fb890';for(let i=0;i<9;i++)c.fillRect(12+i*28,150+((i*37)%40),22,110);
-  c.fillStyle='#cdd6c4';c.fillRect(0,214,w,42);chuvisco(c,w,h,5,4);});}
+  c.fillStyle='#7d8a5e';for(let i=0;i<9;i++)c.fillRect(12+i*28,150+((i*37)%40),22,110);
+  c.fillStyle='#a89268';c.fillRect(0,214,w,42);chuvisco(c,w,h,5,4);});}
 
 // O quadrinho dos talheres: garfo, colher e faca em branco sobre madeira. É o
 // detalhe que diz "sala de jantar" e não "sala de estar".
@@ -119,6 +121,35 @@ function texturaTalheres(){return canvasTex(200,240,(c,w,h)=>{
   // faca
   c.beginPath();c.moveTo(150,40);c.lineTo(160,54);c.lineTo(158,96);c.lineTo(142,96);c.lineTo(142,54);c.closePath();c.fill();haste(150);
   chuvisco(c,w,h,4,7);});}
+
+// Os porta-retratos: foto de fim de tarde com as pessoas em contraluz. Não
+// tem rosto de propósito — rosto genérico em 3 cm de parede vira borrão
+// estranho, e silhueta contra a luz é o que o olho aceita como "foto de
+// família" sem pedir detalhe.
+function texturaRetrato(i){return canvasTex(160,200,(c,w,h)=>{
+  const gr=c.createLinearGradient(0,0,0,h);
+  const ceus=[['#ffd9a0','#e8a86a'],['#cfe0ea','#9db9c8'],['#ffe6bc','#d8a878'],['#e6dcc8','#b9a888']][i%4];
+  gr.addColorStop(0,ceus[0]);gr.addColorStop(1,ceus[1]);c.fillStyle=gr;c.fillRect(0,0,w,h);
+  c.fillStyle='rgba(60,44,30,.75)';
+  const gente=[[2,58],[3,52],[2,64],[4,48]][i%4];
+  for(let k=0;k<gente[0];k++){const x=w/2+(k-(gente[0]-1)/2)*34;
+    c.beginPath();c.arc(x,h-gente[1]-34,13,0,7);c.fill();
+    c.beginPath();c.ellipse(x,h-gente[1]+16,19,32,0,0,7);c.fill();}
+  c.fillStyle='rgba(60,44,30,.55)';c.fillRect(0,h-gente[1]+44,w,gente[1]);
+  chuvisco(c,w,h,5,i*3+2);});}
+
+// A tela da TV: o campo visto de cima, que é o que sempre está passando.
+function texturaTela(){return canvasTex(256,160,(c,w,h)=>{
+  const gr=c.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#3f9a4a');gr.addColorStop(1,'#2c7a36');
+  c.fillStyle=gr;c.fillRect(0,0,w,h);
+  c.strokeStyle='rgba(255,255,255,.8)';c.lineWidth=3;c.strokeRect(10,10,236,140);
+  c.beginPath();c.moveTo(128,10);c.lineTo(128,150);c.stroke();
+  c.beginPath();c.arc(128,80,26,0,7);c.stroke();
+  c.strokeRect(10,50,26,60);c.strokeRect(220,50,26,60);
+  c.fillStyle='#f4f1e8';for(const [x,y] of [[84,54],[150,96],[176,62],[102,110]]){c.beginPath();c.arc(x,y,5,0,7);c.fill();}
+  c.fillStyle='#d84a3a';for(const [x,y] of [[64,88],[196,84]]){c.beginPath();c.arc(x,y,5,0,7);c.fill();}
+  c.fillStyle='rgba(0,0,0,.55)';c.fillRect(0,0,w,16);
+  c.fillStyle='#f4f1e8';c.font='700 11px Georgia, serif';c.textBaseline='middle';c.fillText('2 x 1  ·  72\u2032',8,8);});}
 
 // A espada da casa. É o MESMO contorno do naipe do baralho (o `#naipe-0` do
 // index.html, escrito como Path2D): a marca da casa e a carta na mão têm de ser
@@ -150,27 +181,32 @@ function texturaQuadroCasa(){return canvasTex(430,320,(c,w,h)=>{
 export function iluminaSala(scene,renderer,{centro=new T.Vector3(),compacto=false}={}){
   // Sala clara: o longe derrete em cinza-claro, não em dourado. A neblina começa
   // longe, senão a parede de azulejo (que é o assunto) sai lavada.
-  scene.background=new T.Color(0xd7dad5);scene.fog=new T.Fog(0xd7dad5,9,26);
-  scene.add(new T.HemisphereLight(0xf4f7ff,0xbcae99,1.25));
-  // O dia entra pela janela da esquerda. É a luz principal da sala, e é fria —
-  // o quente aqui vem só da luminária da mesa e da madeira do tampo.
-  const dia=new T.DirectionalLight(0xfff2e0,1.75);dia.position.copy(centro).add(new T.Vector3(-5,3.6,1.5));dia.target.position.copy(centro);scene.add(dia,dia.target);
+  // FIM DE TARDE: a sala ainda se lê, mas já baixou o suficiente para a
+  // lâmpada da mesa aparecer. Dia cheio deixava tudo chapado e a mesa sem
+  // foco; noite fechada sumia com o azulejo e com metade da decoração.
+  scene.background=new T.Color(0xc3b49c);scene.fog=new T.Fog(0xc3b49c,8,24);
+  scene.add(new T.HemisphereLight(0xffe0bc,0x93826c,.62));
+  // A luz da janela é baixa e DOURADA, e entra quase deitada pela esquerda:
+  // é o sol de fim de tarde, não o meio-dia difuso de antes.
+  const dia=new T.DirectionalLight(0xffcb8a,.98);dia.position.copy(centro).add(new T.Vector3(-5.5,2.2,1.8));dia.target.position.copy(centro);scene.add(dia,dia.target);
   // Um rebatido do lado oposto, para a parede da direita não fechar em preto.
-  const rebatido=new T.DirectionalLight(0xe6ecf4,.45);rebatido.position.copy(centro).add(new T.Vector3(4,3,-3));rebatido.target.position.copy(centro);scene.add(rebatido,rebatido.target);
+  const rebatido=new T.DirectionalLight(0xdfd6c8,.3);rebatido.position.copy(centro).add(new T.Vector3(4,3,-3));rebatido.target.position.copy(centro);scene.add(rebatido,rebatido.target);
   // E um rebatido DE FRENTE, vindo de onde a câmera está. Sem ele a carta na
   // sua mão fica cinza: ela é vertical e virada para você, então a luz de cima
   // só a lambe de raspão — no boteco quem fazia esse serviço era o "sol"
   // laranja, que entrava pela frente-esquerda e sumiu com a troca.
-  const frente=new T.DirectionalLight(0xfff4e6,.85);frente.position.copy(centro).add(new T.Vector3(-.6,1.6,4.5));frente.target.position.copy(centro);scene.add(frente,frente.target);
+  const frente=new T.DirectionalLight(0xffeeda,.62);frente.position.copy(centro).add(new T.Vector3(-.6,1.6,4.5));frente.target.position.copy(centro);scene.add(frente,frente.target);
   // A luminária da mesa. Ela sobrevive à troca do boteco pela casa porque não é
   // enfeite: é ela que projeta a sombra das cartas e concentra o olho no jogo.
-  const foco=new T.SpotLight(0xffe9c8,26,12,.85,.7,2);foco.position.copy(centro).add(new T.Vector3(.3,3.05,.45));foco.target.position.copy(centro).setY(MESA.altura);
+  // A lâmpada sobe de 26 para 40: a esta hora ela é a luz que manda na mesa, e
+  // é o que devolve às cartas o foco que o feltro verde dava por contraste.
+  const foco=new T.SpotLight(0xffe0a8,40,12,.85,.7,2);foco.position.copy(centro).add(new T.Vector3(.3,3.05,.45));foco.target.position.copy(centro).setY(MESA.altura);
   foco.castShadow=true;const n=compacto?1024:2048;foco.shadow.mapSize.set(n,n);foco.shadow.bias=-.0004;foco.shadow.normalBias=.02;foco.shadow.camera.near=1;foco.shadow.camera.far=14;scene.add(foco,foco.target);
   // Ambiente PMREM de uma sala clara com uma janela: é o que faz o vidro da
   // cristaleira e o verniz do tampo terem o que refletir.
   const pm=new T.PMREMGenerator(renderer),amb=new T.Scene();amb.background=new T.Color(0xdfe3e0);
-  const sala=new T.Mesh(new T.BoxGeometry(12,6,12),basico({color:0xe4e7e3,side:T.BackSide}));sala.position.y=3;amb.add(sala);
-  const janela=new T.Mesh(new T.PlaneGeometry(3.2,2.6),basico({color:0xffffff}));janela.position.set(-5.9,1.9,1);janela.rotation.y=Math.PI/2;amb.add(janela);
+  const sala=new T.Mesh(new T.BoxGeometry(12,6,12),basico({color:0xd8cdb8,side:T.BackSide}));sala.position.y=3;amb.add(sala);
+  const janela=new T.Mesh(new T.PlaneGeometry(3.2,2.6),basico({color:0xffdda8}));janela.position.set(-5.9,1.9,1);janela.rotation.y=Math.PI/2;amb.add(janela);
   scene.environment=pm.fromScene(amb,.04).texture;scene.environmentIntensity=.55;
   amb.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});pm.dispose();
   return foco;
@@ -262,8 +298,30 @@ export function criaSala(){const g=new T.Group();
     plano(cris,.6,1.46,vidro,s*.325,1.25,.23);}
   caixa(cris,.045,.16,.045,-.03,1.3,.245,puxador);caixa(cris,.045,.16,.045,.03,1.3,.245,puxador);
 
-  // --- o quadro dos talheres, agora acima do buffet ---
-  plano(g,.42,.5,mat(0xffffff,.7,{map:texturaTalheres()}),3.95,1.95,-5.98);
+  // --- o quadro dos talheres muda para a esquerda, abaixo do relógio ---
+  plano(g,.36,.43,mat(0xffffff,.7,{map:texturaTalheres()}),-3.5,1.62,-5.98);
+
+  // --- os porta-retratos da família, entre a porta e a cristaleira ---
+  // Ficam na sobra da faixa que a tela em pé enxerga: o vão da porta come até
+  // x −1,39 e a cristaleira começa em −0,12. Cabe um agrupamento de cinco.
+  const retratos=[[-1.16,2.52,.19,.24,0],[-.9,2.5,.15,.19,1],[-.66,2.55,.13,.17,2],
+                  [-1.02,2.22,.14,.18,3],[-.74,2.2,.17,.21,0]];
+  for(const [x,y,rw,rh,i] of retratos){
+    caixa(g,rw+.035,rh+.035,.025,x,y,-5.965,madeiraEscura);
+    plano(g,rw,rh,mat(0xffffff,.6,{map:texturaRetrato(i)}),x,y,-5.95);}
+
+  // --- as caixas de jogo empilhadas no buffet: é o que se faz nesta mesa ---
+  const CAIXAS=[0xc94f3a,0x2f6b8f,0xd8a838,0x4a7c53];
+  const pilhaJogos=[...Array(4)].map((_,i)=>({x:3.4+((i%2)*.03),y:.95+i*.075,z:-5.55+((i%2)*.02),
+    ry:.18*(i%3)-.15,s:[.36,.07,.36],cor:CAIXAS[i]}));
+  g.add(instancias(CUBO,mat(0xffffff,.62),pilhaJogos));
+  g.add(instancias(CUBO,mat(0xf4f1e8,.7),pilhaJogos.map(b=>({...b,y:b.y+.005,s:[.3,.062,.3],cor:0xffffff}))));
+
+  // --- a TV ligada ao fundo, acima do buffet ---
+  const tv=new T.Group();tv.position.set(3.5,2.28,-5.9);tv.rotation.y=-.16;g.add(tv);
+  caixa(tv,.86,.52,.05,0,0,0,mat(0x1a1a1c,.4,{metalness:.3}));
+  plano(tv,.8,.46,basico({map:texturaTela()}),0,0,.03);
+  caixa(tv,.1,.05,.06,0,-.3,-.02,mat(0x2a2a2c,.5));
 
   // --- O QUADRO DA CASA. É o que faz esta sala ser a sala DESTE jogo: o resto
   //     do cômodo é a casa de qualquer um, e o quadro é a assinatura. Fica na
@@ -295,7 +353,7 @@ export function criaSala(){const g=new T.Group();
   for(let i=1;i<4;i++)caixa(jan,.05,2.2,.06,-1.15+i*.575,0,.02,madeiraEscura);
   for(let i=1;i<4;i++)caixa(jan,2.3,.05,.06,0,-1.1+i*.55,.02,madeiraEscura);
   // a mancha de sol que a janela joga no piso — mais barata que uma segunda luz
-  const luzJanela=canvasTex(128,128,(c,w,h)=>{const gr=c.createLinearGradient(0,0,0,h);gr.addColorStop(0,'rgba(255,246,224,.85)');gr.addColorStop(1,'rgba(255,246,224,0)');c.fillStyle=gr;c.fillRect(0,0,w,h);});
+  const luzJanela=canvasTex(128,128,(c,w,h)=>{const gr=c.createLinearGradient(0,0,0,h);gr.addColorStop(0,'rgba(255,214,142,.9)');gr.addColorStop(1,'rgba(255,214,142,0)');c.fillStyle=gr;c.fillRect(0,0,w,h);});
   plano(g,2.2,3,basico({map:luzJanela,transparent:true,blending:T.AdditiveBlending,depthWrite:false,opacity:.5,fog:false}),-3.3,.006,-1.2,0,-Math.PI/2);
 
   // --- os vasos: o bambu de um lado, o limoeiro do outro ---
@@ -351,7 +409,16 @@ export function criaSala(){const g=new T.Group();
 
   // --- a luminária sobre a mesa: cúpula clara, que é onde mora o foco ---
   caixa(g,.014,1.05,.014,.3,2.68,.45,mat(0x9a9a96,.5,{metalness:.4}));
-  const cupula=new T.Mesh(new T.ConeGeometry(.3,.26,24,1,true),mat(0xf2ede2,.5,{side:T.DoubleSide,emissive:0x3a2a14}));
+  // A cúpula é vista por DENTRO por quem senta, então o emissivo dela é o que
+  // diz que a lâmpada está acesa. Sem isso ela ilumina a mesa mas continua
+  // parecendo um cone apagado pendurado no teto.
+  const cupula=new T.Mesh(new T.ConeGeometry(.3,.26,24,1,true),mat(0xf6f0e2,.45,{side:T.DoubleSide,emissive:0x8a6428,emissiveIntensity:.3}));
   cupula.position.set(.3,2.28,.45);g.add(cupula);
-  const bulbo=new T.Mesh(new T.SphereGeometry(.055,10,8),basico({color:0xfff0d2}));bulbo.position.set(.3,2.17,.45);g.add(bulbo);
+  const bulbo=new T.Mesh(new T.SphereGeometry(.06,12,10),basico({color:0xfff4dc}));bulbo.position.set(.3,2.17,.45);g.add(bulbo);
+  // o halo em volta do bulbo: um plano sempre de frente, aditivo — é o que faz
+  // a luz "estourar" um pouco, como numa foto de sala à tardinha
+  const halo=canvasTex(64,64,(c,w,h)=>{const gr=c.createRadialGradient(32,32,2,32,32,32);
+    gr.addColorStop(0,'rgba(255,226,164,.95)');gr.addColorStop(1,'rgba(255,226,164,0)');c.fillStyle=gr;c.fillRect(0,0,w,h);});
+  const brilho=new T.Sprite(new T.SpriteMaterial({map:halo,transparent:true,blending:T.AdditiveBlending,depthWrite:false,fog:false}));
+  brilho.scale.set(.42,.42,1);brilho.position.set(.3,2.19,.45);g.add(brilho);
   return g;}
