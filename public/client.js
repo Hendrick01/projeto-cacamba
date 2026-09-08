@@ -379,38 +379,6 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // O naipe desenhado (símbolos no topo do index.html). Sem `fill`: o desenho
 // herda `currentColor`, e é só por isso que `.card.red` continua bastando para
 // virar copas e ouros de vermelho sem uma regra por naipe.
-// Onde os naipes ficam numa carta de número, em % da área do miolo. É o
-// arranjo de baralho de verdade: duas colunas nas laterais, a do meio entrando
-// conforme o valor sobe. O que distingue o 3 do 9 passa a ser a CARA da carta,
-// não só o número no canto.
-const ARRANJO_PIPS = {
-  2: [[50, 8], [50, 92]],
-  3: [[50, 8], [50, 50], [50, 92]],
-  4: [[26, 8], [74, 8], [26, 92], [74, 92]],
-  5: [[26, 8], [74, 8], [50, 50], [26, 92], [74, 92]],
-  6: [[26, 8], [74, 8], [26, 50], [74, 50], [26, 92], [74, 92]],
-  7: [[26, 8], [74, 8], [50, 29], [26, 50], [74, 50], [26, 92], [74, 92]],
-  8: [[26, 8], [74, 8], [50, 29], [26, 50], [74, 50], [50, 71], [26, 92], [74, 92]],
-  9: [[26, 6], [74, 6], [26, 35], [74, 35], [50, 50], [26, 65], [74, 65], [26, 94], [74, 94]],
-  10: [[26, 6], [74, 6], [50, 20], [26, 35], [74, 35], [26, 65], [74, 65], [50, 80], [26, 94], [74, 94]],
-};
-
-// O miolo de uma carta de número: um naipe por unidade, e os de baixo de
-// cabeça para baixo — como em qualquer baralho, porque a carta é lida dos dois
-// lados da mesa.
-function pipsEl(card) {
-  const box = document.createElement('span');
-  box.className = 'pips';
-  for (const [x, y] of ARRANJO_PIPS[card.rank]) {
-    const pip = naipeSvg(card, 'pip-un');
-    pip.style.left = `${x}%`;
-    pip.style.top = `${y}%`;
-    if (y > 50) pip.classList.add('virado');
-    box.append(pip);
-  }
-  return box;
-}
-
 function naipeSvg(card, classe) {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', classe);
@@ -434,21 +402,6 @@ function cantoEl(card) {
   return canto;
 }
 
-// A figura de J, Q e K é gente do elenco. São doze cartas de figura para oito
-// personagens, então quatro repetem — e a regra é uma conta, não uma tabela:
-// as doze casas (J♠ J♥ J♦ J♣ Q♠ … K♣) desfilam o elenco na ordem e dão a volta.
-// Assim o dia em que o elenco crescer, a repetição diminui sozinha.
-function figuraDaCarta(card) {
-  if (isJoker(card) || card.rank < 11) return null;
-  const n = SLUGS.length;
-  const casa = (card.rank - 11) * 4 + card.suit;  // 0..11: J♠ J♥ J♦ J♣ Q♠ … K♣
-  // A volta é dada com um passo de duas casas. Sem ele, as quatro últimas
-  // cartas caem exatamente nos rostos das quatro primeiras — e o MESMO rosto
-  // no J e no K do MESMO naipe é o único caso que confunde de verdade, porque
-  // aí a única diferença entre as duas cartas é a letra do canto.
-  return SLUGS[(casa + Math.floor(casa / n) * 2) % n];
-}
-
 function cardEl(card, mini = false) {
   const el = document.createElement('div');
   const joker = isJoker(card);
@@ -466,35 +419,19 @@ function cardEl(card, mini = false) {
   // volta, como em qualquer baralho — é o que faz a carta ler como carta e
   // não como etiqueta.
   // A carta inteira é a arte: papel, índice do canto e cena já vêm desenhados
-  // no arquivo. A miniatura NÃO — em 30x42 o índice impresso fica com 3 px e
-  // some, então lá continua valendo o desenho esquemático de sempre (valor no
-  // canto e um naipe no meio), que é o que deixa um jogo baixado legível.
-  if (!mini) {
-    const arte = document.createElement('img');
-    arte.className = 'arte';
-    arte.src = arteDaCarta(card);
-    arte.alt = '';
-    arte.decoding = 'async';
-    el.append(arte);
-    return el;
-  }
-
-  const figura = figuraDaCarta(card);
-  if (figura) {
-    // O retrato entra NO LUGAR do naipe do meio: quem diz o naipe da figura é
-    // o canto, como em qualquer baralho.
-    const img = document.createElement('img');
-    img.className = 'figura';
-    img.src = caraDe(figura);
-    img.alt = '';
-    el.append(cantoEl(card), img, cantoEl(card));
-  } else if (!mini && ARRANJO_PIPS[card.rank]) {
-    // Nas miniaturas dos jogos baixados não cabe arranjo nenhum: 30x42 com dez
-    // naipes vira mancha. Lá continua o naipe único do meio.
-    el.append(cantoEl(card), pipsEl(card), cantoEl(card));
-  } else {
-    el.append(cantoEl(card), naipeSvg(card, 'pip'), cantoEl(card));
-  }
+  // no arquivo. A MINIATURA também usa a arte (08/09/2026 — "não foi feito a
+  // mudança do baralho": os jogos baixados eram o último lugar com o desenho
+  // esquemático antigo, e ficavam de outro baralho). O que ela ganha por cima
+  // é o índice do canto DESENHADO, em cima do impresso: a 42 px de largura o
+  // índice da arte sai com uns 7 px, e é ele que se lê num jogo baixado, onde
+  // as cartas se sobrepõem e sobra a tira da esquerda.
+  const arte = document.createElement('img');
+  arte.className = 'arte';
+  arte.src = arteDaCarta(card);
+  arte.alt = '';
+  arte.decoding = 'async';
+  el.append(arte);
+  if (mini) el.append(cantoEl(card));
   return el;
 }
 

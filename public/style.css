@@ -828,7 +828,9 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
   font-size: 0.82rem; font-weight: 900; line-height: 1;
   letter-spacing: -0.03em;
 }
-.card .idx:last-child {
+/* O canto espelhado é o SEGUNDO índice da carta — `:last-child` pegava também
+   o índice único da miniatura e a virava de cabeça para baixo. */
+.card .idx ~ .idx {
   top: auto; left: auto; bottom: 4px; right: 5px;
   transform: rotate(180deg);
 }
@@ -861,7 +863,6 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
   transform: translate(-50%, -50%);
   display: block;
 }
-.card.mini .figura { width: 62%; }
 /* Costas. Eram listras `#274d92` — o único azul do jogo, e a cor mais saturada
    da tela quando sete adversários abrem o leque. Agora são a madeira do aro
    com a trama âmbar por cima: o verso vira o mesmo material da mesa. */
@@ -891,11 +892,16 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
    menor ainda não foi feito", disse o usuário depois de a mesa 3D ganhar
    leitura. É a mesma conta de lá: o que precisa aparecer é o índice. */
 .card.mini { width: 42px; height: 58px; border-radius: 6px; box-shadow: 0 3px 7px -2px rgba(0, 0, 0, 0.7); }
-.card.mini .idx { font-size: 0.82rem; top: 2px; left: 4px; }
-/* Nem a mini maior comporta três marcas, e nos jogos baixados elas ainda se
-   sobrepõem: fica o canto de cima e o naipe do meio, e o canto espelhado sai. */
-.card.mini .idx:last-child { display: none; }
-.card.mini .pip { width: 42%; height: 42%; }
+/* A mini traz a arte inteira, e por cima dela um índice desenhado, encaixado
+   sobre o índice impresso: a 42 px de largura o impresso sai com uns 7 px, e
+   num jogo baixado é essa tira da esquerda que se lê. O selo de papel por
+   baixo do número é o que o separa do desenho. */
+.card.mini .idx {
+  font-size: 0.82rem; top: 1px; left: 2px;
+  padding: 1px 3px 2px; border-radius: 5px;
+  background: rgba(247, 243, 233, 0.94);
+  box-shadow: 0 1px 2px rgba(42, 27, 18, 0.28);
+}
 
 /* Meus jogos na mesa */
 
