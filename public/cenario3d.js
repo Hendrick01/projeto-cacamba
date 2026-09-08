@@ -44,8 +44,54 @@ function texturaEngradado(){return canvasTex(256,256,(c,w,h)=>{c.fillStyle='#f0f
 // A rua pela porta: céu de fim de tarde, fachada pêssego da casa em frente, calçada. Sem luz (MeshBasic): é o "estourado" de fora.
 function texturaRua(){return canvasTex(512,512,(c,w,h)=>{const ceu=c.createLinearGradient(0,0,0,200);ceu.addColorStop(0,'#ffd9a4');ceu.addColorStop(1,'#f4a95e');c.fillStyle=ceu;c.fillRect(0,0,w,200);
   c.fillStyle='#e29a6a';c.fillRect(0,150,w,300);c.fillStyle='#c97f52';c.fillRect(0,150,w,14);c.fillStyle='#3c5f7c';for(const x of [60,340])c.fillRect(x,210,110,140);c.fillStyle='#233b4e';c.fillRect(215,240,80,210);
-  c.fillStyle='#d8c39a';c.fillRect(0,450,w,62);c.fillStyle='#b8a480';c.fillRect(0,504,w,8);chuvisco(c,w,h,6,9);});}
+  c.fillStyle='#d8c39a';c.fillRect(0,450,w,62);c.fillStyle='#b8a480';c.fillRect(0,504,w,8);
+  // O dizer da casa pintado na fachada de frente: é a primeira coisa que se lê
+  // pela porta, e amarra o boteco à rua em vez de deixá-la só de pano de fundo.
+  c.fillStyle='#8a5636';c.textAlign='center';c.textBaseline='middle';c.font='700 26px Georgia, serif';
+  ['BOA COMPANHIA','SEMPRE CABE','MAIS UMA'].forEach((t,i)=>c.fillText(t,w/2,372+i*30));
+  chuvisco(c,w,h,6,9);});}
 function texturaVeneziana(){return canvasTex(128,256,(c,w,h)=>{c.fillStyle='#5a3a1e';c.fillRect(0,0,w,h);for(let y=8;y<h-8;y+=20){const gr=c.createLinearGradient(0,y,0,y+14);gr.addColorStop(0,'#fff0c8');gr.addColorStop(1,'#f7b862');c.fillStyle=gr;c.fillRect(8,y,w-16,14);}});}
+// A espada da casa. É o MESMO contorno do naipe do baralho (o `#naipe-0` do
+// index.html), escrito como Path2D: a marca do boteco e a carta na mão têm de
+// ser a mesma espada, senão são duas casas.
+const ESPADA=new Path2D('M50 10 C 82 34, 88 50, 88 62 C 88 74, 79 81, 70 81 C 61 81, 54 74, 50 65 C 46 74, 39 81, 30 81 C 21 81, 12 74, 12 62 C 12 50, 18 34, 50 10 Z');
+const ESPADA_PE=new Path2D('M44 63 h12 c0 15, 3 24, 8 29 h-28 c5 -5, 8 -14, 8 -29 z');
+function espada(c,x,y,s,cor){c.save();c.translate(x,y);c.scale(s/100,s/100);c.fillStyle=cor;c.fill(ESPADA);c.fill(ESPADA_PE);c.restore();}
+
+// A lousa da calçada: "AQUI TEM" e a lista do que a casa promete. Giz é traço
+// irregular, então o texto sai com uma leve inclinação por linha — lousa com
+// texto alinhado a régua lê como cartaz impresso, não como giz.
+function texturaLousa(){return canvasTex(400,540,(c,w,h)=>{c.fillStyle='#1e2420';c.fillRect(0,0,w,h);
+  c.strokeStyle='#6b4a2a';c.lineWidth=22;c.strokeRect(11,11,w-22,h-22);
+  c.globalAlpha=.06;for(let i=0;i<70;i++){c.strokeStyle='#fff';c.lineWidth=1;c.beginPath();const y=Math.random()*h;c.moveTo(0,y);c.lineTo(w,y+(Math.random()-.5)*20);c.stroke();}c.globalAlpha=1;
+  c.fillStyle='#f3ecd8';c.textAlign='left';c.textBaseline='middle';
+  c.font='700 46px Georgia, serif';c.fillText('AQUI',46,86);c.fillText('TEM:',46,138);
+  c.font='600 30px Georgia, serif';
+  [['BOA RESENHA',210],['BOA CERVEJA',262],['BOAS CARTAS',314],['MELHORES',366],['AMIGOS',410]].forEach(([t,y],i)=>{
+    c.save();c.translate(56,y);c.rotate((i%2?-1:1)*.012);
+    if(t!=='AMIGOS'){c.beginPath();c.arc(-8,-8,4.5,0,7);c.fill();}
+    c.fillText(t,10,-8);c.restore();});
+  espada(c,168,442,66,'#f3ecd8');chuvisco(c,w,h,5,11);});}
+
+// O texto pintado direto no reboco: sem moldura, sem fundo — é tinta na
+// parede, e por isso a textura é transparente e a "tinta" tem falha.
+function texturaPintadaParede(){return canvasTex(300,420,(c,w,h)=>{c.clearRect(0,0,w,h);
+  c.fillStyle='#efe4cc';c.textAlign='left';c.textBaseline='middle';c.font='700 52px Georgia, serif';
+  ['JOGO','CERVEJA','RESENHA','SEMPRE'].forEach((t,i)=>{const y=58+i*98;
+    c.beginPath();c.arc(26,y,7,0,7);c.fill();c.save();c.translate(0,0);c.rotate(.008*(i%2?-1:1));c.fillText(t,50,y);c.restore();});
+  // a falha da tinta: pinceladas claras raspadas por cima
+  c.globalCompositeOperation='destination-out';for(let i=0;i<180;i++){c.globalAlpha=.06+Math.random()*.1;c.fillRect(Math.random()*w,Math.random()*h,2+Math.random()*9,1.5);}
+  c.globalAlpha=1;c.globalCompositeOperation='source-over';});}
+
+// A placa esmaltada da casa: espada grande, o nome embaixo. Preta e sem brilho,
+// que é o contraponto escuro numa parede toda ocre.
+function texturaPlaca(){return canvasTex(300,380,(c,w,h)=>{c.fillStyle='#171412';c.fillRect(0,0,w,h);
+  c.strokeStyle='#efe4cc';c.lineWidth=6;c.strokeRect(16,16,w-32,h-32);
+  c.fillStyle='#efe4cc';c.textAlign='center';c.font='700 40px Georgia, serif';c.textBaseline='middle';
+  c.fillText('CAÇAMBA',w/2,66);
+  espada(c,86,110,128,'#efe4cc');
+  c.font='600 22px Georgia, serif';c.fillText('CERVEJA',w/2,320);chuvisco(c,w,h,4,13);});}
+
 function texturaCartaz(fundo,linhas,corTexto='#f7eed8'){return canvasTex(256,340,(c,w,h)=>{c.fillStyle=fundo;c.fillRect(0,0,w,h);c.strokeStyle='rgba(0,0,0,.25)';c.lineWidth=10;c.strokeRect(5,5,w-10,h-10);c.fillStyle=corTexto;c.textAlign='center';c.textBaseline='middle';
   for(const [t,tam,dy] of linhas){c.font=`900 ${tam}px Nunito, sans-serif`;c.fillText(t,128,dy);}});}
 function texturaRelogio(){return canvasTex(256,256,(c)=>{c.fillStyle='#2a2522';c.beginPath();c.arc(128,128,124,0,7);c.fill();c.fillStyle='#f4ecd8';c.beginPath();c.arc(128,128,108,0,7);c.fill();c.strokeStyle='#2a2522';c.lineWidth=5;
@@ -140,9 +186,43 @@ export function criaSala(){const g=new T.Group();
   const cartaz=(x,y,z,ry,fundo,linhas,cor)=>plano(g,.5,.66,mat(0xffffff,.85,{map:texturaCartaz(fundo,linhas,cor)}),x,y,z,ry);
   cartaz(-.6,2.5,-5.985,0,'#9c3a30',[['CERVEJA',44,110],['GELADA',44,165],['R$ 9,99',40,250]]);
   cartaz(2.5,2.75,-5.985,0,'#3a6b45',[['PETISCOS',40,110],['porção',30,165],['R$ 15',44,250]]);
-  cartaz(-2.15,2.62,-5.985,0,'#c9a24e',[['CAÇAMBA',40,110],['toda',30,165],['sexta',44,240]],'#3d2c07');
   cartaz(4.985,2.1,-3.2,-Math.PI/2,'#2f5f8f',[['SINUCA',46,120],['a ficha',30,180],['R$ 5',44,250]]); // depois da janela (que vai de z −5,35 a −3,85)
   plano(g,.42,.42,basico({map:texturaRelogio(),transparent:true}),3.9,2.55,-5.985);
+  // --- a marca da casa na parede: placa esmaltada e o dizer pintado no reboco ---
+  // A faixa livre da parede do fundo é estreita: o vão da porta come de x −2,69
+  // a −1,61, os cartazes moram em −0,6 / 2,5 / 3,9 e a TV em 0,75. O pintado
+  // entra na sobra entre o batente e o cartaz da cerveja; a placa, no vazio
+  // acima do balcão.
+  plano(g,.52,.73,mat(0xffffff,.92,{map:texturaPintadaParede(),transparent:true}),-1.24,2.42,-5.983);
+  plano(g,.62,.78,mat(0xffffff,.7,{map:texturaPlaca()}),1.35,2.62,-5.983);
+
+  // --- a lousa do que a casa tem, pendurada acima da porta ---
+  // Ela era de cavalete, no chão ao lado da porta — e simplesmente não existia
+  // para quem joga: o elenco sentado tapa o piso do meio, e em pé a tela só
+  // enxerga a parede acima das cabeças. Lousa é TEXTO, e texto fora de quadro é
+  // trabalho jogado fora; na parede ela é lida da cadeira.
+  //
+  // O lugar era do cartaz "CAÇAMBA toda sexta", que dizia a mesma coisa com
+  // menos graça: a faixa visível da parede do fundo já estava cheia, e entrar
+  // ali significava alguém sair.
+  const lousa=new T.Group();lousa.position.set(-2.15,2.5,-5.975);g.add(lousa);
+  caixa(lousa,.64,.88,.03,0,0,0,mat(0xffffff,.88,{map:texturaLousa()}));
+  for(const [w,h,x,y] of [[.72,.06,0,.45],[.72,.06,0,-.45],[.06,.94,-.33,0],[.06,.94,.33,0]])caixa(lousa,w,h,.05,x,y,.015,madeiraEscura);
+
+  // --- mesinha de plástico amarela com duas cadeiras, do outro lado do salão ---
+  // O par de plástico amarelo é o que diz "boteco" antes de qualquer letreiro.
+  // `amarelo` já existe lá em cima (é o dos engradados): o plástico do boteco é
+  // o MESMO amarelo, senão a mesa e o engradado brigam de tom.
+  const plastSombra=plastico(0xcf9d1f);
+  const conjunto=(cx,cz,ry)=>{const p=new T.Group();p.position.set(cx,0,cz);p.rotation.y=ry;g.add(p);
+    caixa(p,.72,.05,.72,0,.72,0,amarelo);
+    for(const [dx,dz] of [[-.3,-.3],[.3,-.3],[-.3,.3],[.3,.3]])caixa(p,.05,.72,.05,dx,.36,dz,plastSombra);
+    for(const [sx,sz,sr] of [[0,.62,Math.PI],[-.66,-.06,Math.PI/2]]){const cad=new T.Group();cad.position.set(sx,0,sz);cad.rotation.y=sr;p.add(cad);
+      caixa(cad,.42,.05,.4,0,.44,0,amarelo);
+      caixa(cad,.42,.42,.05,0,.66,-.18,amarelo);
+      for(const [dx,dz] of [[-.17,-.16],[.17,-.16],[-.17,.16],[.17,.16]])caixa(cad,.04,.44,.04,dx,.22,dz,plastSombra);}};
+  conjunto(2.42,-4.02,-.55);
+
   // --- espada-de-são-jorge no vaso de barro, ao lado da porta ---
   const vaso=new T.Mesh(new T.CylinderGeometry(.16,.12,.3,14),mat(0xb5613a,.9));vaso.position.set(-3.05,.15,-5.55);g.add(vaso);
   g.add(instancias(new T.ConeGeometry(.055,.8,4),mat(0xffffff,.7),[...Array(9)].map((_,i)=>({x:-3.05+Math.cos(i*2.3)*.07,y:.66,z:-5.55+Math.sin(i*2.3)*.07,ry:i*.7,rx:Math.sin(i*1.3)*.22,rz:Math.cos(i*2.1)*.22,s:[1,.8+(i%3)*.15,.28],cor:[0x3f7a3a,0x5f9a44,0x2f6a30][i%3]}))));

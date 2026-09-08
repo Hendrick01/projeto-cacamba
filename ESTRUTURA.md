@@ -503,6 +503,34 @@ sentada. A curva segue o arco em que os assentos de trás estão dispostos
 bater com os ~13 px do arco). O miolo é transparente, não recebe toque, e fica
 atrás dos assentos: a cadeira colorida e o nome continuam por cima.
 
+### A voz da casa no cenário 3D
+
+O boteco carrega o que a casa diz, e não só o que ela tem. Três coisas na
+parede do fundo, todas em textura de canvas (nada baixado):
+
+- a **lousa** do "AQUI TEM: boa resenha, boa cerveja, boas cartas, melhores
+  amigos", pendurada acima da porta;
+- o **dizer pintado no reboco** — "jogo · cerveja · resenha · sempre" —, sem
+  moldura e com a tinta falhada, porque é tinta na parede e não cartaz;
+- a **placa esmaltada** preta com a espada e o nome, que é o único contraponto
+  escuro numa parede toda ocre.
+
+A espada dessas peças é a MESMA do naipe do baralho (o `#naipe-0` do
+`index.html`, escrito como `Path2D`): a marca do boteco e a carta na mão têm de
+ser a mesma espada, senão são duas casas. E, pela porta, a fachada de frente
+agora traz o "boa companhia sempre cabe mais uma" pintado — é a primeira coisa
+que se lê de fora, e amarra a rua ao salão em vez de deixá-la de pano de fundo.
+
+**Onde cabe é decidido pela tela em pé.** A faixa útil da parede do fundo é
+`|x| < 2,7`, e ela já estava cheia: entrar ali significou alguém sair — o
+cartaz "CAÇAMBA toda sexta" deu lugar à lousa, que diz a mesma coisa com mais
+graça. E prop de CHÃO no meio do salão não adianta: o elenco sentado tapa o
+piso, e a lousa, quando era de cavalete ao lado da porta, simplesmente não
+existia para quem joga. Texto fora de quadro é trabalho jogado fora.
+
+O par de **mesa e cadeiras de plástico amarelo** — o que diz "boteco" antes de
+qualquer letreiro — fica de paisagem: aparece de lado e em tela deitada.
+
 ## A mesa em 3D
 
 A carta em 3D é um retângulo de **canto arredondado**, e não um plano seco. O
