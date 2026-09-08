@@ -1089,6 +1089,51 @@ function texturaMao2D(pele) {
 }
 
 const maos = { esq: null, dir: null, pele: null, slug: null, tridi: false, rig: null };
+// ENCAIXA A MÃO NO LEQUE, em vez de adivinhar onde ela vai.
+//
+// A conta é invertida: primeiro se MEDE a pinça na própria mão — o meio entre a
+// ponta do polegar e a falange média do indicador, e o eixo que vai de um ao
+// outro — e depois se gira a mão até esse eixo apontar para a câmera e se a
+// desloca até a pinça cair no pé do leque. Assim o plano das cartas passa
+// SEMPRE entre o polegar e os dedos, que é o que faz a mão segurar em vez de
+// atravessar. Empurrar posição e rotação à mão nunca convergia: com o eixo da
+// pinça de través, polegar e dedos caem na mesma profundidade e a carta não
+// tem por onde entrar.
+//
+// Sobra um grau de liberdade — o giro em torno do próprio eixo da pinça. Ele é
+// fixado pelo `inclina`: quanto os dedos sobem em relação à horizontal da tela.
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+const EIXO_Z = new THREE.Vector3(0, 0, 1);
+function encaixaNaPinca(mao, lado, alvo, escala, inclina) {
+  const polegar = mao.getObjectByName(`${lado}Thumb3`), dedo = mao.getObjectByName(`${lado}Index2`);
+  const dedos = mao.getObjectByName(`${lado}Middle3`);
+  if (!polegar || !dedo || !dedos) return false;
+  // 1. mede no espaço da PRÓPRIA mão (transformação zerada)
+  mao.position.set(0, 0, 0); mao.quaternion.identity(); mao.scale.setScalar(1);
+  mao.updateWorldMatrix(true, true);
+  // no espaço do PAI (o grupo da mão), que é onde a transformação da mão vive:
+  // `getWorldPosition` devolve mundo, e o grupo acompanha a câmera
+  const pai = mao.parent;
+  const emCasa = (o, v) => pai.worldToLocal(o.getWorldPosition(v));
+  const pontaPolegar = emCasa(polegar, _v1.clone());
+  const ancora = pontaPolegar.clone().add(emCasa(dedo, _v2)).multiplyScalar(0.5);
+  const eixoPinca = pontaPolegar.clone().sub(_v2).normalize();          // do dedo para o polegar
+  const paraOsDedos = emCasa(dedos, _v3.clone()).sub(ancora);           // para onde a mão aponta
+  // 2. o eixo da pinça olha para a câmera: o polegar fica na frente do plano
+  //    das cartas e os dedos, atrás
+  _q1.setFromUnitVectors(eixoPinca, EIXO_Z);
+  // 3. o giro que sobra: leva os dedos para a inclinação pedida na tela
+  const dedosGirados = paraOsDedos.clone().applyQuaternion(_q1);
+  const roda = inclina - Math.atan2(dedosGirados.y, dedosGirados.x);
+  _q2.setFromAxisAngle(EIXO_Z, roda);
+  mao.quaternion.copy(_q2).multiply(_q1);
+  mao.scale.setScalar(escala);
+  // 4. a pinça cai no alvo
+  mao.position.copy(alvo).sub(ancora.applyQuaternion(mao.quaternion).multiplyScalar(escala));
+  return true;
+}
+
 function poeAMao(lado, objeto) {
   if (maos[lado]) { maoGrupo.remove(maos[lado]); maos[lado].traverse?.((o) => o.material?.dispose?.()); }
   // sólido de verdade: profundidade LIGADA (o passe da mão tem z-buffer próprio).
@@ -1196,28 +1241,14 @@ function sincronizaMao() {
     const { escala,baseY,dist,larguraLeque } = plano;
     maos.esq.visible = maos.dir.visible = n > 0;
     if (maos.tridi) {
-      // A ESQUERDA SEGURA O LEQUE. A mão canônica tem a palma em +Z e os dedos
-      // em +Y; a câmera olha para −Z, então SEM meia-volta a palma fica virada
-      // para você — que é o que se vê de quem segura cartas: a palma e o
-      // polegar por perto, e não as costas da mão. O polegar da esquerda aponta
-      // para +X, ou seja, para dentro do leque.
-      //
-      // A profundidade faz o resto: os dedos ficam ATRÁS do plano das cartas e
-      // o polegar, oposto, vem À FRENTE. É o encaixe que a profundidade
-      // desligada impedia.
-      // O punho vai 4 cm ATRÁS do plano das cartas e os dedos, dobrados, passam
-      // 3,5 cm à frente dele: a carta fica ENTRE a palma e as pontas, que é o
-      // que se chama segurar. Medido no rig: com este tombo em X, a ponta do
-      // médio avança 0,075 e a do polegar 0,054 em relação ao punho.
-      const punho = -dist - 0.04;
-      maos.esq.position.set(-larguraLeque * .5 - .01, baseY - .20 * escala, punho);
-      maos.esq.rotation.set(.42, 0, -.30);
-      maos.esq.scale.setScalar(escala * 0.38);
-      // A DIREITA fica fora do quadro até haver o que fazer: parada, ela só
-      // rouba a faixa de leitura das cartas. Sobe na sua vez.
-      maos.dir.position.set(larguraLeque * .5 + .01, baseY - (minhaVez ? .20 : 1.7) * escala, punho);
-      maos.dir.rotation.set(.42, 0, .30);
-      maos.dir.scale.setScalar(escala * 0.38);
+      // O leque converge num ponto abaixo dele (é o pivô do arco). É ali que a
+      // pinça da mão tem de cair: a carta entra entre o polegar e os dedos.
+      const pinca = new THREE.Vector3(-.045, baseY + CARTA_A * escala * 0.16, -dist);
+      encaixaNaPinca(maos.esq, 'Left', pinca, escala * 0.38, 1.15);
+      // A DIREITA fica fora do quadro fora da sua vez: parada, ela só rouba a
+      // faixa de leitura das cartas. Na sua vez, entra pela direita do leque.
+      if (minhaVez) encaixaNaPinca(maos.dir, 'Right', pinca.clone().setX(larguraLeque * .5), escala * 0.38, 2.0);
+      else { maos.dir.position.set(larguraLeque, baseY - 2 * escala, -dist); maos.dir.scale.setScalar(escala * 0.38); }
     } else {
       // o desenho 2D de reserva: entra pela borda de baixo, nas pontas do leque
       const x = larguraLeque * .5 + .03;

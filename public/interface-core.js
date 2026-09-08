@@ -45,18 +45,45 @@ export function layoutMao3D({ quantidade, largura = 375, altura = 812, fov = 72,
   // borda de baixo — é a mão segurada no colo. O índice da carta mora no alto,
   // então ela continua inteira de ler, e o que se ganha é a faixa de feltro
   // onde ficam os SEUS jogos baixados: em pé sobra altura e a mão fica inteira.
-  const margem = altura >= largura ? 18 : -alturaCard * 0.17;
+  // Abaixo do leque fica a SUA MÃO, que entra pela borda de baixo e sobe com os
+  // dedos por dentro das cartas. Ela precisa de meia carta de folga: sem isso o
+  // punho ficava fora do quadro e só sobrava a ponta dos dedos. Em paisagem o
+  // leque continua afundado de propósito (é a mão no colo), mas menos.
+  const folgaDaMao = alturaCard * 0.55;
+  const margem = (altura >= largura ? 18 : -alturaCard * 0.17) + folgaDaMao;
+  // LEQUE DE VERDADE, e não uma fileira reta: as cartas giram em torno de um
+  // pivô ABAIXO da tela, os pés convergindo para o punho e os topos abrindo.
+  // É o que faz a mão parecer que segura em vez de ladear — com a fileira reta,
+  // a mão só alcançava as pontas. O raio é ~2,6 alturas de carta: menos que
+  // isso e as cartas de baixo se escondem umas nas outras; mais, e volta a ser
+  // uma tira. O passo angular fecha quando a mão cresce, para o leque não
+  // varrer a tela inteira.
+  const emArco = fileiras === 1 && n > 1;
+  const raio = alturaCard * 2.6;
+  const passoAng = emArco ? Math.min(0.15, (passoPx * 0.85) / raio) : 0;
   const posicoes = Array.from({ length: n }, (_, i) => {
     const fila = Math.floor(i / porFila), col = i % porFila;
     const nestaFila = Math.min(porFila, n - fila * porFila), meio = (nestaFila - 1) / 2;
     const dx = col - meio;
-    const giro = fileiras === 1 && nestaFila > 1 ? -dx / meio * 0.045 : 0;
-    return { x: dx * passoPx * unidade, y: (-altura / 2 + margem + alturaCard / 2 + (fileiras - fila - 1) * entreFilas - Math.abs(dx) * 0.4) * unidade,
-      z: -dist, giro, fila, escala: larguraCard * unidade / cartaL };
+    const yReta = -altura / 2 + margem + alturaCard / 2 + (fileiras - fila - 1) * entreFilas - Math.abs(dx) * 0.4;
+    if (!emArco) {
+      return { x: dx * passoPx * unidade, y: yReta * unidade, z: -dist, giro: 0, fila, escala: larguraCard * unidade / cartaL };
+    }
+    // O arco afunda as cartas das pontas (é o que um leque faz). Sem
+    // compensar, em paisagem — onde a mão já começa baixa — elas saíam pela
+    // borda de baixo. Sobe o arco inteiro pelo afundamento da ponta: a ponta
+    // fica na altura de antes e quem sobe é o meio.
+    const ang = dx * passoAng, sobe = raio * (1 - Math.cos(meio * passoAng));
+    return { x: Math.sin(ang) * raio * unidade,
+      y: (yReta + Math.abs(dx) * 0.4 + sobe - raio + Math.cos(ang) * raio) * unidade,
+      z: -dist, giro: -ang, fila, escala: larguraCard * unidade / cartaL };
   });
+  // a largura do leque sai das posições de verdade (no arco a corda é menor que
+  // a soma dos passos), e é por ela que a mesa põe as mãos nas pontas
+  const extremos = posicoes.length ? [Math.min(...posicoes.map((p) => p.x)), Math.max(...posicoes.map((p) => p.x))] : [0, 0];
   return { dist, alturaVisivel, larguraVisivel, unidade, posicoes, passo: passoPx * unidade,
     escala: larguraCard * unidade / cartaL, baseY: posicoes.at(-1)?.y || -alturaVisivel * 0.4,
-    alturaMao, fileiras, porFila, larguraLeque: ((porFila - 1) * passoPx + larguraCard) * unidade };
+    alturaMao, fileiras, porFila, larguraLeque: extremos[1] - extremos[0] + larguraCard * unidade };
 }
 export function indiceInsercao3D(cartas, x, y) {
   if (!cartas.length) return 0;

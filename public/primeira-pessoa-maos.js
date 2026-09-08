@@ -14,12 +14,18 @@ export const POSES_FP = Object.freeze({
     Ring:   [0.24, 0.34, 0.24],
     Pinky:  [0.30, 0.42, 0.30],
   }),
+  // SEGURANDO O LEQUE. A ordem importa mais que os valores: numa mão que segura
+  // cartas, os quatro dedos ficam ATRÁS delas, sustentando, e só o POLEGAR
+  // cruza na frente. Com os dedos dobrados como estavam, eles avançavam tanto
+  // quanto o polegar e a mão saía furando o leque, empurrada contra as cartas
+  // em vez de segurá-las. Agora os quatro quase não dobram — ficam de pé atrás
+  // do leque, onde não se veem — e o polegar fecha por cima.
   leque: Object.freeze({
-    Thumb:  [0.34, 0.54, 0.28],
-    Index:  [0.26, 0.38, 0.24],
-    Middle: [0.46, 0.68, 0.54],
-    Ring:   [0.60, 0.88, 0.70],
-    Pinky:  [0.70, 0.98, 0.80],
+    Thumb:  [0.62, 0.72, 0.34],
+    Index:  [0.10, 0.14, 0.10],
+    Middle: [0.12, 0.18, 0.12],
+    Ring:   [0.16, 0.24, 0.16],
+    Pinky:  [0.22, 0.32, 0.22],
   }),
   pinca: Object.freeze({
     Thumb:  [0.52, 0.72, 0.38],
