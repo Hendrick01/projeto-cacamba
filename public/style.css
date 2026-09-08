@@ -107,8 +107,6 @@ button { font-family: inherit; }
   line-height: 1;
 }
 
-.tagline { color: var(--sage); font-size: 1rem; line-height: 1.45; margin-bottom: 8px; }
-
 .field { display: flex; flex-direction: column; gap: 6px; text-align: left; }
 .field span { color: var(--sage); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; }
 

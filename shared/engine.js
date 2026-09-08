@@ -103,7 +103,6 @@ export function conferirBaralho(numPlayers, opts = {}) {
 }
 
 export function rankLabel(rank) { return RANK_LABELS[rank - 1] || ''; }
-export function suitLabel(suit) { return SUITS[suit] || ''; }
 export function cardLabel(card) {
   return isJoker(card) ? JOKER_LABEL : rankLabel(card.rank) + SUITS[card.suit];
 }
