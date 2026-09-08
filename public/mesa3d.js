@@ -1366,9 +1366,10 @@ function sincronizaMao() {
       // tela: ela vem do ombro, e é essa inclinação que faz o olho ler de que
       // lado a mão é. Sem ela, uma mão vertical com o polegar à direita lê como
       // dorso de mão DIREITA, mesmo sendo a esquerda ("as duas mãos na imagem
-      // são direitas", 08/09/2026). O ângulo é o mesmo que o desenho 2D já usa
-      // nas mãos da mesa normal — ±0,42 rad, 24 graus — para as duas telas
-      // contarem a mesma história.
+      // são direitas", 08/09/2026). O ângulo é o mesmo do desenho 2D — ±0,42
+      // rad, 24 graus — e `mao_pose_segura.py --inclina` sabe dele: é com ele
+      // que o script calcula quanta folga o alto do leque precisa para o giro
+      // não levantar dedo acima da borda.
       _qMao.setFromAxisAngle(EIXO_Z, doMeio.giro - INCLINA_MAO);
       if (!encaixaPeloPlano(maos.esq, _v1.set(doMeio.x, doMeio.y, doMeio.z), _qMao, escalaDaMao))
         encaixaNaPinca(maos.esq, 'Left', pinca, escalaDaMao, 1.15);
@@ -1409,9 +1410,12 @@ function sincronizaMao() {
         // longe da câmera: é o dorso da própria mão que se vê ao esticar o
         // braço. Com a palma para a câmera o polegar cai embaixo e a mão lê de
         // cabeça para baixo. Meia volta em Y vira a palma; o quarto de volta em
-        // Z deita a mão, dedos para o leque.
+        // Z deita a mão. E mais a mesma inclinação da esquerda, para os dedos
+        // apontarem para BAIXO e a mão descer sobre o leque — é assim que se
+        // puxa uma carta de dentro de um leque, pela borda de cima, e é o gesto
+        // da referência que o usuário mandou em 08/09/2026.
         _qMao.setFromAxisAngle(EIXO_Y, Math.PI);
-        _qGiro.setFromAxisAngle(EIXO_Z, Math.PI / 2 + aCarta.giro);
+        _qGiro.setFromAxisAngle(EIXO_Z, Math.PI / 2 + INCLINA_MAO + aCarta.giro);
         _qMao.premultiply(_qGiro);
         const alvoX = aCarta.x + meiaL * cos - meiaA * sen, alvoY = aCarta.y + sobe;
         if (!encaixaPeloPlano(maos.dir, _v1.set(alvoX, alvoY, aCarta.z), _qMao, escalaDaMao))

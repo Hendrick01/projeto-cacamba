@@ -655,15 +655,29 @@ Blender e mede a malha já deformada pelo esqueleto):
   espessura do leque** — 12 cartas (o motor distribui 12) de 0,3 mm sobre os
   185 mm da mão; no plano, a borda de baixo na **linha dos nós**, que é onde o
   canto do leque encosta na mão, e o leque subindo dali;
-* **o polegar** tem uma conta só: passar à frente do leque, com a **última
-  falange inteira** — medida pelo vértice mais ATRASADO dela, não pelo mais
+* **o polegar** tem duas contas, em ordem: passar à frente do leque, com a
+  **última falange inteira** — medida pelo vértice mais ATRASADO dela, não pelo mais
   avançado. Pela ponta, a busca parava assim que a unha assomava e o que
   aparecia sobre as cartas era um calombo, não um dedão (77 vértices à frente
   contra 16). Havia uma segunda conta — puxar a ponta para dentro do retângulo
   da carta — e ela fazia o polegar CRUZAR para o meio do leque, varrendo a
-  palma; um polegar que segura leque fica **do lado de fora**, deitado junto à
-  borda, que é o que se vê em qualquer mão com cartas. Sem esse termo ele sobe
-  pelo próprio lado, e o fechamento cai de 201 para 63 graus. Usar um eixo só o deixava com cara de quebrado; e a rotação se
+  palma; tirá-la de vez deixava o polegar espetado para fora, na borda. A conta
+  que ficou no lugar dela decide entre poses que já cumprem a profundidade, e
+  vale pouco (0,05 contra 10): a falange fica **deitada sobre as cartas, na
+  direção em que elas sobem** — o polegar acompanha o leque, como na referência
+  que o usuário mandou.
+
+* **onde o leque afunda na mão**: a borda de baixo fica na **base do polegar**,
+  não na linha dos nós. Nos nós, a carta ficava logo acima da ponta do polegar e
+  ele aparecia rente à borda em vez de deitado sobre as cartas.
+
+* **quanta folga o alto precisa**: a mesa põe a mão inclinada 24° e o leque
+  continua em pé, então girar a mão levanta o dedo da ponta acima do que ele
+  mede aqui. Quanto, é conta: metade da largura dos dedos vezes o seno do
+  ângulo — 0,100 sobre os 0,012 de margem. Sem ela sobrava dedo espiando por
+  cima da borda do leque (visto na tela). Tentei antes gravar a inclinação no
+  próprio quadro do contrato: piorou, porque aí a pose inteira passa a valer
+  para uma carta torta. Usar um eixo só o deixava com cara de quebrado; e a rotação se
   reparte pelas três juntas, porque 111° concentrados na base rasgavam a pele da
   tenar.
 
@@ -710,8 +724,10 @@ esquerda, e é ele que joga o corpo da mão para fora do leque em vez de cobrir
 as vizinhas. Ela também tem o seu `PlanoDaCarta` (`mao_pose_segura.py --aberta`
 grava só o quadro, sem posar) e a mesma inclinação da esquerda, espelhada.
 
-A **orientação sai do polegar**: numa mão que alcança pela direita ele fica por
-cima da carta, e para uma mão direita com os dedos apontando para a esquerda
+A direita **desce sobre o leque**: os dedos apontam para baixo, na mesma
+inclinação da esquerda, que é como se puxa uma carta de dentro de um leque —
+pela borda de cima. A **orientação sai do polegar**: numa mão que alcança pela
+direita ele fica por cima da carta, e para uma mão direita com os dedos apontando para a esquerda
 isso só acontece com a palma virada para longe da câmera — é o dorso da própria
 mão que se vê ao esticar o braço. Com a palma para a câmera, como a esquerda, o
 polegar cai embaixo e a mão lê de cabeça para baixo (visto na tela, 08/09/2026).

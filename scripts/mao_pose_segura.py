@@ -50,6 +50,8 @@ ap.add_argument('--cartas', type=int, default=12, help='cartas na mão (o motor 
 ap.add_argument('--aberta', action='store_true',
                 help='não posa: só grava o quadro da mão aberta. É o que a mão que JOGA precisa — '
                      'ela não segura leque, mas o jogo ainda tem de saber para onde a palma dela olha')
+ap.add_argument('--inclina', type=float, default=0.42,
+                help='inclinação com que a mesa põe a mão (rad); entra no próprio quadro do contrato')
 ap.add_argument('--junta', type=float, default=math.radians(45), help='rotação máxima em cada junta do polegar')
 ap.add_argument('--pele', type=float, default=0.005, help='folga de pele entre a ponta do polegar e a face da frente')
 ap.add_argument('--passoDedo', type=float, default=math.radians(6), help='resolução da busca do fechamento')
@@ -177,15 +179,22 @@ def eixos_de(osso):
 
 
 def custo_do_polegar():
-    """O polegar só tem uma conta a cumprir: PASSAR À FRENTE do leque.
+    """Duas contas, em ordem de importância.
 
-    Antes havia uma segunda — puxar a ponta para dentro do retângulo da carta —
-    e era ela que fazia o polegar CRUZAR para o meio do leque, varrendo a palma.
-    Um polegar que segura leque fica do lado de fora, deitado junto à borda; é o
-    que se vê em qualquer mão com cartas. Sem esse termo, ele sobe pelo próprio
-    lado e é o que se quer."""
+    A primeira, que manda: a última falange PASSA À FRENTE do leque.
+
+    A segunda, que decide o resto: a falange fica DEITADA SOBRE AS CARTAS, na
+    direção em que elas sobem. É o que se vê em qualquer foto de mão com cartas
+    (e na referência que o usuário mandou em 08/09/2026): o polegar acompanha o
+    leque, não atravessa nem espeta para fora. As duas tentativas anteriores
+    erraram cada uma para um lado — mirar no meio do retângulo fazia o polegar
+    cruzar a palma até o meio do leque; tirar o alvo de vez deixava ele espetado
+    para fora, na borda. O alinhamento vale pouco (0,05 contra 10) porque só
+    escolhe entre poses que já cumprem a profundidade."""
     E = estado()
-    fora = 0.0
+    osso = arm.pose.bones[f'{LADO}Thumb3']
+    direcao = (arm.matrix_world.to_3x3() @ (osso.tail - osso.head)).normalized()
+    fora = 0.05 * (1.0 - direcao.dot(cima))
     alvo = E[NAO_POLEGAR][:, 2].max() + ESPESSURA + args.pele
     # A última falange INTEIRA, não só a pontinha dela. Medindo o polegar todo,
     # a busca cumpria a conta empurrando a BASE para a frente e deixando a ponta
@@ -193,7 +202,7 @@ def custo_do_polegar():
     # unha assomava — e o que aparecia sobre as cartas era um calombo, não um
     # dedão. Pelo vértice mais ATRASADO da falange, ela só para quando a falange
     # toda passou: é o polegar deitado na carta.
-    return fora + max(0.0, alvo - E[PONTA_POL][:, 2].min())
+    return fora + 10.0 * max(0.0, alvo - E[PONTA_POL][:, 2].min())
 
 
 def poe_polegar():
@@ -258,19 +267,41 @@ print('FECHAMENTO: %.0f graus na base de cada dedo (%.0f somando as tres falange
 
 
 def carta_no_plano():
-    """No plano, a carta sai da própria pegada: a borda de baixo fica na LINHA DOS
-    NÓS, onde o canto do leque encosta na mão, e o leque sobe dali — acima da
-    mão, não pendurado abaixo dela. Apoiar na junta do meio do dedo levantava a
-    carta para fora do alcance do polegar. Na largura, centrada na massa dos
-    dedos."""
+    """No plano, a carta sai da própria pegada: a borda de baixo afunda até a BASE
+    DO POLEGAR, que é onde o canto do leque encosta na mão, e o leque sobe dali.
+    As duas âncoras mais altas que tentei antes erraram: na junta do meio do dedo
+    a carta subia para fora do alcance do polegar; na linha dos nós ela ficava
+    logo ACIMA da ponta do polegar, e ele aparecia rente à borda em vez de
+    deitado sobre as cartas. Na largura, centrada na massa dos dedos."""
     global centroU, centroV
     E = estado()
-    apoio = arm.matrix_world @ arm.pose.bones[f'{LADO}Index1'].matrix.translation
+    apoio = arm.matrix_world @ arm.pose.bones[f'{LADO}Thumb1'].matrix.translation
     centroU = float(E[DEDOS_TODOS][:, 0].mean())
     centroV = float(np.array(apoio[:]) @ EIXOS[:, 1]) + ALT / 2 - args.margem
 
 
 carta_no_plano()
+
+# e fecham mais, enquanto as pontas espiarem por cima do leque. Com a carta
+# afundada até a base do polegar, o ângulo reto sozinho já não basta: sobra dedo
+# acima da borda de cima, e no jogo, onde o leque é um arco, sobra mais ainda.
+if not args.aberta:
+    # a mesa põe a mão INCLINADA (0,42 rad, o mesmo ângulo do desenho 2D) e o
+    # leque continua em pé: girar a mão levanta o dedo da ponta acima do que ele
+    # mede aqui. Quanto, é conta e não palpite — metade da largura dos dedos
+    # vezes o seno do ângulo.
+    largura = (lambda E: E[:, 0].max() - E[:, 0].min())(estado()[DEDOS_TODOS])
+    folga = args.margem + (largura / 2) * abs(math.sin(args.inclina))
+    print('  folga de %.3f no alto (%.3f de margem + %.3f que a inclinacao de %.0f graus levanta)'
+          % (folga, args.margem, folga - args.margem, math.degrees(args.inclina)))
+    while fechado <= args.limite:
+        alto = max(estado()[np.concatenate([DONO[f'{LADO}{d}{k}'] for k in (1, 2, 3)])][:, 1].max() for d in DEDOS)
+        if alto <= centroV + ALT / 2 - folga: break
+        fechado += args.passoDedo
+        poe_dedos(fechado)
+        carta_no_plano()
+    print('  fechados a %.0f graus para as pontas nao espiarem por cima do leque' % math.degrees(fechado))
+
 girado, resta = (0.0, 0.0) if args.aberta else poe_polegar()
 
 E = estado()
