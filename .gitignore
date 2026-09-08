@@ -29,3 +29,8 @@ public/assets/personagens/*-256.png
 public/assets/personagens/*-teste-tamanho-pequeno.png
 public/assets/personagens/elenco-*personagens.png
 public/assets/personagens/elenco-teste-*.png
+
+# Saídas geradas: a folha de molde da mão (sai de scripts/molde_mao.py) e as
+# evidências do smoke de interface (o CI as sobe como artefato)
+molde-mao.png
+qa-interface/
