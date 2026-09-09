@@ -23,6 +23,7 @@ import { codigoPix, normalizaChave } from './lib/pix.js';
 import { rotaDeConta, ehRotaDeConta } from './lib/rotas-conta.js';
 import { rotaDeWebhook, ehWebhook } from './lib/rotas-webhook.js';
 import { contaDaSessao } from './lib/contas.js';
+import { migra, temBanco } from './lib/banco.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const cliValue = (name) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
@@ -48,6 +49,20 @@ const PIX = codigoPix({
 if (PIX) {
   const { chave, tipo } = normalizaChave(process.env.PIX_CHAVE, process.env.PIX_TIPO);
   console.log(`Caixinha do Pix ligada — chave lida como ${tipo}: ${chave}`);
+}
+
+// O esquema do banco, aplicado na subida. Todo CREATE tem IF NOT EXISTS, então
+// isto é idempotente e rodar de novo não custa nada — e a alternativa é alguém
+// lembrar de migrar à mão depois de cada deploy. O modo de falhar disso é feio e
+// silencioso: rota no ar, banco vazio, e a primeira compra da vida morrendo na
+// hora de gravar, com o dinheiro já cobrado do outro lado.
+//
+// Falhar aqui NÃO derruba o servidor. O jogo nunca precisou de banco, e não vai
+// passar a precisar por causa da loja.
+if (temBanco) {
+  migra()
+    .then(() => console.log('Esquema da loja conferido no banco.'))
+    .catch((erro) => console.error('Não deu para aplicar o esquema da loja:', erro?.message || erro));
 }
 // O QR é sempre o mesmo desenho, então desenha uma vez na subida. Fica em
 // promessa para a subida não esperar por ele.
