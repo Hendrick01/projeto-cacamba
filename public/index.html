@@ -79,6 +79,8 @@
         <div class="ui-divider">Já tem um convite?</div>
         <div class="join-row"><input id="code-input" maxlength="4" aria-label="Código da sala, quatro letras" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off"><button id="btn-join" type="button" class="btn">Entrar</button></div>
         <button id="btn-rules-home" type="button" class="btn btn-ghost">Como se joga? ↗</button>
+        <button id="btn-loja" type="button" class="btn btn-ghost">Loja ↗</button>
+        <button id="btn-apoiar" type="button" class="btn btn-ghost" hidden>Apoiar o Caçamba ♥</button>
         <p id="home-error" class="error" role="alert" hidden></p>
       </div>
     </main>
@@ -111,6 +113,20 @@
 </section>
 
 <!-- ======================= LOBBY / SALA ======================= -->
+<!-- ======================= LOJA ======================= -->
+<section id="screen-loja" class="screen" hidden>
+  <div class="escolha">
+    <header class="escolha-topo">
+      <button id="btn-loja-voltar" class="icon-btn" aria-label="Voltar">‹</button>
+      <h2>Loja</h2>
+    </header>
+    <p class="loja-nota">O jogo é de graça e continua sendo. O que se vende aqui é enfeite: não dá carta, não dá ponto, não dá vantagem.</p>
+    <div id="loja-conta" class="loja-conta"></div>
+    <ul id="loja-prateleira" class="loja-prateleira"></ul>
+    <p class="loja-legal"><a href="/termos.html" target="_blank" rel="noopener">Termos</a> · <a href="/politica.html" target="_blank" rel="noopener">Privacidade</a></p>
+  </div>
+</section>
+
 <section id="screen-lobby" class="screen" hidden>
   <div class="home-box">
     <p class="lobby-label">Código da sala</p>

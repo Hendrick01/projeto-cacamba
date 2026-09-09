@@ -1,7 +1,7 @@
 {
   "name": "cacamba",
   "version": "0.1.0",
-  "description": "Ca\u00e7amba \u2014 jogo de cartas multiplayer para celular (7 rodadas de contratos com trincas e sequ\u00eancias)",
+  "description": "Caçamba — jogo de cartas multiplayer para celular (7 rodadas de contratos com trincas e sequências)",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -9,12 +9,16 @@
     "test": "node --test \"test/**/*.test.js\"",
     "dev": "node server.js",
     "test:integration": "node test/integration.mjs",
-    "test:security": "node test/security-live.mjs"
+    "test:security": "node test/security-live.mjs",
+    "test:contas": "node test/contas-live.mjs",
+    "db:migra": "node -e \"import('./lib/banco.js').then(m=>m.migra().then(ok=>{console.log(ok?'esquema aplicado':'sem DATABASE_URL');return m.fecha()}))\"",
+    "test:webhook": "node test/webhook-live.mjs"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "postgres": "^3.4.9",
     "qrcode": "^1.5.4",
     "ws": "^8.21.3"
   }

@@ -28,3 +28,41 @@ services:
         value: "https://projeto-cacamba.onrender.com"
       - key: NODE_VERSION
         value: "22"
+      # A caixinha do Pix. `sync: false` faz o Render PERGUNTAR o valor ao criar
+      # o serviço, em vez de guardá-lo aqui: chave de recebimento não entra no
+      # repositório. Sem ela, a rota /apoio.json some e o botão de apoiar nem
+      # aparece — que é o certo em qualquer clone que não seja o oficial.
+      - key: PIX_CHAVE
+        sync: false
+      - key: PIX_NOME
+        value: "Cacamba"
+      - key: PIX_CIDADE
+        sync: false
+
+      # ---- A loja. Tudo `sync: false`: são segredos, e o painel do Render é o
+      # lugar deles. Nenhum destes precisa existir para o JOGO funcionar — sem
+      # eles a loja simplesmente não aparece, e as partidas seguem iguais.
+
+      # Postgres. Neon, Supabase e o Render Postgres dão a mesma coisa: uma URL.
+      - key: DATABASE_URL
+        sync: false
+      # Assina o cookie de sessão. Sem ela o servidor sorteia uma na subida e
+      # todo mundo é deslogado a cada reinício — que no Render acontece sempre.
+      - key: SEGREDO_SESSAO
+        sync: false
+      # Entrega o link de entrada. Sem ela o link sai no LOG em vez do e-mail:
+      # funciona para desenvolver, é vazamento em produção.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_REMETENTE
+        sync: false
+      # O token do webhook da Kiwify. Sem ele o webhook recusa tudo — de
+      # propósito: creditar sem conferir assinatura é dar skin de graça a quem
+      # souber usar curl.
+      - key: KIWIFY_TOKEN
+        sync: false
+      # Saída de emergência para ligar produto sem esperar deploy:
+      # "id_do_produto=sku,outro=sku2". O normal é preencher o campo `kiwify`
+      # do item em shared/catalogo.js.
+      - key: KIWIFY_PRODUTOS
+        sync: false

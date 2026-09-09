@@ -12,6 +12,7 @@ import {
 import {
   ELENCO, SLUGS, personagemValido, personagemDoAssento, peleDe, temExpressao,
 } from '/shared/elenco.js';
+import { prateleira, precoEmReais } from '/shared/catalogo.js';
 import { ordenaMao, reordena } from '/shared/mao.js';
 import { criaVoz } from '/voz.js';
 import { layoutMao2D } from '/interface-core.js';
@@ -154,7 +155,7 @@ function handleMessage(msg) {
 // ---------------- Telas ----------------
 
 function showScreen(name) {
-  for (const s of ['home', 'avatar', 'lobby', 'game']) $(`screen-${s}`).hidden = s !== name;
+  for (const s of ['home', 'avatar', 'loja', 'lobby', 'game']) $(`screen-${s}`).hidden = s !== name;
 }
 
 const me = () => session?.playerId;
@@ -274,6 +275,177 @@ $('btn-avatar-ok').onclick = () => {
 montaMiniaturas();
 pintaBotaoPersonagem();
 $('btn-rules-home').onclick = () => showRules();
+
+// ---------------- A loja ----------------
+// A prateleira é desenhada a partir de shared/catalogo.js, o mesmo arquivo que
+// o servidor usa para decidir se alguém pode USAR o que escolheu. Uma fonte só:
+// se a loja mostrasse uma lista própria, ela e o servidor discordariam no dia
+// em que um preço mudasse.
+//
+// Ainda não há compra: falta escolher a plataforma que vende (ela é quem emite
+// a nota e absorve o estorno). Então tudo entra como "em breve" — e é de
+// propósito que a prateleira já exista assim, porque quem clica em "Loja" e
+// não acha nada responde a pergunta que a Fase 0 está fazendo.
+function desenhaLoja() {
+  const lista = $('loja-prateleira');
+  lista.innerHTML = prateleira().map((item) => {
+    const preco = item.estado === 'a-venda'
+      ? `<span class="loja-preco">${precoEmReais(item.centavos)}</span>`
+      : '<span class="loja-breve">Em breve</span>';
+    // Verso tem desenho e o desenho É o produto; cenário se mostra na mesa, e
+    // uma miniatura mentirosa vende pior que nenhuma.
+    // "Em breve" é literal: a arte ainda NÃO existe no disco. Apontar para ela
+    // renderiza o ícone de imagem quebrada, que faz a loja parecer defeito em
+    // vez de promessa. Enquanto não estiver à venda, o item mostra o símbolo.
+    const arte = item.arquivo && item.estado === 'a-venda'
+      ? `<img class="loja-arte" src="${item.arquivo}" alt="" loading="lazy">`
+      : `<span class="loja-arte loja-arte-vazia" aria-hidden="true">${item.tipo === 'cenario' ? '🪑' : '🂠'}</span>`;
+    return `<li class="loja-item ${item.estado}">
+      ${arte}
+      <div class="loja-texto">
+        <strong>${escapeHTML(item.nome)}</strong>
+        <small>${escapeHTML(item.descricao)}</small>
+      </div>
+      ${preco}
+    </li>`;
+  }).join('');
+}
+
+// A conta só existe por causa da loja: quem só quer jogar nunca vê isto. Por
+// isso o formulário mora AQUI dentro, e não numa tela de login na entrada do
+// jogo — pedir cadastro antes de jogar espantaria mais gente do que a loja
+// jamais traria.
+let conta = null;
+
+async function carregaConta() {
+  const alvo = $('loja-conta');
+  try {
+    const r = await fetch('/eu.json');
+    // 503 é a loja desligada (sem banco), e não erro: mostra a prateleira sem
+    // formulário, em vez de um aviso vermelho que assusta à toa.
+    if (r.status === 503) { alvo.innerHTML = ''; return; }
+    conta = await r.json();
+  } catch { alvo.innerHTML = ''; return; }
+
+  if (conta.entrou) {
+    alvo.innerHTML = `<div class="conta-dentro">
+        <span>Você está em <strong>${escapeHTML(conta.email)}</strong></span>
+        <button id="btn-sair-conta" type="button" class="btn btn-ghost">Sair</button>
+        <button id="btn-apagar-conta" type="button" class="btn btn-ghost btn-apagar">Apagar minha conta</button>
+      </div>`;
+    $('btn-sair-conta').onclick = async () => { await fetch('/sair', { method: 'POST' }); carregaConta(); };
+    $('btn-apagar-conta').onclick = apagaConta;
+    return;
+  }
+
+  alvo.innerHTML = `<form id="form-entrar" class="conta-form">
+      <p class="conta-chamada">Para guardar o que você comprar, o Caçamba precisa saber quem é você. <strong>Não tem senha</strong> — a gente manda um link no seu e-mail.</p>
+      <label class="field"><span>Seu e-mail</span><input id="conta-email" type="email" autocomplete="email" required placeholder="voce@exemplo.com"></label>
+      <label class="field"><span>Data de nascimento</span><input id="conta-nascimento" type="date" required></label>
+      <button type="submit" class="btn btn-primary">Receber o link</button>
+      <p id="conta-aviso" class="conta-aviso" role="status"></p>
+    </form>`;
+  $('form-entrar').onsubmit = pedeLink;
+}
+
+async function pedeLink(evento) {
+  evento.preventDefault();
+  const aviso = $('conta-aviso');
+  aviso.className = 'conta-aviso';
+  aviso.textContent = 'Mandando…';
+  try {
+    const r = await fetch('/entrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: $('conta-email').value, nascimento: $('conta-nascimento').value }),
+    });
+    const dados = await r.json();
+    if (!r.ok) { aviso.className = 'conta-aviso ruim'; aviso.textContent = dados.erro || 'Não deu certo.'; return; }
+    aviso.textContent = dados.enviado
+      ? 'Pronto! Olhe seu e-mail — o link vale por 15 minutos.'
+      : 'Link gerado (o envio de e-mail ainda não está configurado neste servidor).';
+  } catch {
+    aviso.className = 'conta-aviso ruim';
+    aviso.textContent = 'Sem conexão com o servidor.';
+  }
+}
+
+// Apagar é irreversível e some com o que a pessoa comprou. Duas confirmações,
+// e a segunda dizendo em voz alta o que se perde — não é atrito por atrito, é
+// a diferença entre exercer um direito e escorregar num botão.
+async function apagaConta() {
+  if (!confirm('Apagar sua conta? Isso é definitivo.')) return;
+  if (!confirm('Só confirmando: o que você comprou vai junto, e não dá para voltar atrás.')) return;
+  await fetch('/apagar-conta', { method: 'POST' });
+  conta = null;
+  carregaConta();
+}
+
+$('btn-loja').onclick = () => { desenhaLoja(); carregaConta(); showScreen('loja'); };
+$('btn-loja-voltar').onclick = () => showScreen('home');
+
+// Quem clica no link do e-mail volta em /?entrada=ok. Abrir a loja já dentro
+// fecha o ciclo: a pessoa saiu do jogo para o e-mail e volta exatamente onde
+// estava. A URL é limpa em seguida para um F5 não repetir o recado.
+{
+  const veio = new URLSearchParams(location.search).get('entrada');
+  if (veio) {
+    history.replaceState(null, '', location.pathname);
+    if (veio === 'ok') { desenhaLoja(); carregaConta(); showScreen('loja'); }
+    else alert('Esse link já foi usado ou passou dos 15 minutos. Peça outro.');
+  }
+}
+
+// ---------------- A caixinha ----------------
+// O botão nasce escondido e só aparece quando o servidor responde a rota com
+// uma chave configurada. Assim o clone de qualquer pessoa, e o `npm start` de
+// desenvolvimento, não oferecem um Pix que cairia na conta de ninguém.
+let apoio = null;
+fetch('/apoio.json')
+  .then((r) => (r.ok ? r.json() : null))
+  .then((dados) => {
+    if (!dados || !dados.codigo) return;
+    apoio = dados;
+    $('btn-apoiar').hidden = false;
+  })
+  .catch(() => { /* sem caixinha, sem botão */ });
+
+$('btn-apoiar').onclick = () => {
+  if (!apoio) return;
+  showModal(
+    `<h2>Apoiar o Caçamba</h2>
+     <p>O jogo é de graça e continua sendo. Se ele rendeu boas noites, a caixinha ajuda a pagar o servidor.</p>
+     ${apoio.qr ? `<img class="pix-qr" src="${apoio.qr}" alt="QR do Pix para apoiar o Caçamba">` : ''}
+     <p class="pix-dica">Aponte a câmera do banco, ou copie o código:</p>
+     <code class="pix-codigo">${escapeHTML(apoio.codigo)}</code>
+     <p id="pix-aviso" class="pix-aviso" role="status"></p>`,
+    [
+      { label: 'Copiar código Pix', cls: 'btn-primary', fn: copiaPix },
+      { label: 'Fechar', cls: 'btn-ghost', fn: closeModal },
+    ],
+    closeModal,
+    true,
+  );
+};
+
+async function copiaPix() {
+  const aviso = $('pix-aviso');
+  try {
+    await navigator.clipboard.writeText(apoio.codigo);
+    aviso.textContent = 'Copiado! Cole no aplicativo do banco.';
+  } catch {
+    // A área de transferência é negada em http:// e em navegador antigo. Em vez
+    // de um erro sem saída, seleciono o código: aí o "copiar" fica no toque
+    // longo de quem está lendo, que todo celular sabe fazer.
+    const alvo = document.querySelector('.pix-codigo');
+    const faixa = document.createRange();
+    faixa.selectNodeContents(alvo);
+    const selecao = getSelection();
+    selecao.removeAllRanges();
+    selecao.addRange(faixa);
+    aviso.textContent = 'Selecionei o código — toque e segure para copiar.';
+  }
+}
 
 // ---------------- Lobby ----------------
 

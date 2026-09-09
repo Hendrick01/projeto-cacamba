@@ -1281,3 +1281,54 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
 .contract-list { list-style: none; padding: 0 !important; }
 .contract-list li { display: flex; gap: 10px; align-items: baseline; }
 .contract-list .rn { color: var(--gold); font-weight: 900; min-width: 68px; }
+
+/* A caixinha do Pix. O QR herda a moldura creme do QR da sala — é o mesmo
+   gesto (aponte a câmera), então vale parecer a mesma coisa. */
+.pix-qr { display: block; width: 190px; margin: 12px auto; border-radius: 10px; border: 4px solid var(--cream); }
+.pix-dica { margin: 10px 0 6px; opacity: 0.8; }
+/* O copia-e-cola tem ~90 caracteres sem espaço nenhum: sem o break-all ele
+   estoura a largura do modal no celular e empurra os botões para fora. */
+.pix-codigo {
+  display: block; word-break: break-all; user-select: all;
+  font-size: 11px; line-height: 1.5; padding: 10px; border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28); color: var(--cream);
+}
+.pix-aviso:empty { display: none; }
+.pix-aviso { margin-top: 10px; color: var(--gold); font-weight: 700; }
+
+/* A loja. Herda a moldura da tela de escolher personagem — é o mesmo gesto
+   (olhar uma prateleira e escolher), então vale parecer a mesma coisa. */
+.loja-nota { margin: 0 16px 14px; opacity: 0.75; font-size: 13px; line-height: 1.5; }
+.loja-prateleira { list-style: none; margin: 0; padding: 0 16px 24px; display: grid; gap: 10px; }
+.loja-item {
+  display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center;
+  padding: 10px 12px; border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(245, 241, 230, 0.12);
+}
+/* "Em breve" fica apagado de propósito: mostra que vem coisa, sem prometer
+   botão que não existe. */
+.loja-item.em-breve { opacity: 0.55; }
+.loja-arte { width: 56px; height: 78px; object-fit: cover; border-radius: 6px; background: rgba(0, 0, 0, 0.3); }
+.loja-arte-vazia { display: grid; place-items: center; font-size: 26px; }
+.loja-texto { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.loja-texto strong { color: var(--cream); }
+.loja-texto small { opacity: 0.75; line-height: 1.4; }
+.loja-preco { color: var(--gold); font-weight: 900; white-space: nowrap; }
+.loja-breve { font-size: 12px; opacity: 0.8; white-space: nowrap; }
+
+/* A conta, dentro da loja. */
+.loja-conta { margin: 0 16px 14px; }
+.conta-chamada { margin: 0 0 12px; font-size: 13px; line-height: 1.55; opacity: 0.85; }
+.conta-form { display: grid; gap: 10px; padding: 14px; border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(245, 241, 230, 0.12); }
+.conta-dentro { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 14px;
+  border-radius: 12px; background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(245, 241, 230, 0.12); font-size: 13px; }
+.conta-dentro span { flex: 1 1 100%; }
+.conta-aviso:empty { display: none; }
+.conta-aviso { margin: 2px 0 0; font-size: 13px; color: var(--gold); }
+.conta-aviso.ruim { color: #ff9b8a; }
+/* Apagar conta não pode parecer o botão mais convidativo da tela, mas também
+   não pode ficar escondido: é um direito, não uma pegadinha. */
+.btn-apagar { opacity: 0.65; font-size: 12px; }
+.loja-legal { margin: 4px 16px 24px; font-size: 12px; opacity: 0.6; text-align: center; }
+.loja-legal a { color: inherit; }

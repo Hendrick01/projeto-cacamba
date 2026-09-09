@@ -19,6 +19,10 @@ import {
   podeComprarDoDescarte, topoDoDescarte,
 } from './shared/engine.js';
 import { personagemValido } from './shared/elenco.js';
+import { codigoPix, normalizaChave } from './lib/pix.js';
+import { rotaDeConta, ehRotaDeConta } from './lib/rotas-conta.js';
+import { rotaDeWebhook, ehWebhook } from './lib/rotas-webhook.js';
+import { contaDaSessao } from './lib/contas.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const cliValue = (name) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
@@ -28,6 +32,28 @@ const PORT = Number(process.env.PORT || cliValue('--port')) || 3000;
 const HOST = process.env.HOST || cliValue('--host') || '0.0.0.0';
 const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '';
 const TRUST_PROXY = process.env.TRUST_PROXY === '1' || (process.env.RENDER === 'true' && process.env.TRUST_PROXY !== '0');
+
+// A caixinha do Pix. A chave é do dono do jogo e não entra no repositório: sem
+// PIX_CHAVE no ambiente, `codigoPix` devolve null, a rota some e o botão nem
+// aparece — que é o certo em desenvolvimento e no clone de qualquer pessoa.
+const PIX = codigoPix({
+  chave: process.env.PIX_CHAVE,
+  nome: process.env.PIX_NOME || 'Cacamba',
+  cidade: process.env.PIX_CIDADE || 'Brasil',
+  tipo: process.env.PIX_TIPO,
+});
+// Diz em voz alta como leu a chave. Um QR de Pix errado nasce com cara de
+// certo — desenha, o CRC bate, e só quem tenta pagar descobre. Uma linha no
+// log da subida transforma isso em erro visível no primeiro deploy.
+if (PIX) {
+  const { chave, tipo } = normalizaChave(process.env.PIX_CHAVE, process.env.PIX_TIPO);
+  console.log(`Caixinha do Pix ligada — chave lida como ${tipo}: ${chave}`);
+}
+// O QR é sempre o mesmo desenho, então desenha uma vez na subida. Fica em
+// promessa para a subida não esperar por ele.
+const pixQr = PIX
+  ? QRCode.toDataURL(PIX, { margin: 1, width: 240 }).catch(() => null)
+  : Promise.resolve(null);
 
 // ---------------------------------------------------------------------------
 // Arquivos estáticos
@@ -133,6 +159,39 @@ const STATIC_ROOTS = [path.join(__dirname, 'public'), __dirname];
 
 const server = http.createServer((req, res) => {
   for (const [key, value] of Object.entries(CABECALHOS_SEGUROS)) res.setHeader(key, value);
+  // O webhook vem antes porque é a exceção: gateway não manda Origin, e quem
+  // autentica ali é a assinatura do corpo. Ver o cabeçalho de rotas-webhook.js.
+  if (ehWebhook(req)) {
+    rotaDeWebhook(req, res, { avisa: avisaDono })
+      .catch((erro) => {
+        console.error('webhook falhou:', erro?.message || erro);
+        // 500 de propósito: erro NOSSO merece reenvio da Kiwify, ao contrário
+        // de evento repetido ou irrelevante, que respondem 200.
+        if (!res.headersSent && !res.destroyed) { res.writeHead(500); res.end('erro interno'); }
+      });
+    return;
+  }
+
+  // As rotas de conta são as ÚNICAS que aceitam POST, e elas mesmas conferem
+  // origem, tamanho de corpo e balde por IP. Todo o resto do servidor continua
+  // só GET e HEAD, como sempre foi.
+  if (ehRotaDeConta(req)) {
+    rotaDeConta(req, res, { publicUrl: PUBLIC_URL, trustProxy: TRUST_PROXY })
+      .then((tratou) => {
+        if (tratou || res.headersSent || res.destroyed) return;
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Não encontrado');
+      })
+      .catch((erro) => {
+        // Banco fora do ar não pode derrubar o processo: ele segura todas as
+        // salas em memória, e uma partida não tem nada a ver com a loja.
+        console.error('rota de conta falhou:', erro?.message || erro);
+        if (res.headersSent || res.destroyed) return;
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end('{"erro":"Falha ao falar com o banco."}');
+      });
+    return;
+  }
   if (!['GET', 'HEAD'].includes(req.method)) {
     res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return;
   }
@@ -145,6 +204,21 @@ const server = http.createServer((req, res) => {
     res.end('Pedido inválido');
     return;
   }
+  // A caixinha. Responde 404 quando não há chave configurada: o cliente usa
+  // esse 404 para decidir se mostra o botão, então "não configurado" e "não
+  // existe" são a mesma resposta de propósito.
+  if (url.pathname === '/apoio.json') {
+    if (!PIX) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end('{}'); return; }
+    pixQr.then((qr) => {
+      if (res.destroyed) return;
+      const corpo = Buffer.from(JSON.stringify({ codigo: PIX, qr, nome: process.env.PIX_NOME || 'Cacamba' }));
+      // Sem cache: a chave pode mudar no painel do Render sem novo deploy.
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Length': corpo.length });
+      res.end(req.method === 'HEAD' ? undefined : corpo);
+    });
+    return;
+  }
+
   let file = url.pathname === '/' ? '/index.html' : url.pathname;
   file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
   for (const root of STATIC_ROOTS) {
@@ -481,10 +555,43 @@ const wss = new WebSocketServer({
   },
 });
 
+// Quem está com qual conta aberta, para a compra chegar sem a pessoa recarregar
+// nada. É isto que faz o desvio até o checkout da Kiwify valer a pena: ela sai
+// para pagar noutra aba e a skin destrava sozinha nesta, que ficou aberta.
+//
+// Um mesmo login pode ter várias abas, daí o Set. Falha aqui não pode atrapalhar
+// partida: quem não recebe o aviso vê a skin no próximo /eu.json, e ninguém
+// perde nada.
+const socketsPorConta = new Map();
+
+function avisaDono(contaId, sku, o_que) {
+  const sockets = socketsPorConta.get(contaId);
+  if (!sockets) return;
+  for (const ws of sockets) {
+    try { send(ws, { t: 'inventario', sku, situacao: o_que }); } catch { /* aba morta */ }
+  }
+}
+
 wss.on('connection', (ws, req) => {
   ws.roomCode = null;
   ws.playerId = null;
   ws.ip = ipDe(req);
+
+  // O aperto de mão do WebSocket é um pedido HTTP, então ele traz o cookie de
+  // sessão. É de graça saber de quem é esta aba — e sem isso não haveria para
+  // onde empurrar a compra. Assíncrono e sem `await`: uma partida jamais espera
+  // pelo banco para começar.
+  const cru = String(req.headers.cookie || '').match(/cacamba_sessao=([^;]+)/)?.[1] ?? '';
+  let doCookie = ''; try { doCookie = decodeURIComponent(cru); } catch { doCookie = cru; }
+  contaDaSessao(doCookie)
+    .then((conta) => {
+      if (!conta || ws.readyState !== ws.OPEN) return;
+      ws.contaId = conta.id;
+      if (!socketsPorConta.has(conta.id)) socketsPorConta.set(conta.id, new Set());
+      socketsPorConta.get(conta.id).add(ws);
+    })
+    .catch(() => { /* sem banco, ou sessão inválida: a aba segue anônima */ });
+
   conexoesPorIp.set(ws.ip, (conexoesPorIp.get(ws.ip) || 0) + 1);
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
   ws.budget = {};
@@ -515,6 +622,13 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => {
     const n = (conexoesPorIp.get(ws.ip) || 1) - 1;
     if (n <= 0) conexoesPorIp.delete(ws.ip); else conexoesPorIp.set(ws.ip, n);
+    // Sem isto o mapa cresceria para sempre com sockets mortos, e o processo
+    // que segura todas as salas iria junto.
+    if (ws.contaId) {
+      const abas = socketsPorConta.get(ws.contaId);
+      abas?.delete(ws);
+      if (abas && abas.size === 0) socketsPorConta.delete(ws.contaId);
+    }
     const room = rooms.get(ws.roomCode);
     if (!room) return;
     const player = room.players.find((p) => p.id === ws.playerId);
