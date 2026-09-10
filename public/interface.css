@@ -94,11 +94,9 @@ body.ui-3d .ui-3d-footer { position:fixed;bottom:max(5px,env(safe-area-inset-bot
 /* acima do leque e, quando você tem jogo baixado, acima dele também (a mesa
    3D calcula a altura em `--acao-fundo` a cada estado) */
 body.ui-3d .action-3d { bottom:var(--acao-fundo,calc(var(--hand-height,160px) + 14px))!important; }
-/* Deitada não sobra faixa livre entre as pilhas e os seus jogos: a barra sai
-   do meio e encosta na direita, onde o feltro está vazio. */
-@media(min-aspect-ratio:1/1) {
- body.ui-3d .action-3d { justify-content:flex-end!important;padding-right:18px!important; }
-}
+/* A barra ficou no MEIO de novo (09/09/2026): os seus jogos baixados saíram da
+   sua beirada e foram para os lados do leque, então a coluna do meio, logo
+   acima das cartas da sua mão, é dela — e é onde o polegar alcança. */
 @media(max-width:760px) {
  .ui-shell { width:calc(100% - 32px);padding:18px 0; }
  .ui-top { margin-bottom:25px; }.ui-top-right{gap:8px;}.ui-top-right [data-connection]{font-size:.67rem;}

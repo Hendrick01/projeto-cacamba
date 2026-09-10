@@ -159,7 +159,8 @@ const MESA_RAIO = 1.15;          // o feltro; o aro vai a 1,2
 // só o necessário para 78 cm entre vizinhos quando a mesa enche — com sete
 // adversários a roda vai a 1,8 m e a câmera recua para caber todos.
 const raioDosAssentos = (total) => Math.max(MESA.assento, (total - 1) * 0.30);
-const ESCALA_TAMPO = 0.55;       // monte, descarte e jogos, em relação à carta da mão
+const ESCALA_TAMPO = 0.55;       // monte e descarte, em relação à carta da mão
+const ESCALA_JOGO = 0.66;        // o jogo baixado é maior: é o que se lê de longe
 // a sua cabeça, na sua cadeira: a distância é daqui, a ALTURA sai da
 // inclinação (`alturaDoOlho`, lá embaixo) para a carta deitada sempre ler
 const OLHO = { x: 0, z: 1.35 };
@@ -874,6 +875,27 @@ const texSombra = texturaDeCanvas(128, 128, (ctx) => {
   ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
 });
 const geoSombra = new THREE.PlaneGeometry(1, 1);
+
+// O JOGO AMERICANO onde cada um baixa os jogos. Era um retângulo chapado, de
+// canto vivo — na mesa de madeira parecia um buraco preto. Agora é um pano:
+// canto arredondado e uma trama de fios finos, que é o que faz o creme da
+// carta pousar em cima de alguma coisa (09/09/2026).
+const texturaTapete = texturaDeCanvas(256, 256, (ctx) => {
+  const r = 34;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(r, 4); ctx.lineTo(256 - r, 4); ctx.quadraticCurveTo(252, 4, 252, r);
+  ctx.lineTo(252, 256 - r); ctx.quadraticCurveTo(252, 252, 256 - r, 252);
+  ctx.lineTo(r, 252); ctx.quadraticCurveTo(4, 252, 4, 256 - r);
+  ctx.lineTo(4, r); ctx.quadraticCurveTo(4, 4, r, 4);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-atop';
+  for (let i = 0; i < 256; i += 4) {
+    ctx.fillStyle = i % 8 ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.07)';
+    ctx.fillRect(i, 0, 2, 256); ctx.fillRect(0, i, 256, 2);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+});
 const materialSombra = new THREE.MeshBasicMaterial({ map: texSombra, transparent: true, depthWrite: false });
 function sombraDeContato(largura, profundidade) {
   const m = new THREE.Mesh(geoSombra, materialSombra);
@@ -986,12 +1008,16 @@ scene.add(camera);
 // conjunto continua por cima do mundo.
 const cenaMao = new THREE.Scene();
 cenaMao.add(maoGrupo);
-// luz própria, suave: a mão está encostada na câmera e o holofote do boteco,
-// que é forte e âmbar, a estouraria
-// clareza suficiente para ler o gesto, sem estourar o tom da pele: com o
-// ambiente em 1,5 a mão saía branca e perdia a cor do personagem
-cenaMao.add(new THREE.AmbientLight(0xffffff, 0.7));
-const luzDaMao = new THREE.DirectionalLight(0xfff0d8, 0.95);
+// A cena da mão tem luz PRÓPRIA — e era por isso que o seu leque vinha escuro.
+// Medindo o quadro (09/09/2026): a mesma carta valia 247 de branco na mesa e
+// **122 no leque**, metade. A mesa tem mapa de ambiente, hemisférica, três
+// direcionais e o foco da lâmpada; aqui só havia um ambiente fraco e uma
+// direcional. O mapa de ambiente da sala entra também aqui (é o mesmo verniz
+// refletido) e a luz sobe, que é o que põe as duas cartas no mesmo branco.
+cenaMao.environment = scene.environment;
+cenaMao.environmentIntensity = scene.environmentIntensity;
+cenaMao.add(new THREE.AmbientLight(0xffffff, 1.9));
+const luzDaMao = new THREE.DirectionalLight(0xfff0d8, 3.0);
 luzDaMao.position.set(-0.4, 1, 0.8);
 cenaMao.add(luzDaMao);
 // o grupo copia a câmera a cada quadro (era filho dela)
@@ -1514,8 +1540,6 @@ async function sincroniza(primeira) {
     // O resto da leitura vem da câmera (mais alta, em `alturaDoOlho`) e do
     // visor de jogos, que abre no toque.
     jogosNaMesa.clear();
-    let meuJogoZ = Infinity;    // a borda mais funda dos MEUS jogos, para a barra não sentar em cima
-    let meuJogoPertoZ = -Infinity;  // e a mais perto de você, a de baixo na tela
     const todos = [view.players.find((p) => p.id === me()), ...outros].filter(Boolean);
     for (const p of todos) {
       if (!p.melds?.length) continue;
@@ -1534,18 +1558,25 @@ async function sincroniza(primeira) {
       const giro = meu ? 0 : Math.max(-0.61, Math.min(0.61, -pos.ang));
       const escalaJogo = meu ? 0.72 : 1;   // a sua é a mais perto da câmera
 
-      const passoCarta = 0.105;
-      const vaoEntreJogos = 0.14;
-      const cartaLarg = CARTA_L * ESCALA_TAMPO;
+      // A carta do JOGO BAIXADO é maior que a do monte (0,66 contra 0,55): ela é
+      // o que se lê a metros de distância, e na mesa de madeira clara o creme da
+      // carta contrasta menos do que contrastava no feltro verde.
+      const passoCarta = 0.125;
+      const vaoEntreJogos = 0.15;
+      const cartaLarg = CARTA_L * ESCALA_JOGO;
       const larguras = p.melds.map((m) => (m.cards.length - 1) * passoCarta + cartaLarg);
       // quanto cabe numa linha: o vão até o vizinho do anel
-      const vao = meu || outros.length < 2 ? 1.15 : Math.max(0.5, raioJogos * (2 * (camera.aspect < 1 ? 0.58 : 0.96) / Math.max(1, outros.length - 1)) * 1.7);
+      // Em tela deitada os SEUS jogos vão para os lados do leque (veja abaixo),
+      // e lá a linha tem de ser estreita: passando de 0,62 m ela volta a entrar
+      // por trás das cartas da sua mão, que é a queixa de 09/09/2026.
+      const aoLado = meu && camera.aspect >= 1;
+      const vao = aoLado ? 0.62 : meu || outros.length < 2 ? 1.15 : Math.max(0.5, raioJogos * (2 * (camera.aspect < 1 ? 0.58 : 0.96) / Math.max(1, outros.length - 1)) * 1.7);
       const limite = Math.min(1.15, vao) / escalaJogo;
       // Uma linha por vez, quebrando quando estoura. Encolher a fileira
       // inteira (o que se fazia antes) era o que sumia com as cartas de quem
       // baixava três jogos; a segunda linha vai para DENTRO da mesa, na
       // direção do centro, onde há feltro sobrando.
-      const maxLinhas = fundo ? 1 : 2;
+      const maxLinhas = meu ? (camera.aspect >= 1 ? 4 : 2) : fundo ? 1 : 2;
       const linhas = [[]]; const largs = [0];
       p.melds.forEach((meld, mi) => {
         const k = linhas.length - 1;
@@ -1560,17 +1591,30 @@ async function sincroniza(primeira) {
       const cor = new THREE.Color(CORES_DE_ASSENTO[assentoDe(p.id) % CORES_DE_ASSENTO.length]);
       const novas = [];
       linhas.forEach((linha, k) => {
-        const raio = raioJogos - k * 0.24;
         const frente = new THREE.Group();
-        frente.position.set(Math.sin(pos.ang) * raio, MESA_TOPO, -Math.cos(pos.ang) * raio);
-        frente.rotation.y = giro;
+        if (meu && aoLado) {
+          // Em tela DEITADA o leque é alto e come a faixa da sua beirada: aí os
+          // seus jogos vão para o LADO dele — a primeira linha à direita, a
+          // segunda à esquerda, as seguintes mais para dentro da mesa. Medindo
+          // (1000x620): o leque ocupa de 36% a 64% da largura e um jogo a 63°
+          // do seu assento cai fora dessa faixa dos dois lados. Em pé o leque
+          // ocupa só o rodapé, e aí eles ficam à sua frente, que é o natural.
+          const lado = k % 2 ? 1 : -1;
+          const raio = 0.58 + Math.floor(k / 2) * 0.26;
+          const ang = Math.PI + lado * 1.1;
+          frente.position.set(Math.sin(ang) * raio, MESA_TOPO, -Math.cos(ang) * raio);
+        } else {
+          const raio = raioJogos - k * 0.24;
+          frente.position.set(Math.sin(pos.ang) * raio, MESA_TOPO, -Math.cos(pos.ang) * raio);
+          frente.rotation.y = giro;
+        }
         const total = largs[k];
         // o tapete do dono: a borda na cor da banqueta dele e o miolo escuro,
         // que é o que separa um jogo do outro quando a mesa enche
-        const alt = CARTA_A * ESCALA_TAMPO;
+        const alt = CARTA_A * ESCALA_JOGO;
         for (const [dl, dp, material, y] of [
-          [total + 0.13, alt + 0.11, new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.5, depthWrite: false }), 0.004],
-          [total + 0.08, alt + 0.06, new THREE.MeshBasicMaterial({ color: 0x0a2419, transparent: true, opacity: 0.55, depthWrite: false }), 0.005],
+          [total + 0.14, alt + 0.12, new THREE.MeshBasicMaterial({ map: texturaTapete, color: cor, transparent: true, opacity: 0.62, depthWrite: false }), 0.004],
+          [total + 0.105, alt + 0.085, new THREE.MeshBasicMaterial({ map: texturaTapete, color: 0x1c120a, transparent: true, opacity: 0.85, depthWrite: false }), 0.005],
         ]) {
           const t = new THREE.Mesh(geoSombra, material);
           t.rotation.x = -Math.PI / 2;
@@ -1583,7 +1627,7 @@ async function sincroniza(primeira) {
           meld.cards.forEach((card, ci) => {
             const carta = new THREE.Mesh(geoCarta, materialDaCarta(card));
             carta.castShadow = true;
-            carta.scale.setScalar(ESCALA_TAMPO);
+            carta.scale.setScalar(ESCALA_JOGO);
             // deitada no feltro (o 0,025 é só a sombra da borda), e virada
             // para a câmera: o giro do conjunto é desfeito na carta
             carta.rotation.set(-Math.PI / 2 + 0.025, 0, 0);
@@ -1598,10 +1642,6 @@ async function sincroniza(primeira) {
           frente.scale.set(f, 1, f);
         }
         jogosNaMesa.add(frente);
-        if (meu) {
-          meuJogoZ = Math.min(meuJogoZ, raio - (alt * escalaJogo) / 2 - 0.03);
-          meuJogoPertoZ = Math.max(meuJogoPertoZ, raio + (alt * escalaJogo) / 2);
-        }
         if (linha.some(({ meld }) => !jogosVistos.has(meld.id))) novas.push(frente);
       });
       // jogo novo de quem acabou de baixar: a linha inteira voa do assento
@@ -1618,31 +1658,12 @@ async function sincroniza(primeira) {
     }
 
     sincronizaMao();
-    // A barra de ações sobe acima dos SEUS jogos: com eles na beirada, os
-    // botões (que são HTML, por cima da cena) sentavam bem no meio das cartas
-    // que você acabou de baixar.
+    // A barra fica logo acima do leque, no meio: os seus jogos baixados saíram
+    // da sua beirada e foram para os LADOS do leque, então a coluna do meio é
+    // só dela — e é onde o polegar alcança.
     {
       const base = parseFloat(document.body.style.getPropertyValue('--hand-height')) || 160;
-      let fundo = base + 14;
-      if (meuJogoZ < Infinity) {
-        // a mira é a mesma do laço de desenho: na PRIMEIRA sincronia ainda não
-        // houve quadro nenhum, e sem isso a câmera ainda olha no horizonte
-        camera.lookAt(camera.position.x * 0.25, MESA_TOPO + 0.12, -0.35);
-        camera.updateMatrixWorld();
-        const naTela = (z) => {
-          const p = new THREE.Vector3(0, MESA_TOPO, z).project(camera);
-          return (-p.y * 0.5 + 0.5) * innerHeight;
-        };
-        // Se os seus jogos terminam ACIMA da barra, ela fica onde estava
-        // (encostada no leque, que é onde a mão a alcança). Só quando eles
-        // descem até a faixa da barra é que ela sobe para o outro lado deles —
-        // e nunca a ponto de tapar o monte e o descarte.
-        if (naTela(meuJogoPertoZ) > innerHeight - fundo - 46) {
-          const teto = innerHeight - naTela(0.2) - 46;
-          fundo = Math.max(fundo, Math.min(teto, innerHeight - naTela(meuJogoZ) + 10));
-        }
-      }
-      document.body.style.setProperty('--acao-fundo', `${Math.round(Math.min(innerHeight * 0.6, fundo))}px`);
+      document.body.style.setProperty('--acao-fundo', `${Math.round(base + 14)}px`);
     }
     montaBotoes();
     if (!visor.hidden) desenhaVisor();   // com o visor aberto, ele segue a mesa
