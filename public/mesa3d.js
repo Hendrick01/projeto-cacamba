@@ -26,6 +26,8 @@ import { planBaixada, isJoker, cardLabel, layoffOption, layoffEnds } from '/shar
 import { personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
 import { layoutMao3D, indiceInsercao3D } from '/interface-core.js';
+import { criaRigPrimeiraPessoa, defineGestoPrimeiraPessoa, atualizaRigPrimeiraPessoa } from '/primeira-pessoa-maos.js';
+import { identidadeDaMao } from '/mao-identidade.js';
 import { configuraInterface, estadoConexao, ligaControlesVoz } from '/interface.js';
 configuraInterface();
 
@@ -1018,6 +1020,24 @@ cenaMao.environment = scene.environment;
 cenaMao.environmentIntensity = scene.environmentIntensity;
 cenaMao.add(new THREE.AmbientLight(0xffffff, 1.9));
 const luzDaMao = new THREE.DirectionalLight(0xfff0d8, 3.0);
+// A CARNE TEM PASSE PRÓPRIO. A luz acima é afinada para as CARTAS (brancas, sem
+// sombreamento) e queima qualquer pele: medido em 14/09/2026, o polegar saía
+// em (255, 237, 187) — vermelho estourado, azul pela metade — para uma pele
+// de (244, 207, 170). Camada não resolve: no three.js a camada filtra luz pela
+// câmera, não por objeto. Então a mão mora numa terceira cena, desenhada
+// depois das cartas SEM limpar a profundidade (ela continua atrás delas onde
+// deve), com a luz suave que os bonecos da mesa têm — a mão é corpo, não carta.
+const cenaCarne = new THREE.Scene();
+const carneGrupo = new THREE.Group();
+cenaCarne.add(carneGrupo);
+// Afinada por medida (14/09/2026, lendo o quadro em sRGB): para a pele #F4CFAA
+// (244, 207, 170) o polegar sai em ~(240, 200, 160) e o punho, à sombra, perto
+// do tom de sombra do elenco (224, 177, 137). Com chão marrom na hemisférica o
+// azul ficava 15 abaixo; céu branco e chão só um pouco quente acertam a razão.
+const luzCarne = new THREE.HemisphereLight(0xffffff, 0xa38470, 2.1);
+const chaveCarne = new THREE.DirectionalLight(0xfff6ea, 1.4);
+chaveCarne.position.set(0.4, 0.9, 0.9);
+cenaCarne.add(luzCarne, chaveCarne);
 luzDaMao.position.set(-0.4, 1, 0.8);
 cenaMao.add(luzDaMao);
 // o grupo copia a câmera a cada quadro (era filho dela)
@@ -1026,6 +1046,9 @@ function segueACamera() {
   maoGrupo.position.copy(camera.position);
   maoGrupo.quaternion.copy(camera.quaternion);
   maoGrupo.updateMatrixWorld(true);
+  carneGrupo.position.copy(camera.position);
+  carneGrupo.quaternion.copy(camera.quaternion);
+  carneGrupo.updateMatrixWorld(true);
 }
 
 const cartasDaMao = new Map();  // cardId → mesh
@@ -1062,15 +1085,150 @@ function capsulaDupla(ctx, x0, y0, x1, y1, w, pele) {
   capsula(ctx, x0, y0, x1, y1, w - 10, pele);
 }
 
-// AS MÃOS DE PRIMEIRA PESSOA SAÍRAM DAQUI (08/09/2026, a pedido: "deixe apenas
-// as cartas em leque mesmo"). O que existia: mãos rigadas posadas por medida
-// (uma segurando, outra pinçando a carta escolhida), com o nó `PlanoDaCarta`
-// como contrato, e um desenho chapado de reserva. Nada disso ficou de pé contra
-// a referência — a mesa 3D mostra o leque, e só.
+// ---------------------------------------------------------------------------
+// AS SUAS MÃOS, EM PRIMEIRA PESSOA
+// ---------------------------------------------------------------------------
+// Elas vêm POSADAS do arquivo (scripts/mao_segura_leque.py para a que segura) e
+// trazem um nó `PlanoDaCarta`: origem no centro da carta que a mão segura, +Z
+// para o lado do olho — por onde o polegar cruza — e +Y na direção em que a
+// carta sobe. Alinhar a mão a ele é o que tira o palpite: o jogo já tentou
+// procurar um eixo de pinça entre dois ossos e ADIVINHAR o giro que sobrava, e
+// era daí que saíam as mãos viradas ao contrário e furando o leque. Aqui a
+// conta é direta: se P é o plano no espaço da mão e A é onde a carta está na
+// tela, a mão vai para M = A · P⁻¹.
 //
-// O caminho de volta, se um dia: `git show ab5aafd` traz o estado final, e os
-// geradores continuam no repositório (scripts/mao_para_posar.py e
-// scripts/mao_pose_segura.py), que são a parte cara.
+// A PEGADA É NO PÉ DO LEQUE, e isso está na pose, não aqui. A entrega anterior
+// agarrava a carta pelo TOPO com o punho fechado e os dedos caídos sobre a face
+// — é o "as mãos estão por cima das cartas" (usuário, 08/09/2026) assado dentro
+// do .glb. Medido em `scripts/mede_mao.mjs`, que lê o arquivo com o motor do
+// jogo: antes, polegar sobre a carta 0; agora 36, com resto sobre a carta 0.
+const maos = { esq: null, dir: null, slug: null, tridi: false };
+let rigMaos = null;
+
+// A carta do modelo mede 0,3405 na escala da mão — 63 mm de carta contra 185 mm
+// do punho à ponta do médio. É essa razão que faz a carta DO MODELO cair
+// exatamente em cima da carta DA TELA quando o contrato é alinhado: escala e
+// tamanho saem da anatomia, não de tentativa.
+const CARTA_NO_MODELO = 0.3405;
+
+const _mAlvo = new THREE.Matrix4(), _mPlano = new THREE.Matrix4();
+const _escalaMao = new THREE.Vector3(), _qMao = new THREE.Quaternion(), _vMao = new THREE.Vector3();
+const EIXO_Z_MAO = new THREE.Vector3(0, 0, 1);
+
+function encaixaPeloPlano(mao, alvo, giro, escala) {
+  const plano = mao.getObjectByName('PlanoDaCarta');
+  if (!plano) return false;
+  mao.position.set(0, 0, 0); mao.quaternion.identity(); mao.scale.setScalar(1);
+  mao.updateWorldMatrix(true, true);
+  _mPlano.copy(mao.parent.matrixWorld).invert().multiply(plano.matrixWorld);
+  _mAlvo.compose(alvo, giro, _escalaMao.set(escala, escala, escala));
+  mao.matrix.copy(_mAlvo.multiply(_mPlano.invert()));
+  mao.matrix.decompose(mao.position, mao.quaternion, mao.scale);
+  mao.updateWorldMatrix(true, true);
+  return true;
+}
+
+function poeAMao(lado, objeto) {
+  if (maos[lado]) { carneGrupo.remove(maos[lado]); maos[lado].traverse?.((o) => o.material?.dispose?.()); }
+  // Profundidade LIGADA, e é ela quem decide. O passe da mão tem z-buffer
+  // próprio, então o polegar aparece na frente das cartas porque ESTÁ na
+  // frente — não por ordem de desenho. O `renderOrder` abaixo do das cartas
+  // (60 contra 100+) é só desempate para o que empata em profundidade.
+  objeto.traverse((o) => { if (o.isMesh) { o.material.depthTest = true; o.material.depthWrite = true; o.renderOrder = 60; } });
+  objeto.renderOrder = 60;
+  maos[lado] = objeto;
+  carneGrupo.add(objeto);
+}
+
+// A IDENTIDADE VEM DO PERSONAGEM que você escolheu — o mesmo do boneco do seu
+// assento, e pelo mesmo caminho (`personagemDe`), senão a mão seria de um e o
+// boneco de outro. Só a cor de pele por enquanto: seis dos oito do elenco têm a
+// mesma pele, e o que de fato os separa (manga, anel, pulseira) pede geometria
+// que a malha ainda não tem.
+function sincronizaMaos() {
+  const eu = (view?.players || []).find((p) => p.id === me());
+  if (!eu) return;
+  const slug = personagemDe(eu);
+  if (slug === maos.slug) return;
+  maos.slug = slug; maos.tridi = false;
+  const pele = identidadeDaMao(slug).pele;
+  Promise.all(['esq', 'dir'].map((lado) => new Promise((ok, erro) =>
+    carregadorGLTF.load(`/models/mao-fp-${lado}.glb`, ok, undefined, erro))))
+    .then(([esq, dir]) => {
+      if (maos.slug !== slug) return;         // trocou de personagem enquanto carregava
+      // Físico, não toon: testado ao vivo, o toon punha ponta, lado e punho na
+      // MESMA banda — um recorte chapado, o visual que o projeto abandonou. O
+      // Standard sob a luz própria da carne dá volume e devolve a pele do
+      // personagem em vez de queimá-la.
+      const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(pele), roughness: 0.62, metalness: 0 });
+      for (const [lado, gltf] of [['esq', esq], ['dir', dir]]) {
+        const raiz = gltf.scene;
+        raiz.traverse((o) => { if (o.isMesh) { o.material = material; o.frustumCulled = false; } });
+        poeAMao(lado, raiz);
+      }
+      // O rig sai do GRUPO, não de uma mão: ele acha `LeftHand` e `RightHand`
+      // onde estiverem. E `poseDoArquivo` é o que impede a dobra dupla — as
+      // duas já chegam posadas, então pedir `leque` numa mão que já está no
+      // leque somaria a pose a ela mesma, que é a garra que furava as cartas.
+      rigMaos = criaRigPrimeiraPessoa(carneGrupo, { poseDoArquivo: { Left: 'leque', Right: 'pinca' } });
+      maos.tridi = true;
+      // O arquivo chega DEPOIS da última sincronização do leque: sem esta
+      // chamada as mãos ficavam na origem do grupo — dentro do olho — até o
+      // próximo evento da partida mexer na mão (visto em 14/09/2026: as duas
+      // carregadas, nenhuma no quadro).
+      sincronizaMao();
+    })
+    .catch((erro) => { console.info(`mão de primeira pessoa: ${erro.message} — o leque fica sem ela`); });
+}
+
+// Onde as mãos ficam, a cada sincronização do leque.
+function poeAsMaos(plano, hand) {
+  const n = hand.length;
+  if (!maos.tridi || !maos.esq) return;
+  maos.esq.visible = n > 0;
+  // A direita SÓ EXISTE PARA ESCOLHER: aparece na sua vez, na fase de jogar.
+  // Parada ali fora disso, ela só rouba a faixa de leitura das cartas.
+  const escolhendo = minhaVez && view?.phase === 'play';
+  // ...mas por ora FICA ESCONDIDA: o `mao-fp-dir.glb` ainda é a pinça antiga,
+  // que cobria as cartas da mão (a queixa do usuário). Ela volta quando vier
+  // posada por medida, vindo de cima, pela borda superior da carta. Mostrar a
+  // errada seria pior que não mostrar. A colocação abaixo continua, para o
+  // dia em que a pose chegar não ter mais nada a ligar.
+  if (maos.dir) maos.dir.visible = false && n > 0 && escolhendo;
+  if (!n) return;
+  const escalaDaMao = (CARTA_L * plano.escala) / CARTA_NO_MODELO;
+  // A mão segura pelo MEIO do leque — é onde a mão fica quando se abre um leque
+  // de verdade; na ponta ela puxa o olho para o canto. A altura da pegada (o pé
+  // da carta) já está na pose, então alinhar ao centro da carta do meio basta.
+  const doMeio = plano.posicoes[Math.floor((n - 1) / 2)];
+  _qMao.setFromAxisAngle(EIXO_Z_MAO, doMeio.giro);
+  encaixaPeloPlano(maos.esq, _vMao.set(doMeio.x, doMeio.y, doMeio.z), _qMao, escalaDaMao);
+  // A DIREITA vai para a carta escolhida (ou para a última do leque enquanto
+  // não há escolha), pelo mesmo contrato: o plano dela é a carta que ela pinça.
+  // SEMPRE colocada, visível ou não — sem isto ela ficava em escala 1 na origem
+  // do grupo, isto é, em volta da câmera (visto em 14/09/2026).
+  if (maos.dir) {
+    const iEscolhida = hand.findIndex((c) => selecionadas.has(c.id));
+    const aCarta = plano.posicoes[iEscolhida >= 0 ? iEscolhida : n - 1];
+    const sobe = iEscolhida >= 0 ? 14 * plano.unidade : 0;   // a carta escolhida sobe; a mão vai junto
+    _qMao.setFromAxisAngle(EIXO_Z_MAO, aCarta.giro);
+    encaixaPeloPlano(maos.dir, _vMao.set(aCarta.x, aCarta.y + sobe, aCarta.z), _qMao, escalaDaMao);
+  }
+  // Não há medição de recuo por quadro como havia antes: com a pose medida no
+  // arquivo (resto sobre a carta = 0) não há o que recuar, e medir 2.287
+  // vértices a 60 Hz custava mais que tudo o mais junto.
+}
+
+// O gesto de BASE sai do estado da partida; os pulsos (comprar, descartar,
+// baixar, bater) são armados nos eventos, onde eles acontecem.
+function atualizaGestoDaMao() {
+  if (!rigMaos) return;
+  const fase = view?.phase;
+  defineGestoPrimeiraPessoa(rigMaos,
+    fase === 'roundEnd' || fase === 'gameEnd' ? 'fim'
+    : !minhaVez ? 'espera'
+    : selecionadas.size ? 'selecionada' : 'minhaVez');
+}
 
 function sincronizaMao() {
   if (!view?.you) return;
@@ -1110,6 +1268,9 @@ function sincronizaMao() {
     }
   });
   entradaNaMao = null; baixadaDe = null;
+  sincronizaMaos();
+  poeAsMaos(plano, hand);
+  atualizaGestoDaMao();
 }
 
 // Toque na mão seleciona; ARRASTO arruma — o mesmo par de gestos da mesa 2D,
@@ -1991,13 +2152,18 @@ function quadro(t) {
   quadro.n = (quadro.n || 0) + 1;
   if (t - ultimaSombra > (compacto ? 150 : 100)) { renderer.shadowMap.needsUpdate = true; ultimaSombra = t; }
   renderer.render(scene, camera);
-  // os dedos caminham entre as poses (repouso, leque, pinça) no ritmo do quadro
+  // os dedos caminham entre as poses no ritmo do quadro; com movimento reduzido
+  // o gesto acontece de uma vez, sem pulso de pé
+  atualizaRigPrimeiraPessoa(rigMaos, frameMs / 1000, semMovimento);
   // segundo passe: limpa a profundidade e desenha a sua mão por cima do mundo,
   // com profundidade correta entre as cartas e os dedos
   segueACamera();
   renderer.autoClear = false;
   renderer.clearDepth();
   renderer.render(cenaMao, camera);
+  // terceiro passe: a carne, com luz própria, disputando a profundidade com as
+  // cartas que acabaram de ser desenhadas — o polegar na frente, o resto atrás
+  renderer.render(cenaCarne, camera);
   renderer.autoClear = true;
 }
 
@@ -2016,6 +2182,6 @@ if (!sessao) {
 }
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
-window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, abreVisor };
+window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, maos, get rigMaos() { return rigMaos; } };
 
 // interface-2026-09-07-r1

@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Inspetor da mão de primeira pessoa</title>
+<!--
+  Ferramenta de desenvolvimento: olha a mão de primeira pessoa COM O MOTOR DO
+  JOGO. Existe porque reimportar o .glb no Blender mente — o importador converte
+  eixos de forma inconsistente entre a malha e o empty do contrato, e a medida
+  saía errada justamente na conta que importa (ver scripts/olha_mao.py).
+
+  Aqui a mão é carregada pelo mesmo GLTFLoader do jogo, o leque é montado com a
+  mesma geometria de carta da mesa, e o `PlanoDaCarta` é usado como o `mesa3d.js`
+  o usa: a carta do meio do leque vai para o contrato, e todo o resto do leque se
+  arma em volta dela.
+
+  Abra em /inspetor-mao.html?mao=mao-fp-esq&cartas=9
+-->
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #16181d; color: #e8e2d8; font: 13px/1.5 system-ui, sans-serif; }
+  h1 { font-size: 15px; font-weight: 600; margin: 14px 16px 2px; }
+  p.sub { margin: 0 16px 12px; color: #9aa0aa; }
+  .grade { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 16px 16px; }
+  figure { margin: 0; }
+  figcaption { padding: 6px 2px 0; color: #9aa0aa; }
+  canvas { display: block; background: #0d0f13; border-radius: 8px; }
+  #erro { margin: 16px; color: #ff8f8f; white-space: pre-wrap; }
+</style>
+<h1>Inspetor da mão de primeira pessoa</h1>
+<p class="sub" id="legenda">carregando…</p>
+<div class="grade" id="grade"></div>
+<pre id="erro"></pre>
+<script type="module" src="./inspetor-mao.js"></script>
