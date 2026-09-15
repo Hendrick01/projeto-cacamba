@@ -92,13 +92,22 @@ test('a mão direita vem posada em pinça, que é como ela pega a carta', async 
   const p = gltf.scene.getObjectByName('PlanoDaCarta');
   const centro = p.getWorldPosition(new T.Vector3());
   const normal = new T.Vector3(0, 0, 1).applyQuaternion(p.getWorldQuaternion(new T.Quaternion()));
-  const media = (osso) => {
-    const pts = deformados(malha).filter((v) => v.osso === osso);
-    return pts.reduce((a, v) => a.add(v.p), new T.Vector3()).multiplyScalar(1 / pts.length);
-  };
-  const polegar = media('RightThumb3'), indicador = media('RightIndex3');
-  const folga = polegar.distanceTo(indicador);
-  assert.ok(folga < 0.06, `${folga.toFixed(3)} entre as pontas: a mão não está pinçando`);
+  const todos = deformados(malha);
+  const de = (osso) => todos.filter((v) => v.osso === osso).map((v) => v.p);
+  const pontasPol = de('RightThumb3'), pontasInd = de('RightIndex3');
+  const media = (pts) => pts.reduce((a, v) => a.add(v), new T.Vector3()).multiplyScalar(1 / pts.length);
+  const polegar = media(pontasPol), indicador = media(pontasInd);
+  // Pinçar é as POLPAS se encontrarem através do leque — não os centros das
+  // falanges: cada falange tem ~0,08 de grossura, e a distância entre as duas
+  // médias fica em 0,085 numa pinça fechada de verdade (medido em 15/09/2026:
+  // polpas a 0,008, simétricas ao plano em ±0,041). Mede-se pelos pares mais
+  // próximos: a média dos 2% mais chegados tem de caber em 12 cartas + pele.
+  const pares = [];
+  for (const a of pontasPol) for (const b of pontasInd) pares.push(a.distanceTo(b));
+  pares.sort((a, b) => a - b);
+  const k = Math.max(1, Math.round(pares.length * 0.02));
+  const folga = pares.slice(0, k).reduce((s, v) => s + v, 0) / k;
+  assert.ok(folga < 0.04, `${folga.toFixed(3)} entre as polpas: a mão não está pinçando`);
   // a carta passa ENTRE as duas pontas — uma de cada lado do plano. Qual delas
   // fica na frente é da pose e da orientação que a mesa dá; o que o contrato
   // garante é que existe uma carta ali no meio

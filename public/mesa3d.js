@@ -1189,18 +1189,28 @@ function poeAsMaos(plano, hand) {
   // A direita SÓ EXISTE PARA ESCOLHER: aparece na sua vez, na fase de jogar.
   // Parada ali fora disso, ela só rouba a faixa de leitura das cartas.
   const escolhendo = minhaVez && view?.phase === 'play';
-  // ...mas por ora FICA ESCONDIDA: o `mao-fp-dir.glb` ainda é a pinça antiga,
-  // que cobria as cartas da mão (a queixa do usuário). Ela volta quando vier
-  // posada por medida, vindo de cima, pela borda superior da carta. Mostrar a
-  // errada seria pior que não mostrar. A colocação abaixo continua, para o
-  // dia em que a pose chegar não ter mais nada a ligar.
-  if (maos.dir) maos.dir.visible = false && n > 0 && escolhendo;
+  // A pinça vem posada por medida (scripts/mao_pinca_de_cima.py): desce de
+  // cima, prende a borda superior da carta escolhida entre o polegar (na
+  // frente) e o indicador (atrás), com o punho saindo para a direita e os
+  // outros dedos curvados ATRÁS do leque, onde não tapam nada. Medido no
+  // arquivo entregue: só o polegar na frente da carta, resto zero.
+  // E SÓ ENQUANTO HÁ CARTA ESCOLHIDA: a pinça é o gesto de pegar, não um
+  // estado. Pairando na última carta a fase inteira ela virava uma mão
+  // grande parada com o antebraço subindo até o meio da mesa (visto em
+  // 15/09/2026) — mais uma coisa a tapar o tampo.
+  if (maos.dir) maos.dir.visible = n > 0 && escolhendo && selecionadas.size > 0;
   if (!n) return;
   const escalaDaMao = (CARTA_L * plano.escala) / CARTA_NO_MODELO;
   // A mão segura pelo MEIO do leque — é onde a mão fica quando se abre um leque
   // de verdade; na ponta ela puxa o olho para o canto. A altura da pegada (o pé
   // da carta) já está na pose, então alinhar ao centro da carta do meio basta.
-  const doMeio = plano.posicoes[Math.floor((n - 1) / 2)];
+  // ...e, com o leque em DUAS fileiras (em pé, mão cheia), o meio da fileira
+  // DE BAIXO: pelo índice, "a carta do meio" caía na ponta da fileira de cima e
+  // o polegar ia parar sobre a carta do canto da fileira de baixo (visto em
+  // 15/09/2026). A mão segura o leque por baixo, então é a fileira de baixo.
+  const ultimaFila = Math.max(...plano.posicoes.map((p) => p.fila));
+  const daFilaDeBaixo = plano.posicoes.filter((p) => p.fila === ultimaFila);
+  const doMeio = daFilaDeBaixo[Math.floor((daFilaDeBaixo.length - 1) / 2)] || plano.posicoes[Math.floor((n - 1) / 2)];
   _qMao.setFromAxisAngle(EIXO_Z_MAO, doMeio.giro);
   encaixaPeloPlano(maos.esq, _vMao.set(doMeio.x, doMeio.y, doMeio.z), _qMao, escalaDaMao);
   // A DIREITA vai para a carta escolhida (ou para a última do leque enquanto
@@ -2243,6 +2253,8 @@ if (!sessao) {
 window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, maos, get rigMaos() { return rigMaos; },
   // Diagnóstico: ler a visão atual e injetar uma sintética (oito jogadores com
   // três jogos cada, por exemplo) sem esperar a sorte das cartas numa partida.
-  get view() { return view; }, previa(v) { view = v; return sincroniza(false); } };
+  get view() { return view; }, previa(v) { view = v; return sincroniza(false); },
+  // e escolher uma carta da mão sem clique no canvas: é o que faz a pinça aparecer
+  escolhe(id) { selecionadas.clear(); if (id) selecionadas.add(id); sincronizaMao(); } };
 
 // interface-2026-09-07-r1
