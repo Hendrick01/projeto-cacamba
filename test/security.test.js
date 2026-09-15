@@ -32,4 +32,7 @@ test('limite tolera rajada pequena, bloqueia excesso e repõe com o tempo', () =
 test('JSON nulo, arrays e ações sem estrutura não chegam ao motor', () => {
   for (const msg of [null, [], 3, 'create', {}, {t:'action'}, {t:'action',action:[]}]) assert.equal(validMessage(msg),false);
   assert.ok(validMessage({t:'action',action:{a:'draw'}}));
+  // presença: dois inteiros pequenos ou nada; qualquer outra coisa é recusada
+  for (const m of [{t:'presenca'}, {t:'presenca',sel:3}, {t:'presenca',sel:null,olha:0}, {t:'presenca',sel:40,olha:15}]) assert.ok(validMessage(m), JSON.stringify(m));
+  for (const m of [{t:'presenca',sel:-1}, {t:'presenca',sel:41}, {t:'presenca',sel:1.5}, {t:'presenca',sel:'3'}, {t:'presenca',olha:16}, {t:'presenca',olha:{}}]) assert.equal(validMessage(m), false, JSON.stringify(m));
 });

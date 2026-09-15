@@ -18,7 +18,7 @@
 
 import * as THREE from './vendor/three.module.js';
 import { arteDaCarta, chaveDaArte, VERSO } from './baralho.js';
-import { MESA, ESCALA_CARTA_MAO, conectaLeque, arrumaLeque, atualizaInteracao, ajustaBanqueta, gestoCarta } from './interacao3d.js';
+import { MESA, ESCALA_CARTA_MAO, conectaLeque, arrumaLeque, atualizaInteracao, ajustaBanqueta, gestoCarta, apontaCarta } from './interacao3d.js';
 import { iluminaSala, criaMesa, criaSala } from './cenario3d.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
@@ -91,6 +91,10 @@ function conecta() {
       voz.reconectar?.();
     } else if (msg.t === 'voz') {
       voz.receber(msg);
+    } else if (msg.t === 'presenca') {
+      // o que outro jogador está fazendo entre as jogadas; vale por uns
+      // segundos e depois o corpo dele volta ao repouso sozinho
+      presencas.set(msg.from, { sel: msg.sel ?? null, olha: msg.olha ?? null, at: performance.now() });
     } else if (msg.t === 'error') {
       aviso(`⚠️ ${msg.msg}`);
     } else if (msg.t === 'gone') {
@@ -421,6 +425,7 @@ function personagemDe(p) {
 }
 
 const assentos = new Map();   // playerId → { grupo, plano, texturas, nomeSprite, ... }
+const presencas = new Map();  // playerId → { sel, olha, at }: o que ele faz entre as jogadas
 
 // ---------------------------------------------------------------------------
 // O elenco em 3D de verdade: bonecos montados por código, de primitivas.
@@ -1430,6 +1435,24 @@ function sincronizaMao() {
   sincronizaMaos();
   poeAsMaos(plano, hand);
   atualizaGestoDaMao();
+  mandaPresenca();
+}
+
+// A MINHA PRESENÇA, para os outros: só o índice da carta escolhida, na ordem
+// em que EU vejo a mão (nunca a carta), e a cadeira para onde olho. Freio de
+// 150 ms e só quando muda — um toque vira uma mensagem, não um fluxo.
+let presencaEnviada = null, presencaTimer = null, presencaOlha = null;
+function mandaPresenca() {
+  if (!ws || ws.readyState !== 1 || !view?.you) return;
+  const sel = maoOrdenada().findIndex((c) => selecionadas.has(c.id));
+  const dado = { sel: sel >= 0 ? sel : null, olha: presencaOlha };
+  const chave = `${dado.sel}/${dado.olha}`;
+  clearTimeout(presencaTimer);
+  if (chave === presencaEnviada) return;
+  presencaTimer = setTimeout(() => {
+    presencaEnviada = chave;
+    if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'presenca', ...dado }));
+  }, 150);
 }
 
 // Toque na mão seleciona; ARRASTO arruma — o mesmo par de gestos da mesa 2D,
@@ -1514,7 +1537,33 @@ window.addEventListener('pointercancel', () => { arrasto3d = null; toqueNoJogo =
 let olharX = 0;
 window.addEventListener('pointermove', (e) => {
   olharX = ((e.clientX / innerWidth) - 0.5) * 0.35;
+  atualizaOlhar(e.clientX);
 });
+// O MEU OLHAR, para os outros (item 3): a câmera deriva com o ponteiro, e a
+// cadeira cuja projeção fica mais perto de onde ele aponta é para quem eu
+// estou olhando. Vai na presença como `olha` (índice em players); longe de
+// qualquer cadeira, nulo — e o corpo dos outros me devolve ao repouso. Freio
+// de 250 ms: é um ponteiro se mexendo, não uma jogada.
+let olharTimer = null;
+function atualizaOlhar(clientX) {
+  if (olharTimer) return;
+  olharTimer = setTimeout(() => {
+    olharTimer = null;
+    if (!view?.players) return;
+    const v = new THREE.Vector3();
+    let melhor = null, dist = innerWidth * 0.12;
+    for (const [id, a] of assentos) {
+      a.grupo.getWorldPosition(v); v.y += 1.2;    // a altura da cabeça de quem senta
+      const p = v.project(camera);
+      if (p.z > 1) continue;
+      const x = (p.x + 1) / 2 * innerWidth, d = Math.abs(x - clientX);
+      if (d < dist) { dist = d; melhor = id; }
+    }
+    const indice = melhor ? view.players.findIndex((p) => p.id === melhor) : -1;
+    const olha = indice >= 0 ? indice : null;
+    if (olha !== presencaOlha) { presencaOlha = olha; mandaPresenca(); }
+  }, 250);
+}
 
 // ---------------------------------------------------------------------------
 // Botões de ação (HTML): as jogadas do turno
@@ -2289,7 +2338,31 @@ function quadro(t) {
       const m = a.assento.modelo;
       const dt = a.tAnterior ? Math.min(0.05, (t - a.tAnterior) / 1000) : 0; a.tAnterior = t;
       if (m.mixer && !semMovimento) m.mixer.update(dt);
-      atualizaInteracao(m, dt, { flexao: a.leque.visible ? 0.68 : 0, parado: semMovimento, olhar: a.giroAlvo, suaVez: !!a.naVez });
+      // PRESENÇA de quem senta ali: a mão direita dele vai à carta que ele
+      // está escolhendo (a k-ésima do leque dele, como ele a vê) e fica; a
+      // cabeça vira para onde ele olha. Tudo vence em 6 s sem notícia.
+      const pres = presencas.get(id);
+      const viva = !!pres && t - pres.at < 6000 && !semMovimento;
+      const cartasDoLeque = a.leque.children.filter((c) => c.isMesh && c.visible);
+      const k = viva && pres.sel != null && cartasDoLeque.length ? Math.min(pres.sel, cartasDoLeque.length - 1) : -1;
+      apontaCarta(m, k >= 0 ? cartasDoLeque[k].getWorldPosition(new THREE.Vector3()) : null);
+      // e a carta escolhida SOBE do leque dele — é o que se vê de verdade quando
+      // alguém põe o dedo numa carta, e vale para a escultura sem ossos, que é
+      // o que os modelos de hoje são (`estatico`): sem mão para apontar, a
+      // carta é quem conta a história. Sobe pelo raio do leque, a partir do pé.
+      cartasDoLeque.forEach((c, j) => {
+        if (!c.userData.base) return;
+        c.userData.sobe = THREE.MathUtils.lerp(c.userData.sobe || 0, j === k ? 1 : 0, semMovimento ? 1 : 1 - Math.exp(-dt * 9));
+        const radial = c.userData.base.clone().setZ(0).normalize();
+        c.position.copy(c.userData.base).addScaledVector(radial, 0.028 * c.userData.sobe);
+      });
+      let olhar = a.giroAlvo;
+      if (viva && pres.olha != null) {
+        const alvoId = view.players[pres.olha]?.id;
+        const foco = alvoId === me() ? new THREE.Vector3(0, 0, 2.4) : assentos.get(alvoId)?.grupo.position;
+        if (foco) { const local = a.grupo.worldToLocal(foco.clone()); olhar = THREE.MathUtils.clamp(Math.atan2(local.x, local.z), -0.5, 0.5); }
+      }
+      atualizaInteracao(m, dt, { flexao: a.leque.visible ? 0.68 : 0, parado: semMovimento, olhar, suaVez: !!a.naVez });
       if (m.morfos.bocaAberta) {
         const nvm = voz.nivel(id);
         m.morfos.bocaAberta.malha.morphTargetInfluences[m.morfos.bocaAberta.indice] = Math.min(1, nvm * 2.2);
@@ -2376,7 +2449,7 @@ if (!sessao) {
 window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, maos, get rigMaos() { return rigMaos; },
   // Diagnóstico: ler a visão atual e injetar uma sintética (oito jogadores com
   // três jogos cada, por exemplo) sem esperar a sorte das cartas numa partida.
-  get view() { return view; }, previa(v) { view = v; return sincroniza(false); },
+  get view() { return view; }, previa(v) { view = v; return sincroniza(false); }, presencas, get presencaOlha() { return presencaOlha; },
   // e escolher uma carta da mão sem clique no canvas: é o que faz a pinça aparecer
   escolhe(id) { selecionadas.clear(); if (id) selecionadas.add(id); sincronizaMao(); } };
 

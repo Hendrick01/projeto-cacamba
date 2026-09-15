@@ -747,6 +747,18 @@ function poeNaPosicao(id, destino) {
 
 function myTurn() { return view && view.turnId === me(); }
 
+// A MINHA PRESENÇA, para quem vê a mesa em 3D: o índice da carta escolhida na
+// ordem em que eu vejo a mão (nunca a carta). Freio de 150 ms, só quando muda.
+let presencaEnviada = null, presencaTimer = null;
+function mandaPresenca() {
+  if (!view?.you || (view.phase !== 'draw' && view.phase !== 'play')) return;
+  const sel = sortedHand().findIndex((c) => selected.has(c.id));
+  const chave = String(sel >= 0 ? sel : null);
+  clearTimeout(presencaTimer);
+  if (chave === presencaEnviada) return;
+  presencaTimer = setTimeout(() => { presencaEnviada = chave; sendMsg({ t: 'presenca', sel: sel >= 0 ? sel : null, olha: null }); }, 150);
+}
+
 function render() {
   if (!view) return;
   marcaCartasNovas();
@@ -762,6 +774,7 @@ function render() {
   renderHand();
   renderActions();
   renderPhaseModal();
+  mandaPresenca();
 }
 
 

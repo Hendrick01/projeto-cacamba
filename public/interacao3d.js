@@ -197,6 +197,9 @@ export function arrumaLeque(leque, n, max = 9) {
     c.position.set(Math.sin(a) * r, Math.cos(a) * r, k * 0.0007);
     c.rotation.set(0, 0, -a);
     c.material.side = T.DoubleSide;
+    // a base fica guardada: a presença de quem segura o leque ergue a carta
+    // que ele está escolhendo, e ela volta para cá quando ele solta
+    c.userData.base = c.position.clone();
   }
 }
 
@@ -212,6 +215,24 @@ export function gestoCarta(m, tipo, destino) {
   p.x = T.MathUtils.clamp(p.x, -0.30, 0.16);
   const e = { tipo, alvo: p, t: 0, dur: tipo === 'baixar' ? 1.3 : 1.05 };
   if (i.evento) { if (i.fila.length < 4) i.fila.push(e); } else i.evento = e;
+  return true;
+}
+
+// APONTAR, sustentado: a mão direita vai até `destino` (no mundo) e FICA lá
+// enquanto houver destino; sem destino, volta ao repouso. É a presença de
+// outro jogador — a carta que ele está escolhendo na própria mão — e por isso
+// não é um pulso como `gestoCarta`: dura o que a escolha dele durar. O pulso
+// de um evento (comprar, descartar) tem prioridade quando os dois coincidem.
+export function apontaCarta(m, destino) {
+  const i = m.interacao;
+  if (!i || !i.bracos?.Right) return false;
+  if (!destino) { i.aponta = false; return true; }
+  m.raiz.updateWorldMatrix(true, true);
+  const p = m.raiz.worldToLocal(destino.clone());
+  p.y = T.MathUtils.clamp(p.y, MESA.altura + 0.08 - m.raiz.position.y, 1.05);
+  p.z = T.MathUtils.clamp(p.z, 0.15, 0.62);
+  p.x = T.MathUtils.clamp(p.x, -0.35, 0.25);
+  i.apontaAlvo = p; i.aponta = true;
   return true;
 }
 
@@ -293,6 +314,11 @@ export function atualizaInteracao(m, dt, { flexao = 0.62, flexaoDir = 0.3, parad
     aperto = e.tipo === 'comprar' ? (t < 0.4 ? 0.12 : 0.55) : (t > 0.4 && t < 0.6 ? 0.1 : 0.55);
     if (t >= 1) i.evento = i.fila.shift() || null;
   } else if (parado) { i.evento = null; i.fila.length = 0; }
+  // apontar sustentado (presença): entra e sai devagar, e só quando não há
+  // pulso de evento no ar
+  i.apontaT = T.MathUtils.clamp((i.apontaT || 0) + (i.aponta && !parado ? dt * 3.5 : -dt * 3.5), 0, 1);
+  if (!e && i.apontaT > 0 && i.apontaAlvo) { mover = smooth(i.apontaT); aperto = 0.3; }
+  const alvoDoGesto = e ? e.alvo : i.apontaAlvo;
   for (const lado of ['Left', 'Right']) {
     const b = i.bracos[lado];
     if (!b) continue;
@@ -300,7 +326,7 @@ export function atualizaInteracao(m, dt, { flexao = 0.62, flexaoDir = 0.3, parad
     // desliza desse ponto até o alvo e volta (mover 0→1→0)
     b.ombro.quaternion.copy(b.baseO); b.cotovelo.quaternion.copy(b.baseC);
     const alvo = b.repouso.clone();
-    if (lado === 'Right' && mover > 0) { alvo.lerp(e.alvo, mover); alvo.y += Math.sin(mover * Math.PI) * 0.05; }
+    if (lado === 'Right' && mover > 0 && alvoDoGesto) { alvo.lerp(alvoDoGesto, mover); alvo.y += Math.sin(mover * Math.PI) * 0.05; }
     const polo = m.raiz.localToWorld(new T.Vector3(b.sinal * 0.45, 0.72 - m.raiz.position.y, 0.0));
     resolveBraco(b, m.raiz.localToWorld(alvo), polo);
     b.ombro.updateWorldMatrix(false, true);

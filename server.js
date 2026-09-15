@@ -859,6 +859,27 @@ function handle(ws, msg) {
       for (const p of alvos) send(p.ws, { t: 'voz', from: player.id, dados });
       break;
     }
+    // PRESENÇA: o que o jogador está fazendo ENTRE as jogadas — qual carta da
+    // mão está escolhendo (`sel`, índice na mão como ELE a vê; nunca a carta) e
+    // para qual cadeira olha (`olha`, índice em players). É o que faz o modelo
+    // dele, na mesa 3D dos outros, levar a mão à carta e virar a cabeça — o
+    // "quando eu mexo, os outros veem" da referência. O servidor só
+    // retransmite, como a voz: não toca no motor, não guarda, não vai para
+    // robô nem para quem mandou. Orçamento próprio e curto: isto chega a
+    // cada toque e não precisa de mais de meia dúzia por segundo.
+    case 'presenca': {
+      const room = currentRoom(ws);
+      const player = currentPlayer(ws, room);
+      if (!room.game) return;
+      if (!consume(ws.presencaBudget ||= {}, 12, 6)) return;
+      const sel = Number.isInteger(msg.sel) ? msg.sel : null;
+      const olha = Number.isInteger(msg.olha) ? msg.olha : null;
+      for (const p of room.players) {
+        if (p.isBot || p.id === player.id || !p.ws) continue;
+        send(p.ws, { t: 'presenca', from: player.id, sel, olha });
+      }
+      break;
+    }
     case 'nextRound': {
       const room = currentRoom(ws);
       currentPlayer(ws, room);
