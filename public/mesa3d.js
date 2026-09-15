@@ -27,7 +27,7 @@ import { personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js
 import { criaVoz } from '/voz.js';
 import { layoutMao3D, indiceInsercao3D } from '/interface-core.js';
 import { criaRigPrimeiraPessoa, defineGestoPrimeiraPessoa, atualizaRigPrimeiraPessoa } from '/primeira-pessoa-maos.js';
-import { identidadeDaMao } from '/mao-identidade.js';
+import { identidadeDaMao, maoDoLado, mangaNoQuadro } from '/mao-identidade.js';
 import { configuraInterface, estadoConexao, ligaControlesVoz } from '/interface.js';
 configuraInterface();
 
@@ -1165,6 +1165,9 @@ function sincronizaMaos() {
         const raiz = gltf.scene;
         raiz.traverse((o) => { if (o.isMesh) { o.material = material; o.frustumCulled = false; } });
         poeAMao(lado, raiz);
+        // o antebraço (e a manga, os aros do punho e o anel) nascem do toco
+        // da própria mão, no espaço dela: vão junto com ela para onde for
+        raiz.add(montaBraco(raiz, lado === 'esq' ? 'Left' : 'Right', material, slug));
       }
       // O rig sai do GRUPO, não de uma mão: ele acha `LeftHand` e `RightHand`
       // onde estiverem. E `poseDoArquivo` é o que impede a dobra dupla — as
@@ -1179,6 +1182,126 @@ function sincronizaMaos() {
       sincronizaMao();
     })
     .catch((erro) => { console.info(`mão de primeira pessoa: ${erro.message} — o leque fica sem ela`); });
+}
+
+// ---------------------------------------------------------------------------
+// O RESTO DO BRAÇO, em primeira pessoa. O que se vê de um braço da cadeira é
+// antebraço entrando pelo canto e mais nada — ombro e cotovelo ficam fora do
+// quadro. Então o antebraço nasce DENTRO do toco que a malha da mão já tem,
+// com a seção elíptica do toco medida na própria malha (PCA da boca), segue a
+// direção punho→cotovelo dos ossos e se esvai em transparência antes de
+// acabar: sem ombro modelado, um tubo que termina no ar parece amputado, e um
+// tubo que se dissolve parece um braço saindo do quadro. Manga, aros do punho
+// e anel vêm de `mao-identidade.js` — é a identidade do personagem na parte
+// dele que você mais vê.
+const COMPRIMENTO_ANTEBRACO = 0.78;   // na escala da mão (x0,6 na mesa ≈ 47 cm: sai do quadro antes de acabar)
+const texturaEsvai = texturaDeCanvas(4, 64, (ctx) => {
+  // opaco do punho até 55% do comprimento, transparente na ponta. `flipY`
+  // padrão: o alto da imagem é v=1, que é a ponta do cilindro (radiusTop)
+  const g = ctx.createLinearGradient(0, 0, 0, 64);
+  g.addColorStop(0, '#000'); g.addColorStop(0.45, '#fff'); g.addColorStop(1, '#fff');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 4, 64);
+});
+function pontosDeformados(malha) {
+  const { bones, boneInverses } = malha.skeleton;
+  const pos = malha.geometry.attributes.position, idx = malha.geometry.attributes.skinIndex, peso = malha.geometry.attributes.skinWeight;
+  const base = new THREE.Vector3(), acc = new THREE.Vector3(), tmp = new THREE.Vector3(), m = new THREE.Matrix4();
+  const fora = [];
+  for (let i = 0; i < pos.count; i++) {
+    base.fromBufferAttribute(pos, i); acc.set(0, 0, 0);
+    let dono = 0, maior = -1;
+    for (let k = 0; k < 4; k++) {
+      const w = peso.getComponent(i, k);
+      if (w > maior) { maior = w; dono = idx.getComponent(i, k); }
+      if (!w) continue;
+      const b = idx.getComponent(i, k);
+      m.multiplyMatrices(bones[b].matrixWorld, boneInverses[b]);
+      acc.addScaledVector(tmp.copy(base).applyMatrix4(m), w);
+    }
+    fora.push({ p: acc.clone(), osso: bones[dono].name });
+  }
+  return fora;
+}
+function montaBraco(raiz, lado, materialPele, slug) {
+  const braco = new THREE.Group();
+  braco.name = `Braco${lado}`;
+  let malha = null; raiz.traverse((o) => { if (o.isSkinnedMesh) malha = o; });
+  const punho = raiz.getObjectByName(`${lado}Hand`), noMedio = raiz.getObjectByName(`${lado}Middle1`);
+  if (!malha || !punho || !noMedio) return braco;
+  raiz.updateWorldMatrix(true, true);
+  const local = (v) => raiz.worldToLocal(v.clone());
+  const P = local(punho.getWorldPosition(new THREE.Vector3()));
+  const u = P.clone().sub(local(noMedio.getWorldPosition(new THREE.Vector3()))).normalize();   // punho → cotovelo
+  // A BOCA DO TOCO: os vértices do osso da mão mais longe dos dedos, 3 cm
+  // antes da ponta. Centro e elipse (eixo maior por PCA no plano da boca).
+  const pts = pontosDeformados(malha).filter((v) => v.osso === `${lado}Hand`).map((v) => local(v.p));
+  const ao = pts.map((q) => q.clone().sub(P).dot(u));
+  const fim = Math.max(...ao);
+  const boca = pts.filter((q, i) => ao[i] >= fim - 0.03);
+  const c = boca.reduce((a, q) => a.add(q), new THREE.Vector3()).multiplyScalar(1 / Math.max(1, boca.length));
+  const e1 = Math.abs(u.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  e1.sub(u.clone().multiplyScalar(e1.dot(u))).normalize();
+  const e2 = u.clone().cross(e1);
+  let sxx = 0, sxy = 0, syy = 0;
+  for (const q of boca) { const d = q.clone().sub(c); const x = d.dot(e1), y = d.dot(e2); sxx += x * x; sxy += x * y; syy += y * y; }
+  const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  const maior = e1.clone().multiplyScalar(Math.cos(ang)).addScaledVector(e2, Math.sin(ang)).normalize();
+  const menor = u.clone().cross(maior);
+  let a = 0.06, b = 0.06;
+  for (const q of boca) { const d = q.clone().sub(c); a = Math.max(a, Math.abs(d.dot(maior))); b = Math.max(b, Math.abs(d.dot(menor))); }
+  // o grupo: X no eixo maior da boca, Y para o cotovelo, começando 2 cm DENTRO do toco
+  braco.position.copy(c).addScaledVector(u, -0.02);
+  braco.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(maior, u, maior.clone().cross(u)));
+  const L = COMPRIMENTO_ANTEBRACO;
+  const tubo = (rPunho, rCotovelo, comprimento, inicio, material) => {
+    const g = new THREE.CylinderGeometry(rCotovelo, rPunho, comprimento, 18, 1, false);
+    const mesh = new THREE.Mesh(g, material);
+    mesh.position.y = inicio + comprimento / 2;
+    mesh.scale.set(a, 1, b);
+    mesh.frustumCulled = false; mesh.renderOrder = 60;
+    return mesh;
+  };
+  // a carne: afunila ao contrário (o antebraço engrossa para o cotovelo)
+  const pele = materialPele.clone(); pele.transparent = true; pele.alphaMap = texturaEsvai;
+  braco.add(tubo(1.0, 1.18, L, 0, pele));
+  const id = maoDoLado(slug, lado);
+  const manga = identidadeDaMao(slug).manga;
+  if (mangaNoQuadro(manga)) {
+    // manga até o punho cobre o antebraço inteiro; até o antebraço (o punho
+    // dobrado da Dri) começa no meio dele, com a dobra marcada por um aro
+    const inicio = manga.ate === 'punho' ? 0.02 : L * 0.42;
+    const tecido = new THREE.MeshStandardMaterial({ color: new THREE.Color(manga.cor), roughness: 0.92, metalness: 0, transparent: true, alphaMap: texturaEsvai });
+    braco.add(tubo(1.10, 1.28, L - inicio, inicio, tecido));
+    if (manga.ate !== 'punho') {
+      const dobra = new THREE.Mesh(new THREE.TorusGeometry(1.14, 0.045, 8, 24), new THREE.MeshStandardMaterial({ color: new THREE.Color(manga.realce || manga.cor), roughness: 0.9 }));
+      dobra.rotation.x = Math.PI / 2; dobra.position.y = inicio; dobra.scale.set(a, b, 1); dobra.frustumCulled = false;
+      braco.add(dobra);
+    }
+  }
+  // aros do punho: corrente fina, pulseira média, bracelete largo — empilhados
+  const grossura = { corrente: 0.012, pulseira: 0.022, bracelete: 0.032 };
+  let k = 0;
+  for (const ad of id.adornos) {
+    if (ad.onde !== 'punho' || !grossura[ad.tipo]) continue;
+    const metal = ad.metal === 'perola' ? { roughness: 0.35, metalness: 0.1 } : { roughness: 0.3, metalness: 0.85 };
+    const aro = new THREE.Mesh(new THREE.TorusGeometry(1.06, grossura[ad.tipo], 10, 32), new THREE.MeshStandardMaterial({ color: new THREE.Color(ad.cor), ...metal }));
+    aro.rotation.x = Math.PI / 2; aro.position.y = 0.05 + k * 0.05; aro.scale.set(a, b, 1); aro.frustumCulled = false; aro.renderOrder = 61;
+    braco.add(aro); k++;
+  }
+  // o anel: na base da falange proximal do anelar (raio medido: 0,047)
+  const anel = id.adornos.find((ad) => ad.tipo === 'anel');
+  const r1 = raiz.getObjectByName(`${lado}Ring1`), r2 = raiz.getObjectByName(`${lado}Ring2`);
+  if (anel && r1 && r2) {
+    const A = local(r1.getWorldPosition(new THREE.Vector3())), B = local(r2.getWorldPosition(new THREE.Vector3()));
+    const eixo = B.clone().sub(A).normalize();
+    const aroDedo = new THREE.Mesh(new THREE.TorusGeometry(0.053, 0.011, 8, 24), new THREE.MeshStandardMaterial({ color: new THREE.Color(anel.cor), roughness: 0.3, metalness: 0.85 }));
+    aroDedo.position.copy(A).addScaledVector(eixo, 0.3 * A.distanceTo(B));
+    aroDedo.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), eixo);   // o toro é normal a Z; o dedo é o eixo
+    aroDedo.frustumCulled = false; aroDedo.renderOrder = 61;
+    // este anel mora na MÃO, não no antebraço: vai direto na raiz
+    raiz.add(aroDedo);
+  }
+  return braco;
 }
 
 // Onde as mãos ficam, a cada sincronização do leque.
