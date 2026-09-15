@@ -58,6 +58,10 @@ ap.add_argument('--passo', type=float, default=math.radians(3), help='resoluçã
 ap.add_argument('--indicador', default='30:110:10', help='faixa de enrolamento do indicador, em graus (de:ate:passo)')
 ap.add_argument('--soltos', default='40:130:10', help='faixa de recolhimento dos outros três dedos')
 ap.add_argument('--folgaMin', type=float, default=0.02, help='folga minima (na escala da mao) para uma direcao valer na escolha do punho')
+ap.add_argument('--classico', action='store_true',
+                help='a pose ESCOLHIDA pelo dono do jogo (15/09/2026): a mao inteira acima da borda, em qualquer '
+                     'profundidade, e o "para cima" de maior folga — o punho sai para a esquerda, mas a mao fica '
+                     'toda a vista sobre o leque. E o que gera o mao-fp-dir.glb entregue.')
 ap.add_argument('--punho', type=float, default=15.0,
                 help='angulo do punho em relacao ao "para cima" da carta, em graus (positivo = para a direita '
                      'do jogador; 15 e o da gravura de referencia e o do arquivo entregue). Com um valor '
@@ -307,10 +311,10 @@ def quadro(E, contra=None):
     # alcançável ia de −50° a −28°), porque eram os dedos de trás que desciam.
     V = E[FIRME if contra is None else contra] - contato
     naFrente = (V @ n) > 0.0
-    if naFrente.any(): V = V[naFrente]
+    if naFrente.any() and not args.classico: V = V[naFrente]
     alturas = V @ U.T   # (V,G)
     folgas = alturas.min(axis=0)
-    if args.punho is None:
+    if args.punho is None or args.classico:
         g = int(np.argmax(folgas))
     else:
         # A rotação em torno do eixo da pinça é livre: entre as direções que
@@ -384,6 +388,7 @@ for to in faixa(args.soltos):
     contato, n, u, folga = quadro(E)
     V = E[VERT_SOLTOS] - contato
     naFrente = (V @ n) > 0.0
+    if args.classico: naFrente[:] = True
     baixo = float((V[naFrente] @ u).min()) if naFrente.any() else float('inf')
     print('  soltos %3.0f graus — %d vertices na frente, o mais baixo a %+.4f (precisa de %+.4f)'
           % (math.degrees(to), int(naFrente.sum()), baixo if np.isfinite(baixo) else 9.9999, folga))
@@ -421,7 +426,7 @@ print('A FRENTE DA CARTA (z>0): polegar %d/%d · resto %d/%d'
 # O que vale é o que o jogador VÊ: dentro do retângulo E na frente da carta.
 # Atrás dela (z<0) a mão some por trás da própria carta e das vizinhas do leque
 # — é onde os dedos curvados de uma pinça de verdade ficam.
-sobre = dentro & frente
+sobre = dentro & (frente | args.classico)   # no clássico conta qualquer profundidade
 print('DENTRO DO RETANGULO: %d na frente (visiveis) · %d atras (escondidos pelo leque) de %d vertices'
       % (int(sobre.sum()), int((dentro & ~frente).sum()), len(L)))
 for nome, idx in sorted(DONO.items()):
