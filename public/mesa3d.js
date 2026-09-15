@@ -1485,7 +1485,10 @@ canvas.addEventListener('pointerdown', (e) => {
   // toque num jogo do feltro: abre o visor naquele jogador. É o caminho para
   // ler carta por carta numa mesa cheia — e para encaixar sem sair da 3D.
   const noJogo = raycaster.intersectObjects(jogosNaMesa.children, true).find((h) => h.object.userData.jogo);
-  if (noJogo) toqueNoJogo = { dono: noJogo.object.userData.jogo.dono, x0: e.clientX, y0: e.clientY };
+  if (noJogo) { toqueNoJogo = { dono: noJogo.object.userData.jogo.dono, x0: e.clientX, y0: e.clientY }; return; }
+  // fora de carta e de jogo, o dedo é do PESCOÇO: toque num vizinho, viro
+  // para ele; arrasto pelo fundo, a cabeça segue o dedo (ver `soltaOlhar`)
+  arrastoOlhar = { x0: e.clientX, giro0: pescoco.giro, giro: pescoco.giro, ativo: false, assento: assentoSobOPonteiro() };
 });
 
 window.addEventListener('pointermove', (e) => {
@@ -1509,6 +1512,7 @@ window.addEventListener('pointerup', (e) => {
     toqueNoJogo = null;
     if (Math.hypot(e.clientX - x0, e.clientY - y0) < LIMIAR_ARRASTO) { abreVisor(dono); return; }
   }
+  if (arrastoOlhar) { soltaOlhar(); return; }
   if (!arrasto3d) return;
   const { id, ativo } = arrasto3d;
   arrasto3d = null;
@@ -1531,38 +1535,92 @@ window.addEventListener('pointerup', (e) => {
   ordemManual = ordem;
   sincronizaMao();
 });
-window.addEventListener('pointercancel', () => { arrasto3d = null; toqueNoJogo = null; sincronizaMao(); });
+window.addEventListener('pointercancel', () => { arrasto3d = null; toqueNoJogo = null; arrastoOlhar = null; sincronizaMao(); });
 
 // leve paralaxe: a cabeça mexe um pouco com o dedo/mouse, como quem se inclina
 let olharX = 0;
 window.addEventListener('pointermove', (e) => {
   olharX = ((e.clientX / innerWidth) - 0.5) * 0.35;
-  atualizaOlhar(e.clientX);
+  if (arrastoOlhar) arrastaOlhar(e.clientX);
 });
-// O MEU OLHAR, para os outros (item 3): a câmera deriva com o ponteiro, e a
-// cadeira cuja projeção fica mais perto de onde ele aponta é para quem eu
-// estou olhando. Vai na presença como `olha` (índice em players); longe de
-// qualquer cadeira, nulo — e o corpo dos outros me devolve ao repouso. Freio
-// de 250 ms: é um ponteiro se mexendo, não uma jogada.
-let olharTimer = null;
-function atualizaOlhar(clientX) {
-  if (olharTimer) return;
-  olharTimer = setTimeout(() => {
-    olharTimer = null;
-    if (!view?.players) return;
-    const v = new THREE.Vector3();
-    let melhor = null, dist = innerWidth * 0.12;
-    for (const [id, a] of assentos) {
-      a.grupo.getWorldPosition(v); v.y += 1.2;    // a altura da cabeça de quem senta
-      const p = v.project(camera);
-      if (p.z > 1) continue;
-      const x = (p.x + 1) / 2 * innerWidth, d = Math.abs(x - clientX);
-      if (d < dist) { dist = d; melhor = id; }
-    }
-    const indice = melhor ? view.players.findIndex((p) => p.id === melhor) : -1;
-    const olha = indice >= 0 ? indice : null;
-    if (olha !== presencaOlha) { presencaOlha = olha; mandaPresenca(); }
-  }, 250);
+
+// O MEU PESCOÇO É MEU: para onde viro e olho é escolha do jogador (usuário,
+// 15/09/2026 — "quero que o usuário escolha para onde virar e olhar"). Antes
+// o olhar ia atrás do ponteiro, e o que os outros viam era a cabeça de quem
+// procura um botão. Agora: TOQUE num vizinho e eu viro para ele — as mãos e
+// as cartas giram junto, porque é o corpo que vira, não só o olho. Toque nele
+// de novo, ou no feltro, e volto para a mesa. ARRASTE o dedo pelo fundo e a
+// cabeça segue o dedo, um para um; ao soltar perto de alguém, assenta nele;
+// perto do centro, na mesa; no meio do nada, fica onde parou. O que vai na
+// presença (`olha`) é a cadeira escolhida — ou nula, e o corpo dos outros me
+// mostra em repouso, virado para quem está na vez, como todo mundo.
+const ALTURA_DA_CABECA = 1.2;      // de quem senta, acima do chão da cadeira
+let olharEscolhido = null;         // playerId de quem eu olho; null = a mesa
+let giroLivre = null;              // giro parado onde o arrasto soltou, sem cadeira
+let arrastoOlhar = null;           // { x0, giro0, giro, ativo, assento }
+const pescoco = { giro: 0, inclina: 0 };
+
+function anguloAte(alvo) {
+  const d = alvo.clone().sub(camera.position);
+  return { giro: Math.atan2(-d.x, -d.z), inclina: Math.atan2(d.y, Math.hypot(d.x, d.z)) };
+}
+function cabecaDe(a) { const v = a.grupo.getWorldPosition(new THREE.Vector3()); v.y += ALTURA_DA_CABECA; return v; }
+// até onde o pescoço vai: a cadeira mais de lado, com folga — atrás de mim
+// não há nada para olhar
+function limiteDoPescoco() {
+  let maior = 1.2;
+  for (const a of assentos.values()) maior = Math.max(maior, Math.abs(anguloAte(cabecaDe(a)).giro) + 0.3);
+  return Math.min(maior, 2.6);
+}
+function alvoDoPescoco() {
+  const mesa = anguloAte(new THREE.Vector3(camera.position.x * 0.25, MESA_TOPO + 0.12, -0.35));
+  const giro = arrastoOlhar?.ativo ? arrastoOlhar.giro : giroLivre;
+  if (giro != null) {
+    // virado, a linha do olhar sobe do tampo para a altura das cabeças
+    const inclina = Math.atan2(ALTURA_DA_CABECA - camera.position.y, 2.2);
+    return { giro, inclina: THREE.MathUtils.lerp(mesa.inclina, inclina, Math.min(1, Math.abs(giro) / 0.6)) };
+  }
+  const a = olharEscolhido ? assentos.get(olharEscolhido) : null;
+  if (olharEscolhido && !a) escolheOlhar(null);     // ele saiu da mesa
+  return a ? anguloAte(cabecaDe(a)) : mesa;
+}
+function escolheOlhar(id) {
+  olharEscolhido = id && assentos.has(id) ? id : null;
+  giroLivre = null;
+  const indice = olharEscolhido ? (view?.players || []).findIndex((p) => p.id === olharEscolhido) : -1;
+  const olha = indice >= 0 ? indice : null;
+  if (olha !== presencaOlha) { presencaOlha = olha; mandaPresenca(); }
+}
+function assentoSobOPonteiro() {
+  const grupos = new Map([...assentos].map(([id, a]) => [a.grupo, id]));
+  const hit = raycaster.intersectObjects([...grupos.keys()], true)[0];
+  for (let o = hit?.object; o; o = o.parent) if (grupos.has(o)) return grupos.get(o);
+  return null;
+}
+// um para um: o mundo anda com o dedo
+function radianosPorPixel() {
+  return (2 * Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect)) / innerWidth;
+}
+function arrastaOlhar(clientX) {
+  const dx = clientX - arrastoOlhar.x0;
+  if (!arrastoOlhar.ativo) { if (Math.abs(dx) < LIMIAR_ARRASTO) return; arrastoOlhar.ativo = true; }
+  const lim = limiteDoPescoco();
+  arrastoOlhar.giro = THREE.MathUtils.clamp(arrastoOlhar.giro0 + dx * radianosPorPixel(), -lim, lim);
+}
+function soltaOlhar() {
+  const { ativo, giro, assento } = arrastoOlhar;
+  arrastoOlhar = null;
+  if (!ativo) {
+    if (assento) escolheOlhar(olharEscolhido === assento ? null : assento);
+    else if (olharEscolhido || giroLivre != null) escolheOlhar(null);
+    return;
+  }
+  // soltou: assenta em quem estiver a menos de ~10°; perto do centro, na mesa
+  let perto = null, dist = 0.18;
+  for (const [id, a] of assentos) { const d = Math.abs(anguloAte(cabecaDe(a)).giro - giro); if (d < dist) { dist = d; perto = id; } }
+  if (perto) escolheOlhar(perto);
+  else if (Math.abs(giro) < 0.2) escolheOlhar(null);
+  else { escolheOlhar(null); giroLivre = giro; }
 }
 
 // ---------------------------------------------------------------------------
@@ -2296,7 +2354,14 @@ function quadro(t) {
 
   // a cabeça acompanha o ponteiro de leve; a mesa continua o alvo
   camera.position.x += (((semMovimento ? 0 : olharX) * 0.4) - camera.position.x) * (1 - Math.exp(-frameMs / 160));
-  camera.lookAt(camera.position.x * 0.25, MESA_TOPO + 0.12, -0.35);
+  // o pescoço vai em ÂNGULO, não em ponto: interpolar o ponto-alvo entre a
+  // mesa e o vizinho do lado passava rente à câmera e chicoteava. Com o dedo
+  // no fundo, quase sem freio — a cabeça é do dedo.
+  const mira = alvoDoPescoco();
+  const kp = semMovimento ? 1 : 1 - Math.exp(-frameMs / (arrastoOlhar?.ativo ? 45 : 240));
+  pescoco.giro += (mira.giro - pescoco.giro) * kp;
+  pescoco.inclina += (mira.inclina - pescoco.inclina) * kp;
+  camera.rotation.set(pescoco.inclina, pescoco.giro, 0, 'YXZ');
 
   for (const [id, a] of assentos) {
     // respiro contínuo, dessincronizado por posição
@@ -2451,6 +2516,8 @@ window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, 
   // três jogos cada, por exemplo) sem esperar a sorte das cartas numa partida.
   get view() { return view; }, previa(v) { view = v; return sincroniza(false); }, presencas, get presencaOlha() { return presencaOlha; },
   // e escolher uma carta da mão sem clique no canvas: é o que faz a pinça aparecer
-  escolhe(id) { selecionadas.clear(); if (id) selecionadas.add(id); sincronizaMao(); } };
+  escolhe(id) { selecionadas.clear(); if (id) selecionadas.add(id); sincronizaMao(); },
+  // e virar para alguém (playerId) ou para a mesa (null) sem toque; `pescoco` diz onde a cabeça está
+  olharPara: (id) => escolheOlhar(id), get pescoco() { return { escolhido: olharEscolhido, livre: giroLivre, giro: pescoco.giro, inclina: pescoco.inclina }; } };
 
 // interface-2026-09-07-r1

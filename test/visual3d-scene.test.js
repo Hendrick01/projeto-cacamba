@@ -51,6 +51,23 @@ test('provador nunca recebe micromovimento nem alteracao da camera orbital', () 
   assert.ok(f.head.quaternion.equals(h)); assert.ok(f.camera.position.equals(c));
   f.scene.onAfterRender(f.renderer, f.scene, f.camera); a.dispose();
 });
+test('a camera obedece ao pescoco do jogo quando ele existe, e mira o tampo quando nao', () => {
+  const f = fixture(), a = instalaVisual3d(f.contexto);
+  f.scene.onBeforeRender(f.renderer, f.scene, f.camera); f.scene.onAfterRender(f.renderer, f.scene, f.camera);
+  f.contexto.pescoco = { giro: 0.4, inclina: -0.1 };
+  f.scene.onBeforeRender(f.renderer, f.scene, f.camera); f.scene.onAfterRender(f.renderer, f.scene, f.camera);
+  assert.equal(f.camera.rotation.order, 'YXZ');
+  assert.ok(Math.abs(f.camera.rotation.y - 0.4) < 1e-9 && Math.abs(f.camera.rotation.x + 0.1) < 1e-9);
+  // sem numero valido, volta a mira fixa (e nao deixa NaN na camera); a
+  // posicao pode ter andado pela transicao, entao a referencia e um lookAt
+  // feito de onde a camera esta agora
+  f.contexto.pescoco = { giro: NaN, inclina: 0 };
+  f.scene.onBeforeRender(f.renderer, f.scene, f.camera); f.scene.onAfterRender(f.renderer, f.scene, f.camera);
+  const ref = new T.PerspectiveCamera(); ref.position.copy(f.camera.position); ref.lookAt(f.camera.position.x * 0.25, 0.88, -0.35);
+  assert.ok(Number.isFinite(f.camera.rotation.y) && Math.abs(f.camera.rotation.y - 0.4) > 1e-3);
+  assert.ok(f.camera.quaternion.angleTo(ref.quaternion) < 1e-6);   // a ordem de Euler mudou; o que vale e a orientacao
+  a.dispose();
+});
 test('osso de cabeca com maos descendentes nao e animado', () => {
   const f = fixture(); f.head.add(f.hand);
   const h = f.head.quaternion.clone(), a = instalaVisual3d(f.contexto);

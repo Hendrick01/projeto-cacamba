@@ -162,7 +162,13 @@ export function instalaVisual3d(contexto, { modo = 'mesa', animar = modo === 'me
       const p = transicao({ y: camera.position.y, z: camera.position.z, aspecto: camera.aspect, dt, reduzido });
       camera.position.y = p.y; camera.position.z = p.z;
       camera.position.x = reduzido ? 0 : clamp(camera.position.x, -0.18, 0.18);
-      camera.lookAt(camera.position.x * 0.25, 0.88, -0.35); camera.updateMatrixWorld(true);
+      // O PESCOÇO É DO JOGO quando ele o expõe (`contexto.pescoco`: {giro,
+      // inclina} em radianos, ordem YXZ): é o jogador virando para um vizinho
+      // ou arrastando o olhar. Sem isso, a mira fixa de sempre — o meio do tampo.
+      const mira = contexto.pescoco;
+      if (mira && Number.isFinite(mira.giro) && Number.isFinite(mira.inclina)) camera.rotation.set(mira.inclina, mira.giro, 0, 'YXZ');
+      else camera.lookAt(camera.position.x * 0.25, 0.88, -0.35);
+      camera.updateMatrixWorld(true);
       const vivos = new Set();
       for (const [id, a] of contexto.assentos || []) {
         if (a.grupo) { vivos.add(id); contato(id, a.grupo, 0.8, 0.75); }
