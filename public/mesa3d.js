@@ -1230,6 +1230,27 @@ function atualizaGestoDaMao() {
     : selecionadas.size ? 'selecionada' : 'minhaVez');
 }
 
+const _canto = new THREE.Vector3();
+function alturaRealDoLeque(plano, hand) {
+  // O grupo da mão está na câmera, então a posição da carta já é espaço de
+  // câmera: basta a matriz de projeção. Os quatro cantos, com o giro da carta,
+  // porque nas pontas do arco é o canto de fora que sobe mais.
+  let topo = Infinity;
+  const meiaL = CARTA_L / 2, meiaA = CARTA_A / 2;
+  hand.forEach((card, i) => {
+    const p = plano.posicoes[i];
+    if (!p) return;
+    const sobe = selecionadas.has(card.id) ? 14 * plano.unidade : 0;
+    const c = Math.cos(p.giro), sn = Math.sin(p.giro);
+    for (const [dx, dy] of [[-meiaL, meiaA], [meiaL, meiaA], [-meiaL, -meiaA], [meiaL, -meiaA]]) {
+      const x = p.x + (dx * c - dy * sn) * p.escala, y = p.y + sobe + (dx * sn + dy * c) * p.escala;
+      _canto.set(x, y, p.z).applyMatrix4(camera.projectionMatrix);
+      topo = Math.min(topo, (1 - _canto.y) / 2 * innerHeight);
+    }
+  });
+  return Number.isFinite(topo) ? Math.max(0, innerHeight - topo) : plano.alturaMao;
+}
+
 function sincronizaMao() {
   if (!view?.you) return;
   const hand = maoOrdenada(), ids = new Set(hand.map(c => c.id));
@@ -1242,7 +1263,12 @@ function sincronizaMao() {
   const n = hand.length;
   const plano = layoutMao3D({ quantidade:n, largura:innerWidth, altura:innerHeight, fov:camera.fov, cartaL:CARTA_L, cartaA:CARTA_A });
   layoutDaMao = plano;
-  document.body.style.setProperty('--hand-height', plano.alturaMao + 'px');
+  // A ALTURA DO LEQUE É MEDIDA, não estimada. `alturaMao` do layout é uma conta
+  // de fileiras que não sabe do arco (o meio do leque sobe) nem da carta
+  // escolhida (sobe 14 px): em tela deitada os botões caíam em cima dos índices
+  // das cartas (foto do usuário, 15/09/2026). Aqui cada canto de cada carta é
+  // projetado pela câmera e o topo é o maior deles; a barra fica 14 px acima.
+  document.body.style.setProperty('--hand-height', `${Math.round(alturaRealDoLeque(plano, hand))}px`);
   hand.forEach((card,i) => {
     let mesh = cartasDaMao.get(card.id), nova = false;
     if (!mesh) {
@@ -1717,7 +1743,27 @@ async function sincroniza(primeira) {
       // o jogo), mas limitado a ±35°: além disso a carta deitada vira texto de
       // lado. A sua fileira não gira — ela é lida de frente.
       const giro = meu ? 0 : Math.max(-0.61, Math.min(0.61, -pos.ang));
-      const escalaJogo = meu ? 0.72 : 1;   // a sua é a mais perto da câmera
+      // A SUA fileira é a mais perto da câmera, e você já sabe o que baixou: ela
+      // não precisa ser lida de longe. A 0,72 (medido com quatro jogos seus,
+      // 15/09/2026) duas linhas em pé tomavam toda a metade da mesa entre o
+      // leque e o monte — "o jogo do personagem cobre demais a mesa".
+      const escalaJogo = meu ? 0.55 : 1;
+      // Em pé, onde a sua primeira linha PODE ficar: o ponto do tampo que
+      // projeta um dedo acima do topo medido do leque (`--hand-height`), para a
+      // linha não entrar por baixo das cartas da mão. Daí para dentro, nunca
+      // além de 0,32 m do centro — ali começam o monte e o descarte.
+      let zDaMinhaFrente = 0.46;
+      if (meu) {
+        const alturaLeque = parseFloat(document.body.style.getPropertyValue('--hand-height')) || 160;
+        const ndcY = 1 - 2 * (innerHeight - alturaLeque - 12) / innerHeight;
+        const alvo = new THREE.Vector3(0, ndcY, 0.5).unproject(camera);
+        const dir = alvo.sub(camera.position);
+        if (dir.y < -1e-4) {
+          const t = (MESA_TOPO - camera.position.y) / dir.y;
+          const zLivre = camera.position.z + dir.z * t;
+          zDaMinhaFrente = Math.min(0.46, zLivre - CARTA_A * ESCALA_JOGO * 0.55 / 2 - 0.04);
+        }
+      }
 
       // A carta do JOGO BAIXADO é maior que a do monte (0,66 contra 0,55): ela é
       // o que se lê a metros de distância, e na mesa de madeira clara o creme da
@@ -1764,6 +1810,16 @@ async function sincroniza(primeira) {
           const raio = 0.58 + Math.floor(k / 2) * 0.26;
           const ang = Math.PI + lado * 1.1;
           frente.position.set(Math.sin(ang) * raio, MESA_TOPO, -Math.cos(ang) * raio);
+        } else if (meu) {
+          // EM PÉ as suas linhas empilham na SUA direção, a partir da frente
+          // livre acima do leque: a primeira rente a ele, a segunda para
+          // dentro — e nunca além do monte. Antes a segunda ia para 0,14 m do
+          // centro e sentava em cima das pilhas. Entre o leque e o monte há
+          // 0,44 m e cada linha tem ~0,27 de fundo: duas inteiras não cabem.
+          // Então elas se sobrepõem DE PROPÓSITO, como um leque deitado — a
+          // de trás mostra o terço de cima, que é onde moram os índices
+          // (medido: com 0,15 de passo a de trás sumia inteira).
+          frente.position.set(0, MESA_TOPO, Math.max(0.27, zDaMinhaFrente - k * 0.17));
         } else {
           const raio = raioJogos - k * 0.24;
           frente.position.set(Math.sin(pos.ang) * raio, MESA_TOPO, -Math.cos(pos.ang) * raio);
@@ -1775,7 +1831,9 @@ async function sincroniza(primeira) {
         const alt = CARTA_A * ESCALA_JOGO;
         for (const [dl, dp, material, y] of [
           [total + 0.14, alt + 0.12, new THREE.MeshBasicMaterial({ map: texturaTapete, color: cor, transparent: true, opacity: 0.62, depthWrite: false }), 0.004],
-          [total + 0.105, alt + 0.085, new THREE.MeshBasicMaterial({ map: texturaTapete, color: 0x1c120a, transparent: true, opacity: 0.85, depthWrite: false }), 0.005],
+          // o seu tapete é mais leve: perto da câmera o miolo escuro virava uma
+          // mancha preta maior que as próprias cartas
+          [total + 0.105, alt + 0.085, new THREE.MeshBasicMaterial({ map: texturaTapete, color: 0x1c120a, transparent: true, opacity: meu ? 0.55 : 0.85, depthWrite: false }), 0.005],
         ]) {
           const t = new THREE.Mesh(geoSombra, material);
           t.rotation.x = -Math.PI / 2;
@@ -2182,6 +2240,9 @@ if (!sessao) {
 }
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
-window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, maos, get rigMaos() { return rigMaos; } };
+window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, maos, get rigMaos() { return rigMaos; },
+  // Diagnóstico: ler a visão atual e injetar uma sintética (oito jogadores com
+  // três jogos cada, por exemplo) sem esperar a sorte das cartas numa partida.
+  get view() { return view; }, previa(v) { view = v; return sincroniza(false); } };
 
 // interface-2026-09-07-r1

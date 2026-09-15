@@ -90,6 +90,29 @@ test('duas trincas do mesmo valor com 2 baralhos', () => {
   assert.ok(res);
 });
 
+test('o coringa da ponta muda de ponta para a carta real encaixar', () => {
+  // C‑8‑9‑10 de copas: o coringa nasceu como 7. Quem tem o Q não cabe em
+  // ponta nenhuma — mas cabe se o coringa virar J (áudio do usuário, 10/09/2026).
+  const coringa = { id: 'j1', joker: true, rank: 0, suit: -1 };
+  const meld = () => ({ id: 9, type: 's', suit: SU['♥'], values: [7, 8, 9, 10], cards: [coringa, c('8', '♥'), c('9', '♥'), c('10', '♥')], ownerId: 'x' });
+  const opt = layoffOption(c('Q', '♥'), meld());
+  assert.deepEqual(opt, { kind: 's', end: 'hi', v: 12, desloca: 'lo' });
+  assert.deepEqual(layoffEnds(c('Q', '♥'), meld()), ['hi']);
+  // o 6 continua entrando direto pela ponta baixa, sem mexer no coringa
+  assert.deepEqual(layoffOption(c('6', '♥'), meld()), { kind: 's', end: 'lo', v: 6 });
+  // o K não: exigiria dois valores de folga
+  assert.equal(layoffOption(c('K', '♥'), meld()), null);
+  // e o coringa que muda de ponta não é coringa "sobrando" para ninguém pegar
+  assert.equal(coringaLiberadoPeloEncaixe(meld(), opt, 'y'), null);
+  // o espelho: 8‑9‑10‑C (coringa como J) recebe o 6 com o coringa virando 7
+  const alto = { id: 10, type: 's', suit: SU['♥'], values: [8, 9, 10, 11], cards: [c('8', '♥'), c('9', '♥'), c('10', '♥'), coringa], ownerId: 'x' };
+  assert.deepEqual(layoffOption(c('6', '♥'), alto), { kind: 's', end: 'lo', v: 6, desloca: 'hi' });
+  // coringa no meio não se move: 8‑C‑10‑J não aceita o 6 nem o K
+  const meio = { id: 11, type: 's', suit: SU['♥'], values: [8, 9, 10, 11], cards: [c('8', '♥'), coringa, c('10', '♥'), c('J', '♥')], ownerId: 'x' };
+  assert.equal(layoffOption(c('6', '♥'), meio), null);
+  assert.equal(layoffOption(c('K', '♥'), meio), null);
+});
+
 test('encaixe em sequência: só nas pontas, sem passar do ás', () => {
   const meld = { id: 1, type: 's', suit: SU['♥'], values: [3, 4, 5, 6], cards: [c('3', '♥'), c('4', '♥'), c('5', '♥'), c('6', '♥')], ownerId: 'x' };
   assert.ok(layoffOption(c('2', '♥'), meld));

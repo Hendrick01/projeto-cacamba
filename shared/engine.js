@@ -363,6 +363,20 @@ export function layoffOption(card, meld, coringasRemovidos = 0, preferredEnd = n
       if (v === lo - 1 && v >= 1) opcoes.push({ kind: 's', end: 'lo', v });
       if (v === hi + 1 && v <= 14) opcoes.push({ kind: 's', end: 'hi', v });
     }
+    // O CORINGA DA PONTA PODE MUDAR DE PONTA. Um coringa que nasceu como 7 em
+    // C‑8‑9‑10 vale 7 para sempre nos `values` — e quem tem o Q não encaixa,
+    // embora o coringa "também pudesse ser um J" (áudio do usuário,
+    // 10/09/2026). Regra da casa: se a carta real não cabe em ponta nenhuma,
+    // mas caberia com o coringa passando para a outra ponta (C‑8‑9‑10 vira
+    // 8‑9‑10‑C e o Q entra depois), o encaixe vale e leva o coringa junto.
+    // Só quando nada encaixa direto: o coringa não se move à toa.
+    if (opcoes.length === 0 && coringasRemovidos === 0) {
+      const primeira = meld.cards[0], ultima = meld.cards[meld.cards.length - 1];
+      for (const v of cardValues(card)) {
+        if (isJoker(primeira) && v === hi + 2 && v <= 14) opcoes.push({ kind: 's', end: 'hi', v, desloca: 'lo' });
+        if (isJoker(ultima) && v === lo - 2 && v >= 1) opcoes.push({ kind: 's', end: 'lo', v, desloca: 'hi' });
+      }
+    }
   }
   if (opcoes.length === 0) return null;
   if (preferredEnd) return opcoes.find((o) => o.end === preferredEnd) || null;
@@ -380,6 +394,14 @@ function applyLayoff(meld, card, opt) {
   if (opt.kind === 't') {
     meld.cards.push(card);
     return;
+  }
+  // o coringa da ponta oposta vem para esta ponta, ao lado da carta nova
+  if (opt.desloca === 'lo') {
+    const coringa = meld.cards.shift(); meld.values.shift();
+    meld.cards.push(coringa); meld.values.push(opt.v - 1);
+  } else if (opt.desloca === 'hi') {
+    const coringa = meld.cards.pop(); meld.values.pop();
+    meld.cards.unshift(coringa); meld.values.unshift(opt.v + 1);
   }
   if (opt.end === 'lo') {
     meld.cards.unshift(card);
@@ -873,6 +895,9 @@ export function sobrasNaMesa(state) {
 // o empurraria para o meio, onde tirar quebraria a sequência.
 export function coringaLiberadoPeloEncaixe(meld, opt, playerId = null) {
   if (!meld || meld.type !== 's' || !opt || opt.kind !== 's') return null;
+  // Se o encaixe já usa o coringa (ele muda de ponta para a carta caber), não
+  // há coringa sobrando: sem ele o jogo nem existiria.
+  if (opt.desloca) return null;
   // Só em sequência dos OUTROS: tirar coringa do próprio jogo seria só passar
   // a carta de um bolso para o outro, sem o preço de esticar o jogo alheio.
   if (playerId && meld.ownerId === playerId) return null;
@@ -912,7 +937,7 @@ export function actLayoff(state, playerId, cardId, meldId, end = null, pegarCori
   applyLayoff(meld, card, opt);
   player.hand = player.hand.filter((c) => c.id !== cardId);
 
-  const events = [{ e: 'layoff', p: playerId, card: { ...card }, meldId }];
+  const events = [{ e: 'layoff', p: playerId, card: { ...card }, meldId, ...(opt.desloca ? { coringaMudouDePonta: true } : {}) }];
   if (coringa) {
     removeFromMeld(meld, coringa.id);
     player.hand.push(coringa);

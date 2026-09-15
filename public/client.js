@@ -1074,8 +1074,26 @@ function renderCenter() {
       : `🛒 Quero o ${cardText(view.discardTop)}!`;
   }
 
-  // Aviso da vez
+  atualizaBanner();
+}
+
+// A LINHA DA VEZ, e também a linha dos acontecimentos. Os avisos de jogada
+// ("fulano pegou do meio", "baixou o jogo") eram pop-ups no meio do feltro:
+// a 34% da altura, que no celular é exatamente a faixa das pilhas — com dois
+// empilhados, tapavam o monte e o descarte ("os pop-up dificultam a visão",
+// usuário, 15/09/2026). Aqui eles passam pela linha do banner, que já tem o
+// lugar dela reservado abaixo das pilhas: nada novo cobre nada. Cada aviso
+// fica 2,2 s e o próximo espera o seu; a fila guarda só os três últimos.
+const filaDeEventos = [];
+let eventoNoBanner = null;
+function atualizaBanner() {
   const banner = $('turn-banner');
+  if (!banner || !view) return;
+  if (eventoNoBanner) {
+    banner.textContent = eventoNoBanner;
+    banner.className = 'turn-banner evento';
+    return;
+  }
   if (view.phase === 'draw' || view.phase === 'play') {
     if (myTurn()) {
       banner.textContent = view.phase === 'draw' ? 'Sua vez! Puxe do monte ou pegue do meio.' : 'Baixe, encaixe ou descarte uma carta.';
@@ -1086,7 +1104,13 @@ function renderCenter() {
     }
   } else {
     banner.textContent = '';
+    banner.className = 'turn-banner';
   }
+}
+function proximoEventoNoBanner() {
+  eventoNoBanner = filaDeEventos.shift() || null;
+  atualizaBanner();
+  if (eventoNoBanner) setTimeout(proximoEventoNoBanner, 2200);
 }
 
 function emptyCard() {
@@ -1856,7 +1880,8 @@ function announce(ev) {
       break;
     }
     case 'layoff':
-      if (ev.p !== me()) toast(`${playerName(ev.p)} encaixou ${cardText(ev.card)}.`);
+      if (ev.p !== me()) toast(`${playerName(ev.p)} encaixou ${cardText(ev.card)}${ev.coringaMudouDePonta ? ' — e o coringa mudou de ponta' : ''}.`);
+      else if (ev.coringaMudouDePonta) toast('O coringa mudou de ponta para a sua carta caber.');
       break;
     case 'pegouCoringa':
       toast(`${JOKER_LABEL} ${playerName(ev.p)} esticou a sequência e levou o coringa que sobrou.`);
@@ -1897,6 +1922,15 @@ function announce(ev) {
 }
 
 function toast(text) {
+  // Na mesa, o aviso vai para a linha da vez (veja `atualizaBanner`); o
+  // pop-up fica só para onde não há banner — saguão, placar, avisos de sistema.
+  const naMesa = view && (view.phase === 'draw' || view.phase === 'play') && $('screen-game') && !$('screen-game').hidden;
+  if (naMesa && $('turn-banner')) {
+    filaDeEventos.push(text);
+    while (filaDeEventos.length > 3) filaDeEventos.shift();
+    if (!eventoNoBanner) proximoEventoNoBanner();
+    return;
+  }
   const box = $('toasts');
   const el = document.createElement('div');
   el.className = 'toast';
