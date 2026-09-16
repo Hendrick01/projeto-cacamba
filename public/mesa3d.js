@@ -1322,11 +1322,12 @@ function poeAsMaos(plano, hand) {
   // frente) e o indicador (atrás), com o punho saindo para a direita e os
   // outros dedos curvados ATRÁS do leque, onde não tapam nada. Medido no
   // arquivo entregue: só o polegar na frente da carta, resto zero.
-  // E SÓ ENQUANTO HÁ CARTA ESCOLHIDA: a pinça é o gesto de pegar, não um
-  // estado. Pairando na última carta a fase inteira ela virava uma mão
-  // grande parada com o antebraço subindo até o meio da mesa (visto em
-  // 15/09/2026) — mais uma coisa a tapar o tampo.
-  if (maos.dir) maos.dir.visible = n > 0 && escolhendo && selecionadas.size > 0;
+  // E FICA À VISTA A FASE INTEIRA: paira na última carta enquanto não há
+  // escolha e vai para a carta escolhida. Escondê-la sem carta escolhida
+  // (6cac4b5) foi lido pelo dono do jogo como "a pinça sumiu" (16/09/2026):
+  // é a mão que ele escolheu e testou, e quer ver — o que tapa o tampo se
+  // resolve no braço dela, não sumindo com a mão.
+  if (maos.dir) maos.dir.visible = n > 0 && escolhendo;
   if (!n) return;
   const escalaDaMao = (CARTA_L * plano.escala) / CARTA_NO_MODELO;
   // A mão segura pelo MEIO do leque — é onde a mão fica quando se abre um leque
