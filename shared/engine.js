@@ -977,6 +977,42 @@ export function actTrocarPorCoringa(state, playerId, meldId, cardId, coringaId =
   return [{ e: 'trocouPorCoringa', p: playerId, meldId: meld.id, card: { ...saiu }, deQuem: meld.ownerId }];
 }
 
+// TROCA NA TRINCA — regra da casa (usuário, 16/09/2026): uma carta da mão do
+// MESMO VALOR entra na trinca no lugar de uma carta dela, que vem para a mão.
+// Nasceu de uma jogada real que o jogo não deixou fazer: mão [2♥, 5♦], trinca
+// 5♠5♥5♣ e uma sequência C‑2‑3‑4♠ de outro jogador na mesa. O 5♦ não entrava
+// como quarta carta (naipe de fora — regra de 07/09), mas TROCADO pelo 5♠
+// libera o 5♠ para a sequência, e o 2♥ bate. A trinca continua com três
+// naipes diferentes; a quarta carta continua só de naipe que já está lá — a
+// troca é a exceção. Vale em trinca de qualquer um, como as outras jogadas
+// na mesa. Ação livre da fase de jogo: não passa a vez, a mão não muda de
+// tamanho, então nunca bate por si.
+export function trocasNaTrinca(card, meld) {
+  if (!card || !meld || meld.type !== 't' || isJoker(card) || card.rank !== meld.rank) return [];
+  return meld.cards.filter((sai) => {
+    if (isJoker(sai) || sai.id === card.id) return false;
+    const depois = meld.cards.map((c) => (c.id === sai.id ? card : c));
+    return depois.length >= 3 && new Set(depois.map((c) => c.suit)).size >= 3;
+  });
+}
+
+export function actTrocarNaTrinca(state, playerId, meldId, cardId, saiId) {
+  if (state.phase !== 'play') fail('Puxe uma carta antes de mexer na mesa.');
+  const player = state.players[state.turn];
+  if (player.id !== playerId) fail('Não é a sua vez.');
+  const meld = meldById(state, meldId);
+  if (!meld) fail('Esse jogo não está na mesa.');
+  if (meld.type !== 't') fail('A troca de carta é só em trinca.');
+  const card = player.hand.find((c) => c.id === cardId);
+  if (!card) fail('Essa carta não está na sua mão.');
+  const sai = trocasNaTrinca(card, meld).find((c) => c.id === saiId);
+  if (!sai) fail('Essa troca não vale: a carta tem de ser do mesmo valor, e a trinca continuar com três naipes diferentes.');
+  meld.cards[meld.cards.findIndex((c) => c.id === saiId)] = card;
+  player.hand = player.hand.filter((c) => c.id !== cardId);
+  player.hand.push(sai);
+  return [{ e: 'trocouNaTrinca', p: playerId, meldId: meld.id, entra: { ...card }, sai: { ...sai }, deQuem: meld.ownerId }];
+}
+
 // Já pode trocar coringa? A ÚNICA restrição do jogo é ser a vez do jogador,
 // checada em actSwapJoker junto com as demais jogadas. Não precisa ter baixado
 // o próprio contrato: quem ainda está montando a mão também pode resgatar o
@@ -1454,6 +1490,7 @@ export function applyAction(state, playerId, action) {
     case 'meldDiscard': return actMeldDiscard(state, playerId, action.meldId, action.cardId);
     case 'tomarSobra': return actTomarSobra(state, playerId, action.meldId, action.cardId);
     case 'trocarPorCoringa': return actTrocarPorCoringa(state, playerId, action.meldId, action.cardId, action.coringaId ?? null);
+    case 'trocarNaTrinca': return actTrocarNaTrinca(state, playerId, action.meldId, action.cardId, action.saiId);
     case 'queimar': return actQueimar(state, playerId);
     default: fail('Ação desconhecida.');
   }

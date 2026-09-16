@@ -6,7 +6,7 @@ import {
   actLayoff, actDiscard, actMeldDiscard, actTomarSobra, actClaim, actUnclaim, actNextRound, applyAction,
   botNextAction, botWantsCard, mulberry32, viewFor, allMelds, playerById,
   podeComprarDoDescarte, isJoker, topoDoDescarte, sobrasNaMesa, sobraFechaJogo,
-  coringaLiberadoPeloEncaixe, actTrocarPorCoringa, actQueimar,
+  coringaLiberadoPeloEncaixe, actTrocarPorCoringa, actQueimar, trocasNaTrinca, actTrocarNaTrinca,
   decksParaJogadores, conferirBaralho, cartasNecessarias, DEFAULT_OPTS,
 } from '../shared/engine.js';
 
@@ -545,6 +545,43 @@ test('descartar de um jogo com sobra em vez da mão', () => {
   assert.equal(meld.cards.length, 3);
   assert.equal(p.hand.length, 1, 'a mão ficou intacta');
   assert.equal(state.phase, 'draw', 'vez passou adiante');
+});
+
+test('troca na trinca: o 5♦ entra no lugar do 5♠, o 5♠ vai para a sequência do outro e o 2♥ bate', () => {
+  // A jogada real de 16/09/2026 que o jogo não deixou fazer.
+  const state = freshGame();
+  const p = state.players[state.turn];
+  const outro = state.players.find((x) => x.id !== p.id);
+  actDraw(state, p.id, 'deck');
+  const cincoS = c('5', '♠'), cincoD = c('5', '♦'), doisC = c('2', '♥');
+  p.hand = [cincoS, c('5', '♥'), c('5', '♣'), c('Q', '♠'), c('Q', '♥'), c('Q', '♣'), cincoD, doisC];
+  actBaixar(state, p.id, p.hand.slice(0, 6).map((x) => x.id));   // 1ª rodada: duas trincas
+  const trinca = p.melds.find((m) => m.rank === 5);
+  const seq = { id: 9001, type: 's', suit: SU['♠'], values: [1, 2, 3, 4], cards: [J(), c('2', '♠'), c('3', '♠'), c('4', '♠')], ownerId: outro.id };
+  outro.melds.push(seq);
+
+  // a quarta carta de naipe de fora continua NÃO entrando (regra de 07/09)...
+  assert.equal(layoffOption(cincoD, trinca), null);
+  // ...mas trocada por qualquer uma das três vale: a trinca segue com três naipes
+  assert.deepEqual(trocasNaTrinca(cincoD, trinca).map((x) => x.suit).sort(), [SU['♠'], SU['♥'], SU['♣']].sort());
+  // um 5♥ repetido só poderia sair no lugar do próprio 5♥: tirar ♠ ou ♣ deixaria dois naipes
+  assert.deepEqual(trocasNaTrinca(c('5', '♥'), trinca).map((x) => x.suit), [SU['♥']]);
+  // valor diferente ou coringa não trocam nada
+  assert.deepEqual(trocasNaTrinca(c('6', '♦'), trinca), []);
+  assert.deepEqual(trocasNaTrinca(J(), trinca), []);
+  assert.throws(() => actTrocarNaTrinca(state, p.id, trinca.id, doisC.id, cincoS.id), /mesmo valor/);
+
+  const ev = actTrocarNaTrinca(state, p.id, trinca.id, cincoD.id, cincoS.id);
+  assert.equal(ev[0].e, 'trocouNaTrinca');
+  assert.equal(ev[0].deQuem, p.id);
+  assert.deepEqual(trinca.cards.map((x) => x.suit).sort(), [SU['♥'], SU['♦'], SU['♣']].sort(), 'o 5♦ ficou no lugar do 5♠');
+  assert.deepEqual(p.hand.map((x) => x.id).sort(), [doisC.id, cincoS.id].sort(), 'o 5♠ veio para a mão, sem passar a vez');
+  assert.equal(state.phase, 'play');
+
+  actLayoff(state, p.id, cincoS.id, seq.id);
+  assert.deepEqual(seq.values, [1, 2, 3, 4, 5]);
+  actDiscard(state, p.id, doisC.id);
+  assert.equal(state.lastRound.winnerId, p.id, 'bateu com o 2♥');
 });
 
 test('a carta que você descartou não volta para a sua mão', () => {

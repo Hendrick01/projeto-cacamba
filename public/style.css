@@ -1332,3 +1332,14 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
 .btn-apagar { opacity: 0.65; font-size: 12px; }
 .loja-legal { margin: 4px 16px 24px; font-size: 12px; opacity: 0.6; text-align: center; }
 .loja-legal a { color: inherit; }
+
+/* Troca na trinca (16/09/2026): a carta da trinca que pode sair no lugar da
+   carta escolhida na mão. Mesmo aviso de "toque aqui" da sobra, em outra cor
+   para não confundir com a carta que sobra. */
+.meld .card.mini.trocavel {
+  cursor: pointer;
+  outline: 3px solid #4fb3bf;
+  outline-offset: -3px;
+  box-shadow: 0 0 0 2px rgba(79, 179, 191, 0.35), 0 4px 12px rgba(0, 0, 0, 0.35);
+  transform: translateY(-4px);
+}

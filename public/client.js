@@ -6,7 +6,7 @@ import { arteDaCarta } from './baralho.js';
 import {
   planBaixada, layoffOption, layoffEnds, removableCards, SUITS, SUIT_NAMES, SUIT_RED, rankLabel,
   isJoker, JOKER_LABEL, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
-  DEFAULT_OPTS, sobraFechaJogo, coringaLiberadoPeloEncaixe,
+  DEFAULT_OPTS, sobraFechaJogo, coringaLiberadoPeloEncaixe, trocasNaTrinca,
   CONTRACTS as CONTRATOS, TOTAL_ROUNDS,
 } from '/shared/engine.js';
 import {
@@ -1245,6 +1245,23 @@ function decorateMeld(el, meld) {
         encaixa(card, meld, null);
       };
     }
+    // TROCA NA TRINCA (regra da casa, 16/09/2026): a carta escolhida, do mesmo
+    // valor, entra no lugar de uma carta da trinca, que vem para a mão. Cada
+    // carta que pode sair vira alvo de toque — mesmo quando a escolhida também
+    // encaixaria como quarta: o toque no jogo encaixa, o toque na carta troca.
+    if (card) {
+      for (const sai of trocasNaTrinca(card, meld)) {
+        const ce = [...el.children].find((x) => Number(x.dataset.cardId) === sai.id);
+        if (!ce) continue;
+        ce.classList.add('trocavel');
+        ce.title = `Pôr ${cardText(card)} no lugar de ${cardText(sai)} e trazer ${cardText(sai)} para a mão`;
+        ce.onclick = (e) => {
+          e.stopPropagation();
+          selected.clear();
+          sendAction({ a: 'trocarNaTrinca', meldId: meld.id, cardId: card.id, saiId: sai.id });
+        };
+      }
+    }
   }
 }
 
@@ -1904,6 +1921,11 @@ function announce(ev) {
       const dono = ev.deQuem === me() ? 'de um jogo SEU' : (ev.deQuem === ev.p ? 'de um jogo próprio' : `de um jogo de ${playerName(ev.deQuem)}`);
       toast(`${playerName(ev.p)} descartou ${cardText(ev.card)} ${dono}.`);
       if (ev.deQuem === me() && ev.p !== me()) reage(me(), 'perdeu');
+      break;
+    }
+    case 'trocouNaTrinca': {
+      const dono = ev.deQuem === me() ? 'numa trinca SUA' : (ev.deQuem === ev.p ? 'na própria trinca' : `numa trinca de ${playerName(ev.deQuem)}`);
+      toast(`🔁 ${playerName(ev.p)} pôs ${cardText(ev.entra)} no lugar de ${cardText(ev.sai)} ${dono} e levou ${cardText(ev.sai)} para a mão.`);
       break;
     }
     case 'tomouSobra': {

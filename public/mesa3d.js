@@ -22,7 +22,7 @@ import { MESA, ESCALA_CARTA_MAO, conectaLeque, arrumaLeque, atualizaInteracao, a
 import { iluminaSala, criaMesa, criaSala } from './cenario3d.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
-import { planBaixada, isJoker, cardLabel, layoffOption, layoffEnds } from '/shared/engine.js';
+import { planBaixada, isJoker, cardLabel, layoffOption, layoffEnds, trocasNaTrinca } from '/shared/engine.js';
 import { personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
 import { layoutMao3D, indiceInsercao3D } from '/interface-core.js';
@@ -1844,6 +1844,24 @@ function desenhaVisor() {
         cartas.appendChild(alvo);
       }
       linha.appendChild(cartas);
+      // troca na trinca (regra da casa, 16/09/2026): a carta escolhida entra
+      // no lugar de uma da trinca, que vem para a mão — um botão por carta
+      const trocas = minhaVez && selecionada ? trocasNaTrinca(selecionada, meld) : [];
+      if (trocas.length) {
+        const acoesTroca = document.createElement('div');
+        acoesTroca.className = 'visor-encaixes';
+        for (const sai of trocas) {
+          const b = document.createElement('button');
+          b.type = 'button'; b.className = 'visor-acao';
+          b.textContent = `pôr ${cardLabel(selecionada)} no lugar de ${cardLabel(sai)}`;
+          b.onclick = () => {
+            sendAction({ a: 'trocarNaTrinca', meldId: meld.id, cardId: selecionada.id, saiId: sai.id });
+            selecionadas.clear(); fechaVisor(); sincronizaMao(); montaBotoes();
+          };
+          acoesTroca.appendChild(b);
+        }
+        linha.appendChild(acoesTroca);
+      }
       // encaixe: a mesma pergunta da mesa 2D quando a carta serve nas duas
       // pontas — aqui ela vira dois botões, que é mais rápido no dedo
       if (minhaVez && selecionada && layoffOption(selecionada, meld)) {
@@ -2251,7 +2269,7 @@ function reageAoEvento(ev) {
   // o verbo do lance na placa de quem o fez, por um instante — é o "JOGOU" da
   // referência, e o único jeito de saber o que um vizinho fez sem ler o toast
   {
-    const VERBOS = { draw: 'COMPROU', buy: 'COMPROU', tomouSobra: 'PEGOU A SOBRA', discard: 'DESCARTOU', baixou: 'BAIXOU', layoff: 'ENCAIXOU', claim: 'PEDIU O MEIO' };
+    const VERBOS = { draw: 'COMPROU', buy: 'COMPROU', tomouSobra: 'PEGOU A SOBRA', trocouNaTrinca: 'TROCOU NA TRINCA', discard: 'DESCARTOU', baixou: 'BAIXOU', layoff: 'ENCAIXOU', claim: 'PEDIU O MEIO' };
     const dele = ev.p ? assentos.get(ev.p) : null;
     if (dele && VERBOS[ev.e]) { dele.aviso = VERBOS[ev.e]; dele.avisoAte = performance.now() + 1800; }
   }
