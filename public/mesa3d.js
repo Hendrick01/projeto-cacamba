@@ -1168,7 +1168,12 @@ function sincronizaMaos() {
       const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(pele), roughness: 0.62, metalness: 0 });
       for (const [lado, gltf] of [['esq', esq], ['dir', dir]]) {
         const raiz = gltf.scene;
-        raiz.traverse((o) => { if (o.isMesh) { o.material = material; o.frustumCulled = false; } });
+        // A pele da DIREITA é recortada no punho (o toco do antebraço da malha
+        // sai; o antebraço de verdade nasce ali, virado para o corpo): material
+        // próprio com o plano de corte, atualizado a cada colocação.
+        const pele = lado === 'dir' ? material.clone() : material;
+        if (lado === 'dir') { raiz.userData.corte = new THREE.Plane(); pele.clippingPlanes = [raiz.userData.corte]; renderer.localClippingEnabled = true; }
+        raiz.traverse((o) => { if (o.isMesh) { o.material = pele; o.frustumCulled = false; } });
         poeAMao(lado, raiz);
         // o antebraço (e a manga, os aros do punho e o anel) nascem do toco
         // da própria mão, no espaço dela: vão junto com ela para onde for
@@ -1239,10 +1244,16 @@ function montaBraco(raiz, lado, materialPele, slug) {
   const u = P.clone().sub(local(noMedio.getWorldPosition(new THREE.Vector3()))).normalize();   // punho → cotovelo
   // A BOCA DO TOCO: os vértices do osso da mão mais longe dos dedos, 3 cm
   // antes da ponta. Centro e elipse (eixo maior por PCA no plano da boca).
+  // Na DIREITA a boca é outra: o CORTE no punho, 1,5 cm depois do osso da mão.
+  // O toco da malha da pinça aponta para cima e para a esquerda; seguir por
+  // ele e dobrar depois fazia um grampo ("o braço está completamente
+  // retorcido", usuário, 16/09/2026). Cortado ali, o antebraço nasce no punho
+  // e vai direto para o corpo.
+  const CORTE = lado === 'Right' ? 0.006 : null;
   const pts = pontosDeformados(malha).filter((v) => v.osso === `${lado}Hand`).map((v) => local(v.p));
   const ao = pts.map((q) => q.clone().sub(P).dot(u));
   const fim = Math.max(...ao);
-  const boca = pts.filter((q, i) => ao[i] >= fim - 0.03);
+  const boca = CORTE == null ? pts.filter((q, i) => ao[i] >= fim - 0.03) : pts.filter((q, i) => Math.abs(ao[i] - CORTE) <= 0.02);
   const c = boca.reduce((a, q) => a.add(q), new THREE.Vector3()).multiplyScalar(1 / Math.max(1, boca.length));
   const e1 = Math.abs(u.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
   e1.sub(u.clone().multiplyScalar(e1.dot(u))).normalize();
@@ -1254,12 +1265,13 @@ function montaBraco(raiz, lado, materialPele, slug) {
   const menor = u.clone().cross(maior);
   let a = 0.06, b = 0.06;
   for (const q of boca) { const d = q.clone().sub(c); a = Math.max(a, Math.abs(d.dot(maior))); b = Math.max(b, Math.abs(d.dot(menor))); }
-  // o grupo: X no eixo maior da boca, Y para o cotovelo, começando 2 cm DENTRO do toco
-  braco.position.copy(c).addScaledVector(u, -0.02);
+  // o grupo: X no eixo maior da boca, Y para o cotovelo, começando 2 cm DENTRO
+  // do toco (1 cm dentro do corte, na direita)
+  braco.position.copy(c).addScaledVector(u, CORTE == null ? -0.02 : -0.01);
   braco.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(maior, u, maior.clone().cross(u)));
   // o quadro da boca fica guardado: a pinça DOBRA O PUNHO por colocação
-  // (`dobraOAntebraco`), e a dobra parte daqui
-  braco.userData.boca = { maior: maior.clone(), u: u.clone() };
+  // (`dobraOAntebraco`), e a dobra e o corte partem daqui
+  braco.userData.boca = { maior: maior.clone(), u: u.clone(), P: P.clone(), corte: CORTE };
   const L = COMPRIMENTO_ANTEBRACO;
   const tubo = (rPunho, rCotovelo, comprimento, inicio, material) => {
     const g = new THREE.CylinderGeometry(rCotovelo, rPunho, comprimento, 18, 1, false);
@@ -1278,9 +1290,12 @@ function montaBraco(raiz, lado, materialPele, slug) {
   // dobra: um elipsoide na boca do toco esconde a quina entre a mão e o
   // antebraço reapontado — sem ele a dobra abria um degrau na pele.
   if (lado === 'Right') {
+    // achatada no eixo do braço e recuada para dentro da mão: alta e centrada
+    // no corte ela saía do punho como um calombo (visto em 16/09/2026)
     const junta = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), materialPele);
-    junta.scale.set(a * 1.02, Math.max(a, b) * 0.9, b * 1.02);
-    junta.position.copy(braco.position).addScaledVector(u, 0.01);
+    const raio = Math.max(a, b);
+    junta.scale.set(a * 1.02, raio * 0.55, b * 1.02);
+    junta.position.copy(c).addScaledVector(u, -0.25 * raio);
     junta.quaternion.copy(braco.quaternion);
     junta.frustumCulled = false; junta.renderOrder = 60; junta.name = 'JuntaRight';
     raiz.add(junta);
@@ -1387,7 +1402,8 @@ function poeAsMaos(plano, hand) {
 // acompanha a câmera), então vale para qualquer tela e qualquer carta;
 // ligeiramente para TRÁS do leque, para que, onde cruza as cartas, sejam as
 // cartas a ganhar a profundidade — o braço passa por trás, não por cima.
-let DIRECAO_DO_COTOVELO = new THREE.Vector3(-0.55, -0.8, -0.22).normalize();
+let DIRECAO_DO_COTOVELO = new THREE.Vector3(-0.5, -0.85, -0.2).normalize();
+const _nCorte = new THREE.Vector3(), _pCorte = new THREE.Vector3();
 const _pA = new THREE.Vector3(), _pB = new THREE.Vector3(), _dCot = new THREE.Vector3(), _xCot = new THREE.Vector3();
 function dobraOAntebraco(raiz) {
   const braco = raiz.getObjectByName('BracoRight');
@@ -1407,6 +1423,13 @@ function dobraOAntebraco(raiz) {
   _xCot.normalize();
   braco.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(_xCot, _dCot, _xCot.clone().cross(_dCot)));
   braco.updateWorldMatrix(false, true);
+  // o corte no punho, no espaço do mundo (os planos de recorte do three.js
+  // vivem lá): fica o lado dos dedos, some o toco
+  if (raiz.userData.corte && boca.corte != null) {
+    _pCorte.copy(boca.P).addScaledVector(boca.u, boca.corte); raiz.localToWorld(_pCorte);
+    _nCorte.copy(boca.u).negate().transformDirection(raiz.matrixWorld);
+    raiz.userData.corte.setFromNormalAndCoplanarPoint(_nCorte, _pCorte);
+  }
 }
 
 // O gesto de BASE sai do estado da partida; os pulsos (comprar, descartar,
