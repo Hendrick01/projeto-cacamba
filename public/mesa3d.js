@@ -1283,7 +1283,54 @@ function montaBraco(raiz, lado, materialPele, slug) {
   };
   // a carne: afunila ao contrário (o antebraço engrossa para o cotovelo)
   const pele = materialPele.clone(); pele.transparent = true; pele.alphaMap = texturaEsvai;
-  braco.add(tubo(1.0, 1.18, L, 0, pele));
+  // Na DIREITA o tubo é CURVO: sai do punho na direção da mão e vira aos
+  // poucos para o corpo (`dobraOAntebraco` refaz a curva a cada colocação).
+  // Reto e dobrado num ponto só "parecia um pulso quebrado" (usuário,
+  // 16/09/2026). A elipse da boca (a × b) vai na própria geometria, com o
+  // eixo maior alinhado ao da boca no início e transportado ao longo da curva.
+  const curvos = [];
+  const tuboCurvo = (rPunho, rCotovelo, tIni, material) => {
+    const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
+    mesh.frustumCulled = false; mesh.renderOrder = 60;
+    curvos.push({ mesh, rPunho, rCotovelo, tIni });
+    return mesh;
+  };
+  const geoCurva = (rPunho, rCotovelo, tIni, dir) => {
+    const P1 = new THREE.Vector3(0, L * 0.3, 0);
+    const curva = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), P1, P1.clone().addScaledVector(dir, L * 0.7));
+    const N = 26, R = 16, q = curva.computeFrenetFrames(N, false);
+    // o quadro inicial gira para o eixo maior ficar em +X (o da boca)
+    const phi = Math.atan2(q.normals[0].z, q.normals[0].x);
+    const cph = Math.cos(-phi), sph = Math.sin(-phi);
+    const pos = [], uv = [], idx = []; const i0 = Math.round(tIni * N);
+    for (let i = i0; i <= N; i++) {
+      const t = i / N, c = curva.getPoint(t), raio = rPunho + (rCotovelo - rPunho) * (t - tIni) / Math.max(1e-6, 1 - tIni);
+      const n = q.normals[i].clone().multiplyScalar(cph).addScaledVector(q.binormals[i], sph);
+      const bn = q.binormals[i].clone().multiplyScalar(cph).addScaledVector(q.normals[i], -sph);
+      for (let j = 0; j <= R; j++) {
+        const th = (j / R) * Math.PI * 2, ca = Math.cos(th) * a * raio, sb = Math.sin(th) * b * raio;
+        pos.push(c.x + ca * n.x + sb * bn.x, c.y + ca * n.y + sb * bn.y, c.z + ca * n.z + sb * bn.z);
+        uv.push(j / R, t);
+      }
+    }
+    const aneis = N - i0 + 1;
+    for (let i = 0; i < aneis - 1; i++) for (let j = 0; j < R; j++) {
+      const A = i * (R + 1) + j, B = A + R + 1;
+      idx.push(A, B, A + 1, B, B + 1, A + 1);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  };
+  if (lado === 'Right') {
+    braco.add(tuboCurvo(1.0, 1.18, 0, pele));
+    braco.userData.refaz = (dir) => { for (const c of curvos) { c.mesh.geometry.dispose(); c.mesh.geometry = geoCurva(c.rPunho, c.rCotovelo, c.tIni, dir); } };
+    braco.userData.refaz(new THREE.Vector3(0, 1, 0));
+  } else {
+    braco.add(tubo(1.0, 1.18, L, 0, pele));
+  }
   // A JUNTA DO PUNHO, na mão direita: a pinça desce de cima, mas o antebraço
   // tem de vir do CORPO (usuário, 16/09/2026: "ele vem muito de cima, teria
   // que ser algo natural, como se estivesse saindo do corpo"). Então o punho
@@ -1307,7 +1354,8 @@ function montaBraco(raiz, lado, materialPele, slug) {
     // dobrado da Dri) começa no meio dele, com a dobra marcada por um aro
     const inicio = manga.ate === 'punho' ? 0.02 : L * 0.42;
     const tecido = new THREE.MeshStandardMaterial({ color: new THREE.Color(manga.cor), roughness: 0.92, metalness: 0, transparent: true, alphaMap: texturaEsvai });
-    braco.add(tubo(1.10, 1.28, L - inicio, inicio, tecido));
+    if (lado === 'Right') { braco.add(tuboCurvo(1.10, 1.28, inicio / L, tecido)); braco.userData.refaz(new THREE.Vector3(0, 1, 0)); }
+    else braco.add(tubo(1.10, 1.28, L - inicio, inicio, tecido));
     if (manga.ate !== 'punho') {
       const dobra = new THREE.Mesh(new THREE.TorusGeometry(1.14, 0.045, 8, 24), new THREE.MeshStandardMaterial({ color: new THREE.Color(manga.realce || manga.cor), roughness: 0.9 }));
       dobra.rotation.x = Math.PI / 2; dobra.position.y = inicio; dobra.scale.set(a, b, 1); dobra.frustumCulled = false;
@@ -1405,24 +1453,27 @@ function poeAsMaos(plano, hand) {
 let DIRECAO_DO_COTOVELO = new THREE.Vector3(-0.5, -0.85, -0.2).normalize();
 const _nCorte = new THREE.Vector3(), _pCorte = new THREE.Vector3();
 const _pA = new THREE.Vector3(), _pB = new THREE.Vector3(), _dCot = new THREE.Vector3(), _xCot = new THREE.Vector3();
+// um pulso de verdade vira até uns 70°; mais que isso, é pulso quebrado
+const VIRADA_MAXIMA_DO_PUNHO = 1.2;
+const _qBraco = new THREE.Quaternion(), _eixoVirada = new THREE.Vector3(), _Y = new THREE.Vector3(0, 1, 0);
 function dobraOAntebraco(raiz) {
   const braco = raiz.getObjectByName('BracoRight');
   const boca = braco?.userData.boca;
-  if (!boca) return;
-  raiz.updateWorldMatrix(true, false);
-  // a direção, do espaço da câmera para o espaço da mão (escala uniforme:
-  // direções sobrevivem)
+  if (!boca || !braco.userData.refaz) return;
+  raiz.updateWorldMatrix(true, true);
+  // a direção do cotovelo, do espaço da câmera para o espaço do grupo do braço
+  // (cujo +Y é o eixo do toco; escala uniforme, direções sobrevivem)
   _pA.set(0, 0, 0); _pB.copy(DIRECAO_DO_COTOVELO);
   carneGrupo.localToWorld(_pA); carneGrupo.localToWorld(_pB);
-  raiz.worldToLocal(_pA); raiz.worldToLocal(_pB);
-  _dCot.subVectors(_pB, _pA).normalize();
-  // X segue o eixo maior da boca projetado no plano da nova direção, para a
-  // elipse do tubo continuar casando com a do toco
-  _xCot.copy(boca.maior).addScaledVector(_dCot, -boca.maior.dot(_dCot));
-  if (_xCot.lengthSq() < 1e-6) _xCot.copy(boca.u).addScaledVector(_dCot, -boca.u.dot(_dCot));
-  _xCot.normalize();
-  braco.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(_xCot, _dCot, _xCot.clone().cross(_dCot)));
-  braco.updateWorldMatrix(false, true);
+  _dCot.subVectors(_pB, _pA).applyQuaternion(braco.getWorldQuaternion(_qBraco).invert()).normalize();
+  // a virada, limitada: o tubo sai pelo eixo do toco e curva até esta direção
+  const virada = Math.acos(THREE.MathUtils.clamp(_dCot.y, -1, 1));
+  if (virada > VIRADA_MAXIMA_DO_PUNHO) {
+    _eixoVirada.crossVectors(_Y, _dCot);
+    if (_eixoVirada.lengthSq() < 1e-8) _eixoVirada.set(1, 0, 0); else _eixoVirada.normalize();
+    _dCot.copy(_Y).applyAxisAngle(_eixoVirada, VIRADA_MAXIMA_DO_PUNHO);
+  }
+  braco.userData.refaz(_dCot);
   // o corte no punho, no espaço do mundo (os planos de recorte do three.js
   // vivem lá): fica o lado dos dedos, some o toco
   if (raiz.userData.corte && boca.corte != null) {
