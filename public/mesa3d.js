@@ -1257,6 +1257,9 @@ function montaBraco(raiz, lado, materialPele, slug) {
   // o grupo: X no eixo maior da boca, Y para o cotovelo, começando 2 cm DENTRO do toco
   braco.position.copy(c).addScaledVector(u, -0.02);
   braco.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(maior, u, maior.clone().cross(u)));
+  // o quadro da boca fica guardado: a pinça DOBRA O PUNHO por colocação
+  // (`dobraOAntebraco`), e a dobra parte daqui
+  braco.userData.boca = { maior: maior.clone(), u: u.clone() };
   const L = COMPRIMENTO_ANTEBRACO;
   const tubo = (rPunho, rCotovelo, comprimento, inicio, material) => {
     const g = new THREE.CylinderGeometry(rCotovelo, rPunho, comprimento, 18, 1, false);
@@ -1269,6 +1272,19 @@ function montaBraco(raiz, lado, materialPele, slug) {
   // a carne: afunila ao contrário (o antebraço engrossa para o cotovelo)
   const pele = materialPele.clone(); pele.transparent = true; pele.alphaMap = texturaEsvai;
   braco.add(tubo(1.0, 1.18, L, 0, pele));
+  // A JUNTA DO PUNHO, na mão direita: a pinça desce de cima, mas o antebraço
+  // tem de vir do CORPO (usuário, 16/09/2026: "ele vem muito de cima, teria
+  // que ser algo natural, como se estivesse saindo do corpo"). Então o punho
+  // dobra: um elipsoide na boca do toco esconde a quina entre a mão e o
+  // antebraço reapontado — sem ele a dobra abria um degrau na pele.
+  if (lado === 'Right') {
+    const junta = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), materialPele);
+    junta.scale.set(a * 1.02, Math.max(a, b) * 0.9, b * 1.02);
+    junta.position.copy(braco.position).addScaledVector(u, 0.01);
+    junta.quaternion.copy(braco.quaternion);
+    junta.frustumCulled = false; junta.renderOrder = 60; junta.name = 'JuntaRight';
+    raiz.add(junta);
+  }
   const id = maoDoLado(slug, lado);
   const manga = identidadeDaMao(slug).manga;
   if (mangaNoQuadro(manga)) {
@@ -1322,12 +1338,11 @@ function poeAsMaos(plano, hand) {
   // frente) e o indicador (atrás), com o punho saindo para a direita e os
   // outros dedos curvados ATRÁS do leque, onde não tapam nada. Medido no
   // arquivo entregue: só o polegar na frente da carta, resto zero.
-  // E FICA À VISTA A FASE INTEIRA: paira na última carta enquanto não há
-  // escolha e vai para a carta escolhida. Escondê-la sem carta escolhida
-  // (6cac4b5) foi lido pelo dono do jogo como "a pinça sumiu" (16/09/2026):
-  // é a mão que ele escolheu e testou, e quer ver — o que tapa o tampo se
-  // resolve no braço dela, não sumindo com a mão.
-  if (maos.dir) maos.dir.visible = n > 0 && escolhendo;
+  // E SÓ ENQUANTO HÁ CARTA ESCOLHIDA — decisão do dono do jogo, confirmada em
+  // 16/09/2026 depois de a ver pairando a fase inteira: "ela é para aparecer
+  // somente quando tiver carta escolhida mesmo". A pinça é o gesto de pegar,
+  // não um estado; parada a fase inteira ela tapava o tampo.
+  if (maos.dir) maos.dir.visible = n > 0 && escolhendo && selecionadas.size > 0;
   if (!n) return;
   const escalaDaMao = (CARTA_L * plano.escala) / CARTA_NO_MODELO;
   // A mão segura pelo MEIO do leque — é onde a mão fica quando se abre um leque
@@ -1351,11 +1366,47 @@ function poeAsMaos(plano, hand) {
     const aCarta = plano.posicoes[iEscolhida >= 0 ? iEscolhida : n - 1];
     const sobe = iEscolhida >= 0 ? 14 * plano.unidade : 0;   // a carta escolhida sobe; a mão vai junto
     _qMao.setFromAxisAngle(EIXO_Z_MAO, aCarta.giro);
+    // Girá-la em torno do ponto da pega para vir de baixo foi medido e
+    // descartado (16/09/2026): na frente do leque cobre a escolhida e a
+    // vizinha; por trás mostra só o polegar. A v1 é a única que não cobre.
     encaixaPeloPlano(maos.dir, _vMao.set(aCarta.x, aCarta.y + sobe, aCarta.z), _qMao, escalaDaMao);
+    dobraOAntebraco(maos.dir);
   }
   // Não há medição de recuo por quadro como havia antes: com a pose medida no
   // arquivo (resto sobre a carta = 0) não há o que recuar, e medir 2.287
   // vértices a 60 Hz custava mais que tudo o mais junto.
+}
+
+// O ANTEBRAÇO DA PINÇA VEM DO CORPO. A mão desce de cima (a v1 escolhida pelo
+// usuário), mas seguir o punho dela levava o antebraço para cima e para a
+// esquerda, cruzando a mesa inteira — "vem muito de cima". Então o punho
+// dobra e o antebraço desce. Para a ESQUERDA: a pinça v1 chega por cima com
+// o punho à esquerda dos dedos, e lê-se como mão vinda desse lado; dobrada
+// para a direita "estava dobrando na direção errada" (usuário, 16/09/2026,
+// foto 1 escolhida). A direção é no espaço da câmera (o grupo da carne
+// acompanha a câmera), então vale para qualquer tela e qualquer carta;
+// ligeiramente para TRÁS do leque, para que, onde cruza as cartas, sejam as
+// cartas a ganhar a profundidade — o braço passa por trás, não por cima.
+let DIRECAO_DO_COTOVELO = new THREE.Vector3(-0.55, -0.8, -0.22).normalize();
+const _pA = new THREE.Vector3(), _pB = new THREE.Vector3(), _dCot = new THREE.Vector3(), _xCot = new THREE.Vector3();
+function dobraOAntebraco(raiz) {
+  const braco = raiz.getObjectByName('BracoRight');
+  const boca = braco?.userData.boca;
+  if (!boca) return;
+  raiz.updateWorldMatrix(true, false);
+  // a direção, do espaço da câmera para o espaço da mão (escala uniforme:
+  // direções sobrevivem)
+  _pA.set(0, 0, 0); _pB.copy(DIRECAO_DO_COTOVELO);
+  carneGrupo.localToWorld(_pA); carneGrupo.localToWorld(_pB);
+  raiz.worldToLocal(_pA); raiz.worldToLocal(_pB);
+  _dCot.subVectors(_pB, _pA).normalize();
+  // X segue o eixo maior da boca projetado no plano da nova direção, para a
+  // elipse do tubo continuar casando com a do toco
+  _xCot.copy(boca.maior).addScaledVector(_dCot, -boca.maior.dot(_dCot));
+  if (_xCot.lengthSq() < 1e-6) _xCot.copy(boca.u).addScaledVector(_dCot, -boca.u.dot(_dCot));
+  _xCot.normalize();
+  braco.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(_xCot, _dCot, _xCot.clone().cross(_dCot)));
+  braco.updateWorldMatrix(false, true);
 }
 
 // O gesto de BASE sai do estado da partida; os pulsos (comprar, descartar,
@@ -2519,6 +2570,8 @@ window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, 
   // e escolher uma carta da mão sem clique no canvas: é o que faz a pinça aparecer
   escolhe(id) { selecionadas.clear(); if (id) selecionadas.add(id); sincronizaMao(); },
   // e virar para alguém (playerId) ou para a mesa (null) sem toque; `pescoco` diz onde a cabeça está
+  // e apontar o cotovelo da pinça (direção no espaço da câmera) para afinar na banca
+  cotovelo(x, y, z) { DIRECAO_DO_COTOVELO = new THREE.Vector3(x, y, z).normalize(); sincronizaMao(); return DIRECAO_DO_COTOVELO.toArray(); },
   olharPara: (id) => escolheOlhar(id), get pescoco() { return { escolhido: olharEscolhido, livre: giroLivre, giro: pescoco.giro, inclina: pescoco.inclina }; } };
 
 // interface-2026-09-07-r1
