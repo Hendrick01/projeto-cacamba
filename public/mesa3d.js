@@ -1115,6 +1115,20 @@ let rigMaos = null;
 // exatamente em cima da carta DA TELA quando o contrato é alinhado: escala e
 // tamanho saem da anatomia, não de tentativa.
 const CARTA_NO_MODELO = 0.3405;
+// AS MÃOS SÃO ESPELHADAS NA COLOCAÇÃO. Medido em 17/09/2026 (produto misto
+// punho→indicador × punho→mínimo contra a curva do dedo): o arquivo `-dir`
+// tem geometria de mão ESQUERDA e o `-esq`, de DIREITA — o usuário já tinha
+// visto ("a mão de apoio é direita e a pinça está como a esquerda"). No
+// Capote, e em qualquer mesa, quem segura o leque é a esquerda e quem joga é
+// a direita, que entra pelo lado direito. Espelhar no quadro da carta (x → −x)
+// conserta a quiralidade das duas sem tocar nos arquivos nem no contrato: a
+// profundidade não muda, então "polegar na frente, resto atrás" continua valendo.
+const ESPELHA_MAOS = true;
+// A PINÇA SÓ EXISTE NA JOGADA (usuário, 17/09/2026, com o vídeo do Capote):
+// "ela vai apenas no momento que já executou a cena; enquanto está escolhendo
+// a carta ela não aparece". `jogadaMinha` é armada pelo evento da minha jogada
+// e consumida quando a carta sai do leque; `gestoPinca` é o gesto em curso.
+let jogadaMinha = null, gestoPinca = null;
 
 const _mAlvo = new THREE.Matrix4(), _mPlano = new THREE.Matrix4();
 const _escalaMao = new THREE.Vector3(), _qMao = new THREE.Quaternion(), _vMao = new THREE.Vector3();
@@ -1126,7 +1140,7 @@ function encaixaPeloPlano(mao, alvo, giro, escala) {
   mao.position.set(0, 0, 0); mao.quaternion.identity(); mao.scale.setScalar(1);
   mao.updateWorldMatrix(true, true);
   _mPlano.copy(mao.parent.matrixWorld).invert().multiply(plano.matrixWorld);
-  _mAlvo.compose(alvo, giro, _escalaMao.set(escala, escala, escala));
+  _mAlvo.compose(alvo, giro, _escalaMao.set(ESPELHA_MAOS ? -escala : escala, escala, escala));
   mao.matrix.copy(_mAlvo.multiply(_mPlano.invert()));
   mao.matrix.decompose(mao.position, mao.quaternion, mao.scale);
   mao.updateWorldMatrix(true, true);
@@ -1395,17 +1409,15 @@ function poeAsMaos(plano, hand) {
   maos.esq.visible = n > 0;
   // A direita SÓ EXISTE PARA ESCOLHER: aparece na sua vez, na fase de jogar.
   // Parada ali fora disso, ela só rouba a faixa de leitura das cartas.
-  const escolhendo = minhaVez && view?.phase === 'play';
   // A pinça vem posada por medida (scripts/mao_pinca_de_cima.py): desce de
   // cima, prende a borda superior da carta escolhida entre o polegar (na
   // frente) e o indicador (atrás), com o punho saindo para a direita e os
   // outros dedos curvados ATRÁS do leque, onde não tapam nada. Medido no
   // arquivo entregue: só o polegar na frente da carta, resto zero.
-  // E SÓ ENQUANTO HÁ CARTA ESCOLHIDA — decisão do dono do jogo, confirmada em
-  // 16/09/2026 depois de a ver pairando a fase inteira: "ela é para aparecer
-  // somente quando tiver carta escolhida mesmo". A pinça é o gesto de pegar,
-  // não um estado; parada a fase inteira ela tapava o tampo.
-  if (maos.dir) maos.dir.visible = n > 0 && escolhendo && selecionadas.size > 0;
+  // E NÃO APARECE ESCOLHENDO (17/09/2026): no Capote a direita descansa fora
+  // do quadro enquanto se escolhe — a carta escolhida só sobe — e entra na
+  // hora de jogar. Aqui ela só é visível dentro de `animaGestoPinca`.
+  if (maos.dir && !gestoPinca) maos.dir.visible = false;
   if (!n) return;
   const escalaDaMao = (CARTA_L * plano.escala) / CARTA_NO_MODELO;
   // A mão segura pelo MEIO do leque — é onde a mão fica quando se abre um leque
@@ -1424,7 +1436,7 @@ function poeAsMaos(plano, hand) {
   // não há escolha), pelo mesmo contrato: o plano dela é a carta que ela pinça.
   // SEMPRE colocada, visível ou não — sem isto ela ficava em escala 1 na origem
   // do grupo, isto é, em volta da câmera (visto em 14/09/2026).
-  if (maos.dir) {
+  if (maos.dir && !gestoPinca) {
     const iEscolhida = hand.findIndex((c) => selecionadas.has(c.id));
     const aCarta = plano.posicoes[iEscolhida >= 0 ? iEscolhida : n - 1];
     const sobe = iEscolhida >= 0 ? 14 * plano.unidade : 0;   // a carta escolhida sobe; a mão vai junto
@@ -1450,7 +1462,7 @@ function poeAsMaos(plano, hand) {
 // acompanha a câmera), então vale para qualquer tela e qualquer carta;
 // ligeiramente para TRÁS do leque, para que, onde cruza as cartas, sejam as
 // cartas a ganhar a profundidade — o braço passa por trás, não por cima.
-let DIRECAO_DO_COTOVELO = new THREE.Vector3(-0.5, -0.85, -0.2).normalize();
+let DIRECAO_DO_COTOVELO = new THREE.Vector3(ESPELHA_MAOS ? 0.5 : -0.5, -0.85, -0.2).normalize();
 const _nCorte = new THREE.Vector3(), _pCorte = new THREE.Vector3();
 const _pA = new THREE.Vector3(), _pB = new THREE.Vector3(), _dCot = new THREE.Vector3(), _xCot = new THREE.Vector3();
 // um pulso de verdade vira até uns 70°; mais que isso, é pulso quebrado
@@ -1463,9 +1475,12 @@ function dobraOAntebraco(raiz) {
   raiz.updateWorldMatrix(true, true);
   // a direção do cotovelo, do espaço da câmera para o espaço do grupo do braço
   // (cujo +Y é o eixo do toco; escala uniforme, direções sobrevivem)
+  // por PONTOS e pela matriz inteira, não por quaternion: a mão está espelhada
+  // (determinante negativo), e rotação extraída de matriz espelhada mente
   _pA.set(0, 0, 0); _pB.copy(DIRECAO_DO_COTOVELO);
   carneGrupo.localToWorld(_pA); carneGrupo.localToWorld(_pB);
-  _dCot.subVectors(_pB, _pA).applyQuaternion(braco.getWorldQuaternion(_qBraco).invert()).normalize();
+  braco.worldToLocal(_pA); braco.worldToLocal(_pB);
+  _dCot.subVectors(_pB, _pA).normalize();
   // a virada, limitada: o tubo sai pelo eixo do toco e curva até esta direção
   const virada = Math.acos(THREE.MathUtils.clamp(_dCot.y, -1, 1));
   if (virada > VIRADA_MAXIMA_DO_PUNHO) {
@@ -1481,6 +1496,69 @@ function dobraOAntebraco(raiz) {
     _nCorte.copy(boca.u).negate().transformDirection(raiz.matrixWorld);
     raiz.userData.corte.setFromNormalAndCoplanarPoint(_nCorte, _pCorte);
   }
+}
+
+// O GESTO DA PINÇA, como no Capote (vídeo de 17/09/2026, quadro a quadro):
+// enquanto se escolhe, nada; na jogada, a mão direita entra pelo lado dela,
+// pega a carta pela borda de cima, leva-a um trecho rumo à mesa, solta e sai
+// por onde veio. A carta continua sozinha até o destino — o meio, ou o jogo
+// onde encaixou — deitando e encolhendo para o tamanho das cartas do tampo.
+// Tudo no espaço da mão (o da câmera), então vale para qualquer tela.
+const TEMPO_PINCA = { entra: 170, leva: 460, sai: 300, solta: 0.5 };
+const _vFora = new THREE.Vector3(), _vAlvoGesto = new THREE.Vector3(), _vMaoGesto = new THREE.Vector3();
+const _qGesto = new THREE.Quaternion(), _eGesto = new THREE.Euler();
+const suaveGesto = (k) => k * k * (3 - 2 * k);
+function posicaoDoJogo(meldId) {
+  let achada = null;
+  jogosNaMesa.traverse((o) => { if (!achada && o.userData.jogo?.meldId === meldId) achada = o; });
+  return achada ? achada.getWorldPosition(new THREE.Vector3()).setY(MESA_TOPO + 0.08) : new THREE.Vector3(0, MESA_TOPO + 0.08, 0.6);
+}
+function iniciaGestoPinca(mesh, destino) {
+  if (gestoPinca) terminaGestoPinca();
+  mesh.renderOrder = 1000;
+  gestoPinca = { mesh, t0: performance.now(), de: mesh.position.clone(), giro: mesh.rotation.z, escala: mesh.scale.x, destino, soltouEm: null, soltouT: 0 };
+}
+function terminaGestoPinca() {
+  const g = gestoPinca;
+  if (!g) return;
+  maoGrupo.remove(g.mesh); g.mesh.material.dispose();
+  if (maos.dir) maos.dir.visible = false;
+  const face = descarte.grupo.children[1];
+  if (face && face.userData.esperaAte) { face.visible = true; face.userData.esperaAte = 0; }
+  gestoPinca = null;
+}
+function animaGestoPinca(t) {
+  const g = gestoPinca;
+  if (!g) return;
+  const { entra, leva, sai, solta } = TEMPO_PINCA;
+  const dt = t - g.t0;
+  const k = THREE.MathUtils.clamp((dt - entra) / leva, 0, 1), e = suaveGesto(k);
+  // a carta: parada enquanto a mão chega; depois vai ao destino
+  _vAlvoGesto.copy(g.destino); maoGrupo.worldToLocal(_vAlvoGesto);
+  g.mesh.position.lerpVectors(g.de, _vAlvoGesto, e);
+  g.mesh.position.y += Math.sin(e * Math.PI) * 0.05;
+  g.mesh.rotation.set(-1.15 * e, 0, g.giro * (1 - e));
+  g.mesh.scale.setScalar(THREE.MathUtils.lerp(g.escala, ESCALA_TAMPO, e * e));
+  // a mão: de fora do quadro até a carta; junto com ela até soltar; de volta
+  const lado = ESPELHA_MAOS ? 1 : -1;
+  _vFora.set(g.de.x + lado * (layoutDaMao?.larguraVisivel ?? 1) * 0.8, g.de.y - (layoutDaMao?.alturaVisivel ?? 1) * 0.12, g.de.z);
+  let visivel = true;
+  if (dt < entra) _vMaoGesto.lerpVectors(_vFora, g.de, 1 - Math.pow(1 - dt / entra, 3));
+  else if (k < solta) _vMaoGesto.copy(g.mesh.position);
+  else {
+    if (!g.soltouEm) { g.soltouEm = g.mesh.position.clone(); g.soltouT = t; g.soltouGiro = g.mesh.rotation.clone(); }
+    const sQ = THREE.MathUtils.clamp((t - g.soltouT) / sai, 0, 1);
+    _vMaoGesto.lerpVectors(g.soltouEm, _vFora, sQ * sQ);
+    visivel = sQ < 1;
+  }
+  if (maos.dir) {
+    // o quadro da pega é o da carta enquanto a leva; ao soltar, fica como estava
+    _qGesto.setFromEuler(g.soltouGiro ? _eGesto.copy(g.soltouGiro) : _eGesto.copy(g.mesh.rotation));
+    encaixaPeloPlano(maos.dir, _vMaoGesto, _qGesto, (CARTA_L * g.escala) / CARTA_NO_MODELO);
+    dobraOAntebraco(maos.dir);
+    maos.dir.visible = visivel;
+  }
+  if (k >= 1 && (!g.soltouEm || t - g.soltouT >= sai)) terminaGestoPinca();
 }
 
 // O gesto de BASE sai do estado da partida; os pulsos (comprar, descartar,
@@ -1522,8 +1600,13 @@ function sincronizaMao() {
   ordemManual = ordemManual.filter(id => ids.has(id));
   const cancelarVoo = mesh => { for (let i = voos.length - 1; i >= 0; i--) if (voos[i].obj === mesh) voos.splice(i, 1); };
   for (const [id, mesh] of cartasDaMao) {
-    if (!ids.has(id)) { cancelarVoo(mesh); maoGrupo.remove(mesh); mesh.material.dispose(); cartasDaMao.delete(id); }
+    if (!ids.has(id)) {
+      cancelarVoo(mesh); cartasDaMao.delete(id);
+      if (jogadaMinha?.cardId === id && maos.tridi && maos.dir && !semMovimento) iniciaGestoPinca(mesh, jogadaMinha.destino);
+      else { maoGrupo.remove(mesh); mesh.material.dispose(); }
+    }
   }
+  jogadaMinha = null;
   const n = hand.length;
   const plano = layoutMao3D({ quantidade:n, largura:innerWidth, altura:innerHeight, fov:camera.fov, cartaL:CARTA_L, cartaA:CARTA_A });
   layoutDaMao = plano;
@@ -2089,6 +2172,10 @@ async function sincroniza(primeira) {
             const destino = face.position.clone();
             voa(face, destino, destino, { dur: 330, atraso: temGesto(a) ? 520 : 90, arco: 0.012,
               deAtual: () => descarte.grupo.worldToLocal(pontoDaMaoAtiva(a)) });
+          } else if (descarteDe === me() && (jogadaMinha || gestoPinca) && maos.tridi && maos.dir) {
+            // é a MINHA carta, e a pinça a está trazendo: a do meio só aparece
+            // quando ela chega (com um prazo, para nunca ficar invisível)
+            face.visible = false; face.userData.esperaAte = performance.now() + 900;
           } else face.userData.cai = performance.now();
         }
         descarteDe = null;
@@ -2606,6 +2693,7 @@ function quadro(t) {
 
   // a carta do meio chega girando e assenta no lugar de pé
   const face = descarte.grupo.children[1];
+  if (face && face.userData.esperaAte && t > face.userData.esperaAte) { face.visible = true; face.userData.esperaAte = 0; }
   if (face && face.userData.cai) {
     const dt = (t - face.userData.cai) / 420;
     if (dt >= 1) { face.userData.cai = 0; face.position.copy(face.userData.alvo); face.rotation.y = 0; }
@@ -2631,6 +2719,7 @@ function quadro(t) {
   // segundo passe: limpa a profundidade e desenha a sua mão por cima do mundo,
   // com profundidade correta entre as cartas e os dedos
   segueACamera();
+  animaGestoPinca(t);
   renderer.autoClear = false;
   renderer.clearDepth();
   renderer.render(cenaMao, camera);
@@ -2664,6 +2753,9 @@ window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, 
   // e virar para alguém (playerId) ou para a mesa (null) sem toque; `pescoco` diz onde a cabeça está
   // e apontar o cotovelo da pinça (direção no espaço da câmera) para afinar na banca
   cotovelo(x, y, z) { DIRECAO_DO_COTOVELO = new THREE.Vector3(x, y, z).normalize(); sincronizaMao(); return DIRECAO_DO_COTOVELO.toArray(); },
+  // armar o gesto da pinça sem servidor: a próxima saída dessa carta do leque vai com a mão
+  armaJogada(id) { jogadaMinha = { cardId: id, destino: descarte.grupo.position.clone().setY(MESA_TOPO + 0.08) }; },
+  get gestoPinca() { return gestoPinca ? { desde: performance.now() - gestoPinca.t0, soltou: !!gestoPinca.soltouEm } : null; },
   olharPara: (id) => escolheOlhar(id), get pescoco() { return { escolhido: olharEscolhido, livre: giroLivre, giro: pescoco.giro, inclina: pescoco.inclina }; } };
 
 // interface-2026-09-07-r1
