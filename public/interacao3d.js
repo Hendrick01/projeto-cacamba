@@ -137,6 +137,9 @@ export function preparaInteracao(m) {
     i.repousoRaiz = raiz.position.clone();
     i.giroBase = raiz.rotation.y;
     i.giro = 0; i.vez = 0;
+    // o pescoço medido na escultura (pescoco3d.js), quando há: a cabeça vira
+    // por conta própria e o corpo acompanha menos
+    i.pescoco = m.pescoco?.osso || null; i.giroCabeca = 0;
   }
   if (i.bracos.Left?.dedos) i.pegaEsq = pontoNaMao(i.bracos.Left.dedos, PEGA.leque);
   if (i.bracos.Right?.dedos) i.pegaDir = pontoNaMao(i.bracos.Right.dedos, PEGA.carta);
@@ -275,7 +278,18 @@ function passoDaReacao(i, dt, parado) {
 }
 function atuaCorpoInteiro(m, i, dt, { parado, olhar, suaVez }) {
   const suave = parado ? 1 : 1 - Math.exp(-dt * 4);
-  i.giro += (T.MathUtils.clamp(olhar, -0.5, 0.5) * 0.75 - i.giro) * suave;
+  // COM pescoço quem olha é a cabeça: o tronco dá só o começo do giro (até
+  // ~13°) e a cabeça completa, até ~46° além dele — e chega antes, como
+  // gente. SEM pescoço, o corpo inteiro vira até 0,37 rad, como sempre foi.
+  const alvo = T.MathUtils.clamp(olhar, -1.3, 1.3);
+  const doCorpo = T.MathUtils.clamp(alvo, -0.5, 0.5) * (i.pescoco ? 0.45 : 0.75);
+  i.giro += (doCorpo - i.giro) * suave;
+  if (i.pescoco) {
+    const daCabeca = T.MathUtils.clamp(alvo - doCorpo, -0.8, 0.8);
+    i.giroCabeca += (daCabeca - i.giroCabeca) * (parado ? 1 : 1 - Math.exp(-dt * 7));
+    // quem olha para o lado baixa um pouco o queixo; e um nada de respiro
+    i.pescoco.rotation.set(Math.abs(i.giroCabeca) * 0.06 + (parado ? 0 : Math.sin(i.tempo * 0.9) * 0.012), i.giroCabeca, 0);
+  }
   i.vez += ((suaVez ? 1 : 0) - i.vez) * suave;
   const r = m.raiz;
   r.rotation.y = i.giroBase + i.giro;

@@ -250,7 +250,8 @@ a referência (Capote) se lê de longe, que é como se joga no celular:
 | Quando | O que acontece |
 |---|---|
 | sempre | respiro de ±8 mm, dessincronizado |
-| alguém joga | o tronco vira até 0,37 rad na direção de quem está jogando |
+| alguém joga | a **cabeça** vira para quem está jogando (até 0,8 rad além do tronco) e o tronco acompanha com até 0,22 rad. O pescoço é criado ao carregar (`public/pescoco3d.js`, 17/09/2026): a linha do queixo é medida na malha, tudo acima dela é cabeça a 100% — a cara é rígida, não deforma —, tudo abaixo do pé do pescoço é corpo a 100%, e só o anel de 6 cm mistura. Se a medida falhar, o corpo inteiro vira até 0,37 rad, como antes |
+| um jogador escolhe para onde olhar | o mesmo, para a cadeira que ele escolheu (presença ao vivo) |
 | a vez é dele | chega 5,5 cm para a frente, levanta o leque 6 cm e o deita um pouco mais para si |
 | um lance qualquer | a placa sobre a cabeça diz o verbo (COMPROU, DESCARTOU, BAIXOU, ENCAIXOU) por 1,8 s; fora disso diz JOGANDO ou PRÓXIMO |
 | baixou, bateu, pegou coringa | **reação `feliz`**: dois pulos no assento (4,5 cm) |

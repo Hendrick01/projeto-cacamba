@@ -19,8 +19,11 @@ for (const slug of ['matheus', 'junior', 'dri', 'esterex', 'gabizinsky', 'lyly',
     const raiz = m.raiz;
     const no = (n) => raiz.getObjectByName(n);
     assert.equal(m.dedos.juntas.length, 0);
-    let temOsso = false; raiz.traverse((o) => { if (o.isBone) temOsso = true; });
+    // os únicos ossos são os dois do pescoço, criados ao carregar (pescoco3d.js):
+    // o ARQUIVO continua sem esqueleto
+    let temOsso = false; raiz.traverse((o) => { if (o.isBone && !/^Escultura/.test(o.name)) temOsso = true; });
     assert.ok(!temOsso, 'o arquivo trouxe esqueleto');
+    assert.ok(m.pescoco?.osso, 'a escultura ficou sem pescoço');
     for (const n of ['Cabeca', 'MaoEsq', 'MaoDir']) assert.ok(no(n), `sem o nó ${n}`);
 
     raiz.updateMatrixWorld(true);

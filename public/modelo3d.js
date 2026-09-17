@@ -11,6 +11,7 @@
 import * as THREE from './vendor/three.module.js';
 import { preparaDedos } from './dedos3d.js';
 import { preparaInteracao, reageCorpo, MESA } from './interacao3d.js';
+import { criaPescoco } from './pescoco3d.js';
 
 // Do chão ao topo da cabeça, sentado. Modelo cru é normalizado para isso.
 export const ALTURA_SENTADO = 1.55;
@@ -208,6 +209,9 @@ export function encaixaModelo(gltf, slug, { estilo = 'elenco', avisa = true } = 
   if (avisa) console.info(`modelo: ${slug} carregado (altura ${alturaOriginal.toFixed(2)}${preparado ? ', escala do arquivo' : ` → ${ALTURA_SENTADO}`})`);
   const cabecaAnimada = gltf.animations?.some(a => a.name === 'idle' && a.tracks.some(t => t.name === 'Head.quaternion'));
   const modelo = { dedos: preparaDedos(raiz), raiz, materiais, morfos, mixer, acoes, cabecaAnimada, alturaCabeca, posLeque, posAssento, alturaOriginal, escala, caixa, sentado: preparado && temEsqueleto, estatico: preparado && !temEsqueleto, recuo };
+  // a escultura ganha um pescoço: cabeça rígida, corpo rígido, e só o anel do
+  // pescoço mistura (ver pescoco3d.js). Se não der para medir, fica como era.
+  if (modelo.estatico) { try { modelo.pescoco = criaPescoco(raiz); } catch (e) { console.warn(`modelo: ${slug} sem pescoço`, e); modelo.pescoco = null; } }
   if (modelo.dedos.juntas.length || modelo.estatico) preparaInteracao(modelo);
   return modelo;
 }

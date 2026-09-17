@@ -2131,7 +2131,10 @@ async function sincroniza(primeira) {
         if (parado || id === view.turnId) { a.giroAlvo = 0; continue; }
         a.grupo.updateMatrixWorld(true);
         const local = a.grupo.worldToLocal(foco.clone());
-        a.giroAlvo = THREE.MathUtils.clamp(Math.atan2(local.x, local.z), -0.5, 0.5);
+        // até ±1,3 rad: quem decide quanto é do tronco e quanto é da cabeça é o
+        // corpo de cada um (`atuaCorpoInteiro`); a escultura sem pescoço e o
+        // boneco de papel continuam limitados a ±0,5 lá dentro
+        a.giroAlvo = THREE.MathUtils.clamp(Math.atan2(local.x, local.z), -1.3, 1.3);
       }
     }
 
@@ -2617,7 +2620,7 @@ function quadro(t) {
     // o corpo vira de leve para quem está jogando; o leque (e a boca da fala
     // de um modelo externo, que mora no grupo) giram em volta do mesmo eixo
     {
-      const alvoGiro = a.apagado || a.assento?.modelo ? 0 : a.giroAlvo;
+      const alvoGiro = a.apagado || a.assento?.modelo ? 0 : THREE.MathUtils.clamp(a.giroAlvo, -0.5, 0.5);   // o boneco de papel vira o corpo, até onde virava
       a.corpo.rotation.y += (alvoGiro - a.corpo.rotation.y) * (semMovimento ? 1 : 0.06);
       const r = a.corpo.rotation.y, s = Math.sin(r), c = Math.cos(r);
       const b = a.lequeBase;
@@ -2665,7 +2668,7 @@ function quadro(t) {
       if (viva && pres.olha != null) {
         const alvoId = view.players[pres.olha]?.id;
         const foco = alvoId === me() ? new THREE.Vector3(0, 0, 2.4) : assentos.get(alvoId)?.grupo.position;
-        if (foco) { const local = a.grupo.worldToLocal(foco.clone()); olhar = THREE.MathUtils.clamp(Math.atan2(local.x, local.z), -0.5, 0.5); }
+        if (foco) { const local = a.grupo.worldToLocal(foco.clone()); olhar = THREE.MathUtils.clamp(Math.atan2(local.x, local.z), -1.3, 1.3); }
       }
       atualizaInteracao(m, dt, { flexao: a.leque.visible ? 0.68 : 0, parado: semMovimento, olhar, suaVez: !!a.naVez });
       if (m.morfos.bocaAberta) {
