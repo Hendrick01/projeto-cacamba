@@ -19,6 +19,7 @@ import {
   podeComprarDoDescarte, topoDoDescarte,
 } from './shared/engine.js';
 import { personagemValido } from './shared/elenco.js';
+import { emoteDe } from './shared/emotes.js';
 import { codigoPix, normalizaChave } from './lib/pix.js';
 import { rotaDeConta, ehRotaDeConta } from './lib/rotas-conta.js';
 import { rotaDeWebhook, ehWebhook } from './lib/rotas-webhook.js';
@@ -877,6 +878,20 @@ function handle(ws, msg) {
       for (const p of room.players) {
         if (p.isBot || p.id === player.id || !p.ws) continue;
         send(p.ws, { t: 'presenca', from: player.id, sel, olha });
+      }
+      break;
+    }
+    // EMOTES e frases prontas: para quem está sem microfone ou sem áudio. Só a
+    // chave de um catálogo fechado viaja; o servidor confere que ela existe,
+    // freia (4 de saída, 1 a cada 2 s) e retransmite aos outros humanos.
+    case 'emote': {
+      const room = currentRoom(ws);
+      const player = currentPlayer(ws, room);
+      if (!room.game || !emoteDe(msg.k)) return;
+      if (!consume(ws.emoteBudget ||= {}, 4, 0.5)) return;
+      for (const p of room.players) {
+        if (p.isBot || p.id === player.id || !p.ws) continue;
+        send(p.ws, { t: 'emote', from: player.id, k: msg.k });
       }
       break;
     }

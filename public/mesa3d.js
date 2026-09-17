@@ -23,6 +23,8 @@ import { iluminaSala, criaMesa, criaSala } from './cenario3d.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqueta, ESCALA_ELENCO } from './modelo3d.js';
 import { planBaixada, isJoker, cardLabel, layoffOption, layoffEnds, trocasNaTrinca } from '/shared/engine.js';
+import { emoteDe, textoDoEmote } from '/shared/emotes.js';
+import { montaEmotes } from './emotes-ui.js';
 import { personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
 import { layoutMao3D, indiceInsercao3D } from '/interface-core.js';
@@ -91,6 +93,8 @@ function conecta() {
       voz.reconectar?.();
     } else if (msg.t === 'voz') {
       voz.receber(msg);
+    } else if (msg.t === 'emote') {
+      mostraEmote3D(msg.from, msg.k);
     } else if (msg.t === 'presenca') {
       // o que outro jogador está fazendo entre as jogadas; vale por uns
       // segundos e depois o corpo dele volta ao repouso sozinho
@@ -2427,12 +2431,17 @@ function reageAoEvento(ev) {
   }
   if (ev.e === 'baixou' && !semMovimento) baixadaDe = ev.p;
   if (ev.e === 'discard' && !semMovimento) descarteDe = ev.p;
+  // a MINHA jogada de uma carta só: a pinça vai levá-la (ver `animaGestoPinca`)
+  if (ev.p === me() && !semMovimento) {
+    const id = ev.e === 'discard' || ev.e === 'layoff' ? ev.card?.id : ev.e === 'trocouNaTrinca' ? ev.entra?.id : null;
+    if (id != null) jogadaMinha = { cardId: id, destino: ev.e === 'discard' ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.08) : posicaoDoJogo(ev.meldId) };
+  }
   // o verbo do lance na placa de quem o fez, por um instante — é o "JOGOU" da
   // referência, e o único jeito de saber o que um vizinho fez sem ler o toast
   {
     const VERBOS = { draw: 'COMPROU', buy: 'COMPROU', tomouSobra: 'PEGOU A SOBRA', trocouNaTrinca: 'TROCOU NA TRINCA', discard: 'DESCARTOU', baixou: 'BAIXOU', layoff: 'ENCAIXOU', claim: 'PEDIU O MEIO' };
     const dele = ev.p ? assentos.get(ev.p) : null;
-    if (dele && VERBOS[ev.e]) { dele.aviso = VERBOS[ev.e]; dele.avisoAte = performance.now() + 1800; }
+    if (dele && VERBOS[ev.e]) { dele.aviso = VERBOS[ev.e]; dele.avisoAte = performance.now() + 1800; dele.avisoEmote = false; }
   }
   const alvo = ev.p || ev.winnerId;
   const a = alvo ? assentos.get(alvo) : null;
@@ -2683,9 +2692,9 @@ function quadro(t) {
     // a placa de estado: o verbo do último lance manda enquanto dura; depois
     // volta a dizer de quem é a vez. Some quando não há nada a dizer.
     {
-      if (a.avisoAte && t > a.avisoAte) { a.aviso = null; a.avisoAte = 0; }
+      if (a.avisoAte && t > a.avisoAte) { a.aviso = null; a.avisoAte = 0; a.avisoEmote = false; }
       const texto = a.aviso || (a.apagado ? 'FORA' : a.naVez ? 'JOGANDO' : a.proximo ? 'PRÓXIMO' : '');
-      const cor = a.aviso ? 'rgba(58,102,74,0.95)' : a.naVez ? 'rgba(207,138,42,0.95)' : 'rgba(27,17,11,0.8)';
+      const cor = a.aviso ? (a.avisoEmote ? 'rgba(38,84,124,0.96)' : 'rgba(58,102,74,0.95)') : a.naVez ? 'rgba(207,138,42,0.95)' : 'rgba(27,17,11,0.8)';
       a.estado.visible = !!texto;
       if (texto) trocaRotulo(a.estado, texto, cor, '#fff6e2');
     }
@@ -2742,6 +2751,26 @@ if (!sessao) {
   conecta();
   requestAnimationFrame(quadro);
 }
+
+// EMOTES e frases prontas (17/09/2026): na 3D o balão é a PLACA em cima de
+// quem mandou, em azul por três segundos, e o rosto reage quando o emote tem
+// humor. O meu sai na faixa de aviso — eu não me vejo sentado.
+function mostraEmote3D(id, k) {
+  const e = emoteDe(k), a = assentos.get(id);
+  if (!e || !a) return;
+  a.aviso = textoDoEmote(e); a.avisoAte = performance.now() + 3000; a.avisoEmote = true;
+  if (e.humor) {
+    const feliz = e.humor === 'feliz';
+    a.bocas.neutra.visible = false; a.bocas.feliz.visible = feliz; a.bocas.brava.visible = !feliz;
+    a.cara?.mostra(feliz ? 'feliz' : 'brava');
+    a.caraAte = performance.now() + 1900;
+    if (!semMovimento) a.pulo = performance.now();
+  }
+}
+montaEmotes({
+  botao: document.getElementById('btn-emote'),
+  envia: (k) => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'emote', k })); aviso(`💬 ${textoDoEmote(emoteDe(k))}`); },
+});
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
 window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, maos, get rigMaos() { return rigMaos; },

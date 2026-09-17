@@ -624,6 +624,10 @@ input::placeholder { color: #5d7a6c; font-weight: 700; }
   transform: translateX(-50%);
 }
 .assento .balao.fala { animation: fala 1.9s ease-out; }
+/* Emote ou frase pronta de um jogador: o mesmo balão, maior e por mais tempo. */
+.assento .balao.emote { font-size: 0.82rem; padding: 4px 10px; z-index: 5; }
+.assento .balao.emote.fala { animation-duration: 3s; }
+@media (prefers-reduced-motion: reduce) { .assento .balao.emote.fala { animation: none; opacity: 1; } }
 
 /* Cartas voando do monte para os assentos, no começo da rodada. */
 .carta-voando {

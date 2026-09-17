@@ -9,6 +9,8 @@ import {
   DEFAULT_OPTS, sobraFechaJogo, coringaLiberadoPeloEncaixe, trocasNaTrinca,
   CONTRACTS as CONTRATOS, TOTAL_ROUNDS,
 } from '/shared/engine.js';
+import { emoteDe, textoDoEmote } from '/shared/emotes.js';
+import { montaEmotes } from './emotes-ui.js';
 import {
   ELENCO, SLUGS, personagemValido, personagemDoAssento, peleDe, temExpressao,
 } from '/shared/elenco.js';
@@ -140,6 +142,9 @@ function handleMessage(msg) {
       break;
     case 'voz':
       voz.receber(msg);
+      break;
+    case 'emote':
+      mostraEmote(msg.from, msg.k);
       break;
     case 'error':
       toast(`⚠️ ${msg.msg}`);
@@ -1701,6 +1706,7 @@ $('btn-discard').onclick = () => {
 };
 $('btn-meld-discard').onclick = () => { meldDiscardMode = true; selected.clear(); render(); };
 $('btn-cancel-mode').onclick = () => { meldDiscardMode = false; render(); };
+montaEmotes({ botao: $('btn-emote'), envia: (k) => { sendMsg({ t: 'emote', k }); mostraEmote(me(), k); } });
 $('btn-sort').onclick = () => {
   sortMode = sortMode === 'suit' ? 'rank' : 'suit';
   ordemManual = [];   // pediu ordenação automática: a arrumação à mão sai de cena
@@ -1798,6 +1804,31 @@ const REACOES = {
   coringa: { texto: 'coringa!',  gesto: 'pula',   cara: 'feliz' },
   saiu:    { texto: 'fui',        gesto: 'murcha', cara: null },
 };
+
+// EMOTES e frases prontas (17/09/2026): o mesmo balão das reações, maior e
+// por mais tempo, em cima de quem mandou. Vale com movimento reduzido — é
+// conversa, não enfeite: aí o balão aparece parado e some no tempo.
+function mostraEmote(playerId, k) {
+  const e = emoteDe(k);
+  if (!e) return;
+  const el = playerId === me() ? $('meu-assento') : assentos.get(playerId);
+  if (!el) { toast(`${playerName(playerId)}: ${textoDoEmote(e)}`); return; }
+  let balao = el.querySelector('.balao');
+  if (!balao) {
+    balao = document.createElement('span');
+    balao.className = 'balao';
+    el.appendChild(balao);
+  }
+  balao.textContent = textoDoEmote(e);
+  balao.classList.add('emote');
+  repete(balao, 'fala');
+  clearTimeout(Number(balao.dataset.some));
+  balao.dataset.some = String(setTimeout(() => balao.classList.remove('emote', 'fala'), 3000));
+  if (e.humor && !semMovimento()) {
+    repete(el, e.humor === 'feliz' ? 'pula' : 'treme');
+    trocaCara(el, playerId, e.humor);
+  }
+}
 
 function reage(playerId, chave) {
   const r = REACOES[chave];
