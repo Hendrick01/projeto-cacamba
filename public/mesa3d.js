@@ -1542,43 +1542,83 @@ function posicaoDoJogo(meldId) {
   jogosNaMesa.traverse((o) => { if (!achada && o.userData.jogo?.meldId === meldId) achada = o; });
   return achada ? achada.getWorldPosition(new THREE.Vector3()).setY(MESA_TOPO + 0.08) : new THREE.Vector3(0, MESA_TOPO + 0.08, 0.6);
 }
+function posicaoDoMeuJogoNovo() {
+  let ultima = null;
+  jogosNaMesa.traverse((o) => { if (o.userData.jogo?.dono === me()) ultima = o; });
+  // sem jogo meu ainda desenhado: o lugar onde ele vai nascer, na minha frente
+  return ultima ? ultima.getWorldPosition(new THREE.Vector3()).setY(MESA_TOPO + 0.08) : new THREE.Vector3(0, MESA_TOPO + 0.08, 0.45);
+}
 function iniciaGestoPinca(mesh, destino) {
   if (gestoPinca) terminaGestoPinca();
   mesh.renderOrder = 1000;
-  gestoPinca = { mesh, t0: performance.now(), de: mesh.position.clone(), giro: mesh.rotation.z, escala: mesh.scale.x, destino, soltouEm: null, soltouT: 0 };
+  gestoPinca = { modo: 'leva', mesh, t0: performance.now(), de: mesh.position.clone(), giro: mesh.rotation.z, escala: mesh.scale.x, destino, soltouEm: null, soltouT: 0, extras: [] };
+}
+// as outras cartas de uma baixada: vão atrás da primeira, sem mão, em fila
+function acompanhaGestoPinca(mesh) {
+  mesh.renderOrder = 999;
+  gestoPinca.extras.push({ mesh, de: mesh.position.clone(), giro: mesh.rotation.z, escala: mesh.scale.x, atraso: 70 * (gestoPinca.extras.length + 1) });
+}
+// COMPRAR: a carta já vem voando do monte (ou do meio) para o lugar dela no
+// leque (`voa`, 400 ms). A mão entra pelo lado dela, alcança a carta no
+// primeiro quarto do voo, vem com ela até o leque e sai.
+function iniciaGestoTraz(mesh) {
+  gestoPinca = { modo: 'traz', mesh, t0: performance.now(), escala: mesh.scale.x, para: mesh.position.clone(), soltouEm: null, soltouT: 0, extras: [] };
 }
 function terminaGestoPinca() {
   const g = gestoPinca;
   if (!g) return;
-  maoGrupo.remove(g.mesh); g.mesh.material.dispose();
+  if (g.modo === 'leva') {
+    for (const m of [g.mesh, ...g.extras.map((x) => x.mesh)]) { maoGrupo.remove(m); m.material.dispose(); }
+    const face = descarte.grupo.children[1];
+    if (face && face.userData.esperaAte) { face.visible = true; face.userData.esperaAte = 0; }
+  }
   if (maos.dir) maos.dir.visible = false;
-  const face = descarte.grupo.children[1];
-  if (face && face.userData.esperaAte) { face.visible = true; face.userData.esperaAte = 0; }
   gestoPinca = null;
+}
+function levaCartaDoGesto(c, k, alvo) {
+  const e = suaveGesto(k);
+  c.mesh.position.lerpVectors(c.de, alvo, e);
+  c.mesh.position.y += Math.sin(e * Math.PI) * 0.05;
+  c.mesh.rotation.set(-1.15 * e, 0, c.giro * (1 - e));
+  c.mesh.scale.setScalar(THREE.MathUtils.lerp(c.escala, ESCALA_TAMPO, e * e));
 }
 function animaGestoPinca(t) {
   const g = gestoPinca;
   if (!g) return;
   const { entra, leva, sai, solta } = TEMPO_PINCA;
   const dt = t - g.t0;
-  const k = THREE.MathUtils.clamp((dt - entra) / leva, 0, 1), e = suaveGesto(k);
-  // a carta: parada enquanto a mão chega; depois vai ao destino
-  _vAlvoGesto.copy(g.destino); maoGrupo.worldToLocal(_vAlvoGesto);
-  g.mesh.position.lerpVectors(g.de, _vAlvoGesto, e);
-  g.mesh.position.y += Math.sin(e * Math.PI) * 0.05;
-  g.mesh.rotation.set(-1.15 * e, 0, g.giro * (1 - e));
-  g.mesh.scale.setScalar(THREE.MathUtils.lerp(g.escala, ESCALA_TAMPO, e * e));
-  // a mão: de fora do quadro até a carta; junto com ela até soltar; de volta
   const lado = ESPELHA_MAOS ? 1 : -1;
-  _vFora.set(g.de.x + lado * (layoutDaMao?.larguraVisivel ?? 1) * 0.8, g.de.y - (layoutDaMao?.alturaVisivel ?? 1) * 0.12, g.de.z);
-  let visivel = true;
-  if (dt < entra) _vMaoGesto.lerpVectors(_vFora, g.de, 1 - Math.pow(1 - dt / entra, 3));
-  else if (k < solta) _vMaoGesto.copy(g.mesh.position);
-  else {
-    if (!g.soltouEm) { g.soltouEm = g.mesh.position.clone(); g.soltouT = t; g.soltouGiro = g.mesh.rotation.clone(); }
-    const sQ = THREE.MathUtils.clamp((t - g.soltouT) / sai, 0, 1);
-    _vMaoGesto.lerpVectors(g.soltouEm, _vFora, sQ * sQ);
-    visivel = sQ < 1;
+  const ref = g.modo === 'leva' ? g.de : g.para;
+  _vFora.set(ref.x + lado * (layoutDaMao?.larguraVisivel ?? 1) * 0.8, ref.y - (layoutDaMao?.alturaVisivel ?? 1) * 0.12, ref.z);
+  let visivel = true, acabou = false;
+  if (g.modo === 'traz') {
+    // a carta é do `voa`; a mão a alcança, vem junto e sai
+    const k = dt / 400;
+    if (k < 0.25) _vMaoGesto.lerpVectors(_vFora, g.mesh.position, suaveGesto(k / 0.25));
+    else if (k < 1) _vMaoGesto.copy(g.mesh.position);
+    else {
+      if (!g.soltouEm) { g.soltouEm = g.mesh.position.clone(); g.soltouT = t; g.soltouGiro = g.mesh.rotation.clone(); }
+      const sQ = THREE.MathUtils.clamp((t - g.soltouT) / sai, 0, 1);
+      _vMaoGesto.lerpVectors(g.soltouEm, _vFora, sQ * sQ);
+      visivel = sQ < 1; acabou = sQ >= 1;
+    }
+  } else {
+    const k = THREE.MathUtils.clamp((dt - entra) / leva, 0, 1);
+    // a carta: parada enquanto a mão chega; depois vai ao destino
+    _vAlvoGesto.copy(typeof g.destino === 'function' ? g.destino() : g.destino); maoGrupo.worldToLocal(_vAlvoGesto);
+    levaCartaDoGesto(g, k, _vAlvoGesto);
+    for (const x of g.extras) levaCartaDoGesto(x, THREE.MathUtils.clamp((dt - entra - x.atraso) / leva, 0, 1), _vAlvoGesto);
+    // a mão: de fora do quadro até a carta; junto com ela até soltar; de volta
+    if (dt < entra) _vMaoGesto.lerpVectors(_vFora, g.de, 1 - Math.pow(1 - dt / entra, 3));
+    else if (k < solta) _vMaoGesto.copy(g.mesh.position);
+    else {
+      if (!g.soltouEm) { g.soltouEm = g.mesh.position.clone(); g.soltouT = t; g.soltouGiro = g.mesh.rotation.clone(); }
+      const sQ = THREE.MathUtils.clamp((t - g.soltouT) / sai, 0, 1);
+      _vMaoGesto.lerpVectors(g.soltouEm, _vFora, sQ * sQ);
+      visivel = sQ < 1;
+    }
+    const fimDasOutras = entra + leva + (g.extras.length ? g.extras.at(-1).atraso : 0);
+    acabou = dt >= fimDasOutras && (!g.soltouEm || t - g.soltouT >= sai);
   }
   if (maos.dir) {
     // o quadro da pega é o da carta enquanto a leva; ao soltar, fica como estava
@@ -1587,7 +1627,7 @@ function animaGestoPinca(t) {
     dobraOAntebraco(maos.dir);
     maos.dir.visible = visivel;
   }
-  if (k >= 1 && (!g.soltouEm || t - g.soltouT >= sai)) terminaGestoPinca();
+  if (acabou) terminaGestoPinca();
 }
 
 // O gesto de BASE sai do estado da partida; os pulsos (comprar, descartar,
@@ -1628,10 +1668,13 @@ function sincronizaMao() {
   selecionadas = new Set([...selecionadas].filter(id => ids.has(id)));
   ordemManual = ordemManual.filter(id => ids.has(id));
   const cancelarVoo = mesh => { for (let i = voos.length - 1; i >= 0; i--) if (voos[i].obj === mesh) voos.splice(i, 1); };
+  let levou = false; const chegaram = [];
   for (const [id, mesh] of cartasDaMao) {
     if (!ids.has(id)) {
       cancelarVoo(mesh); cartasDaMao.delete(id);
-      if (jogadaMinha?.cardId === id && maos.tridi && maos.dir && !semMovimento) iniciaGestoPinca(mesh, jogadaMinha.destino);
+      const vai = jogadaMinha && maos.tridi && maos.dir && !semMovimento && (jogadaMinha.multi || jogadaMinha.cardId === id);
+      if (vai && !levou) { iniciaGestoPinca(mesh, jogadaMinha.destino); levou = true; }
+      else if (vai && gestoPinca?.modo === 'leva') acompanhaGestoPinca(mesh);
       else { maoGrupo.remove(mesh); mesh.material.dispose(); }
     }
   }
@@ -1667,8 +1710,12 @@ function sincronizaMao() {
       const origem = entradaNaMao === 'meio' ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.06) : topoDoMonte();
       segueACamera();
       voa(mesh,noEspacoDaMao(origem),mesh.position.clone(),{dur:400,arco:0.04});
+      chegaram.push(mesh);
     }
   });
+  // COMPRAR: uma carta só chegando é compra (do monte ou do meio) — a direita
+  // vai buscá-la e a traz para o leque. Várias de uma vez é a distribuição.
+  if (chegaram.length === 1 && maos.tridi && maos.dir && !gestoPinca) iniciaGestoTraz(chegaram[0]);
   entradaNaMao = null; baixadaDe = null;
   sincronizaMaos();
   poeAsMaos(plano, hand);
@@ -2463,6 +2510,11 @@ function reageAoEvento(ev) {
   if (ev.p === me() && !semMovimento) {
     const id = ev.e === 'discard' || ev.e === 'layoff' ? ev.card?.id : ev.e === 'trocouNaTrinca' ? ev.entra?.id : null;
     if (id != null) jogadaMinha = { cardId: id, destino: ev.e === 'discard' ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.08) : posicaoDoJogo(ev.meldId) };
+    // BAIXAR JOGO: saem várias cartas de uma vez e o evento não diz quais. A
+    // mão leva a primeira que sair do leque e as outras vão atrás dela, para
+    // o meu jogo mais novo no tampo (que só existe depois da sincronização —
+    // por isso o destino é uma função, lida a cada quadro).
+    if (ev.e === 'baixou') jogadaMinha = { multi: true, destino: posicaoDoMeuJogoNovo };
   }
   // o verbo do lance na placa de quem o fez, por um instante — é o "JOGOU" da
   // referência, e o único jeito de saber o que um vizinho fez sem ler o toast
@@ -2811,8 +2863,8 @@ window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, 
   // e apontar o cotovelo da pinça (direção no espaço da câmera) para afinar na banca
   cotovelo(x, y, z) { DIRECAO_DO_COTOVELO = new THREE.Vector3(x, y, z).normalize(); sincronizaMao(); return DIRECAO_DO_COTOVELO.toArray(); },
   // armar o gesto da pinça sem servidor: a próxima saída dessa carta do leque vai com a mão
-  armaJogada(id) { jogadaMinha = { cardId: id, destino: descarte.grupo.position.clone().setY(MESA_TOPO + 0.08) }; },
-  get gestoPinca() { return gestoPinca ? { desde: performance.now() - gestoPinca.t0, soltou: !!gestoPinca.soltouEm } : null; },
+  armaJogada(id, varias = false) { jogadaMinha = varias ? { multi: true, destino: posicaoDoMeuJogoNovo } : { cardId: id, destino: descarte.grupo.position.clone().setY(MESA_TOPO + 0.08) }; },
+  get gestoPinca() { return gestoPinca ? { modo: gestoPinca.modo, desde: performance.now() - gestoPinca.t0, soltou: !!gestoPinca.soltouEm, outras: gestoPinca.extras.length } : null; },
   olharPara: (id) => escolheOlhar(id), get pescoco() { return { escolhido: olharEscolhido, livre: giroLivre, giro: pescoco.giro, inclina: pescoco.inclina }; } };
 
 // interface-2026-09-07-r1
