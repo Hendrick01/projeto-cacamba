@@ -12,7 +12,8 @@
     "test:security": "node test/security-live.mjs",
     "test:contas": "node test/contas-live.mjs",
     "db:migra": "node -e \"import('./lib/banco.js').then(m=>m.migra().then(ok=>{console.log(ok?'esquema aplicado':'sem DATABASE_URL');return m.fecha()}))\"",
-    "test:webhook": "node test/webhook-live.mjs"
+    "test:webhook": "node test/webhook-live.mjs",
+    "test:reinicio": "node test/reinicio.mjs"
   },
   "engines": {
     "node": ">=20"

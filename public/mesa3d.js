@@ -73,6 +73,15 @@ function atualizaBotaoVoz() {
 }
 const controlesVoz = ligaControlesVoz(voz, { botao: $('btn-voz'), avisar: texto => aviso(texto,true) });
 
+let tentouRestaurar = false, versaoCarregada = null;
+function avisaVersaoNova() {
+  if (document.getElementById('faixa-versao')) return;
+  const b = document.createElement('button');
+  b.id = 'faixa-versao'; b.type = 'button'; b.className = 'faixa-versao';
+  b.textContent = '✨ Saiu versão nova do jogo. Toque para atualizar.';
+  b.onclick = () => location.reload();
+  document.body.appendChild(b);
+}
 function conecta() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}`);
@@ -90,11 +99,20 @@ function conecta() {
     } else if (msg.t === 'lobby' && !msg.started) {
       aviso('A partida ainda não começou — comece pela mesa normal.', true);
     } else if (msg.t === 'welcome') {
+      tentouRestaurar = false;
       voz.reconectar?.();
     } else if (msg.t === 'voz') {
       voz.receber(msg);
     } else if (msg.t === 'emote') {
       mostraEmote3D(msg.from, msg.k);
+    } else if (msg.t === 'versao') {
+      if (versaoCarregada === null) versaoCarregada = msg.v;
+      else if (msg.v !== versaoCarregada) avisaVersaoNova();
+    } else if (msg.t === 'selo') {
+      // o retrato cifrado da sala (lib/selo-sala.js): guardar e devolver
+      if (msg.code === sessao.code) { try { localStorage.setItem('cacamba-selo', JSON.stringify({ code: msg.code, seq: msg.seq, selo: msg.selo })); } catch { /* modo privado */ } }
+    } else if (msg.t === 'reinicio') {
+      aviso('O servidor está reiniciando. A partida volta em instantes.', true);
     } else if (msg.t === 'presenca') {
       // o que outro jogador está fazendo entre as jogadas; vale por uns
       // segundos e depois o corpo dele volta ao repouso sozinho
@@ -102,6 +120,13 @@ function conecta() {
     } else if (msg.t === 'error') {
       aviso(`⚠️ ${msg.msg}`);
     } else if (msg.t === 'gone') {
+      // o servidor reiniciou: devolve o retrato da sala, uma vez só
+      let selo = null; try { selo = JSON.parse(localStorage.getItem('cacamba-selo')); } catch { /* sem retrato */ }
+      if (msg.semSala && selo?.code === sessao.code && !tentouRestaurar) {
+        tentouRestaurar = true;
+        ws.send(JSON.stringify({ t: 'restaura', selo: selo.selo, playerId: sessao.playerId, token: sessao.token }));
+        return;
+      }
       voz.desligar();
       aviso('A sala não existe mais. Voltando…', true);
       setTimeout(() => { location.href = '/'; }, 1500);

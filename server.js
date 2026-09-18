@@ -20,6 +20,7 @@ import {
 } from './shared/engine.js';
 import { personagemValido } from './shared/elenco.js';
 import { emoteDe } from './shared/emotes.js';
+import { chaveDasSalas, sela, abre } from './lib/selo-sala.js';
 import { codigoPix, normalizaChave } from './lib/pix.js';
 import { rotaDeConta, ehRotaDeConta } from './lib/rotas-conta.js';
 import { rotaDeWebhook, ehWebhook } from './lib/rotas-webhook.js';
@@ -310,6 +311,73 @@ const server = http.createServer((req, res) => {
 // ---------------------------------------------------------------------------
 
 const rooms = new Map(); // code → room
+
+// ---- A sala sobrevive ao reinício (ver lib/selo-sala.js) --------------------
+const CHAVE_SALAS = chaveDasSalas();
+const SELO_MAXIMO = 15000;            // o que cabe numa mensagem do cliente (maxPayload 16 KiB)
+const SELO_VALIDADE_MS = 12 * 60 * 60 * 1000;
+
+// A VERSÃO do que está no ar: o commit do deploy no Render; fora dele, um
+// resumo do tamanho e da data dos arquivos servidos. Vai a cada conexão — e é
+// como a página aberta descobre que ficou velha ("ainda não alterou no site").
+const VERSAO = (() => {
+  if (process.env.RENDER_GIT_COMMIT) return process.env.RENDER_GIT_COMMIT.slice(0, 12);
+  const h = crypto.createHash('sha1');
+  const anda = (dir) => {
+    for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (f.name.startsWith('.') || f.name === 'models' || f.name === 'vendor') continue;
+      const p = path.join(dir, f.name);
+      if (f.isDirectory()) anda(p);
+      else if (/\.(js|css|html|json)$/.test(f.name)) { const st = fs.statSync(p); h.update(`${p}:${st.size}:${Math.round(st.mtimeMs)};`); }
+    }
+  };
+  try { for (const d of ['public', 'shared']) anda(path.join(path.dirname(fileURLToPath(import.meta.url)), d)); } catch { /* fica o resumo do que deu */ }
+  return h.digest('hex').slice(0, 12);
+})();
+
+function retratoDaSala(room) {
+  return {
+    v: 1, seq: room.seloSeq, em: Date.now(),
+    code: room.code, origin: room.origin, gameSeq: room.gameSeq, createdAt: room.createdAt,
+    players: room.players.map(({ ws, ...p }) => p),   // sem o socket
+    game: room.game,                                   // `rnd` é função: some no JSON, volta na restauração
+  };
+}
+function retratoValido(d) {
+  return !!d && d.v === 1 && typeof d.code === 'string' && /^[A-Z]{4}$/.test(d.code)
+    && Number.isFinite(d.em) && Date.now() - d.em < SELO_VALIDADE_MS && d.em <= Date.now() + 60000
+    && Array.isArray(d.players) && d.players.length >= 1 && d.players.length <= DEFAULT_OPTS.maxPlayers
+    && d.players.every((p) => p && typeof p.id === 'string' && typeof p.name === 'string')
+    && (d.game === null || (typeof d.game === 'object' && Array.isArray(d.game.players) && Array.isArray(d.game.deck)));
+}
+// Manda o retrato a todos os humanos ligados (ou a um só, que acabou de chegar).
+function enviaSelo(room, so = null) {
+  const para = so ? [so] : room.players.filter((p) => !p.isBot && p.ws);
+  if (!para.length) return;
+  if (!so) room.seloSeq = (room.seloSeq || 0) + 1;
+  let selo;
+  try { selo = sela(retratoDaSala(room), CHAVE_SALAS); } catch (e) { console.error('selo da sala:', e?.message || e); return; }
+  if (selo.length > SELO_MAXIMO) return;   // o cliente não conseguiria devolver
+  for (const p of para) send(p.ws, { t: 'selo', code: room.code, seq: room.seloSeq || 0, selo });
+}
+function recriaSala(d, origin) {
+  const room = {
+    code: d.code,
+    players: d.players.map((p) => ({ ...p, ws: null, connected: !!p.isBot, lastSeen: Date.now(), awayActed: false, awayNotified: false })),
+    game: d.game || null,
+    gameSeq: d.gameSeq || 0,
+    botTimer: null, botTimerKey: null, qr: null,
+    origin: origin || d.origin || LAN_HOST,
+    createdAt: d.createdAt || Date.now(),
+    seloSeq: d.seq || 0, restauradaEm: Date.now(), mexeu: false,
+  };
+  if (room.game) room.game.rnd = Math.random;
+  rooms.set(room.code, room);
+  QRCode.toDataURL(`${room.origin}/?sala=${room.code}`, { margin: 1, width: 220 })
+    .then((dataUrl) => { room.qr = dataUrl; broadcastLobby(room); })
+    .catch(() => {});
+  return room;
+}
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // sem I e O (confundem com 1 e 0)
 // Teto de salas vivas ao mesmo tempo. Sem ele, um socket mandando `create` em
 // loop enchia a memória do plano free com salas permanentes (cada uma guarda
@@ -436,6 +504,8 @@ function lobbyView(room) {
 
 function broadcastLobby(room) {
   for (const p of room.players) if (!p.isBot) send(p.ws, lobbyView(room));
+  // antes de a partida começar, quem entra e sai da sala também vale um retrato
+  if (!room.game) enviaSelo(room);
 }
 
 // Presença é assunto da sala, não do motor — o engine não sabe de sockets, e
@@ -456,6 +526,13 @@ function broadcastState(room, events = []) {
   for (const p of room.players) {
     if (!p.isBot) send(p.ws, { t: 'state', view: comPresenca(room, viewFor(room.game, p.id)), events });
   }
+  if (events.length) room.mexeu = true;
+  // O RETRATO vai a cada passagem de vez, começo e fim de rodada — não a cada
+  // jogada: é o que pesa no plano de dados de quem joga no celular. Reiniciar
+  // no meio de uma vez devolve a vez ao começo dela, com o mesmo monte.
+  const g = room.game;
+  const marca = `${room.gameSeq}/${g.round}/${g.turnNo}/${g.phase === 'roundEnd' || g.phase === 'gameEnd' ? g.phase : ''}`;
+  if (marca !== room.seloMarca) { room.seloMarca = marca; enviaSelo(room); }
 }
 
 // ---------------------------------------------------------------------------
@@ -612,6 +689,9 @@ wss.on('connection', (ws, req) => {
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
   ws.budget = {};
   ws.origin = originFrom(req); // endereço por onde ESTE jogador chegou
+  // a versão do que está no ar: a página aberta compara com a que carregou e
+  // oferece atualizar (o cliente antigo ignora mensagem que não conhece)
+  send(ws, { t: 'versao', v: VERSAO });
 
   // Sem este ouvinte, um frame malformado (sem máscara, UTF-8 inválido) faz o
   // `ws` emitir 'error' sem ninguém escutando — e o EventEmitter transforma
@@ -707,11 +787,14 @@ function attach(ws, room, player) {
   player.awayNotified = false;
   send(ws, { t: 'welcome', playerId: player.id, token: player.token, code: room.code });
   broadcastLobby(room);
-  if (room.game) send(ws, { t: 'state', view: comPresenca(room, viewFor(room.game, player.id)), events: [] });
+  if (room.game) {
+    send(ws, { t: 'state', view: comPresenca(room, viewFor(room.game, player.id)), events: [] });
+    enviaSelo(room, player);
+  }
 }
 
 function handle(ws, msg) {
-  if (!['create', 'join', 'resume'].includes(msg.t)) currentPlayer(ws, currentRoom(ws));
+  if (!['create', 'join', 'resume', 'restaura'].includes(msg.t)) currentPlayer(ws, currentRoom(ws));
   switch (msg.t) {
     case 'create': {
       if (rooms.size >= MAX_SALAS) { const e = new Error('O servidor está lotado de salas agora. Tente daqui a pouco.'); e.gameRule = true; throw e; }
@@ -769,13 +852,47 @@ function handle(ws, msg) {
     }
     case 'resume': {
       const room = rooms.get(String(msg.code || '').toUpperCase().trim());
-      if (!room) { send(ws, { t: 'gone' }); return; }
+      // `semSala`: o servidor não conhece a sala — reiniciou, ou ela expirou.
+      // O cliente que tiver o retrato dela responde com `restaura`; o cliente
+      // antigo lê só o `gone` e volta para o começo, como sempre.
+      if (!room) { send(ws, { t: 'gone', semSala: true }); return; }
       // Robôs têm token vazio e id público (a visão do lobby mostra os ids):
       // sem o filtro, um `resume` com token "" anexava o socket a um robô — e
       // dava para ver a mão dele e jogar por ele.
       const player = room.players.find((p) => !p.isBot && p.token && p.id === msg.playerId && p.token === msg.token);
       if (!player) { send(ws, { t: 'gone' }); return; }
       attach(ws, room, player);
+      break;
+    }
+    // A SALA VOLTA DO RETRATO (lib/selo-sala.js). Só abre o que ESTE servidor
+    // selou, com a chave dele; e quem devolve o retrato ainda tem de ser um
+    // jogador daquela sala, com o token dele.
+    case 'restaura': {
+      const d = abre(msg.selo, CHAVE_SALAS);
+      if (!retratoValido(d)) { send(ws, { t: 'gone' }); return; }
+      let room = rooms.get(d.code);
+      // o mesmo código sorteado de novo para OUTRA sala: não é esta
+      if (room && room.createdAt !== d.createdAt) { send(ws, { t: 'gone' }); return; }
+      if (!room) {
+        if (rooms.size >= MAX_SALAS) { const e = new Error('O servidor está lotado de salas agora. Tente daqui a pouco.'); e.gameRule = true; throw e; }
+        room = recriaSala(d, ws.origin);
+        console.log(`sala ${room.code} restaurada do retrato ${d.seq} (${room.players.length} jogadores${room.game ? `, rodada ${room.game.round + 1}` : ', no lobby'})`);
+      } else if (room.restauradaEm && !room.mexeu && d.seq > (room.seloSeq || 0)) {
+        // outro jogador chegou com um retrato MAIS NOVO e ninguém jogou ainda
+        // desde a volta: vale o mais novo (é o que impede voltar a partida no
+        // tempo devolvendo de propósito um retrato velho)
+        room.game = d.game || null;
+        if (room.game) room.game.rnd = Math.random;
+        room.gameSeq = d.gameSeq || 0; room.seloSeq = d.seq; room.seloMarca = null;
+        for (const p of room.players) { const n = d.players.find((x) => x.id === p.id); if (n) { p.desistiu = !!n.desistiu; p.token = n.token; } }
+        if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; room.botTimerKey = null; }
+        console.log(`sala ${room.code}: adotado o retrato mais novo (${d.seq})`);
+        broadcastState(room, []);
+      }
+      const player = room.players.find((p) => !p.isBot && p.token && p.id === msg.playerId && p.token === msg.token);
+      if (!player) { send(ws, { t: 'gone' }); return; }
+      attach(ws, room, player);
+      scheduleBots(room);
       break;
     }
     case 'addBot': {
@@ -958,9 +1075,14 @@ server.listen(PORT, HOST, () => {
 for (const sinal of ['SIGTERM', 'SIGINT']) {
   process.on(sinal, () => {
     console.log(`\n${sinal} recebido, encerrando…`);
-    for (const room of rooms.values()) if (room.botTimer) clearTimeout(room.botTimer);
-    wss.close();
-    server.close(() => process.exit(0));
+    // Para os robôs, entrega a cada jogador o ÚLTIMO retrato da sala dele e
+    // avisa do reinício — só então fecha. É com esse retrato que a sala renasce
+    // no processo que vem depois (ver lib/selo-sala.js).
+    for (const room of rooms.values()) {
+      if (room.botTimer) clearTimeout(room.botTimer);
+      try { enviaSelo(room); for (const p of room.players) if (!p.isBot) send(p.ws, { t: 'reinicio' }); } catch { /* fechar é mais importante */ }
+    }
+    setTimeout(() => { for (const c of wss.clients) { try { c.close(1012, 'reinicio'); } catch { /* já foi */ } } wss.close(); server.close(() => process.exit(0)); }, 350);
     setTimeout(() => process.exit(0), 5000).unref();
   });
 }

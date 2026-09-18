@@ -20,3 +20,12 @@
 }
 .emotes-painel button:active { transform: scale(0.96); }
 .emotes-painel.descansando button { opacity: 0.45; pointer-events: none; }
+
+/* "Saiu versão nova": faixa fixa no pé, nas duas mesas. Não some sozinha. */
+.faixa-versao {
+  position: fixed; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  z-index: 400; max-width: calc(100vw - 20px); padding: 10px 16px;
+  font: inherit; font-weight: 800; font-size: 0.88rem; color: #1d140c; cursor: pointer;
+  border: 0; border-radius: 999px; background: #f0c46a; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}

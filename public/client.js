@@ -44,6 +44,12 @@ let cartasNovas = new Set();
 let maoAnterior = null;
 let meldDiscardMode = false;
 let reconnectDelay = 500;
+// O RETRATO DA SALA (lib/selo-sala.js): cifrado, o cliente só guarda e devolve.
+// É com ele que a partida volta depois que o servidor reinicia.
+let seloDaSala = loadJSONCedo('cacamba-selo');
+let tentouRestaurar = false;
+let versaoCarregada = null;
+function loadJSONCedo(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
 
 function loadJSON(key) {
   try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
@@ -52,7 +58,7 @@ function saveSession(s) {
   session = s;
   try {
     if (s) localStorage.setItem('cacamba-session', JSON.stringify(s));
-    else localStorage.removeItem('cacamba-session');
+    else { localStorage.removeItem('cacamba-session'); localStorage.removeItem('cacamba-selo'); seloDaSala = null; }
   } catch { /* modo privado */ }
 }
 
@@ -114,7 +120,22 @@ setInterval(() => {
 
 function handleMessage(msg) {
   switch (msg.t) {
+    case 'versao':
+      // a primeira que chega é a desta página; outra diferente = saiu versão nova
+      if (versaoCarregada === null) versaoCarregada = msg.v;
+      else if (msg.v !== versaoCarregada) avisaVersaoNova();
+      break;
+    case 'selo':
+      if (session && msg.code === session.code) {
+        seloDaSala = { code: msg.code, seq: msg.seq, selo: msg.selo };
+        try { localStorage.setItem('cacamba-selo', JSON.stringify(seloDaSala)); } catch { /* modo privado */ }
+      }
+      break;
+    case 'reinicio':
+      toast('O servidor está reiniciando. A partida volta em instantes.');
+      break;
     case 'welcome':
+      tentouRestaurar = false;
       saveSession({ code: msg.code, playerId: msg.playerId, token: msg.token });
       voz.reconectar?.();
       break;
@@ -150,11 +171,31 @@ function handleMessage(msg) {
       toast(`⚠️ ${msg.msg}`);
       break;
     case 'gone':
+      // o servidor reiniciou e não conhece a sala: devolve o retrato que ele
+      // mesmo entregou, uma vez só — se não servir, aí sim acabou
+      if (msg.semSala && session && seloDaSala?.code === session.code && !tentouRestaurar) {
+        tentouRestaurar = true;
+        sendMsg({ t: 'restaura', selo: seloDaSala.selo, playerId: session.playerId, token: session.token });
+        break;
+      }
       voz.desligar();
       saveSession(null);
       showScreen('home');
       break;
   }
+}
+
+// VERSÃO NOVA NO AR: a página aberta fica com o código velho até recarregar
+// (foi o "ainda não alterou no site" de 15/09/2026). Uma faixa fixa, que não
+// some sozinha e não interrompe a jogada: quem decide a hora é o jogador. A
+// sessão está guardada, então recarregar volta direto para a mesa.
+function avisaVersaoNova() {
+  if (document.getElementById('faixa-versao')) return;
+  const b = document.createElement('button');
+  b.id = 'faixa-versao'; b.type = 'button'; b.className = 'faixa-versao';
+  b.textContent = '✨ Saiu versão nova do jogo. Toque para atualizar.';
+  b.onclick = () => location.reload();
+  document.body.appendChild(b);
 }
 
 // ---------------- Telas ----------------
@@ -2203,12 +2244,16 @@ function showRules() {
      <ul>
        <li><strong>Trinca:</strong> 3 cartas de mesmo valor com naipes diferentes.</li>
        <li><strong>Sequência:</strong> 4 cartas seguidas do mesmo naipe. Ás vale 1 (A-2-3-4) ou 14 (J-Q-K-A), mas não “vira a esquina”.</li>
+       <li><strong>Quarta carta na trinca:</strong> só de um <strong>naipe que já está nela</strong>. Numa trinca de ♠ ♥ ♣ entra outro ♠, ♥ ou ♣ — nunca o ♦.</li>
+       <li><strong>Troca na trinca:</strong> uma carta da mão do <strong>mesmo valor</strong> pode entrar <strong>no lugar</strong> de uma carta da trinca, que vem para a sua mão — sem passar a vez, e em trinca de qualquer jogador. A trinca tem de continuar com 3 naipes diferentes. É assim que o 5♦ entra numa trinca de ♠ ♥ ♣: no lugar do 5♠, que sai para você usar em outro jogo. Escolha a carta na mão e toque na carta da trinca marcada em azul.</li>
      </ul>
      <h3>Coringa ${JOKER_LABEL}</h3>
      <ul>
        <li>Vale <strong>só em sequência</strong> (nunca em trinca), no máximo <strong>1 por sequência</strong>.</li>
        <li>Nas rodadas só de trincas (1ª e 4ª) ele <strong>fica fora do baralho</strong>.</li>
        <li>Na sua vez, quem tem a <strong>carta exata</strong> que o coringa representa pode trocá-lo em qualquer sequência da mesa: a carta entra no lugar e o coringa <strong>vem para a mão</strong>.</li>
+       <li>O coringa da mão também pode entrar <strong>no lugar de qualquer carta</strong> de uma sequência já baixada: a carta sai para a sua mão e a sequência não muda.</li>
+       <li>Coringa <strong>na ponta muda de ponta</strong>: em ${JOKER_LABEL}‑8‑9‑10 o coringa vale 7, mas se você tem o Q ele passa para o outro lado (8‑9‑10‑${JOKER_LABEL}) e o Q encaixa. Só acontece quando a sua carta não cabe de outro jeito.</li>
        <li>Coringa descartado <strong>tranca o meio</strong>: ninguém compra do descarte até alguém descartar por cima.</li>
        <li>Na mão ao fim da rodada, custa <strong>20 pontos</strong>.</li>
      </ul>
@@ -2222,6 +2267,12 @@ function showRules() {
      <h3>Compra fora da vez</h3>
      <p>Quando alguém descarta, os outros jogadores podem pedir a carta: leva <strong>quem apertar primeiro</strong>, e ele fica só com a carta pedida (não puxa nem descarta). Mas <strong>quem está na vez tem preferência</strong> sobre todos — se ele também quiser a carta, ela é dele.</p>
      <p><strong>Quem descartou não pede de volta:</strong> a carta que saiu da sua mão não volta para ela, nem pela compra da vez nem pelo pedido. Numa mesa de dois isso quer dizer que a compra fora da vez não acontece — o único que não está na vez é justamente quem acabou de descartar.</p>
+     <h3>Falar sem microfone</h3>
+     <p>O botão <strong>💬</strong> abre emotes e frases prontas (“Bora!”, “Demora demais…”, “Boa jogada!”). O balão aparece em cima de você para todo mundo da mesa. O <strong>🎙</strong> liga o chat de voz.</p>
+     <h3>Na mesa 3D</h3>
+     <p><strong>Toque num jogador</strong> para virar e olhar para ele; toque de novo, ou no tampo, para voltar à mesa. <strong>Arraste o fundo</strong> e a cabeça segue o dedo. Os outros veem a sua cabeça virar. Toque num jogo do tampo para ver as cartas de perto e encaixar.</p>
+     <h3>Se a conexão cair</h3>
+     <p>O jogo guarda o seu lugar: abra de novo e você volta para a mesma mão. Se ficar fora mais de 45 segundos na sua vez, o jogo joga por você até voltar. A partida também <strong>sobrevive a uma atualização do jogo</strong> — e quando sai versão nova, aparece um aviso para atualizar na hora que você quiser.</p>
      <h3>Pontos</h3>
      <p>Cartas que sobram na mão contam pelo <strong>valor de face</strong>: o 5 vale 5, o 10 vale 10, e assim por diante. <strong>J = 11</strong> · <strong>Q = 12</strong> · <strong>K = 13</strong> · <strong>Ás = 15</strong> (mesmo tendo jogado como 1) · <strong>coringa = 20</strong>. Se o monte esgotar 3 vezes na mesma rodada, a rodada acaba sem vencedor e todos contam a mão.</p>`,
     [{ label: 'Fechar', fn: closeModal }],
