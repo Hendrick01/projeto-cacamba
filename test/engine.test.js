@@ -547,6 +547,37 @@ test('descartar de um jogo com sobra em vez da mão', () => {
   assert.equal(state.phase, 'draw', 'vez passou adiante');
 });
 
+test('robô FÁCIL: joga a partida inteira sem pegar do meio, sem encaixar em jogo alheio e sem trocar coringa', () => {
+  for (const seed of [3, 11]) {
+    const players = [{ id: 'r1', name: 'A', isBot: true }, { id: 'r2', name: 'B', isBot: true }, { id: 'r3', name: 'C', isBot: true }];
+    const state = createGame(players, { rnd: mulberry32(seed), nivelRobos: 'facil' });
+    startRound(state);
+    let guarda = 0, descartes = 0;
+    while (state.phase !== 'gameEnd') {
+      while (state.phase === 'draw' || state.phase === 'play') {
+        assert.ok(guarda++ < 40000, `a partida fácil não terminou (semente ${seed})`);
+        const atual = state.players[state.turn];
+        const acao = botNextAction(state, atual.id);
+        assert.ok(acao, 'robô sem ação');
+        if (acao.a === 'draw') assert.equal(acao.source, 'deck', 'o robô fácil não pega do meio');
+        if (acao.a === 'layoff') assert.equal(allMelds(state).find((m) => m.id === acao.meldId).ownerId, atual.id, 'o robô fácil só encaixa nos próprios jogos');
+        assert.notEqual(acao.a, 'swapJoker', 'o robô fácil não troca coringa');
+        if (acao.a === 'discard') { descartes++; assert.ok(atual.hand.some((c) => c.id === acao.cardId), 'descarta carta que tem'); }
+        applyAction(state, atual.id, acao);
+      }
+      if (state.phase === 'roundEnd') actNextRound(state);
+    }
+    assert.ok(descartes > 20);
+  }
+  // e o normal continua pegando do meio quando a carta serve
+  const s = freshGame(); const p = s.players[s.turn]; p.isBot = true;
+  p.hand = [c('7', '♠'), c('7', '♥'), c('2', '♣'), c('9', '♦'), c('K', '♠'), c('4', '♥')];
+  const topo = c('7', '♦'); topo.by = s.players[(s.turn + 1) % s.players.length].id; s.discard.push(topo); s.discardFresh = true;
+  assert.deepEqual(botNextAction(s, p.id), { a: 'draw', source: 'discard' });
+  s.opts.nivelRobos = 'facil';
+  assert.deepEqual(botNextAction(s, p.id), { a: 'draw', source: 'deck' });
+});
+
 test('troca na trinca: o 5♦ entra no lugar do 5♠, o 5♠ vai para a sequência do outro e o 2♥ bate', () => {
   // A jogada real de 16/09/2026 que o jogo não deixou fazer.
   const state = freshGame();

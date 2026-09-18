@@ -1428,13 +1428,20 @@ function melhorPonta(player, card, meld) {
 }
 
 // Próxima ação do bot na vez dele (uma por chamada, para o servidor dar ritmo)
+// NÍVEL DOS ROBÔS (`opts.nivelRobos`, escolhido por quem cria a sala). O robô
+// NORMAL é o de sempre. O FÁCIL joga certo, mas deixa passar: nunca pega do
+// meio, só encaixa nos próprios jogos, não troca coringa e, uma vez em três,
+// descarta uma carta qualquer em vez da pior. É para a primeira partida de
+// quem está aprendendo — perder para robô na estreia espanta.
+export const NIVEIS_DE_ROBO = ['facil', 'normal'];
 export function botNextAction(state, playerId) {
   const player = state.players[state.turn];
   if (!player || player.id !== playerId) return null;
+  const facil = state.opts?.nivelRobos === 'facil';
 
   if (state.phase === 'draw') {
     const top = topoDoDescarte(state);
-    if (top && podeComprarDoDescarte(state, player.id) && botWantsCard(state, player, top)) {
+    if (!facil && top && podeComprarDoDescarte(state, player.id) && botWantsCard(state, player, top)) {
       return { a: 'draw', source: 'discard' };
     }
     return { a: 'draw', source: 'deck' };
@@ -1457,6 +1464,7 @@ export function botNextAction(state, playerId) {
     if (player.baixou) {
       for (const card of player.hand) {
         for (const meld of allMelds(state)) {
+          if (facil && meld.ownerId !== player.id) continue;
           if (!layoffOption(card, meld)) continue;
           const end = melhorPonta(player, card, meld);
           return { a: 'layoff', cardId: card.id, meldId: meld.id, end };
@@ -1467,10 +1475,14 @@ export function botNextAction(state, playerId) {
     // também para quem ainda não baixou: pegar o coringa da mesa pode ser o
     // que faltava para fechar o contrato. Se fechar, o `baixar` acima pega na
     // chamada seguinte, ainda neste turno.
-    const troca = botFindJokerSwap(state, player);
+    const troca = facil ? null : botFindJokerSwap(state, player);
     if (troca) return { a: 'swapJoker', ...troca };
 
-    const card = botPickDiscard(state, player);
+    let card = botPickDiscard(state, player);
+    if (facil && player.hand.length > 1 && (state.rnd || Math.random)() < 1 / 3) {
+      const outras = player.hand.filter((c) => c.id !== card.id && !isJoker(c));
+      if (outras.length) card = outras[Math.floor((state.rnd || Math.random)() * outras.length)];
+    }
     return { a: 'discard', cardId: card.id };
   }
 

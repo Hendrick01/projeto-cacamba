@@ -526,12 +526,19 @@ function renderLobby() {
   }
 
   $('btn-add-bot').hidden = !isHost() || lobby.players.length >= DEFAULT_OPTS.maxPlayers;
+  // o nível dos robôs: quem criou a sala escolhe; os outros só leem
+  const temRobo = lobby.players.some((p) => p.isBot), facil = lobby.nivelRobos === 'facil';
+  $('btn-nivel-robos').hidden = !temRobo;
+  $('btn-nivel-robos').disabled = !isHost();
+  $('btn-nivel-robos').textContent = facil ? '🤖 Robôs: fáceis' : '🤖 Robôs: normais';
+  $('btn-nivel-robos').title = isHost() ? 'Toque para trocar. Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.' : 'Quem criou a sala escolhe o nível dos robôs.';
   $('btn-start').hidden = !isHost();
   $('btn-start').disabled = lobby.players.length < DEFAULT_OPTS.minPlayers;
   $('lobby-wait').hidden = isHost();
 }
 
 $('btn-add-bot').onclick = () => sendMsg({ t: 'addBot' });
+$('btn-nivel-robos').onclick = () => sendMsg({ t: 'nivelRobos', nivel: lobby?.nivelRobos === 'facil' ? 'normal' : 'facil' });
 $('btn-start').onclick = () => sendMsg({ t: 'start' });
 $('btn-leave-lobby').onclick = () => {
   sendMsg({ t: 'leave' });   // avisa a sala, senão fica assento fantasma nela
