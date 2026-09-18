@@ -508,6 +508,7 @@ function renderLobby() {
     const dot = document.createElement('span');
     dot.className = 'dot' + (p.connected ? '' : ' off');
     li.appendChild(dot);
+    li.dataset.playerId = p.id;
     li.appendChild(avatarEl(p.id, lobby.players, 30));
     li.appendChild(document.createTextNode(p.id === me() ? `${p.name} (você)` : p.name));
     const tag = document.createElement('span');
@@ -1162,7 +1163,7 @@ function atualizaBanner() {
   }
   if (view.phase === 'draw' || view.phase === 'play') {
     if (myTurn()) {
-      banner.textContent = view.phase === 'draw' ? 'Sua vez! Puxe do monte ou pegue do meio.' : 'Baixe, encaixe ou descarte uma carta.';
+      banner.textContent = dicaDaVez() || (view.phase === 'draw' ? 'Sua vez! Puxe do monte ou pegue do meio.' : 'Baixe, encaixe ou descarte uma carta.');
       banner.className = 'turn-banner me';
     } else {
       banner.textContent = `Vez de ${playerName(view.turnId)}…`;
@@ -1172,6 +1173,19 @@ function atualizaBanner() {
     banner.textContent = '';
     banner.className = 'turn-banner';
   }
+}
+// DICAS DA PRIMEIRA PARTIDA. As regras são da casa, e quem chega novo só tinha
+// a janela do "?". Nas duas primeiras partidas deste aparelho a faixa da vez
+// diz o que FAZER agora, olhando a mão de verdade — depois volta ao normal.
+function dicaDaVez() {
+  let jogadas = 0; try { jogadas = Number(localStorage.getItem('cacamba-partidas') || 0); } catch { /* modo privado */ }
+  if (jogadas >= 2 || !view?.you) return null;
+  if (view.phase === 'draw') return 'Sua vez! Toque no MONTE para puxar — ou na carta do meio, se ela te serve.';
+  const eu = view.you;
+  if (!eu.baixou && eu.remaining && planBaixada(eu.hand, eu.remaining)) return 'Você tem jogo pronto! Toque em “Baixar”.';
+  if (selected.size === 1) return 'Agora toque em “Descartar” — ou num jogo da mesa onde a carta encaixe.';
+  if (eu.baixou) return 'Contrato na mesa! Encaixe o que der nos jogos e descarte para passar a vez.';
+  return 'Toque numa carta da sua mão para escolher, e depois em “Descartar”.';
 }
 function proximoEventoNoBanner() {
   eventoNoBanner = filaDeEventos.shift() || null;
@@ -1755,6 +1769,7 @@ $('btn-discard').onclick = () => {
 $('btn-meld-discard').onclick = () => { meldDiscardMode = true; selected.clear(); render(); };
 $('btn-cancel-mode').onclick = () => { meldDiscardMode = false; render(); };
 montaEmotes({ botao: $('btn-emote'), envia: (k) => { sendMsg({ t: 'emote', k }); mostraEmote(me(), k); } });
+montaEmotes({ botao: $('btn-emote-lobby'), envia: (k) => { sendMsg({ t: 'emote', k }); mostraEmote(me(), k); } });
 $('btn-sort').onclick = () => {
   sortMode = sortMode === 'suit' ? 'rank' : 'suit';
   ordemManual = [];   // pediu ordenação automática: a arrumação à mão sai de cena
@@ -1859,6 +1874,17 @@ const REACOES = {
 function mostraEmote(playerId, k) {
   const e = emoteDe(k);
   if (!e) return;
+  // na sala de espera o balão sai ao lado do nome de quem falou
+  if (!$('screen-lobby').hidden) {
+    const li = [...document.querySelectorAll('#lobby-players li')].find((x) => x.dataset.playerId === playerId);
+    if (li) {
+      let b = li.querySelector('.balao-lobby');
+      if (!b) { b = document.createElement('span'); b.className = 'balao-lobby'; li.appendChild(b); }
+      b.textContent = textoDoEmote(e); b.hidden = false;
+      clearTimeout(Number(b.dataset.some)); b.dataset.some = String(setTimeout(() => { b.hidden = true; }, 3000));
+    }
+    return;
+  }
   const el = playerId === me() ? $('meu-assento') : assentos.get(playerId);
   if (!el) { toast(`${playerName(playerId)}: ${textoDoEmote(e)}`); return; }
   let balao = el.querySelector('.balao');
@@ -2100,6 +2126,8 @@ function renderPhaseModal() {
   } else if (view.phase === 'gameEnd') {
     if (modalPhaseShown === 'gameEnd') return;
     modalPhaseShown = 'gameEnd';
+    // uma partida inteira jogada: as dicas da primeira partida contam até duas
+    try { localStorage.setItem('cacamba-partidas', String(Number(localStorage.getItem('cacamba-partidas') || 0) + 1)); } catch { /* modo privado */ }
     showGameEnd();
   } else {
     // Só os modais de FASE (fim de rodada/jogo) fecham sozinhos. Placar,

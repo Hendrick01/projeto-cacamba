@@ -224,6 +224,21 @@ const server = http.createServer((req, res) => {
   // A caixinha. Responde 404 quando não há chave configurada: o cliente usa
   // esse 404 para decidir se mostra o botão, então "não configurado" e "não
   // existe" são a mesma resposta de propósito.
+  // TURN PARA A VOZ. Só com STUN, quem está atrás de NAT fechado (rede de
+  // operadora, Wi‑Fi de empresa) não se ouve — pendência anotada desde
+  // 04/09/2026. Um servidor TURN resolve, e é serviço de fora: configure
+  // TURN_URLS ("turn:host:3478,turns:host:5349") e OU TURN_SEGREDO (coturn com
+  // `use-auth-secret`: a credencial sai daqui, vale 6 h e nunca é fixa no JS)
+  // OU TURN_USUARIO + TURN_SENHA (provedor com credencial estática). Sem isso a
+  // rota some e a voz segue só com STUN, como sempre.
+  if (url.pathname === '/voz.json') {
+    const ice = servidoresDeVoz();
+    if (!ice) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end('{}'); return; }
+    const corpo = Buffer.from(JSON.stringify({ iceServers: ice }));
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Length': corpo.length });
+    res.end(req.method === 'HEAD' ? undefined : corpo);
+    return;
+  }
   if (url.pathname === '/apoio.json') {
     if (!PIX) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end('{}'); return; }
     pixQr.then((qr) => {
@@ -311,6 +326,18 @@ const server = http.createServer((req, res) => {
 // ---------------------------------------------------------------------------
 
 const rooms = new Map(); // code → room
+
+const TURN_URLS = (process.env.TURN_URLS || '').split(',').map((s) => s.trim()).filter((s) => /^turns?:[^\s]+$/.test(s));
+function servidoresDeVoz() {
+  if (!TURN_URLS.length) return null;
+  if (process.env.TURN_SEGREDO) {
+    const usuario = `${Math.floor(Date.now() / 1000) + 6 * 3600}:cacamba`;
+    const credencial = crypto.createHmac('sha1', process.env.TURN_SEGREDO).update(usuario).digest('base64');
+    return [{ urls: TURN_URLS, username: usuario, credential: credencial }];
+  }
+  if (process.env.TURN_USUARIO && process.env.TURN_SENHA) return [{ urls: TURN_URLS, username: process.env.TURN_USUARIO, credential: process.env.TURN_SENHA }];
+  return null;
+}
 
 // ---- A sala sobrevive ao reinício (ver lib/selo-sala.js) --------------------
 const CHAVE_SALAS = chaveDasSalas();
@@ -1053,7 +1080,7 @@ function handle(ws, msg) {
     case 'emote': {
       const room = currentRoom(ws);
       const player = currentPlayer(ws, room);
-      if (!room.game || !emoteDe(msg.k)) return;
+      if (!emoteDe(msg.k)) return;   // vale no lobby também: é onde se espera, e onde se diz "bora"
       if (!consume(ws.emoteBudget ||= {}, 4, 0.5)) return;
       for (const p of room.players) {
         if (p.isBot || p.id === player.id || !p.ws) continue;

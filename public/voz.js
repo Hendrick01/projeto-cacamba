@@ -9,7 +9,27 @@ const MAX_REINICIOS = 3;
 const tokenValido = (s) => typeof s === 'string' && s.length > 0 && s.length <= 128;
 const nonce = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 
-export function criaVoz({ meuId, enviar, iceServers = STUN }) {
+// A lista de verdade: STUN sempre, e o TURN que o servidor do jogo entregar em
+// /voz.json (credencial de vida curta, nunca fixa aqui). É o MESMO array que as
+// conexões usam, então o que chegar depois vale para a próxima ligação.
+// (sem `export`: o teste do módulo o carrega num sandbox que só conhece
+// `criaVoz`; quem precisar destes dois os acha em `criaVoz.ICE`/`.carregaIce`)
+const ICE = [...STUN];
+function carregaIce(buscar = globalThis.fetch) {
+  if (typeof buscar !== 'function') return Promise.resolve(ICE);
+  return buscar('/voz.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((j) => {
+    if (!Array.isArray(j?.iceServers)) return ICE;
+    ICE.length = STUN.length;
+    for (const s of j.iceServers) if (s && s.urls) ICE.push({ urls: s.urls, username: s.username, credential: s.credential });
+    return ICE;
+  }).catch(() => ICE);
+}
+if (typeof location !== 'undefined' && typeof fetch === 'function') {
+  carregaIce();
+  setInterval(carregaIce, 30 * 60 * 1000);   // a credencial vence em horas
+}
+
+export function criaVoz({ meuId, enviar, iceServers = ICE }) {
   const eu = () => (typeof meuId === 'function' ? meuId() : meuId);
   const pares = new Map();
   const encerradas = new Map();
@@ -378,3 +398,4 @@ export function criaVoz({ meuId, enviar, iceServers = STUN }) {
       audioBloqueado: p.bloqueado, tentativas: p.tentativas, erro: p.erro })),
   };
 }
+criaVoz.ICE = ICE; criaVoz.carregaIce = carregaIce;

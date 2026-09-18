@@ -33,6 +33,14 @@ services:
       # reconecta depois de um deploy o devolve. A chave sai, nesta ordem, de
       # SEGREDO_SALAS, SEGREDO_SESSAO ou RENDER_SERVICE_ID — este último o Render
       # define sozinho, então NÃO é preciso configurar nada para funcionar.
+      # TURN PARA O CHAT DE VOZ (opcional). Só com STUN, quem está em rede de
+      # operadora ou Wi‑Fi de empresa não se ouve. Com um servidor TURN (coturn
+      # próprio, Metered, Cloudflare…), preencha no painel do Render:
+      #   TURN_URLS     "turn:host:3478,turns:host:5349"
+      #   TURN_SEGREDO  o `static-auth-secret` do coturn (a credencial sai do
+      #                 servidor do jogo, vale 6 h e nunca fica fixa no JS)
+      #   — ou —  TURN_USUARIO e TURN_SENHA, se o provedor der credencial fixa.
+      # Sem nada disso a rota /voz.json some e a voz segue só com STUN.
       # A caixinha do Pix. `sync: false` faz o Render PERGUNTAR o valor ao criar
       # o serviço, em vez de guardá-lo aqui: chave de recebimento não entra no
       # repositório. Sem ela, a rota /apoio.json some e o botão de apoiar nem

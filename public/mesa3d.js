@@ -2800,6 +2800,7 @@ function quadro(t) {
   meuFoco.material.opacity += (alvoMeu - meuFoco.material.opacity) * 0.1;
 
   quadro.n = (quadro.n || 0) + 1;
+  if (medidorFps) medeQuadro(t, frameMs);
   if (t - ultimaSombra > (compacto ? 150 : 100)) { renderer.shadowMap.needsUpdate = true; ultimaSombra = t; }
   renderer.render(scene, camera);
   // os dedos caminham entre as poses no ritmo do quadro; com movimento reduzido
@@ -2830,6 +2831,25 @@ if (!sessao) {
 } else {
   conecta();
   requestAnimationFrame(quadro);
+}
+
+// MEDIDOR DE QUADROS: abra a mesa com `?fps=1` para ver, no próprio celular,
+// quantos quadros por segundo ela faz, o pior quadro do último meio segundo, a
+// resolução que o ajuste automático escolheu e o que a cena custa. É o jeito
+// de medir num aparelho simples em vez de adivinhar daqui.
+const medidorFps = new URLSearchParams(location.search).has('fps') ? document.body.appendChild(Object.assign(document.createElement('div'), { className: 'medidor-fps', textContent: 'medindo…' })) : null;
+const _fps = { desde: 0, quadros: 0, pior: 0, calls: 0, tris: 0 };
+if (medidorFps) renderer.info.autoReset = false;   // os três passes do quadro somam
+function medeQuadro(t, frameMs) {
+  // o que o quadro ANTERIOR custou, somados os três passes; e zera para este
+  _fps.calls = renderer.info.render.calls; _fps.tris = renderer.info.render.triangles; renderer.info.reset();
+  _fps.quadros++; _fps.pior = Math.max(_fps.pior, frameMs);
+  if (!_fps.desde) _fps.desde = t;
+  if (t - _fps.desde < 500) return;
+  const fps = (_fps.quadros * 1000) / (t - _fps.desde);
+  const inf = { calls: _fps.calls, triangles: _fps.tris };
+  medidorFps.textContent = `${fps.toFixed(0)} qps · pior ${_fps.pior.toFixed(0)} ms\nresolução ×${renderer.getPixelRatio().toFixed(2)} · ${innerWidth}×${innerHeight}\n${inf.calls} desenhos · ${(inf.triangles / 1000).toFixed(0)} mil triângulos\n${assentos.size + 1} à mesa`;
+  _fps.desde = t; _fps.quadros = 0; _fps.pior = 0;
 }
 
 // EMOTES e frases prontas (17/09/2026): na 3D o balão é a PLACA em cima de

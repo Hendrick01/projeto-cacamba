@@ -1,25 +1,47 @@
-/* Painel de emotes e frases prontas — mesa 2D e 3D (public/emotes-ui.js). */
-.emotes-painel {
-  position: fixed; top: 58px; right: 8px; z-index: 300;
-  width: min(320px, calc(100vw - 16px)); padding: 10px;
-  display: grid; gap: 10px;
-  border-radius: 16px; border: 1px solid rgba(240, 214, 150, 0.35);
-  background: rgba(20, 32, 26, 0.96); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-  pointer-events: auto;
+/* Emotes e frases prontas — mesa 2D, 3D e sala de espera (public/emotes-ui.js).
+   Os emotes numa RODA de oito setores; as frases em fichas embaixo. */
+.emotes-fundo {
+  position: fixed; inset: 0; z-index: 300; display: grid; place-items: center;
+  background: rgba(8, 14, 11, 0.55); pointer-events: auto;
 }
-.emotes-painel[hidden] { display: none; }
-.emotes-grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.emotes-grade button {
-  font-size: 1.6rem; line-height: 1; padding: 10px 0; cursor: pointer;
-  border-radius: 12px; border: 1px solid rgba(240, 214, 150, 0.25); background: rgba(255, 255, 255, 0.06);
+.emotes-fundo[hidden] { display: none; }
+.emotes-painel { display: grid; gap: 14px; justify-items: center; width: min(340px, calc(100vw - 24px)); }
+.emotes-roda {
+  position: relative; width: 264px; height: 264px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(240, 196, 106, 0.16) 0 38%, rgba(20, 32, 26, 0.96) 39% 100%);
+  border: 3px solid rgba(240, 196, 106, 0.75); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
 }
-.emotes-frases { display: flex; flex-wrap: wrap; gap: 6px; }
+.emotes-setor {
+  position: absolute; left: 50%; top: 50%; width: 68px; height: 68px; margin: -34px 0 0 -34px;
+  transform: rotate(var(--ang)) translateY(-92px) rotate(calc(var(--ang) * -1));
+  font-size: 1.9rem; line-height: 1; cursor: pointer;
+  border-radius: 50%; border: 1px solid rgba(240, 214, 150, 0.3); background: rgba(255, 255, 255, 0.08);
+}
+.emotes-setor:hover, .emotes-setor:focus-visible { background: rgba(240, 196, 106, 0.32); outline: none; }
+.emotes-centro {
+  position: absolute; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px 0 0 -38px;
+  border-radius: 50%; border: 2px solid rgba(240, 196, 106, 0.75); background: #26547c; color: #f3ead2;
+  font-size: 1.3rem; font-weight: 900; cursor: pointer;
+}
+.emotes-frases { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
 .emotes-frases button {
-  font: inherit; font-weight: 800; font-size: 0.82rem; color: #f3ead2; cursor: pointer;
-  padding: 7px 11px; border-radius: 999px; border: 1px solid rgba(240, 214, 150, 0.3); background: rgba(255, 255, 255, 0.07);
+  font: inherit; font-weight: 800; font-size: 0.86rem; color: #f3ead2; cursor: pointer;
+  padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(240, 214, 150, 0.35); background: rgba(20, 32, 26, 0.96);
 }
-.emotes-painel button:active { transform: scale(0.96); }
-.emotes-painel.descansando button { opacity: 0.45; pointer-events: none; }
+.emotes-painel button:active { filter: brightness(1.25); }
+
+/* o balão de quem fala na sala de espera */
+.lobby-players li .balao-lobby {
+  margin-left: 8px; padding: 2px 9px; border-radius: 10px; background: #f3ead2; color: #1d140c;
+  font-size: 0.8rem; font-weight: 900; white-space: nowrap;
+}
+.lobby-players li .balao-lobby[hidden] { display: none; }
+
+/* medidor de quadros da mesa 3D (3d.html?fps=1) */
+.medidor-fps {
+  position: fixed; left: 8px; bottom: 8px; z-index: 450; padding: 6px 9px; border-radius: 8px;
+  font: 700 11px/1.35 ui-monospace, Menlo, monospace; color: #d8f5c8; background: rgba(0, 0, 0, 0.72); pointer-events: none; white-space: pre;
+}
 
 /* "Saiu versão nova": faixa fixa no pé, nas duas mesas. Não some sozinha. */
 .faixa-versao {

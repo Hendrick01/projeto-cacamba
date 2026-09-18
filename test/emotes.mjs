@@ -38,6 +38,11 @@ await espera(300);
 const B = await cliente('B');
 manda(B, { t: 'join', code: A.sessao.code, name: 'Quem Fala', avatar: 'dri' });
 await espera(300);
+// na sala de espera também vale
+manda(B, { t: 'emote', k: 'bora' });
+await espera(300);
+confere(A.emotes.at(-1)?.k === 'bora', 'no lobby, antes de começar, o emote já chega');
+await espera(2200);
 manda(A, { t: 'addBot' });
 await espera(200);
 manda(A, { t: 'start' });
@@ -70,5 +75,5 @@ confere(passaram >= 1 && passaram <= 5, `enchente de 12 emotes: passaram ${passa
 confere(B.ws.readyState === WebSocket.OPEN, 'a enchente não derrubou a conexão de B');
 
 A.ws.close(); B.ws.close();
-console.log(falhou.length ? `\nEMOTES FALHOU: ${falhou.length}` : '\nEMOTES OK: 8/8');
+console.log(falhou.length ? `\nEMOTES FALHOU: ${falhou.length}` : '\nEMOTES OK: 9/9');
 process.exit(falhou.length ? 1 : 0);
