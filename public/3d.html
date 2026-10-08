@@ -118,6 +118,25 @@
     padding: 5px 9px; border-radius: 9px; cursor: pointer; white-space: nowrap;
   }
   .visor-acao.forte { background: #f2c14e; color: #23150c; border-color: #f2c14e; }
+  /* O PLACAR (fim de rodada e de jogo), na mesma caixa do visor, mas no meio
+     da tela: é a vez de ler, não de jogar. */
+  .placar-3d { align-items: center; }
+  .placar-3d .visor-caixa { width: min(440px, 100%); border-radius: 18px; }
+  .placar-3d .palco { text-align: center; padding: 4px 0 0; }
+  .placar-3d .palco img { height: 128px; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.5)); }
+  .placar-3d h2 { font-size: 1.15rem; color: #f5d28b; text-align: center; margin: 6px 0 2px; }
+  .placar-3d .sub { color: #cad6be; text-align: center; font-size: 0.82rem; margin-bottom: 8px; }
+  .placar-3d table { width: 100%; border-collapse: collapse; }
+  .placar-3d th { font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8c6a45; text-align: left; padding: 4px 6px; }
+  .placar-3d td { padding: 7px 6px; border-top: 1px solid rgba(197, 180, 108, 0.18); font-size: 0.9rem; }
+  .placar-3d .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 900; }
+  .placar-3d .quem { display: flex; align-items: center; gap: 8px; }
+  .placar-3d .quem img { width: 28px; height: 28px; border-radius: 50%; background: #1b110b; box-shadow: 0 0 0 2px var(--anel, #8c6a45); }
+  .placar-3d tr.vencedor td { color: #f5d28b; }
+  .placar-3d .espera { color: #cad6be; text-align: center; font-size: 0.84rem; padding: 10px 0 2px; }
+  .placar-acoes { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; padding: 10px 12px 12px; border-top: 1px solid rgba(197, 180, 108, 0.25); background: #0b1b16; }
+  .placar-acoes:empty { display: none; }
+  .placar-acoes .visor-acao { font-size: 0.84rem; padding: 9px 14px; }
 </style>
 <link rel="stylesheet" href="interface.css">
 <link rel="stylesheet" href="emotes.css">

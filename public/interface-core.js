@@ -5,11 +5,14 @@ export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export function layoutMao2D(quantidade, largura = 375) {
   const n = clamp(Math.floor(finite(quantidade, 0)), 0, 200);
   const util = Math.max(140, finite(largura, 375) - 36);
-  const carta = 60, altura = 84, minimo = 26;
+  // `carta` é a largura que o leque reserva por carta: a da CSS (66 px no
+  // celular) mais a folga de 4 px que o passo desconta — cartas maiores desde
+  // 08/10/2026, "fica muito pequeno para enxergar".
+  const carta = 70, altura = 96, minimo = 26;
   const porFileira = Math.max(2, Math.min(13, Math.floor((util - carta) / minimo) + 1));
   const fileiras = Math.max(1, Math.ceil(n / porFileira));
   const itensPorFila = Math.max(1, Math.ceil(n / fileiras));
-  const passo = itensPorFila > 1 ? Math.min(44, (util - carta) / (itensPorFila - 1)) : 0;
+  const passo = itensPorFila > 1 ? Math.min(50, (util - carta) / (itensPorFila - 1)) : 0;
   return { fileiras, itensPorFila, passo: Math.max(0, passo), carta, altura };
 }
 export function layoutMao3D({ quantidade, largura = 375, altura = 812, fov = 72, cartaL = 0.42, cartaA = 0.59 }) {

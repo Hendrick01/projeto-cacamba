@@ -25,7 +25,7 @@ import { GRADIENTE_TOON, M_CONTORNO, contornoDe, encaixaModelo, reage, criaBanqu
 import { planBaixada, isJoker, cardLabel, layoffOption, layoffEnds, trocasNaTrinca } from '/shared/engine.js';
 import { emoteDe, textoDoEmote } from '/shared/emotes.js';
 import { montaEmotes } from './emotes-ui.js';
-import { personagemValido, personagemDoAssento, peleDe } from '/shared/elenco.js';
+import { personagemValido, personagemDoAssento, peleDe, temExpressao } from '/shared/elenco.js';
 import { criaVoz } from '/voz.js';
 import { layoutMao3D, indiceInsercao3D } from '/interface-core.js';
 import { criaRigPrimeiraPessoa, defineGestoPrimeiraPessoa, atualizaRigPrimeiraPessoa } from '/primeira-pessoa-maos.js';
@@ -42,6 +42,7 @@ const semMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').match
 
 let ws = null;
 let view = null;
+let hostId = null;   // quem criou a sala: é quem avança a rodada e recomeça (vem no `lobby`)
 let sessao = null;
 try { sessao = JSON.parse(localStorage.getItem('cacamba-session')); } catch { /* ok */ }
 
@@ -57,6 +58,9 @@ function aviso(texto, fixo = false) {
 
 function sendAction(action) {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'action', action }));
+}
+function enviaAoServidor(msg) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
 }
 
 // Chat de voz — o mesmo módulo da mesa 2D. Aqui quem fala mexe a boca do boneco.
@@ -96,8 +100,12 @@ function conecta() {
       controlesVoz.presenca(view.players);
       for (const ev of msg.events || []) reageAoEvento(ev);
       sincroniza(primeira);
-    } else if (msg.t === 'lobby' && !msg.started) {
-      aviso('A partida ainda não começou — comece pela mesa normal.', true);
+    } else if (msg.t === 'lobby') {
+      // o anfitrião pode mudar no meio (o antigo caiu): o placar aberto ganha
+      // ou perde o botão de continuar na hora
+      hostId = msg.hostId;
+      if (!msg.started) aviso('A partida ainda não começou — comece pela mesa normal.', true);
+      else if (!placar.hidden) desenhaPlacar();
     } else if (msg.t === 'welcome') {
       tentouRestaurar = false;
       voz.reconectar?.();
@@ -1935,7 +1943,7 @@ function montaBotoes() {
   if (!view || !view.you) return;
   const minhaVez = view.turnId === me() && (view.phase === 'draw' || view.phase === 'play');
   if (view.phase === 'roundEnd' || view.phase === 'gameEnd') {
-    barra.appendChild(botao('Ver o placar na mesa normal', 'primario', () => { location.href = '/'; }));
+    barra.appendChild(botao(view.phase === 'gameEnd' ? '🏁 Resultado final' : '📋 Placar da rodada', 'primario', abrePlacar));
     return;
   }
   // o visor de jogos sempre à mão: na mesa cheia é por ele que se lê carta por
@@ -2128,6 +2136,118 @@ function desenhaVisor() {
   }
   const foco = corpo.querySelector('.foco');
   if (foco) foco.scrollIntoView({ block: 'nearest' });
+}
+
+// ---------------------------------------------------------------------------
+// O placar: fim de rodada e fim de jogo SEM sair da 3D. Até 08/10/2026 a barra
+// mandava para a mesa normal ("Ver o placar na mesa normal") e quem criou a
+// sala tinha de continuar a partida de lá — e depois voltar. Agora a caixa
+// abre aqui, com as mesmas contas da mesa 2D (showRoundEnd/showGameEnd), e o
+// anfitrião avança a rodada ou recomeça sem trocar de página.
+// ---------------------------------------------------------------------------
+
+const placar = document.createElement('div');
+placar.className = 'visor-jogos placar-3d';
+placar.hidden = true;
+placar.innerHTML = '<div class="visor-caixa" role="dialog" aria-label="Placar">'
+  + '<header><strong>Placar</strong><button class="visor-x" type="button">ver a mesa</button></header>'
+  + '<div class="visor-corpo"></div><footer class="placar-acoes"></footer></div>';
+document.body.appendChild(placar);
+placar.addEventListener('click', (e) => {
+  if (e.target === placar || e.target.classList.contains('visor-x')) fechaPlacar();
+});
+let placarMostrado = null;   // 'round-N' | 'gameEnd': abre uma vez por fase, como o modal da 2D
+let placarTimer = null;
+
+function fechaPlacar() { placar.hidden = true; }
+function abrePlacar() { clearTimeout(placarTimer); fechaVisor(); desenhaPlacar(); placar.hidden = false; }
+const caraDe = (slug) => `/assets/personagens/${slug}-avatar.svg`;
+// quem bateu aparece de corpo inteiro, com a cara feliz se o elenco tiver essa expressão
+function figuraFeliz(p) {
+  const slug = personagemDe(p);
+  return `/assets/personagens/${slug}-corpo-inteiro${temExpressao(slug, 'feliz') ? '-feliz' : ''}.svg`;
+}
+const nomeDe = (p) => (p.id === me() ? 'Você' : p.name);
+function linhaDoPlacar(p, texto, destaque, ...numeros) {
+  const tr = document.createElement('tr');
+  if (destaque) tr.className = 'vencedor';
+  const quem = document.createElement('td');
+  const caixa = document.createElement('span');
+  caixa.className = 'quem';
+  caixa.style.setProperty('--anel', CORES_DE_ASSENTO[assentoDe(p.id) % CORES_DE_ASSENTO.length]);
+  const img = document.createElement('img');
+  img.src = caraDe(personagemDe(p)); img.alt = ''; img.width = 28; img.height = 28;
+  const nome = document.createElement('span');
+  nome.textContent = texto;
+  caixa.append(img, nome);
+  quem.appendChild(caixa);
+  tr.appendChild(quem);
+  for (const v of numeros) { const td = document.createElement('td'); td.className = 'num'; td.textContent = v; tr.appendChild(td); }
+  return tr;
+}
+function acaoDoPlacar(txt, forte, fn) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'visor-acao' + (forte ? ' forte' : ''); b.textContent = txt; b.onclick = fn;
+  return b;
+}
+function palcoDe(p) {
+  const palco = document.createElement('div');
+  palco.className = 'palco';
+  const img = document.createElement('img');
+  img.src = figuraFeliz(p); img.alt = '';
+  palco.appendChild(img);
+  return palco;
+}
+function cabecalho(titulo, linha) {
+  const h2 = document.createElement('h2'); h2.textContent = titulo;
+  const sub = document.createElement('p'); sub.className = 'sub'; sub.textContent = linha;
+  return [h2, sub];
+}
+function desenhaPlacar() {
+  const corpo = placar.querySelector('.visor-corpo'), acoes = placar.querySelector('.placar-acoes');
+  corpo.textContent = ''; acoes.textContent = '';
+  if (!view) return;
+  const souAnfitriao = hostId === me();
+  const tabela = document.createElement('table');
+  const jogador = (id) => view.players.find((p) => p.id === id);
+  if (view.phase === 'roundEnd' && view.lastRound) {
+    const lr = view.lastRound;
+    const venceu = lr.winnerId ? jogador(lr.winnerId) : null;
+    if (venceu) corpo.appendChild(palcoDe(venceu));
+    corpo.append(...cabecalho(venceu ? `${nomeDe(venceu)} bateu!` : 'Monte esgotado — ninguém bateu',
+      `Rodada ${view.round + 1} de ${view.totalRounds} · ${view.contract ? view.contract.label : ''}`));
+    tabela.innerHTML = '<tr><th>Jogador</th><th style="text-align:right">Rodada</th><th style="text-align:right">Total</th></tr>';
+    for (const p of view.players) {
+      const pts = lr.scores?.[p.id];
+      tabela.appendChild(linhaDoPlacar(p, `${lr.winnerId === p.id ? '🏆 ' : ''}${nomeDe(p)}`, lr.winnerId === p.id, pts == null ? '' : `+${pts}`, p.score));
+    }
+    corpo.appendChild(tabela);
+    const ultima = view.round + 1 >= view.totalRounds;
+    if (souAnfitriao) acoes.appendChild(acaoDoPlacar(ultima ? 'Ver resultado final' : 'Próxima rodada', true, () => enviaAoServidor({ t: 'nextRound' })));
+    else { const e = document.createElement('p'); e.className = 'espera'; e.textContent = 'Esperando o anfitrião continuar…'; corpo.appendChild(e); }
+  } else if (view.phase === 'gameEnd' && view.ranking?.length) {
+    const medalhas = ['🥇', '🥈', '🥉', '🏳️'];
+    const campeao = jogador(view.ranking[0].id);
+    if (campeao) corpo.appendChild(palcoDe(campeao));
+    corpo.append(...cabecalho('Fim de jogo!', 'Menos pontos ganha — cartas na mão contam contra você.'));
+    tabela.innerHTML = '<tr><th>Jogador</th><th style="text-align:right">Pontos</th></tr>';
+    view.ranking.forEach((r, i) => {
+      const p = jogador(r.id) || r;
+      tabela.appendChild(linhaDoPlacar(p, `${medalhas[i] || ''} ${nomeDe(p)}`, i === 0, r.score));
+    });
+    corpo.appendChild(tabela);
+    if (souAnfitriao) acoes.appendChild(acaoDoPlacar('Jogar de novo', true, () => enviaAoServidor({ t: 'playAgain' })));
+    acoes.appendChild(acaoDoPlacar('Sair da sala', false, () => {
+      try { localStorage.removeItem('cacamba-session'); localStorage.removeItem('cacamba-selo'); } catch { /* modo privado */ }
+      location.href = '/';
+    }));
+  } else {
+    // no meio da rodada: só os totais, do melhor para o pior
+    corpo.append(...cabecalho('Placar', `Rodada ${view.round + 1} de ${view.totalRounds} · menos pontos ganha`));
+    tabela.innerHTML = '<tr><th>Jogador</th><th style="text-align:right">Pontos</th></tr>';
+    for (const p of [...view.players].sort((a, b) => a.score - b.score)) tabela.appendChild(linhaDoPlacar(p, nomeDe(p), false, p.score));
+    corpo.appendChild(tabela);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2436,6 +2556,13 @@ async function sincroniza(primeira) {
     }
     montaBotoes();
     if (!visor.hidden) desenhaVisor();   // com o visor aberto, ele segue a mesa
+    // fim de rodada ou de jogo: o placar abre aqui mesmo, uma vez por fase — com
+    // um fôlego, para a comemoração de quem bateu aparecer na mesa antes
+    if (view.phase === 'roundEnd' || view.phase === 'gameEnd') {
+      const chave = view.phase === 'gameEnd' ? 'gameEnd' : `round-${view.round}`;
+      if (placarMostrado !== chave) { placarMostrado = chave; clearTimeout(placarTimer); placarTimer = setTimeout(abrePlacar, primeira ? 0 : 1400); }
+      else if (!placar.hidden) desenhaPlacar();
+    } else if (placarMostrado) { placarMostrado = null; clearTimeout(placarTimer); fechaPlacar(); }
 
     // aviso da vez
     if (view.phase === 'draw' || view.phase === 'play') {
@@ -2446,9 +2573,9 @@ async function sincroniza(primeira) {
         aviso(`Vez de ${dono ? dono.name : '…'}`, true);
       }
     } else if (view.phase === 'roundEnd') {
-      aviso('Fim da rodada — o placar está na mesa normal.', true);
+      aviso('Fim da rodada.', true);
     } else if (view.phase === 'gameEnd') {
-      aviso('Fim de jogo! O resultado está na mesa normal.', true);
+      aviso('Fim de jogo!', true);
     }
   } finally {
     sincronizando = false;
@@ -2474,6 +2601,17 @@ function reageAoEvento(ev) {
   if (ev.e === 'roundStart') {
     ordemManual = []; selecionadas.clear();
     jogosVistos.clear();
+    // os ids das cartas RECOMEÇAM a cada rodada (buildDecks): a malha da carta
+    // 7 da rodada passada seria reaproveitada para outra carta 7, e o topo do
+    // meio com o mesmo id ficaria com a cara velha. Some tudo o que é guardado
+    // por id — a rodada nova começa de mesa limpa, como ao abrir a página.
+    terminaGestoPinca(); jogadaMinha = null;
+    for (const mesh of cartasDaMao.values()) {
+      for (let i = voos.length - 1; i >= 0; i--) if (voos[i].obj === mesh) voos.splice(i, 1);
+      maoGrupo.remove(mesh); mesh.material.dispose();
+    }
+    cartasDaMao.clear();
+    descarte.topoId = undefined;
     // distribuir: três cartas viradas por assento saem do monte, escalonadas —
     // as de verdade não vão (com oito na mesa seriam quase cem), como na 2D
     if (!semMovimento) {
@@ -2873,7 +3011,7 @@ montaEmotes({
 });
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
-window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, maos, get rigMaos() { return rigMaos; },
+window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, abrePlacar, acao: sendAction, maos, get rigMaos() { return rigMaos; },
   // Diagnóstico: ler a visão atual e injetar uma sintética (oito jogadores com
   // três jogos cada, por exemplo) sem esperar a sorte das cartas numa partida.
   get view() { return view; }, previa(v) { view = v; return sincroniza(false); }, presencas, get presencaOlha() { return presencaOlha; },

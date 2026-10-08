@@ -82,6 +82,7 @@ function connect() {
     if (event.code === 4001 || event.code === 1008) {
       voz.desligar();
       toast(event.code === 4001 ? 'Partida aberta em outra janela. Recarregue para voltar aqui.' : 'Conexão pausada por excesso de mensagens. Aguarde e recarregue.');
+      if (!$('screen-retomando').hidden) showScreen('home');
       return;
     }
     setTimeout(connect, reconnectDelay);
@@ -201,7 +202,7 @@ function avisaVersaoNova() {
 // ---------------- Telas ----------------
 
 function showScreen(name) {
-  for (const s of ['home', 'avatar', 'loja', 'lobby', 'game']) $(`screen-${s}`).hidden = s !== name;
+  for (const s of ['home', 'retomando', 'avatar', 'loja', 'lobby', 'game']) $(`screen-${s}`).hidden = s !== name;
 }
 
 const me = () => session?.playerId;
@@ -1448,8 +1449,8 @@ function marcaCartasNovas() {
 // O leque da sua mão. O passo entre as cartas é calculado, não fixo: a rodada
 // 7 dá 12 cartas e um passo fixo estouraria a largura do celular; com poucas
 // cartas, o mesmo passo deixaria o leque frouxo demais.
-const CARTA_LARGURA = 56;
-const CARTA_ALTURA = 78;
+const CARTA_LARGURA = 66;
+const CARTA_ALTURA = 92;
 const PASSO_MAXIMO = 40;
 const PASSO_MINIMO = 20;
 const ABERTURA = 16;          // graus de ponta a ponta
@@ -1493,13 +1494,13 @@ function montaLeque(fila, cartas, largura) {
   // leque precisa da largura, e mão cheia cobrindo as próprias mãos é o que
   // acontece de verdade. O que o giro empurra para fora entra na conta uma
   // vez, aqui — é isso que faz a folga ser a da tela e não a do papel.
-  const { passo } = layoutMao2D(n, largura || 355);
+  const { passo, carta } = layoutMao2D(n, largura || 355);
   const meio = (n - 1) / 2;
 
   cartas.forEach((card, i) => {
     const el = cardEl(card);
     el.dataset.cardId = card.id;
-    el.style.setProperty('--passo', `${passo - 60}px`);
+    el.style.setProperty('--passo', `${passo - carta}px`);
     el.style.setProperty('--giro', n > 1 ? `${(i - meio) * (8 / (n - 1))}deg` : '0deg');
     el.setAttribute('role','button'); el.tabIndex = 0;
     el.setAttribute('aria-label', cardText(card));
@@ -2321,7 +2322,12 @@ function escapeHTML(s) {
 
 // ---------------- Início ----------------
 
-showScreen('home');
+// Com sessão guardada a página abre na ESPERA, não na tela inicial: quem volta
+// da mesa 3D (ou recarrega) via o formulário de início piscar até a partida
+// chegar pela conexão — "jogado para a tela de início" (usuário, 08/10/2026).
+// Se a partida não vier em 8 s, aí sim a tela inicial.
+showScreen(session ? 'retomando' : 'home');
 connect();
+if (session) setTimeout(() => { if (!$('screen-retomando').hidden) showScreen('home'); }, 8000);
 
 // interface-2026-09-07-r1
