@@ -584,10 +584,10 @@ function robosReagem(room, events) {
   const ehRobo = (id) => !!room.players.find((p) => p.id === id && p.isBot);
   for (const ev of events) {
     if (ev.e === 'roundEnd' && ev.reason === 'bateu') {
-      if (ehRobo(ev.winnerId)) roboFala(room, Math.random() < 0.5 ? 'joinha' : 'valeu', ev.winnerId);
-      else if (Math.random() < 0.7) roboFala(room, Math.random() < 0.5 ? 'palmas' : 'boa');
-    } else if (ev.e === 'claimVoid' && ehRobo(ev.p) && Math.random() < 0.5) roboFala(room, 'ai-nao', ev.p);
-    else if (ev.e === 'baixou' && ev.completa && !ehRobo(ev.p) && Math.random() < 0.35) roboFala(room, 'boa');
+      if (ehRobo(ev.winnerId)) roboFala(room, Math.random() < 0.5 ? 'joinha' : 'muito-bem', ev.winnerId);
+      else if (Math.random() < 0.7) roboFala(room, Math.random() < 0.5 ? 'palmas' : 'nojo');
+    } else if (ev.e === 'claimVoid' && ehRobo(ev.p) && Math.random() < 0.5) roboFala(room, 'perdao', ev.p);
+    else if (ev.e === 'baixou' && ev.completa && !ehRobo(ev.p) && Math.random() < 0.35) roboFala(room, 'quer-tudo');
     else if (ev.e === 'buy' && ehRobo(ev.p) && Math.random() < 0.25) roboFala(room, 'pisca', ev.p);
   }
 }

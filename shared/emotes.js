@@ -18,11 +18,11 @@ export const EMOTES = [
 export const FRASES = [
   { k: 'bora', texto: 'Bora!' },
   { k: 'demora', texto: 'Demora demais…' },
-  { k: 'boa', texto: 'Boa jogada!', humor: 'feliz' },
-  { k: 'ai-nao', texto: 'Aí não…', humor: 'bravo' },
-  { k: 'quase', texto: 'Tô quase batendo' },
-  { k: 'calma', texto: 'Calma aí' },
-  { k: 'valeu', texto: 'Valeu!', humor: 'feliz' },
+  { k: 'quer-tudo', texto: 'Quer tudo também' },
+  { k: 'faz-certo', texto: 'Faz as coisa certo…', humor: 'bravo' },
+  { k: 'muito-bem', texto: 'Muito que bem mesmo', humor: 'feliz' },
+  { k: 'perdao', texto: 'Perdão?', humor: 'bravo' },
+  { k: 'nojo', texto: 'Nojo!', humor: 'feliz' },
   { k: 'kkk', texto: 'Kkkkk', humor: 'feliz' },
 ];
 const POR_CHAVE = new Map([...EMOTES, ...FRASES].map((e) => [e.k, e]));

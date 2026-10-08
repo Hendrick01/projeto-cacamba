@@ -38,6 +38,6 @@ test('JSON nulo, arrays e ações sem estrutura não chegam ao motor', () => {
   for (const m of [{t:'nivelRobos',nivel:'facil'}, {t:'nivelRobos',nivel:'normal'}]) assert.ok(validMessage(m));
   for (const m of [{t:'nivelRobos'}, {t:'nivelRobos',nivel:'impossivel'}, {t:'nivelRobos',nivel:1}]) assert.equal(validMessage(m), false);
   // emote: só uma chave curta de catálogo — nada de texto livre
-  for (const m of [{t:'emote',k:'joinha'}, {t:'emote',k:'ai-nao'}, {t:'emote',k:'kkk'}]) assert.ok(validMessage(m), JSON.stringify(m));
+  for (const m of [{t:'emote',k:'joinha'}, {t:'emote',k:'faz-certo'}, {t:'emote',k:'kkk'}]) assert.ok(validMessage(m), JSON.stringify(m));
   for (const m of [{t:'emote'}, {t:'emote',k:''}, {t:'emote',k:'Bora!'}, {t:'emote',k:'a'.repeat(25)}, {t:'emote',k:7}, {t:'emote',k:'<b>oi</b>'}, {t:'emote',k:['joinha']}]) assert.equal(validMessage(m), false, JSON.stringify(m));
 });

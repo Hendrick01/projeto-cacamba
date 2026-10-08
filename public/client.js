@@ -2303,7 +2303,7 @@ function showRules() {
      <p>Quando alguém descarta, os outros jogadores podem pedir a carta: leva <strong>quem apertar primeiro</strong>, e ele fica só com a carta pedida (não puxa nem descarta). Mas <strong>quem está na vez tem preferência</strong> sobre todos — se ele também quiser a carta, ela é dele.</p>
      <p><strong>Quem descartou não pede de volta:</strong> a carta que saiu da sua mão não volta para ela, nem pela compra da vez nem pelo pedido. Numa mesa de dois isso quer dizer que a compra fora da vez não acontece — o único que não está na vez é justamente quem acabou de descartar.</p>
      <h3>Falar sem microfone</h3>
-     <p>O botão <strong>💬</strong> abre emotes e frases prontas (“Bora!”, “Demora demais…”, “Boa jogada!”). O balão aparece em cima de você para todo mundo da mesa. O <strong>🎙</strong> liga o chat de voz.</p>
+     <p>O botão <strong>💬</strong> abre emotes e frases prontas (“Bora!”, “Demora demais…”, “Nojo!”). O balão aparece em cima de você para todo mundo da mesa. O <strong>🎙</strong> liga o chat de voz.</p>
      <h3>Na mesa 3D</h3>
      <p><strong>Toque num jogador</strong> para virar e olhar para ele; toque de novo, ou no tampo, para voltar à mesa. <strong>Arraste o fundo</strong> e a cabeça segue o dedo. Os outros veem a sua cabeça virar. Toque num jogo do tampo para ver as cartas de perto e encaixar.</p>
      <h3>Se a conexão cair</h3>
