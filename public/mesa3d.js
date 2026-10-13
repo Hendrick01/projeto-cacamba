@@ -1571,6 +1571,10 @@ const PEITO_NO_ASSENTO = new THREE.Vector3(0, 1.0, 0.12);
 // a carta que a mão carrega: nasce do tamanho das do leque dele e cresce até o
 // das do tampo pelo caminho (e encolhe na volta, quando compra)
 const ESCALA_CARTA_SOLTA = { leque: 0.26, tampo: 0.5 };
+// A mão solta: 'cheia' (pele, manga e aros, opaca), 'fantasma' (só a pele,
+// translúcida: lê como indicação do gesto e não como terceira mão) ou
+// 'desligada' (fica tudo pronto, sem aparecer). Decisão do dono do jogo.
+let MAO_SOLTA = { modo: 'fantasma', opacidade: 0.55 };
 const maosSoltas = new Map();          // playerId → { slug, raiz, materiais }
 const escoltas = [];                   // gestos em curso
 // a carta passageira vista pelas costas: a mão a segura de frente para o dono
@@ -1593,6 +1597,8 @@ function maoSoltaDe(playerId, slug) {
     raiz.userData.corte = new THREE.Plane(); pele.clippingPlanes = [raiz.userData.corte]; renderer.localClippingEnabled = true;
     raiz.traverse((o) => { if (o.isMesh) { o.material = pele; o.frustumCulled = false; } });
     raiz.add(montaBraco(raiz, 'Right', base, slug));
+    // a fantasma vai só de pele: manga e aros são identidade demais para um vulto
+    if (MAO_SOLTA.modo === 'fantasma') raiz.traverse((o) => { if (o.isMesh && o.material !== pele && o.material !== base && o.material.color && !o.material.alphaMap) o.visible = false; });
     // tudo esmaece junto na entrada e na saída: pele, junta, antebraço, manga, aros
     const vistos = new Set();
     raiz.traverse((o) => { if (o.isMesh && !vistos.has(o.material)) { vistos.add(o.material); o.material.transparent = true; o.material.depthWrite = true; m.materiais.push(o.material); } });
@@ -1612,7 +1618,7 @@ const peitoDe = (a) => a.grupo.localToWorld(PEITO_NO_ASSENTO.clone());
 // do meio ou do tampo pode aparecer.
 function escolta(playerId, { de, para, dur = 520, buscar = false, aoFim = null } = {}) {
   const a = assentos.get(playerId);
-  if (!a || semMovimento || !de || !para) return null;
+  if (!a || semMovimento || !de || !para || MAO_SOLTA.modo === 'desligada') return null;
   const p = (view?.players || []).find((x) => x.id === playerId);
   if (!p) return null;
   const m = maoSoltaDe(playerId, personagemDe(p));
@@ -1701,7 +1707,7 @@ function animaMaosSoltas(t) {
     // o antebraço desce para o cotovelo dele, comprido o bastante para quase chegar
     const comp = THREE.MathUtils.clamp(e.cotovelo.distanceTo(_alvoEsc) / ESCALA_MAO_SOLTA, COMPRIMENTO_ANTEBRACO, 1.5);
     dobraOAntebracoAte(raiz, e.cotovelo, comp);
-    for (const mat of e.m.materiais) mat.opacity = alpha;
+    for (const mat of e.m.materiais) mat.opacity = alpha * (MAO_SOLTA.modo === 'fantasma' ? MAO_SOLTA.opacidade : 1);
     raiz.visible = alpha > 0;
   }
 }
@@ -3200,7 +3206,7 @@ montaEmotes({
 });
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
-window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, abrePlacar, acao: sendAction, gesto: gestoSolto, get escoltas() { return escoltas.length; }, maos, get rigMaos() { return rigMaos; },
+window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, abrePlacar, acao: sendAction, gesto: gestoSolto, get escoltas() { return escoltas.length; }, get maoSolta() { return MAO_SOLTA; }, set maoSolta(v) { MAO_SOLTA = { ...MAO_SOLTA, ...v }; for (const m of maosSoltas.values()) if (m.raiz) { scene.remove(m.raiz); } maosSoltas.clear(); }, maos, get rigMaos() { return rigMaos; },
   // Diagnóstico: ler a visão atual e injetar uma sintética (oito jogadores com
   // três jogos cada, por exemplo) sem esperar a sorte das cartas numa partida.
   get view() { return view; }, previa(v) { view = v; return sincroniza(false); }, presencas, get presencaOlha() { return presencaOlha; },
