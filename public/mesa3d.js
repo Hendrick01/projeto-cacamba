@@ -1573,8 +1573,11 @@ const PEITO_NO_ASSENTO = new THREE.Vector3(0, 1.0, 0.12);
 const ESCALA_CARTA_SOLTA = { leque: 0.26, tampo: 0.5 };
 // A mão solta: 'cheia' (pele, manga e aros, opaca), 'fantasma' (só a pele,
 // translúcida: lê como indicação do gesto e não como terceira mão) ou
-// 'desligada' (fica tudo pronto, sem aparecer). Decisão do dono do jogo.
-let MAO_SOLTA = { modo: 'fantasma', opacidade: 0.55 };
+// 'desligada' (fica tudo pronto, sem aparecer). Decisão do dono do jogo em
+// 13/10/2026: DESLIGADA até chegarem as esculturas com a mão direita livre —
+// com as duas mãos da escultura no leque, qualquer mão a mais é uma terceira.
+// Quando os modelos novos entrarem, ligar em 'cheia' e esconder a direita deles.
+let MAO_SOLTA = { modo: 'desligada', opacidade: 0.55 };
 const maosSoltas = new Map();          // playerId → { slug, raiz, materiais }
 const escoltas = [];                   // gestos em curso
 // a carta passageira vista pelas costas: a mão a segura de frente para o dono
