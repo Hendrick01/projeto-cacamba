@@ -1346,9 +1346,9 @@ function montaBraco(raiz, lado, materialPele, slug) {
     curvos.push({ mesh, rPunho, rCotovelo, tIni });
     return mesh;
   };
-  const geoCurva = (rPunho, rCotovelo, tIni, dir) => {
-    const P1 = new THREE.Vector3(0, L * 0.3, 0);
-    const curva = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), P1, P1.clone().addScaledVector(dir, L * 0.7));
+  const geoCurva = (rPunho, rCotovelo, tIni, dir, comp = L) => {
+    const P1 = new THREE.Vector3(0, comp * 0.3, 0);
+    const curva = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), P1, P1.clone().addScaledVector(dir, comp * 0.7));
     const N = 26, R = 16, q = curva.computeFrenetFrames(N, false);
     // o quadro inicial gira para o eixo maior ficar em +X (o da boca)
     const phi = Math.atan2(q.normals[0].z, q.normals[0].x);
@@ -1377,7 +1377,7 @@ function montaBraco(raiz, lado, materialPele, slug) {
   };
   if (lado === 'Right') {
     braco.add(tuboCurvo(1.0, 1.18, 0, pele));
-    braco.userData.refaz = (dir) => { for (const c of curvos) { c.mesh.geometry.dispose(); c.mesh.geometry = geoCurva(c.rPunho, c.rCotovelo, c.tIni, dir); } };
+    braco.userData.refaz = (dir, comp) => { for (const c of curvos) { c.mesh.geometry.dispose(); c.mesh.geometry = geoCurva(c.rPunho, c.rCotovelo, c.tIni, dir, comp); } };
     braco.userData.refaz(new THREE.Vector3(0, 1, 0));
   } else {
     braco.add(tubo(1.0, 1.18, L, 0, pele));
@@ -1518,6 +1518,22 @@ function dobraOAntebraco(raiz) {
   carneGrupo.localToWorld(_pA); carneGrupo.localToWorld(_pB);
   braco.worldToLocal(_pA); braco.worldToLocal(_pB);
   _dCot.subVectors(_pB, _pA).normalize();
+  aplicaDobra(raiz, braco, boca);
+}
+// a mesma dobra, mas rumo a um PONTO do mundo (o ombro do adversário, na mão
+// solta), com o comprimento do antebraço pedido na escala da mão
+function dobraOAntebracoAte(raiz, alvoMundo, comp) {
+  const braco = raiz.getObjectByName('BracoRight');
+  const boca = braco?.userData.boca;
+  if (!boca || !braco.userData.refaz) return;
+  raiz.updateWorldMatrix(true, true);
+  _pA.set(0, 0, 0); braco.localToWorld(_pA);
+  _pB.copy(alvoMundo);
+  braco.worldToLocal(_pA); braco.worldToLocal(_pB);
+  _dCot.subVectors(_pB, _pA).normalize();
+  aplicaDobra(raiz, braco, boca, comp);
+}
+function aplicaDobra(raiz, braco, boca, comp) {
   // a virada, limitada: o tubo sai pelo eixo do toco e curva até esta direção
   const virada = Math.acos(THREE.MathUtils.clamp(_dCot.y, -1, 1));
   if (virada > VIRADA_MAXIMA_DO_PUNHO) {
@@ -1525,13 +1541,168 @@ function dobraOAntebraco(raiz) {
     if (_eixoVirada.lengthSq() < 1e-8) _eixoVirada.set(1, 0, 0); else _eixoVirada.normalize();
     _dCot.copy(_Y).applyAxisAngle(_eixoVirada, VIRADA_MAXIMA_DO_PUNHO);
   }
-  braco.userData.refaz(_dCot);
+  braco.userData.refaz(_dCot, comp);
   // o corte no punho, no espaço do mundo (os planos de recorte do three.js
   // vivem lá): fica o lado dos dedos, some o toco
   if (raiz.userData.corte && boca.corte != null) {
     _pCorte.copy(boca.P).addScaledVector(boca.u, boca.corte); raiz.localToWorld(_pCorte);
     _nCorte.copy(boca.u).negate().transformDirection(raiz.matrixWorld);
     raiz.userData.corte.setFromNormalAndCoplanarPoint(_nCorte, _pCorte);
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// A MÃO SOLTA DO ADVERSÁRIO (12/10/2026, "caminho 1"). As esculturas do elenco
+// seguram o leque com as duas mãos fundidas na malha, e nenhum rig move esse
+// braço sem rasgar a membrana entre as mãos (ver elenco-pescoco-e-gestos).
+// Até chegarem modelos com a direita livre, o gesto que os outros veem é
+// este: a mesma mão da pinça, na pele e na manga do personagem, nasce junto
+// do leque dele, vai buscar a carta no monte (ou leva a dele ao meio e ao
+// tampo) e se desfaz. É o princípio do Capote — a jogada se vê no braço de
+// quem joga — sem tocar na escultura. O antebraço aponta para o ombro dele e
+// se esvai antes de chegar, como o seu em primeira pessoa.
+// ---------------------------------------------------------------------------
+const ESCALA_MAO_SOLTA = 0.18;         // mão de ~17 cm: o elenco é de tamanho real, um pouco estilizado
+// o cotovelo direito dele, sentado, no quadro do assento (x negativo é a direita
+// de quem olha para a mesa): o antebraço da mão solta desce para cá
+const COTOVELO_NO_ASSENTO = new THREE.Vector3(-0.26, 0.7, 0.2);
+const PEITO_NO_ASSENTO = new THREE.Vector3(0, 1.0, 0.12);
+// a carta que a mão carrega: nasce do tamanho das do leque dele e cresce até o
+// das do tampo pelo caminho (e encolhe na volta, quando compra)
+const ESCALA_CARTA_SOLTA = { leque: 0.26, tampo: 0.5 };
+const maosSoltas = new Map();          // playerId → { slug, raiz, materiais }
+const escoltas = [];                   // gestos em curso
+// a carta passageira vista pelas costas: a mão a segura de frente para o dono
+const materialVersoDuplo = (() => { const m = materialVerso.clone(); m.side = THREE.DoubleSide; return m; })();
+
+function maoSoltaDe(playerId, slug) {
+  let m = maosSoltas.get(playerId);
+  if (m && m.slug === slug) return m;
+  if (m?.raiz) { scene.remove(m.raiz); for (const mat of m.materiais) mat.dispose(); }
+  m = { slug, raiz: null, materiais: [] };
+  maosSoltas.set(playerId, m);
+  // um arquivo por assento (o navegador guarda o download): cada mão tem a
+  // própria pele, manga e aros, e o esqueleto posado vem junto
+  carregadorGLTF.load('/models/mao-fp-dir.glb', (gltf) => {
+    if (maosSoltas.get(playerId) !== m) return;
+    const raiz = gltf.scene;
+    // toon, como o elenco em volta: é a mão DELE, no sombreamento dele
+    const base = new THREE.MeshToonMaterial({ color: new THREE.Color(identidadeDaMao(slug).pele), gradientMap: GRADIENTE_TOON });
+    const pele = base.clone();
+    raiz.userData.corte = new THREE.Plane(); pele.clippingPlanes = [raiz.userData.corte]; renderer.localClippingEnabled = true;
+    raiz.traverse((o) => { if (o.isMesh) { o.material = pele; o.frustumCulled = false; } });
+    raiz.add(montaBraco(raiz, 'Right', base, slug));
+    // tudo esmaece junto na entrada e na saída: pele, junta, antebraço, manga, aros
+    const vistos = new Set();
+    raiz.traverse((o) => { if (o.isMesh && !vistos.has(o.material)) { vistos.add(o.material); o.material.transparent = true; o.material.depthWrite = true; m.materiais.push(o.material); } });
+    raiz.visible = false;
+    scene.add(raiz);
+    m.raiz = raiz;
+  }, undefined, (e) => console.info(`mão solta: ${e.message} — o gesto fica só com a carta`));
+  return m;
+}
+
+const cotoveloDe = (a) => a.grupo.localToWorld(COTOVELO_NO_ASSENTO.clone());
+const peitoDe = (a) => a.grupo.localToWorld(PEITO_NO_ASSENTO.clone());
+
+// Um gesto: `buscar` = vai vazia até `para` e volta com a carta (comprar);
+// senão leva a carta de `de` a `para` e a solta lá (descartar, baixar,
+// encaixar). `aoFim` roda quando a carta é solta — é quando a carta de verdade
+// do meio ou do tampo pode aparecer.
+function escolta(playerId, { de, para, dur = 520, buscar = false, aoFim = null } = {}) {
+  const a = assentos.get(playerId);
+  if (!a || semMovimento || !de || !para) return null;
+  const p = (view?.players || []).find((x) => x.id === playerId);
+  if (!p) return null;
+  const m = maoSoltaDe(playerId, personagemDe(p));
+  const carta = new THREE.Mesh(geoCarta, materialVersoDuplo);
+  carta.scale.setScalar(ESCALA_CARTA_SOLTA.leque); carta.visible = false;
+  scene.add(carta);
+  const { leque, tampo } = ESCALA_CARTA_SOLTA;
+  const tramos = buscar
+    ? [{ de: de.clone(), para: para.clone(), dur: dur * 0.42, carta: false, escala: [tampo, tampo] }, { de: para.clone(), para: de.clone(), dur: dur * 0.58, carta: true, escala: [tampo, leque] }]
+    : [{ de: de.clone(), para: para.clone(), dur, carta: true, escala: [leque, tampo] }];
+  const e = { a, m, carta, tramos, t0: performance.now(), aoFim, feito: false, soltouEm: 0, cotovelo: cotoveloDe(a), peito: peitoDe(a) };
+  escoltas.push(e);
+  return e;
+}
+
+// o mesmo gesto pela banca (`mesa3d.gesto(id, tipo)`) e pelos eventos
+function gestoSolto(playerId, tipo, { dur } = {}) {
+  const a = assentos.get(playerId);
+  if (!a) return null;
+  const leque = lequeDe(a).add(_ladoEsc.set(-1, 0, 0).transformDirection(a.grupo.matrixWorld).multiplyScalar(0.14)).add(_alvoEsc.set(0, -0.05, 0.04));
+  if (tipo === 'comprar') return escolta(playerId, { de: leque, para: topoDoMonte(), buscar: true, dur: dur || 760 });
+  if (tipo === 'meio') return escolta(playerId, { de: leque, para: descarte.grupo.position.clone().setY(MESA_TOPO + 0.06), buscar: true, dur: dur || 760 });
+  if (tipo === 'descartar') return escolta(playerId, { de: leque, para: descarte.grupo.position.clone().setY(MESA_TOPO + 0.1), dur: dur || 520 });
+  if (tipo === 'baixar') {
+    const frente = a.naBeirada.localToWorld(new THREE.Vector3(0, MESA_TOPO + 0.1, 0.45));
+    return escolta(playerId, { de: leque, para: frente, dur: dur || 520 });
+  }
+  return null;
+}
+
+const _vEsc = new THREE.Vector3(), _qEsc = new THREE.Quaternion(), _qInclina = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -0.3);
+const _upEsc = new THREE.Vector3(), _paraCorpo = new THREE.Vector3(), _mEsc = new THREE.Matrix4(), _alvoEsc = new THREE.Vector3(), _Ycima = new THREE.Vector3(0, 1, 0);
+// A PEGA É PELO LADO. A pose do arquivo pega a carta pela borda de CIMA, de
+// frente para quem olha (é a sua pinça). Vista de fora, uma mão pendurada no
+// alto da carta fica na altura da cara e o antebraço cruza o rosto. Rolando o
+// quadro da carta 90° a mesma pose pega a borda da DIREITA dele, na altura do
+// peito, e o punho sai para baixo — rumo ao cotovelo, como um braço sentado.
+const _qRola = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
+const _qPega = new THREE.Quaternion(), _ladoEsc = new THREE.Vector3();
+// a carta do modelo (CARTA_NO_MODELO de largura, na escala da mão) é menor que
+// a passageira: o plano do modelo anda para o lado até as bordas coincidirem
+const andaAPega = (escalaCarta) => (CARTA_L / 2) * escalaCarta - (CARTA_A / 2) * (CARTA_NO_MODELO / CARTA_L) * ESCALA_MAO_SOLTA;
+
+function animaMaosSoltas(t) {
+  for (let i = escoltas.length - 1; i >= 0; i--) {
+    const e = escoltas[i];
+    let dt = t - e.t0, tramo = null;
+    // a página ficou escondida (o quadro não roda) e o gesto venceu há muito:
+    // some sem animar, mas o que ele devia liberar (a carta do meio) é liberado
+    if (dt > e.tramos.reduce((s, tr) => s + tr.dur, 0) + 2500) {
+      if (!e.feito) { e.feito = true; e.aoFim?.(); }
+      escoltas.splice(i, 1); scene.remove(e.carta); if (e.m.raiz) e.m.raiz.visible = false; continue;
+    }
+    for (const tr of e.tramos) { if (dt <= tr.dur) { tramo = tr; break; } dt -= tr.dur; }
+    let alpha;
+    if (tramo) {
+      const k = suaveGesto(Math.max(0, dt / tramo.dur));
+      _vEsc.lerpVectors(tramo.de, tramo.para, k);
+      _vEsc.y += Math.sin(k * Math.PI) * 0.06;
+      e.carta.visible = tramo.carta;
+      e.carta.scale.setScalar(tramo.escala[0] + (tramo.escala[1] - tramo.escala[0]) * k);
+      alpha = Math.min(1, (t - e.t0) / 140);
+    } else {
+      // percurso feito: solta a carta e esmaece recuando um palmo
+      if (!e.feito) { e.feito = true; e.soltouEm = t; e.carta.visible = false; e.aoFim?.(); }
+      const s = Math.min(1, (t - e.soltouEm) / 200);
+      const ult = e.tramos.at(-1);
+      _vEsc.lerpVectors(ult.para, ult.de, s * 0.12);
+      alpha = 1 - s;
+      if (s >= 1) { escoltas.splice(i, 1); scene.remove(e.carta); if (e.m.raiz) e.m.raiz.visible = false; continue; }
+    }
+    // a carta de frente para o dono (o verso para a mesa), um pouco inclinada
+    // para trás: assim o punho sai pela direita DELE, como a pinça pela sua
+    _paraCorpo.subVectors(e.peito, _vEsc); _paraCorpo.y = 0;
+    if (_paraCorpo.lengthSq() < 1e-6) _paraCorpo.set(0, 0, 1);
+    _paraCorpo.normalize();
+    _mEsc.lookAt(_alvoEsc.copy(_vEsc).add(_paraCorpo), _vEsc, _Ycima);
+    _qEsc.setFromRotationMatrix(_mEsc).multiply(_qInclina);
+    e.carta.position.copy(_vEsc); e.carta.quaternion.copy(_qEsc);
+    const raiz = e.m.raiz;
+    if (!raiz) continue;
+    _ladoEsc.set(1, 0, 0).applyQuaternion(_qEsc);          // a direita DELE, no plano da carta
+    _alvoEsc.copy(_vEsc).addScaledVector(_ladoEsc, andaAPega(e.carta.scale.x));
+    _qPega.copy(_qEsc).multiply(_qRola);
+    encaixaPeloPlano(raiz, _alvoEsc, _qPega, ESCALA_MAO_SOLTA);
+    // o antebraço desce para o cotovelo dele, comprido o bastante para quase chegar
+    const comp = THREE.MathUtils.clamp(e.cotovelo.distanceTo(_alvoEsc) / ESCALA_MAO_SOLTA, COMPRIMENTO_ANTEBRACO, 1.5);
+    dobraOAntebracoAte(raiz, e.cotovelo, comp);
+    for (const mat of e.m.materiais) mat.opacity = alpha;
+    raiz.visible = alpha > 0;
   }
 }
 
@@ -2266,7 +2437,10 @@ async function sincroniza(primeira) {
     const outros = view.players.filter((p) => p.id !== me());
     ajustaCameraParaAssentos(outros.length);
     for (const [id, a] of assentos) {
-      if (!outros.some((p) => p.id === id)) { scene.remove(a.grupo); scene.remove(a.naBeirada); assentos.delete(id); }
+      if (!outros.some((p) => p.id === id)) {
+        scene.remove(a.grupo); scene.remove(a.naBeirada); assentos.delete(id);
+        const ms = maosSoltas.get(id); if (ms?.raiz) scene.remove(ms.raiz); maosSoltas.delete(id);
+      }
     }
     for (let i = 0; i < outros.length; i++) {
       const p = outros[i];
@@ -2367,7 +2541,12 @@ async function sincroniza(primeira) {
         face.userData.alvo = face.position.clone();
         if (!semMovimento && descarteDe) {
           const a = assentos.get(descarteDe);
-          if (a?.assento?.modelo) {
+          const solta = a && !temGesto(a) ? gestoSolto(descarteDe, 'descartar') : null;
+          if (solta) {
+            // a mão solta dele traz a carta: a do meio só aparece quando ela chega
+            face.visible = false; face.userData.esperaAte = performance.now() + 1100;
+            solta.aoFim = () => { face.visible = true; face.userData.esperaAte = 0; };
+          } else if (a?.assento?.modelo) {
             const destino = face.position.clone();
             voa(face, destino, destino, { dur: 330, atraso: temGesto(a) ? 520 : 90, arco: 0.012,
               deAtual: () => descarte.grupo.worldToLocal(pontoDaMaoAtiva(a)) });
@@ -2540,7 +2719,8 @@ async function sincroniza(primeira) {
         const a = assentos.get(p.id);
         const origem = a ? lequeDe(a) : new THREE.Vector3(0, MESA_TOPO + 0.3, 1.2);
         for (const frente of novas) {
-          voa(frente, origem, frente.position.clone(), { dur: 340, atraso: temGesto(a) ? 635 : 120, arco: 0.015, deAtual: a?.assento?.modelo ? () => pontoDaMaoAtiva(a) : null });
+          if (a && !temGesto(a) && escolta(p.id, { de: origem, para: frente.position.clone().setY(MESA_TOPO + 0.1), dur: 520, aoFim: () => { frente.visible = true; } })) frente.visible = false;
+          else voa(frente, origem, frente.position.clone(), { dur: 340, atraso: temGesto(a) ? 635 : 120, arco: 0.015, deAtual: a?.assento?.modelo ? () => pontoDaMaoAtiva(a) : null });
         }
       }
       for (const m of p.melds) jogosVistos.add(m.id);
@@ -2633,7 +2813,9 @@ function reageAoEvento(ev) {
       if (a) {
         const m = cartaPassageira();
         const de = doMeio ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.06) : topoDoMonte();
-        if (a.assento?.modelo) {
+        // escultura (sem braço que se mova): a mão solta dele vai buscar a carta
+        if (!temGesto(a) && gestoSolto(ev.p, doMeio ? 'meio' : 'comprar')) scene.remove(m);
+        else if (a.assento?.modelo) {
           gestoCarta(a.assento.modelo, 'comprar', de);
           const destino = a.grupo.localToWorld(new THREE.Vector3(-0.1, 0.91, 0.53));
           m.scale.setScalar(ESCALA_CARTA_MAO);
@@ -2641,6 +2823,12 @@ function reageAoEvento(ev) {
         } else voa(m, de, lequeDe(a), { dur: 420, aoFim: () => scene.remove(m) });
       }
     }
+  }
+  // encaixar numa sequência ou trocar na trinca: a mão dele leva a carta até o jogo
+  if ((ev.e === 'layoff' || ev.e === 'trocouNaTrinca') && ev.p !== me() && !semMovimento) {
+    const a = assentos.get(ev.p);
+    const jogo = ev.meldId != null ? posicaoDoJogo(ev.meldId) : null;
+    if (a && !temGesto(a) && jogo) escolta(ev.p, { de: lequeDe(a), para: jogo.setY(MESA_TOPO + 0.1), dur: 520 });
   }
   if (ev.e === 'baixou' && !semMovimento) baixadaDe = ev.p;
   if (ev.e === 'discard' && !semMovimento) descarteDe = ev.p;
@@ -2809,6 +2997,7 @@ function quadro(t) {
     somaFrame = 0; nFrames = 0;
   }
   animaVoos(t);
+  animaMaosSoltas(t);
 
   // a cabeça acompanha o ponteiro de leve; a mesa continua o alvo
   camera.position.x += (((semMovimento ? 0 : olharX) * 0.4) - camera.position.x) * (1 - Math.exp(-frameMs / 160));
@@ -3011,7 +3200,7 @@ montaEmotes({
 });
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera
-window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, abrePlacar, acao: sendAction, maos, get rigMaos() { return rigMaos; },
+window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, cenaCarne, carneGrupo, abreVisor, abrePlacar, acao: sendAction, gesto: gestoSolto, get escoltas() { return escoltas.length; }, maos, get rigMaos() { return rigMaos; },
   // Diagnóstico: ler a visão atual e injetar uma sintética (oito jogadores com
   // três jogos cada, por exemplo) sem esperar a sorte das cartas numa partida.
   get view() { return view; }, previa(v) { view = v; return sincroniza(false); }, presencas, get presencaOlha() { return presencaOlha; },
