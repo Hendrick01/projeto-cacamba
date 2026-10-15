@@ -411,7 +411,12 @@ arquivo; testes em `test/bazuca.test.js`), mesa 2D em `public/bazuca-mesa.js`
   grande no meio da tela, com o dono e um mapinha da grade dele.
 - **BAZUCA acaba a rodada** (regra corrigida pelo dono no mesmo dia): grita-se
   em qualquer etapa da sua vez, sem punição; `fimDaRodada` soma tudo e a
-  menor soma vence, de quem gritou ou não (empate na menor: ninguém leva).
+  menor soma vence, de quem gritou ou não. Quem gritou só vence com a menor
+  soma sozinho: empatou, leva quem empatou com ele (`vencedorDoBazuca`); dois
+  ou mais dos outros empatados na menor, ninguém leva.
+- **A rodada só acaba batendo ou gritando.** O monte acabou, o descarte vira
+  monte (menos a de cima); sem carta nem assim, a vez passa sem compra
+  (evento `semCarta`).
   `lastRound.gritou` diz quem gritou, e `contaDaRodada(lr, nome, eu)` (no
   motor) é o título e a linha do fim de rodada nas duas mesas.
 - **Partida até 4 vitórias** (`VITORIAS_PARA_GANHAR`), com quantas rodadas

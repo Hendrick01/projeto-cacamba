@@ -34,6 +34,10 @@
 //  - BAZUCA (corrigido por ele no mesmo dia): grita-se na SUA vez, a qualquer
 //    momento dela, e a rodada acaba na hora — vai direto para a contagem.
 //    Soma-se tudo e a menor soma vence, tenha gritado ou não. Não há punição.
+//    Quem gritou só vence com a menor soma SOZINHO: empatou com alguém, perde
+//    para ele (confirmado por ele em 15/10/2026).
+//  - A rodada só acaba quando alguém bate ou grita. O monte acabou, embaralha
+//    o descarte (menos a de cima); sem carta nem assim, a vez passa sem compra.
 //  - A partida vai até alguém somar 4 vitórias (VITORIAS_PARA_GANHAR), com
 //    quantas rodadas forem precisas; aí acaba, e o anfitrião recomeça se a
 //    mesa quiser jogar de novo — como no Caçamba.
@@ -46,8 +50,8 @@
 //  - O par na vez não substitui a compra.
 //  - Carta de punição entra numa posição nova, no fim da fileira.
 //  - Toda rodada começa por sorteio.
-//  - Se monte e descarte acabarem, a rodada fecha pela menor soma.
-//  - Empate na menor soma (no bazuca ou no fim do monte): ninguém leva.
+//  - Bazuca de quem não tinha a menor soma, com dois ou mais dos outros
+//    empatados na menor: ninguém leva.
 //  - Bazuca com carta comprada na mão: ela vai para o descarte e não conta;
 //    com troca de carta pendente (alguém deve uma), espera-se a troca.
 //
@@ -221,19 +225,23 @@ function confereBatida(state, events) {
   return events;
 }
 
-// A menor soma da mesa, se for de um só (empate na menor: ninguém).
-function menorSoma(state, somas) {
-  const menor = Math.min(...Object.values(somas));
-  const com = state.players.filter((p) => somas[p.id] === menor);
+// Quem leva no bazuca: quem gritou, se tem a menor soma SOZINHO; senão, o de
+// menor soma entre os outros — e empatou com quem gritou, leva do mesmo jeito.
+// Dois ou mais dos outros empatados na menor: ninguém.
+function vencedorDoBazuca(state, somas, gritou) {
+  const outros = state.players.filter((p) => p.id !== gritou);
+  const menor = Math.min(...outros.map((p) => somas[p.id]));
+  if (somas[gritou] < menor) return gritou;
+  const com = outros.filter((p) => somas[p.id] === menor);
   return com.length === 1 ? com[0].id : null;
 }
 
-// `vencedor` só vem pronto na batida; no bazuca e no fim do monte é a conta.
+// `vencedor` só vem pronto na batida; no bazuca é a conta.
 function fimDaRodada(state, events, motivo, vencedor = null, gritou = null) {
   if (state.comprada) poeNoDescarte(state, state.comprada);   // quem estava decidindo larga a carta
   state.comprada = null;
   const somas = Object.fromEntries(state.players.map((p) => [p.id, soma(p)]));
-  if (motivo !== 'bateu') vencedor = menorSoma(state, somas);
+  if (motivo === 'bazuca') vencedor = vencedorDoBazuca(state, somas, gritou);
   const v = vencedor ? playerById(state, vencedor) : null;
   if (v) v.vitorias++;
   if (v && v.vitorias >= VITORIAS_PARA_GANHAR) state.campeao = v.id;
@@ -283,7 +291,9 @@ export function actComprar(state, playerId, agora = Date.now()) {
   exigeVez(state, playerId, 'comprar');
   const events = [];
   const c = tiraDoMonte(state, events);
-  if (!c) return fimDaRodada(state, events, 'monte');
+  // nem monte nem descarte para embaralhar: a vez passa sem compra (a rodada
+  // só acaba batendo ou gritando)
+  if (!c) return passaAVez(state, [...events, { e: 'semCarta', p: playerId }], agora);
   state.comprada = c;
   state.etapa = 'decidir';
   events.push({ e: 'comprou', p: playerId, monte: state.deck.length });
@@ -387,6 +397,7 @@ export function actBazuca(state, playerId, agora = Date.now()) {
   const p = exigeVez(state, playerId);
   // carta a caminho de alguém: a soma ainda não fecha
   if (state.dividas.length) fail('Espere a troca de cartas terminar.');
+  // `certo`: tinha a menor soma sozinho. Empatou, perde para quem empatou.
   const minha = soma(p);
   const certo = state.players.every((x) => x.id === p.id || soma(x) > minha);
   return fimDaRodada(state, [{ e: 'bazuca', p: p.id, certo }], 'bazuca', null, p.id);
@@ -496,9 +507,10 @@ export function tick(state, agora = Date.now()) {
     events.push({ e: 'estourou', p: p.id });
     if (state.etapa === 'comprar') {
       const c = tiraDoMonte(state, events);
-      if (!c) return fimDaRodada(state, events, 'monte');
-      poeNoDescarte(state, c);
-      events.push({ e: 'descartou', p: p.id, card: c, semPoder: true });
+      if (c) {
+        poeNoDescarte(state, c);
+        events.push({ e: 'descartou', p: p.id, card: c, semPoder: true });
+      } else events.push({ e: 'semCarta', p: p.id });
     } else if (state.etapa === 'decidir') {
       poeNoDescarte(state, state.comprada);
       events.push({ e: 'descartou', p: p.id, card: state.comprada, semPoder: true });
@@ -546,11 +558,14 @@ export function contaDaRodada(lr, nome, eu) {
   if (lr.motivo === 'bazuca') {
     const gritou = !g ? 'Alguém gritou' : g === eu ? 'Você gritou' : `${nome(g)} gritou`;
     if (q && q === g) return { titulo: q === eu ? 'Bazuca certeiro!' : `Bazuca certeiro de ${nome(q)}!`, texto: `${gritou} BAZUCA e tinha mesmo a menor soma da mesa.` };
-    if (q) return { titulo: q === eu ? 'Você tinha a menor soma!' : `${nome(q)} tinha a menor soma`, texto: `${gritou} BAZUCA, mas quem tinha menos era ${q === eu ? 'você' : nome(q)}.` };
-    return { titulo: 'Empate na menor soma: ninguém leva', texto: `${gritou} BAZUCA e a contagem empatou.` };
+    const quemLeva = q === eu ? 'você' : nome(q);
+    if (q && g && lr.somas?.[g] === lr.somas?.[q]) {
+      return { titulo: q === eu ? 'Você leva no empate!' : `${nome(q)} leva no empate`, texto: `${gritou} BAZUCA, mas empatou com ${quemLeva}: quem grita precisa ter a menor soma sozinho.` };
+    }
+    if (q) return { titulo: q === eu ? 'Você tinha a menor soma!' : `${nome(q)} tinha a menor soma`, texto: `${gritou} BAZUCA, mas quem tinha menos era ${quemLeva}.` };
+    return { titulo: 'Empate na menor soma: ninguém leva', texto: `${gritou} BAZUCA sem ter a menor soma, e os de menor soma empataram.` };
   }
-  return q ? { titulo: q === eu ? 'Você tinha a menor soma!' : `${nome(q)} tinha a menor soma`, texto: 'O monte e o descarte acabaram: vale a menor soma.' }
-    : { titulo: 'Empate: ninguém leva', texto: 'O monte e o descarte acabaram e a menor soma empatou.' };
+  return { titulo: 'Fim da rodada', texto: '' };
 }
 
 // O servidor não agenda vez neste modo: quem cuida do tempo e dos robôs é o

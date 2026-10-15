@@ -150,7 +150,7 @@ try {
   const fins = A.eventos.filter((e) => e.e === 'roundEnd');
   const vit = A.view.players.reduce((n, p) => n + p.vitorias, 0);
   confere(vit === fins.filter((f) => f.vencedor).length, `vitórias batem com as rodadas (${vit})`);
-  confere(fins.every((f) => ['bateu', 'bazuca', 'monte'].includes(f.motivo)), `motivos: ${fins.map((f) => f.motivo).join(', ')}`);
+  confere(fins.every((f) => ['bateu', 'bazuca'].includes(f.motivo)), `motivos: ${fins.map((f) => f.motivo).join(', ')}`);
   confere(A.eventos.some((e) => e.e === 'rapido' || e.e === 'errou'), 'houve descarte rápido na mesa');
   const iGrito = A.eventos.findIndex((e) => e.e === 'bazuca' && e.p === id(A));
   if (gritou) {

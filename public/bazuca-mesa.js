@@ -646,6 +646,9 @@ export function criaMesaBazuca(ctx) {
         case 'remexeu':
           ctx.toast('O monte acabou: o descarte foi embaralhado.');
           break;
+        case 'semCarta':
+          ctx.toast(`Não há carta para comprar: ${ev.p === eu() ? 'sua vez passou' : `a vez de ${nome(ev.p)} passou`}.`);
+          break;
         case 'roundEnd':
           if (ev.motivo === 'bateu' && ev.vencedor) ctx.reage(ev.vencedor, 'bateu');
           break;
@@ -689,7 +692,8 @@ export function criaMesaBazuca(ctx) {
          <p><strong>Descarte em cima:</strong> a qualquer momento, qualquer um descarta uma carta de mesmo valor da que está em cima — a sua ou a de outro jogador. Pegou a de outro? Dê uma das suas para ele. Errou? A carta aparece para todos e você leva mais uma. Dois toques numa carta descartam na hora.</p>
          <p><strong>Par:</strong> na sua vez, dá para descartar um par seu de uma vez.</p>
          <p><strong>Bateu:</strong> quem fica sem nenhuma carta vence na hora.</p>
-         <p><strong>BAZUCA!</strong> Na sua vez, a qualquer momento dela. A rodada acaba na hora e vai para a contagem: soma-se tudo e quem tiver a menor soma vence — tenha gritado ou não. Empate na menor soma: ninguém leva.</p>
+         <p><strong>BAZUCA!</strong> Na sua vez, a qualquer momento dela. A rodada acaba na hora e vai para a contagem: soma-se tudo e quem tiver a menor soma vence — tenha gritado ou não. Quem gritou só vence com a menor soma sozinho: empatou com alguém, perde para ele.</p>
+         <p><strong>Monte:</strong> acabou, o descarte é embaralhado de novo. A rodada só acaba quando alguém bate ou grita.</p>
          <p><strong>Partida:</strong> cada rodada vale uma vitória; quem chegar a 4 vitórias ganha, com quantas rodadas forem precisas.</p>
          <p class="modal-hint">O jogo não ajuda: nada marca carta já vista nem avisa descarte possível. A memória é sua.</p>`,
         [{ label: 'Entendi', cls: 'btn-primary', fn: ctx.closeModal }],

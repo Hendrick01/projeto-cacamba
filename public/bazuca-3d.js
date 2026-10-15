@@ -1014,6 +1014,9 @@ export function criaBazuca3D(ctx) {
         case 'poderPerdido':
           anuncia(`${Nome(ev.p)} perdeu o poder do ${NOME_DO_PODER[ev.poder]}.`);
           break;
+        case 'semCarta':
+          anuncia(`Não há carta para comprar: ${ev.p === eu ? 'sua vez passou' : `a vez de ${nomeDe(ev.p)} passou`}.`);
+          break;
         case 'remexeu':
           anuncia('O monte acabou: o descarte foi embaralhado.');
           pendentes.push(() => {

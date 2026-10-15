@@ -198,12 +198,32 @@ test('bazuca sempre acaba a rodada: a menor soma vence, gritando ou não', () =>
   assert.equal(g2.players[0].slots.length, 2, 'sem carta de punição');
   assert.equal(g2.lastRound.vencedor, 'p1');
   assert.equal(g2.players[1].vitorias, 1);
-  // empate na menor soma: ninguém leva
+  // quem gritou empatou na menor: perde para quem empatou (dono do jogo, 15/10)
   const g3 = montado([[1, 3], [4, 0], [9]]);
   B.applyAction(g3, 'p0', { a: 'bazuca' }, T0);
   assert.equal(g3.phase, 'roundEnd');
-  assert.equal(g3.lastRound.vencedor, null);
-  assert.ok(g3.players.every((p) => p.vitorias === 0));
+  assert.equal(g3.lastRound.vencedor, 'p1');
+  assert.equal(g3.players[1].vitorias, 1);
+  assert.match(B.contaDaRodada(g3.lastRound, (id) => id, 'p2').texto, /empatou com p1/);
+  // quem gritou não tinha a menor, e dois dos outros empataram nela: ninguém leva
+  const g4 = montado([[5, 6], [2, 1], [3, 0]]);
+  B.applyAction(g4, 'p0', { a: 'bazuca' }, T0);
+  assert.equal(g4.lastRound.vencedor, null);
+  assert.ok(g4.players.every((p) => p.vitorias === 0));
+});
+
+test('sem carta no monte nem no descarte, a vez passa sem compra — a rodada não acaba', () => {
+  const g = montado([[5, 6], [7, 8]], { deck: [], topo: 4 });
+  const ev = B.applyAction(g, 'p0', { a: 'comprar' }, T0);
+  assert.deepEqual(ev.map((e) => e.e), ['semCarta', 'vez']);
+  assert.equal(g.phase, 'play');
+  assert.equal(g.players[g.turn].id, 'p1');
+  // e o tempo estourado sem carta também só passa a vez
+  g.prazo = T0;
+  const ev2 = B.tick(g, T0 + 1);
+  assert.deepEqual(ev2.map((e) => e.e), ['estourou', 'semCarta', 'vez']);
+  assert.equal(g.phase, 'play');
+  assert.equal(g.players[g.turn].id, 'p0');
 });
 
 test('bazuca vale a vez inteira — com a comprada na mão ela vai para o descarte', () => {
@@ -320,8 +340,8 @@ test('robô difícil vence mais que robô fácil a longo prazo (memória conta)'
   const placar = { facil: 0, dificil: 0 };
   for (const nivel of ['facil', 'dificil']) {
     const { fins } = simula(3, nivel, 12);
-    // quantas rodadas acabaram com bazuca CERTO ou batida (jogo bem jogado), não por monte
-    placar[nivel] = fins.filter((f) => f.motivo !== 'monte').length;
+    // quantas rodadas tiveram vencedor (batida, ou bazuca com a menor soma)
+    placar[nivel] = fins.filter((f) => f.vencedor).length;
   }
   assert.ok(placar.dificil >= placar.facil - 2, JSON.stringify(placar));
 });
