@@ -616,7 +616,7 @@ function renderLobby() {
     li.appendChild(document.createTextNode(p.id === me() ? `${p.name} (você)` : p.name));
     const tag = document.createElement('span');
     tag.className = 'tag';
-    tag.textContent = p.isBot ? '🤖 robô' : (p.id === lobby.hostId ? 'anfitrião' : '');
+    tag.textContent = p.isBot ? 'robô' : (p.id === lobby.hostId ? 'anfitrião' : '');
     li.appendChild(tag);
     if (p.isBot && isHost()) {
       const x = document.createElement('button');
@@ -635,7 +635,7 @@ function renderLobby() {
   const temRobo = !!cadeiras || lobby.players.some((p) => p.isBot), facil = lobby.nivelRobos === 'facil';
   $('btn-nivel-robos').hidden = !temRobo;
   $('btn-nivel-robos').disabled = !isHost();
-  $('btn-nivel-robos').textContent = facil ? '🤖 Robôs: fáceis' : '🤖 Robôs: normais';
+  $('btn-nivel-robos').textContent = facil ? 'Robôs: fáceis' : 'Robôs: normais';
   $('btn-nivel-robos').title = isHost() ? 'Toque para trocar. Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.' : 'Quem criou a sala escolhe o nível dos robôs.';
   $('btn-start').hidden = !isHost();
   $('btn-start').disabled = lobby.players.length < MODOS[modoDaSala].min;
@@ -697,6 +697,38 @@ function desenhaDuplas(cadeiras) {
 $('btn-add-bot').onclick = () => sendMsg({ t: 'addBot' });
 $('btn-nivel-robos').onclick = () => sendMsg({ t: 'nivelRobos', nivel: lobby?.nivelRobos === 'facil' ? 'normal' : 'facil' });
 $('btn-start').onclick = () => sendMsg({ t: 'start' });
+
+// O convite. O endereço comprido quebrava em duas linhas na sala; virou um
+// botão. No celular abre o compartilhar do aparelho (WhatsApp e cia.); no
+// computador copia. Sem área de transferência (http://, navegador antigo), o
+// endereço aparece selecionado para o toque longo.
+const podeCompartilhar = !!navigator.share && matchMedia('(pointer: coarse)').matches;
+$('convite-rotulo').textContent = podeCompartilhar ? 'Mandar convite' : 'Copiar convite';
+$('btn-convite').onclick = async () => {
+  const url = lobby?.joinUrl;
+  if (!url) return;
+  const rotulo = $('convite-rotulo');
+  const original = rotulo.textContent;
+  if (podeCompartilhar) {
+    try {
+      await navigator.share({ title: 'Caçamba', text: `Bora jogar ${MODOS[lobby.modo]?.nome || 'Caçamba'}? Sala ${lobby.code}`, url });
+      return;
+    } catch (e) { if (e?.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    rotulo.textContent = 'Convite copiado';
+  } catch {
+    const alvo = $('lobby-url');
+    alvo.classList.add('visivel');
+    const faixa = document.createRange();
+    faixa.selectNodeContents(alvo);
+    getSelection().removeAllRanges();
+    getSelection().addRange(faixa);
+    rotulo.textContent = 'Toque e segure para copiar';
+  }
+  setTimeout(() => { rotulo.textContent = original; }, 2200);
+};
 $('btn-leave-lobby').onclick = () => {
   sendMsg({ t: 'leave' });   // avisa a sala, senão fica assento fantasma nela
   saveSession(null);
@@ -1322,9 +1354,11 @@ function renderCenter() {
   $('btn-claim').hidden = !claimable;
   if (claimable) {
     $('btn-claim').classList.toggle('claimed', claimed);
-    $('btn-claim').textContent = claimed
+    // o carrinho é desenhado (index.html, #i-carrinho), não emoji
+    $('btn-claim').innerHTML = claimed ? '' : '<svg class="ico" aria-hidden="true"><use href="#i-carrinho"/></svg>';
+    $('btn-claim').append(claimed
       ? '✓ Pedido feito — quem está na vez tem preferência'
-      : `🛒 Quero o ${cardText(view.discardTop)}!`;
+      : `Quero o ${cardText(view.discardTop)}!`);
   }
 
   atualizaBanner();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0e3b2c">
+<meta name="theme-color" content="#1b110b">
 <title>Caçamba</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="interface.css">
 <link rel="stylesheet" href="emotes.css">
+<link rel="stylesheet" href="cara-nova.css">
 </head>
 <body>
 
@@ -57,6 +58,15 @@
       <circle cx="50" cy="18" r="8"/>
       <circle cx="75" cy="26" r="8"/>
     </symbol>
+    <!-- Os ícones dos botões, no lugar dos emoji (🎙 💬 🛒 ⏻): emoji muda de
+         desenho em cada aparelho, pelo mesmo motivo que os naipes foram
+         desenhados. Traço grosso de ponta redonda, como os naipes; a cor vem
+         do botão (`stroke: currentColor`, em cara-nova.css). -->
+    <symbol id="i-ajuda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.4 9.3a2.7 2.7 0 0 1 5.2 1c0 1.8-2.6 2.2-2.6 3.9"/><path d="M12 17.4v.1"/></symbol>
+    <symbol id="i-fala" viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 4 13.5z"/><path d="M8.5 10h.01M12 10h.01M15.5 10h.01"/></symbol>
+    <symbol id="i-sair" viewBox="0 0 24 24"><path d="M12 3.5v8"/><path d="M7 6.5a7.5 7.5 0 1 0 10 0"/></symbol>
+    <symbol id="i-copiar" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-carrinho" viewBox="0 0 24 24"><path d="M3 4h2.5l2.2 10.5h10.6L20.5 7H7"/><circle cx="9.5" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></symbol>
   </defs>
 </svg>
 
@@ -71,23 +81,26 @@
       <p class="ui-eyebrow">Toda sexta, mesa aberta</p>
       <h1 class="modos-titulo">Qual mesa hoje?</h1>
       <button id="modo-cacamba" type="button" class="modo modo-principal" data-modo="cacamba">
+        <span class="modo-obj leque" aria-hidden="true"><img src="assets/baralho/0-1.webp" width="70" height="98" alt="" decoding="async"><img src="assets/baralho/1-7.webp" width="70" height="98" alt="" decoding="async"><img src="assets/baralho/3-7.webp" width="70" height="98" alt="" decoding="async"></span>
         <span class="modo-selo">O jogo da casa</span>
         <strong>Caçamba</strong>
         <span class="modo-texto">Tradicional do muquifão: 7 rodadas de contrato, trincas e sequências. Menos pontos, mais perto da vitória.</span>
         <span class="modo-fatos"><span><b>2–8</b> jogadores</span><span><b>7</b> rodadas</span></span>
-        <span class="modo-ir">Jogar Caçamba →</span>
+        <span class="modo-ir">Jogar Caçamba</span>
       </button>
       <button id="modo-presidente" type="button" class="modo" data-modo="presidente">
+        <span class="modo-obj pilha" aria-hidden="true"><img src="assets/baralho/verso.webp" width="46" height="64" alt="" decoding="async"><img src="assets/baralho/2-2.webp" width="46" height="64" alt="" decoding="async"></span>
         <strong>Presidente</strong>
-        <span class="modo-texto">Livre-se das cartas primeiro e vire Presidente. Quem sobra por último vira o Cu, e na rodada seguinte entrega as melhores.</span>
+        <span class="modo-texto">Livre-se das cartas primeiro e vire Presidente. Quem sobra por último vira o Cu.</span>
         <span class="modo-fatos"><span><b>3–8</b> jogadores</span><span><b>3 … A, 2</b> a mais forte</span></span>
-        <span class="modo-ir">Jogar Presidente →</span>
+        <span class="modo-ir">Jogar Presidente</span>
       </button>
       <button id="modo-domino" type="button" class="modo" data-modo="domino">
+        <span class="modo-obj pedra" aria-hidden="true"><svg viewBox="0 0 30 30"><g fill="#2a1b12"><circle cx="7" cy="7" r="3"/><circle cx="23" cy="7" r="3"/><circle cx="15" cy="15" r="3"/><circle cx="7" cy="23" r="3"/><circle cx="23" cy="23" r="3"/></g></svg><i></i><svg viewBox="0 0 30 30"><g fill="#2a1b12"><circle cx="7" cy="7" r="3"/><circle cx="23" cy="7" r="3"/><circle cx="15" cy="15" r="3"/><circle cx="7" cy="23" r="3"/><circle cx="23" cy="23" r="3"/></g></svg></span>
         <strong>Dominó de ponto</strong>
-        <span class="modo-texto">Pedra na mesa e conta nas pontas: deu múltiplo de 5, a dupla marca. Quem bate leva o que sobrou na mão dos outros.</span>
+        <span class="modo-texto">Pedra na mesa e conta nas pontas: deu múltiplo de 5, a dupla marca.</span>
         <span class="modo-fatos"><span><b>4</b> jogadores em dupla</span><span>até <b>240</b></span></span>
-        <span class="modo-ir">Jogar Dominó →</span>
+        <span class="modo-ir">Jogar Dominó</span>
       </button>
     </main>
     <footer class="ui-footer"><span>Mesmo baralho, mesma gelera.</span><span>A cúpula criadora joga aqui.</span></footer>
@@ -104,17 +117,19 @@
         <h1 id="home-titulo">Caçamba<br><em>tradicional do muquifão</em></h1>
         <p class="ui-description">Junte a gelera, escolhe um dos personagens da grande cúpula criadora e aproveite.</p>
         <div id="home-fatos" class="ui-stats"><span><strong>2–8</strong>jogadores</span><span><strong>7</strong>rodadas</span><span><strong>Menos pontos</strong>mais perto da vitória</span></div>
-        <div class="ui-stage" aria-hidden="true"><div class="palco-inicio"><img id="persona-figura" alt=""></div><span class="ui-mini-card">A<br>♠</span><span class="ui-mini-card">7<br>♥</span></div>
+        <div class="ui-stage" aria-hidden="true"><div class="palco-inicio"><img id="persona-figura" width="125" height="250" alt=""></div><span class="ui-mini-card">A<br>♠</span><span class="ui-mini-card">7<br>♥</span></div>
       </div>
       <div class="ui-entry">
         <h2>Bora?</h2><p>Abra a mesa do muquifão ou entre na sala da gelera.</p>
         <label class="field"><span>Como podemos chamar você?</span><input id="name-input" maxlength="16" placeholder="Seu nome" autocomplete="nickname"></label>
-        <button id="btn-personagem" type="button" class="btn btn-persona"><img id="persona-cara" class="persona-cara" alt=""><span class="persona-txt"><small>Seu personagem</small><strong id="persona-nome">Gabizinsky</strong></span><span class="persona-seta">Trocar ↗</span></button>
-        <button id="btn-create" type="button" class="btn btn-primary"><span>Criar minha sala<small>Convide amigos ou adicione robôs</small></span><span aria-hidden="true">→</span></button>
+        <button id="btn-personagem" type="button" class="btn btn-persona"><img id="persona-cara" class="persona-cara" alt=""><span class="persona-txt"><small>Seu personagem</small><strong id="persona-nome">Gabizinsky</strong></span><span class="persona-seta">Trocar</span></button>
+        <button id="btn-create" type="button" class="btn btn-primary"><span>Criar minha sala<small>Convide amigos ou adicione robôs</small></span></button>
         <div class="ui-divider">Já tem um convite?</div>
         <div class="join-row"><input id="code-input" maxlength="4" aria-label="Código da sala, quatro letras" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off"><button id="btn-join" type="button" class="btn">Entrar</button></div>
-        <button id="btn-rules-home" type="button" class="btn btn-ghost">Como se joga? ↗</button>
-        <button id="btn-loja" type="button" class="btn btn-ghost">Loja ↗</button>
+        <div class="links-casa">
+          <button id="btn-rules-home" type="button" class="btn btn-ghost">Como se joga</button>
+          <button id="btn-loja" type="button" class="btn btn-ghost">Loja</button>
+        </div>
         <button id="btn-apoiar" type="button" class="btn btn-ghost" hidden>Apoiar o Caçamba ♥</button>
         <p id="home-error" class="error" role="alert" hidden></p>
       </div>
@@ -137,7 +152,7 @@
 
     <div class="palco">
       <button id="btn-avatar-ant" class="seta" aria-label="Personagem anterior">‹</button>
-      <img id="avatar-figura" class="avatar-figura" alt="">
+      <img id="avatar-figura" class="avatar-figura" width="200" height="400" alt="">
       <button id="btn-avatar-prox" class="seta" aria-label="Próximo personagem">›</button>
     </div>
 
@@ -170,9 +185,19 @@
 <section id="screen-lobby" class="screen" hidden>
   <div class="home-box">
     <p id="lobby-modo" class="lobby-modo"></p>
-    <p class="lobby-label">Código da sala</p>
-    <div id="lobby-code" class="lobby-code">····</div>
-    <img id="lobby-qr" class="lobby-qr" alt="QR para entrar na sala" hidden>
+    <!-- O código no quadro da parede ("A mesa é aqui", da mesa 2D) -->
+    <div class="lobby-placa">
+      <p class="lobby-label">Código da sala</p>
+      <div id="lobby-code" class="lobby-code">····</div>
+      <svg class="naipe-placa" aria-hidden="true"><use href="#naipe-0"/></svg>
+    </div>
+    <div class="lobby-convite">
+      <img id="lobby-qr" class="lobby-qr" width="112" height="112" alt="QR para entrar na sala" hidden>
+      <div class="lado">
+        <p>Aponte a câmera para o código ou mande o convite para a gelera.</p>
+        <button id="btn-convite" type="button" class="btn"><svg class="ico" aria-hidden="true"><use href="#i-copiar"/></svg><span id="convite-rotulo">Copiar convite</span></button>
+      </div>
+    </div>
     <p id="lobby-url" class="lobby-url"></p>
 
     <ul id="lobby-players" class="lobby-players"></ul>
@@ -181,13 +206,15 @@
     <div id="lobby-duplas" class="lobby-duplas" hidden></div>
 
     <div class="lobby-actions">
-      <button id="btn-add-bot" class="btn" hidden>+ Robô</button>
+      <button id="btn-add-bot" class="btn" hidden>Adicionar robô</button>
       <button id="btn-nivel-robos" class="btn btn-ghost" hidden></button>
-      <button id="btn-emote-lobby" class="btn btn-ghost" title="Emotes e frases prontas" aria-label="Emotes e frases prontas">💬</button>
-      <button id="btn-start" class="btn btn-primary" hidden>Começar partida</button>
     </div>
+    <button id="btn-start" class="btn btn-primary" hidden>Começar partida</button>
     <p id="lobby-wait" class="lobby-wait" hidden>Esperando quem criou a sala começar…</p>
-    <button id="btn-leave-lobby" class="btn btn-ghost">Sair da sala</button>
+    <div class="lobby-rodape">
+      <button id="btn-emote-lobby" class="btn btn-ghost" title="Emotes e frases prontas" aria-label="Emotes e frases prontas"><svg class="ico" aria-hidden="true"><use href="#i-fala"/></svg>Frases</button>
+      <button id="btn-leave-lobby" class="btn btn-ghost">Sair da sala</button>
+    </div>
   </div>
 </section>
 
@@ -336,14 +363,15 @@
   </svg>
 
   <header class="topbar">
-    <div class="round-pill"><span id="round-label">Rodada 1/7</span><strong id="contract-label">2 trincas</strong></div>
+    <!-- A rodada é também o botão do placar: o Σ saiu da fileira de ícones,
+         que não cabia em 375 px (o botão de sair ficava cortado na borda). -->
+    <button id="btn-score" type="button" class="round-pill" title="Ver o placar"><span class="sigma" aria-hidden="true">Σ</span><span class="linhas"><span id="round-label">Rodada 1/7</span><strong id="contract-label">2 trincas</strong></span></button>
     <div class="topbar-btns">
-      <button id="btn-score" class="icon-btn" title="Placar">Σ</button>
-      <button id="btn-rules" class="icon-btn" title="Regras">?</button>
-      <button id="btn-voz" class="icon-btn" title="Ligar o microfone (chat de voz)" aria-label="Chat de voz">🎙</button>
-      <button id="btn-emote" class="icon-btn" title="Emotes e frases prontas" aria-label="Emotes e frases prontas">💬</button>
-      <button id="btn-3d" class="icon-btn" title="Ver a mesa em 3D" aria-label="Ver a mesa em 3D">3D</button>
-      <button id="btn-quit" class="icon-btn icon-btn-sair" title="Sair da partida" aria-label="Sair da partida">⏻</button>
+      <button id="btn-rules" class="icon-btn" title="Regras" aria-label="Regras"><svg class="ico" aria-hidden="true"><use href="#i-ajuda"/></svg></button>
+      <button id="btn-voz" class="icon-btn" title="Ligar o microfone (chat de voz)" aria-label="Chat de voz"><svg class="ico" aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button>
+      <button id="btn-emote" class="icon-btn" title="Emotes e frases prontas" aria-label="Emotes e frases prontas"><svg class="ico" aria-hidden="true"><use href="#i-fala"/></svg></button>
+      <button id="btn-3d" class="icon-btn btn-3d" title="Ver a mesa em 3D" aria-label="Ver a mesa em 3D">3D</button>
+      <button id="btn-quit" class="icon-btn icon-btn-sair" title="Sair da partida" aria-label="Sair da partida"><svg class="ico" aria-hidden="true"><use href="#i-sair"/></svg></button>
     </div>
   </header>
 
@@ -366,7 +394,7 @@
           <span class="pile-count">meio</span>
         </button>
       </div>
-      <button id="btn-claim" class="btn btn-claim" hidden>🛒 Quero essa carta!</button>
+      <button id="btn-claim" class="btn btn-claim" hidden><svg class="ico" aria-hidden="true"><use href="#i-carrinho"/></svg>Quero essa carta!</button>
       <p id="turn-banner" class="turn-banner">…</p>
     </div>
 

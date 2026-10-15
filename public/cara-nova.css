@@ -1,0 +1,226 @@
+/* ===========================================================================
+   Cara nova (15/10/2026) — aprovada pelo dono do jogo a partir do esboço
+   "Caçamba de cara nova". Vem DEPOIS do interface.css e manda nele.
+
+   A ideia é uma só: fora da partida o site parecia outro site, um verde liso
+   de qualquer lugar. Agora todas as telas acontecem na mesma sala da mesa 2D:
+   a parede de azulejo, a lâmpada lá em cima, o chão de nogueira. O painel
+   onde se age vira uma mesinha (feltro com aro de madeira, a direção de arte
+   original da mesa) e só ele ganha caixa. Nada aqui baixa arquivo: é tudo
+   gradiente e SVG em linha.
+   =========================================================================== */
+
+:root {
+  --cn-parede: #3b3b34;
+  --cn-parede-luz: #55554c;
+  --cn-chao: #1b110b;
+  --cn-linha: rgba(242, 193, 78, 0.24);
+  --cn-borda: rgba(201, 162, 78, 0.35);
+}
+
+/* O fundo do body se repetia na altura da janela: numa página mais alta que
+   a tela aparecia uma emenda mais clara atrás do formulário. Agora o body é
+   chão liso e cada tela pinta a própria parede, do tamanho dela. */
+html, body { background: var(--cn-chao); }
+
+/* ---- V1: a parede da sala atrás de todas as telas de fora da partida ---- */
+#screen-modos, #screen-home, #screen-lobby, #screen-avatar, #screen-loja, #screen-retomando {
+  background:
+    radial-gradient(95% 420px at 50% -60px, rgba(242, 193, 78, 0.26), rgba(242, 193, 78, 0) 72%),
+    radial-gradient(circle at 13px 13px, rgba(255, 255, 255, 0.05) 0 6px, transparent 7px) 0 0 / 26px 26px,
+    linear-gradient(90deg, rgba(12, 12, 10, 0.55) 0 1.5px, transparent 1.5px) 0 0 / 26px 26px,
+    linear-gradient(rgba(12, 12, 10, 0.55) 0 1.5px, transparent 1.5px) 0 0 / 26px 26px,
+    linear-gradient(180deg, var(--cn-parede-luz) 0, var(--cn-parede) 340px, #26231d 70%, var(--cn-chao) 100%);
+}
+/* a faixa de azulejo azul virou redundante: a parede inteira já é azulejo */
+#screen-home .ui-shell::before { display: none; }
+.ui-top-right { color: #c9d3c4; }
+
+/* ---- C3: etiqueta de versão só para quem desenvolve (?debug) ---- */
+.ui-version { display: none; }
+html.debug .ui-version { display: inline; }
+
+/* ---- V5: rótulos em frase normal, sem caixa alta espaçada ---- */
+.ui-eyebrow, .field span, .ui-entry .field span, .persona-txt small, .persona-seta,
+.lobby-label, .lobby-modo, .modo-selo, .round-pill span, .lobby-dupla h4 {
+  text-transform: none; letter-spacing: 0;
+}
+.ui-eyebrow { font-size: .9rem; font-weight: 800; color: #d9c79f; }
+#screen-home .ui-eyebrow::before { content: none; }
+.ui-entry .field span { font-size: .82rem; color: #c9d6c8; }
+.persona-txt small { font-size: .74rem; }
+.persona-seta { font-size: .82rem; }
+.modo-selo { font-size: .74rem; }
+.lobby-modo { font-size: .88rem; font-weight: 800; }
+.lobby-dupla h4 { font-size: .8rem; }
+/* o rodapé do palco era um rótulo em caixa alta que só enfeitava */
+.ui-stage::after, #screen-home .ui-stage::after { content: none; }
+
+/* ---- V3: a mesinha — feltro com aro de madeira, só onde se age ---- */
+.ui-entry, #screen-lobby .home-box, .modo-principal {
+  background: radial-gradient(130% 90% at 50% 0%, #22704f 0%, #0e3b2c 62%, #082a1f 100%);
+  border: 7px solid #7a4a2b; border-top-color: #9c7748; border-bottom-color: #4a2f1b;
+  border-radius: 22px;
+  box-shadow: 0 0 0 1px rgba(201, 162, 78, 0.25), inset 0 0 28px rgba(0, 0, 0, 0.45), 0 22px 40px -18px #000;
+}
+.ui-entry input, #screen-lobby input { border: 1.5px solid var(--cn-borda); background: rgba(0, 0, 0, 0.3); }
+.ui-entry .btn-persona { border: 1.5px solid rgba(201, 162, 78, 0.3); background: rgba(0, 0, 0, 0.18); }
+
+/* ---- C2: "Como se joga" e "Loja" lado a lado, iguais ---- */
+.ui-entry .links-casa { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.ui-entry .links-casa .btn,
+.ui-entry #btn-rules-home {
+  width: 100%; margin: 0; padding: 10px; font-size: .86rem; color: #c9d6c8;
+  border: 1.5px solid rgba(245, 241, 230, 0.12); border-radius: 12px;
+}
+.ui-entry #btn-apoiar { width: 100%; margin-top: 8px; }
+
+/* ---- V4: o cartaz em duas linhas, "tradicional do muquifão" menor ---- */
+#screen-home .ui-hero h1 em { display: block; font-size: .46em; line-height: 1.12; margin-top: .22em; }
+@media (max-width: 760px) {
+  #screen-home .ui-hero h1 { font-size: 3.1rem; max-width: 100%; padding: .24em .42em .32em; }
+  #screen-home .ui-hero h1 em { font-size: .42em; }
+  .ui-grid { gap: 26px; }
+}
+@media (max-width: 360px) { #screen-home .ui-hero h1 { font-size: 2.6rem; } }
+
+/* ---- V2: a porta das mesas, cada jogo com o seu objeto ---- */
+.modos .ui-eyebrow { margin-bottom: 0; }
+.modo { position: relative; overflow: hidden; }
+.modo:not(.modo-principal) {
+  background: linear-gradient(170deg, #3a2618, #2a1b12);
+  border: 1.5px solid rgba(156, 119, 72, 0.55); border-top-color: rgba(242, 193, 78, 0.4);
+  box-shadow: 0 18px 34px -16px #000;
+}
+.modo:hover { border-color: #f6cc78aa; }
+.modo-principal:hover { border-color: #b08350; border-top-color: #c9a26a; }
+.modo-obj { position: absolute; pointer-events: none; }
+.modo-obj img { position: absolute; display: block; border-radius: 5px; box-shadow: 0 8px 14px -6px rgba(0, 0, 0, 0.8); }
+/* Caçamba: o leque de três cartas, no canto de cima */
+.modo-obj.leque { right: 10px; top: 14px; width: 170px; height: 140px; }
+.modo-obj.leque img { width: 70px; height: 98px; left: 50px; top: 22px; transform-origin: 50% 160%; }
+.modo-obj.leque img:nth-child(1) { transform: rotate(-20deg); }
+.modo-obj.leque img:nth-child(2) { transform: translateY(-6px); }
+.modo-obj.leque img:nth-child(3) { transform: rotate(20deg); }
+/* Presidente: o 2, a mais forte, por cima de uma carta virada */
+.modo-obj.pilha { right: 18px; top: 16px; width: 80px; height: 74px; }
+.modo-obj.pilha img { width: 46px; height: 64px; }
+.modo-obj.pilha img:nth-child(1) { left: 22px; transform: rotate(8deg); }
+.modo-obj.pilha img:nth-child(2) { left: 4px; transform: rotate(-9deg); }
+/* Dominó: a pedra 5|5, desenhada */
+.modo-obj.pedra {
+  right: 16px; top: 22px; width: 82px; height: 42px; padding: 5px;
+  display: grid; grid-template-columns: 1fr 2px 1fr; align-items: center;
+  background: #f3ecdc; border-radius: 7px; transform: rotate(-7deg);
+  box-shadow: 0 8px 14px -6px rgba(0, 0, 0, 0.8), inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+}
+.modo-obj.pedra i { display: block; width: 2px; height: 28px; background: rgba(42, 27, 18, 0.65); }
+.modo-obj.pedra svg { width: 100%; height: 28px; }
+.modo-principal { padding-top: 132px; }
+.modo:not(.modo-principal) { padding-top: 92px; }
+@media (min-width: 761px) {
+  .modo-principal { padding-top: 34px; }
+  .modo-principal .modo-texto { max-width: 34ch; }
+  .modo-obj.leque { right: 26px; top: 26px; width: 200px; height: 170px; }
+  .modo-obj.leque img { width: 84px; height: 118px; left: 58px; }
+}
+@media (max-width: 760px) {
+  .modos { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modo-principal { grid-column: 1 / -1; }
+  .modo:not(.modo-principal) { padding: 92px 14px 16px; gap: 6px; }
+  .modo:not(.modo-principal) strong { font-size: 1.35rem; }
+  .modo:not(.modo-principal) .modo-texto { font-size: .8rem; line-height: 1.45; }
+  .modo:not(.modo-principal) .modo-fatos { font-size: .72rem; gap: 2px 10px; }
+  .modo-principal { padding-top: 120px; }
+  .modo-obj.leque { right: 4px; top: 6px; }
+}
+
+/* ---- V6 + C4: a sala de espera ---- */
+/* o código ganha a moldura do quadro "A mesa é aqui" da parede da mesa 2D */
+.lobby-placa {
+  position: relative; background: #16261f; border: 7px solid #4a3020; border-radius: 6px;
+  padding: 12px 12px 10px; box-shadow: 0 14px 24px -12px #000; text-align: center;
+}
+.lobby-placa::before { content: ''; position: absolute; inset: 6px; border: 1.5px solid rgba(201, 162, 78, 0.7); pointer-events: none; }
+.lobby-placa .lobby-label { color: #8fae9c; font-size: .8rem; margin: 0; }
+#screen-lobby .lobby-placa .lobby-code { color: var(--cream, #f5f1e6); padding: 0; margin-left: .18em; text-shadow: none; }
+.lobby-placa .naipe-placa { width: 14px; height: 14px; fill: #c9a24e; display: block; margin: 2px auto 0; }
+.lobby-convite { display: grid; grid-template-columns: 112px 1fr; gap: 14px; align-items: center; text-align: left; }
+.lobby-convite .lobby-qr { width: 112px; height: 112px; margin: 0; border-width: 4px; }
+.lobby-convite .lado { display: grid; gap: 8px; min-width: 0; }
+.lobby-convite p { margin: 0; font-size: .86rem; line-height: 1.4; color: #d9d1bd; font-weight: 600; }
+.lobby-convite .btn { display: flex; gap: 8px; align-items: center; justify-content: center; font-size: .9rem; padding: 10px 12px; }
+/* sem QR (servidor sem a biblioteca), o convite ocupa a linha toda */
+.lobby-convite:has(.lobby-qr[hidden]) { grid-template-columns: 1fr; }
+/* o endereço comprido quebrava em duas linhas; fica só para leitor de tela,
+   e o botão copia ou compartilha */
+.lobby-url:not(.visivel) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* os botões: robô e nível dividem uma linha; começar vai sozinho, inteiro */
+#screen-lobby .lobby-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#screen-lobby .lobby-actions .btn { font-size: .92rem; padding: 11px 8px; min-width: 0; }
+/* se só um dos dois aparece (quem não criou a sala não adiciona robô), ele
+   ocupa a linha; se nenhum aparece, a linha some */
+#screen-lobby .lobby-actions .btn[hidden] + .btn,
+#screen-lobby .lobby-actions .btn:has(+ .btn[hidden]) { grid-column: 1 / -1; }
+#screen-lobby .lobby-actions:not(:has(.btn:not([hidden]))) { display: none; }
+#screen-lobby #btn-start { width: 100%; }
+#screen-lobby #btn-nivel-robos { border: 1.5px solid rgba(245, 241, 230, 0.12); }
+.lobby-rodape { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+.lobby-rodape .btn { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: .92rem; border: 1.5px solid rgba(245, 241, 230, 0.12); }
+
+/* ---- os ícones desenhados (V8) ---- */
+.ico { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+.icon-btn { display: inline-grid; place-items: center; }
+.btn-claim .ico { margin-right: 6px; vertical-align: -4px; }
+
+/* ---- C5 + C8: a barra de cima da mesa cabe em 375 px ---- */
+/* o placar abre tocando na rodada; ficam cinco botões de ícone */
+#screen-game .round-pill {
+  font: inherit; text-align: left; cursor: pointer; color: inherit; min-width: 0;
+  display: flex; flex-direction: row; align-items: center; gap: 8px;
+  padding: 4px 10px 4px 4px; border-radius: 12px;
+  border: 1.5px solid rgba(201, 162, 78, 0.3); background: rgba(255, 255, 255, 0.03);
+}
+#screen-game .round-pill .sigma {
+  width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+  display: grid; place-items: center; font-weight: 900; font-size: .95rem;
+  background: rgba(242, 193, 78, 0.14); color: var(--gold, #f2c14e);
+}
+#screen-game .round-pill .linhas { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+#screen-game .round-pill span#round-label { white-space: nowrap; }
+#screen-game .round-pill:focus-visible { outline: 3px solid var(--gold, #f2c14e); outline-offset: 2px; }
+#screen-game .topbar-btns { gap: 6px; align-items: center; }
+#screen-game .icon-btn { width: 38px; height: 38px; min-width: 38px; padding: 0; border-radius: 11px; position: relative; }
+/* área de toque de 44 px sem crescer o desenho */
+#screen-game .icon-btn::after { content: ''; position: absolute; inset: -3px; }
+#screen-game .icon-btn.btn-3d { font-size: .82rem; }
+/* o selo dos detalhes da voz, encostado no canto do microfone */
+.voice-details {
+  width: 20px; height: 20px; min-width: 0; padding: 0; margin: -22px 0 0 -16px;
+  border-radius: 50%; font-size: .72rem; line-height: 1; display: grid; place-items: center;
+  position: relative; z-index: 1; border: 1.5px solid #98b292aa; background: #1b110b;
+}
+.voice-details[hidden] { display: none; }
+@media (max-width: 430px) {
+  #screen-game .topbar { padding: max(8px, env(safe-area-inset-top)) 10px 8px; gap: 8px; }
+  #screen-game .topbar-btns { gap: 4px; }
+  #screen-game .topbar-btns .icon-btn { width: 36px; height: 36px; min-width: 36px; line-height: normal; }
+  #screen-game .round-pill { padding-right: 8px; gap: 6px; }
+  #screen-game .round-pill .sigma { width: 26px; height: 26px; }
+  #screen-game .round-pill span { font-size: .66rem; }
+  #screen-game .round-pill strong { font-size: .92rem; }
+  .voice-details { font-size: .66rem; padding: 0; }
+}
+@media (max-width: 360px) {
+  #screen-game .topbar { flex-wrap: nowrap; }
+  #screen-game .topbar-btns .icon-btn { width: 33px; height: 33px; min-width: 33px; }
+  #screen-game .topbar-btns { gap: 3px; }
+}
+
+/* ---- V7: em volta da mesa de madeira, madeira escura — não mais feltro ---- */
+#screen-game .topbar { background: rgba(27, 17, 11, 0.94); border-bottom-color: var(--cn-linha); }
+#screen-game .action-bar { background: rgba(27, 17, 11, 0.9); border-top-color: var(--cn-linha); }
+#screen-game .hand { background: linear-gradient(rgba(27, 17, 11, 0.55), #120b06); }
+#screen-game .turn-banner:not(.me):not(.evento) { background: rgba(27, 17, 11, 0.85); border-color: rgba(201, 162, 78, 0.3); }
+#screen-game .icon-btn { border-color: rgba(201, 162, 78, 0.3); background: rgba(255, 255, 255, 0.04); }
+#screen-game .action-bar .btn { border-color: rgba(201, 162, 78, 0.35); }

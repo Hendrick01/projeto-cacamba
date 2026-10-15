@@ -72,7 +72,10 @@ button:focus-visible,a:focus-visible,input:focus-visible { outline:3px solid var
 #screen-game .action-bar { max-width:760px;width:100%;margin-inline:auto;padding:10px 14px;border-top:1px solid var(--ui-line);background:#0d251ed9;min-height:58px; }
 #screen-game .action-bar .btn { border-radius:10px;border-width:1px;min-height:42px;font-size:.8rem;padding:10px 13px; }
 #screen-game .hand { width:100%;max-width:760px;margin-inline:auto;padding:24px 12px calc(20px + env(safe-area-inset-bottom));gap:18px;background:linear-gradient(#102c2380,#0a201b); }
-#screen-game .hand .card { width:60px;height:84px;transform-origin:50% 100%;border-radius:7px;background-color:#fff7e6; }
+/* Sem largura/altura aqui: o 60×84 que morava nesta linha vencia, por
+   especificidade, as cartas maiores de 08/10/2026 (66×92, 74×104 em tela
+   grande, no style.css) — a mão nunca chegou a crescer. */
+#screen-game .hand .card { transform-origin:50% 100%;border-radius:7px;background-color:#fff7e6; }
 #screen-game .hand .card.sel { z-index:auto;transform:rotate(var(--giro,0deg)) translateY(-15px);outline:2px solid #f5ca73;outline-offset:1px;box-shadow:0 6px 18px #0005; }
 #screen-game .hand .card.nova:not(.sel) { transform:rotate(var(--giro,0deg)) translateY(-8px);box-shadow:0 0 0 2px #8cc9a5,0 5px 14px #0004; }
 #screen-game .hand .card.arrastando { z-index:20; }
