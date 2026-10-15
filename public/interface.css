@@ -160,3 +160,28 @@ body.ui-3d .action-3d { bottom:var(--acao-fundo,calc(var(--hand-height,160px) + 
      ali viraria um retângulo por cima das palavras */
   #screen-home .ui-stage { background:none;border-radius:0; }
 }
+
+/* ---- Escolha do modo (porta da casa) ---------------------------------- */
+.modos { display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:stretch; }
+.modos .ui-eyebrow,.modos-titulo { grid-column:1/-1; }
+.modos-titulo { font-family:var(--font-display),Georgia,serif;font-weight:400;font-size:clamp(2.4rem,5vw,4.2rem);line-height:1;color:var(--ui-paper);margin:-4px 0 14px; }
+.modo { display:flex;flex-direction:column;gap:12px;text-align:left;padding:26px;border-radius:24px;border:1px solid var(--ui-line);background:linear-gradient(145deg,#243f34ed,#122d26fa);color:#c7d6c8;cursor:pointer;box-shadow:0 20px 50px #0004,inset 0 1px #fff1;transition:transform .15s,border-color .15s; }
+.modo:hover { transform:translateY(-3px);border-color:#f6cc7899; }
+.modo strong { font-family:var(--font-display),Georgia,serif;font-weight:400;font-size:2.1rem;color:var(--ui-paper);line-height:1; }
+.modo-texto { font-size:.9rem;line-height:1.6;font-weight:600; }
+.modo-fatos { display:flex;gap:18px;flex-wrap:wrap;font-size:.75rem;color:#a9c0b0; }
+.modo-fatos b { color:var(--ui-paper); }
+.modo-ir { margin-top:auto;padding-top:6px;font-weight:900;color:var(--ui-gold); }
+.modo-principal { background:linear-gradient(145deg,#3a5a3f,#173a2e);border-color:#f6cc7888;padding:34px; }
+.modo-principal strong { font-size:3.4rem;color:var(--ui-gold); }
+.modo-principal .modo-ir { display:inline-flex;align-self:flex-start;padding:13px 18px;border-radius:12px;background:linear-gradient(120deg,#f6d795,#e7b45e);color:#2d291d; }
+.modo-selo { align-self:flex-start;font-size:.64rem;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#2d291d;background:var(--ui-gold);padding:4px 10px;border-radius:30px; }
+.btn-modos { background:none;border:0;cursor:pointer;padding:0;font:inherit;color:var(--ui-gold); }
+.lobby-modo { margin:0 0 6px;font-size:.72rem;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--ui-gold);text-align:center; }
+.lobby-modo:empty { display:none; }
+@media (max-width:760px) {
+  .modos { grid-template-columns:1fr;gap:14px; }
+  .modo { padding:20px; }
+  .modo-principal { padding:24px; }
+  .modo-principal strong { font-size:2.6rem; }
+}

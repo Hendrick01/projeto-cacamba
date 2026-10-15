@@ -95,6 +95,8 @@ function conecta() {
   ws.onmessage = (e) => {
     let msg; try { msg = JSON.parse(e.data); } catch { return; }
     if (msg.t === 'state') {
+      // A mesa 3D ainda é só do Caçamba: sala de Presidente volta para a 2D.
+      if (msg.view?.modo === 'presidente') { location.replace('/'); return; }
       const primeira = !view;
       view = msg.view;
       controlesVoz.presenca(view.players);

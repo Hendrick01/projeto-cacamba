@@ -31,6 +31,7 @@ let lobby = null;         // última visão da sala
 let session = loadJSON('cacamba-session');
 let selected = new Set(); // cartas da mão selecionadas (ids)
 let sortMode = localStorage.getItem('cacamba-sort') || 'suit';
+let ordemPresidente = 'forca';
 // Ordem escolhida à mão pelo jogador. Vazia = ordenação automática. Vive só
 // nesta rodada: os ids das cartas recomeçam a cada uma.
 let ordemManual = [];
@@ -82,7 +83,7 @@ function connect() {
     if (event.code === 4001 || event.code === 1008) {
       voz.desligar();
       toast(event.code === 4001 ? 'Partida aberta em outra janela. Recarregue para voltar aqui.' : 'Conexão pausada por excesso de mensagens. Aguarde e recarregue.');
-      if (!$('screen-retomando').hidden) showScreen('home');
+      if (!$('screen-retomando').hidden) showScreen(telaInicial());
       return;
     }
     setTimeout(connect, reconnectDelay);
@@ -153,6 +154,17 @@ function handleMessage(msg) {
       break;
     }
     case 'state':
+      // A mesa do Presidente só é baixada quando a primeira visão dela chega.
+      // Enquanto baixa, as visões seguintes esperam na fila, em ordem.
+      if (msg.view?.modo === 'presidente' && !mesaPresidente) {
+        filaPresidente.push(msg);
+        if (filaPresidente.length === 1) {
+          carregaPresidente()
+            .then(() => { const fila = filaPresidente.splice(0); for (const m of fila) handleMessage(m); })
+            .catch(() => { filaPresidente.length = 0; toast('⚠️ Não deu para abrir a mesa do Presidente. Recarregue a página.'); });
+        }
+        break;
+      }
       view = msg.view;
       controlesVoz.presenca(view.players);
       showScreen('game');
@@ -181,7 +193,7 @@ function handleMessage(msg) {
       }
       voz.desligar();
       saveSession(null);
-      showScreen('home');
+      showScreen(telaInicial());
       break;
   }
 }
@@ -202,7 +214,7 @@ function avisaVersaoNova() {
 // ---------------- Telas ----------------
 
 function showScreen(name) {
-  for (const s of ['home', 'retomando', 'avatar', 'loja', 'lobby', 'game']) $(`screen-${s}`).hidden = s !== name;
+  for (const s of ['modos', 'home', 'retomando', 'avatar', 'loja', 'lobby', 'game']) $(`screen-${s}`).hidden = s !== name;
 }
 
 const me = () => session?.playerId;
@@ -218,6 +230,55 @@ function playerName(id) {
 
 const params = new URLSearchParams(location.search);
 if (params.get('sala')) $('code-input').value = params.get('sala').toUpperCase();
+
+// ---------------- Modos de jogo ----------------
+// A porta da casa mostra os modos; o Caçamba é o principal. Quem chega por
+// convite (?sala=) vai direto ao formulário: a sala já tem modo, e é ela que
+// manda. O modo escolhido aqui só vale para CRIAR sala.
+const MODOS = {
+  cacamba: {
+    nome: 'Caçamba',
+    titulo: 'Caçamba<br><em>tradicional do muquifão</em>',
+    fatos: '<span><strong>2–8</strong>jogadores</span><span><strong>7</strong>rodadas</span><span><strong>Menos pontos</strong>mais perto da vitória</span>',
+    min: DEFAULT_OPTS.minPlayers,
+  },
+  presidente: {
+    nome: 'Presidente',
+    titulo: 'Presidente<br><em>quem sai primeiro manda</em>',
+    fatos: '<span><strong>3–8</strong>jogadores</span><span><strong>3 … A, 2</strong>a mais forte</span><span><strong>Cu</strong>entrega as melhores</span>',
+    min: 3,
+  },
+};
+let modoDaCasa = 'cacamba';
+function telaInicial() { return params.get('sala') ? 'home' : 'modos'; }
+function escolheModo(modo) {
+  modoDaCasa = MODOS[modo] ? modo : 'cacamba';
+  const m = MODOS[modoDaCasa];
+  $('home-marca').textContent = m.nome;
+  $('home-titulo').innerHTML = m.titulo;
+  $('home-fatos').innerHTML = m.fatos;
+  showScreen('home');
+}
+$('modo-cacamba').onclick = () => escolheModo('cacamba');
+$('modo-presidente').onclick = () => {
+  escolheModo('presidente');
+  carregaPresidente().catch(() => {});   // já vai baixando enquanto a pessoa digita o nome
+};
+$('btn-modos').onclick = () => showScreen('modos');
+
+// A MESA DO PRESIDENTE. Só é baixada quando alguém escolhe o modo ou cai numa
+// sala dele: quem joga Caçamba nunca paga por ela.
+let mesaPresidente = null;
+let carregandoPresidente = null;
+const filaPresidente = [];
+function carregaPresidente() {
+  carregandoPresidente ||= import('./presidente-mesa.js').then((mod) => {
+    mesaPresidente = mod.criaMesaPresidente(contextoDaMesa());
+    return mesaPresidente;
+  });
+  return carregandoPresidente;
+}
+const ehPresidente = () => view?.modo === 'presidente';
 $('name-input').value = localStorage.getItem('cacamba-name') || '';
 
 function myNameInput() {
@@ -234,7 +295,7 @@ function myNameInput() {
 
 $('btn-create').onclick = () => {
   const name = myNameInput();
-  if (name) { saveSession(null); sendMsg({ t: 'create', name, avatar: meuPersonagem }); }
+  if (name) { saveSession(null); sendMsg({ t: 'create', name, avatar: meuPersonagem, modo: modoDaCasa }); }
 };
 $('btn-join').onclick = () => {
   const name = myNameInput();
@@ -321,7 +382,10 @@ $('btn-avatar-ok').onclick = () => {
 
 montaMiniaturas();
 pintaBotaoPersonagem();
-$('btn-rules-home').onclick = () => showRules();
+$('btn-rules-home').onclick = () => {
+  if (modoDaCasa === 'presidente') carregaPresidente().then((m) => m.regras()).catch(() => {});
+  else showRules();
+};
 
 // ---------------- A loja ----------------
 // A prateleira é desenhada a partir de shared/catalogo.js, o mesmo arquivo que
@@ -499,6 +563,8 @@ async function copiaPix() {
 function renderLobby() {
   if (!lobby) return;
   $('lobby-code').textContent = lobby.code;
+  const modoDaSala = MODOS[lobby.modo] ? lobby.modo : 'cacamba';
+  $('lobby-modo').textContent = `Mesa de ${MODOS[modoDaSala].nome}`;
   $('lobby-url').textContent = lobby.joinUrl;
   if (lobby.qr) { $('lobby-qr').src = lobby.qr; $('lobby-qr').hidden = false; }
 
@@ -535,7 +601,7 @@ function renderLobby() {
   $('btn-nivel-robos').textContent = facil ? '🤖 Robôs: fáceis' : '🤖 Robôs: normais';
   $('btn-nivel-robos').title = isHost() ? 'Toque para trocar. Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.' : 'Quem criou a sala escolhe o nível dos robôs.';
   $('btn-start').hidden = !isHost();
-  $('btn-start').disabled = lobby.players.length < DEFAULT_OPTS.minPlayers;
+  $('btn-start').disabled = lobby.players.length < MODOS[modoDaSala].min;
   $('lobby-wait').hidden = isHost();
 }
 
@@ -786,6 +852,11 @@ function confirmarTroca(troca, destino) {
 // moram em shared/mao.js, onde dá para testá-las sem navegador — foi ali que
 // morou o bug da carta nova presa no canto do leque.
 function sortedHand() {
+  // No Presidente o que importa é a força (3 … A, 2), não o valor de face.
+  // Tem ordem própria (começa pela força) para não herdar a do Caçamba.
+  if (ehPresidente() && !ordemManual.length) {
+    return ordemPresidente === 'suit' ? ordenaMao(view?.you?.hand || [], [], 'suit') : mesaPresidente.ordena(view?.you?.hand || []);
+  }
   return ordenaMao(view?.you?.hand || [], ordemManual, sortMode);
 }
 
@@ -816,6 +887,14 @@ function mandaPresenca() {
 
 function render() {
   if (!view) return;
+  $('screen-game').classList.toggle('modo-presidente', ehPresidente());
+  if (ehPresidente()) {
+    marcaCartasNovas();
+    selected = new Set([...selected].filter((id) => (view.you?.hand || []).some((c) => c.id === id)));
+    mesaPresidente.render();
+    notifyTurn();
+    return;
+  }
   marcaCartasNovas();
   selected = new Set([...selected].filter((id) => (view.you?.hand || []).some((c) => c.id === id)));
 
@@ -1046,6 +1125,7 @@ function renderMeuAssento() {
 // não cabem no assento — com 7 adversários numa tela de 375 não há largura — e
 // para encaixar carta os jogos dos outros já aparecem na fileira de baixo.
 function mostraOponente(playerId) {
+  if (ehPresidente()) { mesaPresidente.mostraJogador(playerId); return; }
   const p = view.players.find((x) => x.id === playerId);
   if (!p) return;
   const prog = progressoDoContrato(p);
@@ -1160,6 +1240,12 @@ function atualizaBanner() {
   if (eventoNoBanner) {
     banner.textContent = eventoNoBanner;
     banner.className = 'turn-banner evento';
+    return;
+  }
+  if (ehPresidente()) {
+    const t = mesaPresidente.textoDaVez();
+    banner.textContent = t.texto;
+    banner.className = `turn-banner${t.minha ? ' me' : ''}`;
     return;
   }
   if (view.phase === 'draw' || view.phase === 'play') {
@@ -1511,7 +1597,8 @@ function montaLeque(fila, cartas, largura) {
     el.onclick = () => {
       // Se o dedo arrastou, o gesto foi de arrumar: não seleciona.
       if (el.dataset.arrastou === '1') { delete el.dataset.arrastou; return; }
-      if (selected.has(card.id)) selected.delete(card.id);
+      if (ehPresidente()) mesaPresidente.toca(card, selected);
+      else if (selected.has(card.id)) selected.delete(card.id);
       else selected.add(card.id);
       render();
     };
@@ -1772,14 +1859,15 @@ $('btn-cancel-mode').onclick = () => { meldDiscardMode = false; render(); };
 montaEmotes({ botao: $('btn-emote'), envia: (k) => { sendMsg({ t: 'emote', k }); mostraEmote(me(), k); } });
 montaEmotes({ botao: $('btn-emote-lobby'), envia: (k) => { sendMsg({ t: 'emote', k }); mostraEmote(me(), k); } });
 $('btn-sort').onclick = () => {
+  if (ehPresidente()) { ordemPresidente = ordemPresidente === 'suit' ? 'forca' : 'suit'; ordemManual = []; render(); return; }
   sortMode = sortMode === 'suit' ? 'rank' : 'suit';
   ordemManual = [];   // pediu ordenação automática: a arrumação à mão sai de cena
   try { localStorage.setItem('cacamba-sort', sortMode); } catch { /* ok */ }
   render();
 };
 
-$('btn-rules').onclick = () => showRules();
-$('btn-score').onclick = () => showScore();
+$('btn-rules').onclick = () => (ehPresidente() ? mesaPresidente.regras() : showRules());
+$('btn-score').onclick = () => (ehPresidente() ? mesaPresidente.placar() : showScore());
 // A mesa em 3D é outra janela para a MESMA partida: entra com a sessão
 // guardada e conversa com o mesmo servidor. A biblioteca dela (three.js) só é
 // baixada quando se abre — a mesa normal continua leve.
@@ -1867,6 +1955,10 @@ const REACOES = {
   perdeu:  { texto: 'ah, não…',   gesto: 'murcha', cara: 'bravo' },
   coringa: { texto: 'coringa!',  gesto: 'pula',   cara: 'feliz' },
   saiu:    { texto: 'fui',        gesto: 'murcha', cara: null },
+  // Presidente
+  presidente: { texto: 'sou o presidente!', gesto: 'pula', cara: 'feliz' },
+  livre:      { texto: 'tô fora!',          gesto: 'pula', cara: 'feliz' },
+  cu:         { texto: 'ah, não…',          gesto: 'murcha', cara: 'bravo' },
 };
 
 // EMOTES e frases prontas (17/09/2026): o mesmo balão das reações, maior e
@@ -1956,6 +2048,7 @@ function anunciaRodada(round) {
 let lastTurnWasMine = false;
 
 function announce(ev) {
+  if (ehPresidente() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaPresidente.anuncia(ev); return; }
   switch (ev.e) {
     case 'roundStart':
       distribuirPendente = true;
@@ -2065,7 +2158,7 @@ function announce(ev) {
 function toast(text) {
   // Na mesa, o aviso vai para a linha da vez (veja `atualizaBanner`); o
   // pop-up fica só para onde não há banner — saguão, placar, avisos de sistema.
-  const naMesa = view && (view.phase === 'draw' || view.phase === 'play') && $('screen-game') && !$('screen-game').hidden;
+  const naMesa = view && ['draw', 'play', 'troca'].includes(view.phase) && $('screen-game') && !$('screen-game').hidden;
   if (naMesa && $('turn-banner')) {
     filaDeEventos.push(text);
     while (filaDeEventos.length > 3) filaDeEventos.shift();
@@ -2083,7 +2176,7 @@ function toast(text) {
 
 // Vibra e avisa quando a vez chega
 function notifyTurn() {
-  const mine = myTurn() && (view.phase === 'draw' || view.phase === 'play');
+  const mine = myTurn() && ['draw', 'play', 'troca'].includes(view.phase);
   if (mine && !lastTurnWasMine) {
     // Só depois de um toque de verdade: antes disso o Chrome recusa e registra
     // um erro no console a cada chamada (77 numa partida dirigida por script).
@@ -2320,14 +2413,29 @@ function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 
+// O que a mesa do Presidente usa daqui: assentos, leque da mão, cartas,
+// avisos e modais são os MESMOS do Caçamba — só a regra muda.
+function contextoDaMesa() {
+  return {
+    $, me, isHost, sendAction, sendMsg, toast, showModal, closeModal, escapeHTML, playerName,
+    cardEl, avatarEl, assentos, reage, repete, semMovimento, figuraFeliz, render,
+    renderOpponents, renderHand, atualizaBanner,
+    caraDoJogador: (id) => caraDe(personagemDe(id, view.players)),
+    corDoJogador: (id) => CORES_DE_ASSENTO[assentoDe(id, view.players) % CORES_DE_ASSENTO.length],
+    get view() { return view; },
+    get selected() { return selected; },
+    novaRodada() { selected.clear(); ordemManual = []; cartasNovas.clear(); maoAnterior = null; },
+  };
+}
+
 // ---------------- Início ----------------
 
 // Com sessão guardada a página abre na ESPERA, não na tela inicial: quem volta
 // da mesa 3D (ou recarrega) via o formulário de início piscar até a partida
 // chegar pela conexão — "jogado para a tela de início" (usuário, 08/10/2026).
 // Se a partida não vier em 8 s, aí sim a tela inicial.
-showScreen(session ? 'retomando' : 'home');
+showScreen(session ? 'retomando' : telaInicial());
 connect();
-if (session) setTimeout(() => { if (!$('screen-retomando').hidden) showScreen('home'); }, 8000);
+if (session) setTimeout(() => { if (!$('screen-retomando').hidden) showScreen(telaInicial()); }, 8000);
 
 // interface-2026-09-07-r1

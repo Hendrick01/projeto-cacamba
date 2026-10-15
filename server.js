@@ -18,6 +18,7 @@ import {
   botNextAction, botWantsCard, actClaim, DEFAULT_OPTS, conferirBaralho, NIVEIS_DE_ROBO,
   podeComprarDoDescarte, topoDoDescarte,
 } from './shared/engine.js';
+import * as Presidente from './shared/presidente.js';
 import { personagemValido } from './shared/elenco.js';
 import { emoteDe } from './shared/emotes.js';
 import { chaveDasSalas, sela, abre } from './lib/selo-sala.js';
@@ -28,6 +29,23 @@ import { contaDaSessao } from './lib/contas.js';
 import { migra, temBanco } from './lib/banco.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// MODOS DE JOGO. A sala nasce num modo e não muda. Cada modo tem o seu motor
+// em shared/; o servidor só escolhe qual chamar. O Caçamba é o principal e o
+// padrão: mensagem sem `modo`, retrato antigo sem `modo`, tudo vira Caçamba.
+const MODOS = {
+  cacamba: {
+    createGame, startRound, applyAction, actNextRound, viewFor, botNextAction,
+    FASES_DE_VEZ: ['draw', 'play'], MIN: DEFAULT_OPTS.minPlayers, MAX: DEFAULT_OPTS.maxPlayers,
+  },
+  presidente: {
+    createGame: Presidente.createGame, startRound: Presidente.startRound, applyAction: Presidente.applyAction,
+    actNextRound: Presidente.actNextRound, viewFor: Presidente.viewFor, botNextAction: Presidente.botNextAction,
+    FASES_DE_VEZ: Presidente.FASES_DE_VEZ, MIN: Presidente.MIN_JOGADORES, MAX: Presidente.MAX_JOGADORES,
+  },
+};
+const modoValido = (m) => (Object.hasOwn(MODOS, m) ? m : 'cacamba');
+const motorDe = (room) => MODOS[modoValido(room.modo)];
 const cliValue = (name) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
 const PORT = Number(process.env.PORT || cliValue('--port')) || 3000;
 // Hospedagens injetam a porta e esperam que o processo escute em todas as
@@ -366,6 +384,7 @@ function retratoDaSala(room) {
   return {
     v: 1, seq: room.seloSeq, em: Date.now(),
     code: room.code, origin: room.origin, gameSeq: room.gameSeq, createdAt: room.createdAt, nivelRobos: room.nivelRobos || 'normal',
+    modo: modoValido(room.modo),
     players: room.players.map(({ ws, ...p }) => p),   // sem o socket
     game: room.game,                                   // `rnd` é função: some no JSON, volta na restauração
   };
@@ -398,6 +417,7 @@ function recriaSala(d, origin) {
     createdAt: d.createdAt || Date.now(),
     seloSeq: d.seq || 0, restauradaEm: Date.now(), mexeu: false,
     nivelRobos: NIVEIS_DE_ROBO.includes(d.nivelRobos) ? d.nivelRobos : 'normal',
+    modo: modoValido(d.modo),
   };
   if (room.game) room.game.rnd = Math.random;
   rooms.set(room.code, room);
@@ -478,9 +498,10 @@ function sanitizeName(name) {
   return clean || 'Jogador';
 }
 
-function newRoom(origin = LAN_HOST) {
+function newRoom(origin = LAN_HOST, modo = 'cacamba') {
   const room = {
     code: makeCode(),
+    modo: modoValido(modo),
     players: [], // { id, name, token, isBot, ws, connected, lastSeen }
     game: null,
     gameSeq: 0,     // sobe a cada partida nova: invalida chave de timer antiga
@@ -523,6 +544,7 @@ function lobbyView(room) {
     joinUrl: `${room.origin}/?sala=${room.code}`,
     qr: room.qr,
     started: !!room.game,
+    modo: modoValido(room.modo),
     nivelRobos: room.nivelRobos || 'normal',
     players: room.players.map((p) => ({
       id: p.id, name: p.name, isBot: p.isBot, connected: p.isBot || p.connected,
@@ -553,7 +575,7 @@ function comPresenca(room, view) {
 function broadcastState(room, events = []) {
   if (!room.game) return;
   for (const p of room.players) {
-    if (!p.isBot) send(p.ws, { t: 'state', view: comPresenca(room, viewFor(room.game, p.id)), events });
+    if (!p.isBot) send(p.ws, { t: 'state', view: comPresenca(room, motorDe(room).viewFor(room.game, p.id)), events });
   }
   if (events.length) { room.mexeu = true; robosReagem(room, events); }
   // O RETRATO vai a cada passagem de vez, começo e fim de rodada — não a cada
@@ -589,6 +611,10 @@ function robosReagem(room, events) {
     } else if (ev.e === 'claimVoid' && ehRobo(ev.p) && Math.random() < 0.5) roboFala(room, 'perdao', ev.p);
     else if (ev.e === 'baixou' && ev.completa && !ehRobo(ev.p) && Math.random() < 0.35) roboFala(room, 'quer-tudo');
     else if (ev.e === 'buy' && ehRobo(ev.p) && Math.random() < 0.25) roboFala(room, 'pisca', ev.p);
+    else if (ev.e === 'saiu' && ev.pos === 0) {
+      if (ehRobo(ev.p)) roboFala(room, 'muito-bem', ev.p);
+      else if (Math.random() < 0.6) roboFala(room, Math.random() < 0.5 ? 'palmas' : 'nojo');
+    }
   }
 }
 // humano presente demorando na vez: depois de meio minuto, um robô cobra
@@ -598,7 +624,7 @@ function armaCobranca(room, game, atual) {
   clearTimeout(room.cobrancaTimer); room.cobrancaChave = chave;
   room.cobrancaTimer = setTimeout(() => {
     if (room.game !== game || game.players[game.turn]?.id !== atual.id) return;
-    if (game.phase !== 'draw' && game.phase !== 'play') return;
+    if (!motorDe(room).FASES_DE_VEZ.includes(game.phase)) return;
     roboFala(room, Math.random() < 0.6 ? 'demora' : 'bora');
   }, 28000 + Math.random() * 9000);
   room.cobrancaTimer.unref?.();
@@ -610,7 +636,8 @@ const AWAY_TAKEOVER_MS = 45_000;
 
 function scheduleBots(room) {
   const game = room.game;
-  if (!game || (game.phase !== 'draw' && game.phase !== 'play')) {
+  const motor = motorDe(room);
+  if (!game || !motor.FASES_DE_VEZ.includes(game.phase)) {
     if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; room.botTimerKey = null; }
     return;
   }
@@ -620,7 +647,7 @@ function scheduleBots(room) {
 
   // Bots fora da vez pedem a carta recém-descartada (se ela ajuda e se ela
   // está comprável — coringa descartado tranca o meio)
-  if (game.phase === 'draw' && game.discardFresh && podeComprarDoDescarte(game)) {
+  if (motor === MODOS.cacamba && game.phase === 'draw' && game.discardFresh && podeComprarDoDescarte(game)) {
     const top = topoDoDescarte(game);
     let claimed = false;
     for (const gp of game.players) {
@@ -653,7 +680,7 @@ function scheduleBots(room) {
 
   // Janela maior quando há carta comprável (dá tempo do humano pedir).
   // Humano caído: espera generosa na primeira ação; depois ritmo de bot.
-  const buyWindow = game.phase === 'draw' && game.discardFresh && podeComprarDoDescarte(game);
+  const buyWindow = motor === MODOS.cacamba && game.phase === 'draw' && game.discardFresh && podeComprarDoDescarte(game);
   // Ritmo do robô: rápido demais a mesa parecia um caixa eletrônico, com as
   // jogadas dos outros acontecendo antes de dar tempo de ler o que houve.
   const delay = away
@@ -664,7 +691,7 @@ function scheduleBots(room) {
     room.botTimer = null;
     room.botTimerKey = null;
     if (!room.game || room.game !== game) return;
-    if (game.phase !== 'draw' && game.phase !== 'play') return;
+    if (!motor.FASES_DE_VEZ.includes(game.phase)) return;
     if (game.players[game.turn].id !== current.id) return;
     const actor = room.players.find((p) => p.id === current.id);
     if (!actor) return;
@@ -673,9 +700,9 @@ function scheduleBots(room) {
       actor.awayActed = true;
     }
     try {
-      const action = botNextAction(game, current.id);
+      const action = motor.botNextAction(game, current.id);
       if (!action) return;
-      let events = applyAction(game, current.id, action);
+      let events = motor.applyAction(game, current.id, action);
       if (!actor.isBot && !actor.awayNotified) {
         actor.awayNotified = true;
         events = [{ e: 'away', p: current.id }, ...events];
@@ -856,7 +883,7 @@ function attach(ws, room, player) {
   send(ws, { t: 'welcome', playerId: player.id, token: player.token, code: room.code });
   broadcastLobby(room);
   if (room.game) {
-    send(ws, { t: 'state', view: comPresenca(room, viewFor(room.game, player.id)), events: [] });
+    send(ws, { t: 'state', view: comPresenca(room, motorDe(room).viewFor(room.game, player.id)), events: [] });
     enviaSelo(room, player);
   }
 }
@@ -866,7 +893,7 @@ function handle(ws, msg) {
   switch (msg.t) {
     case 'create': {
       if (rooms.size >= MAX_SALAS) { const e = new Error('O servidor está lotado de salas agora. Tente daqui a pouco.'); e.gameRule = true; throw e; }
-      const room = newRoom(ws.origin);
+      const room = newRoom(ws.origin, msg.modo);
       const player = {
         id: crypto.randomUUID(), name: sanitizeName(msg.name), token: crypto.randomUUID(),
         avatar: personagemEscolhido(msg.avatar),
@@ -999,17 +1026,21 @@ function handle(ws, msg) {
       currentPlayer(ws, room);
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode começar.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
-      if (room.players.length < DEFAULT_OPTS.minPlayers) { const e = new Error('Chame pelo menos mais 1 jogador (ou adicione um robô).'); e.gameRule = true; throw e; }
+      const motor = motorDe(room);
+      if (room.players.length < motor.MIN) {
+        const faltam = motor.MIN - room.players.length;
+        const e = new Error(`Chame pelo menos mais ${faltam} jogador${faltam > 1 ? 'es' : ''} (ou adicione robô).`); e.gameRule = true; throw e;
+      }
       // O motor recusaria na hora de distribuir; conferir aqui dá uma mensagem
       // no lobby em vez de derrubar a partida na rodada mais apertada.
-      const aperto = conferirBaralho(room.players.length);
+      const aperto = motor === MODOS.cacamba && conferirBaralho(room.players.length);
       if (aperto) {
         const e = new Error(`Não dá para jogar com ${room.players.length} jogadores: a rodada ${aperto.round + 1} precisaria de ${aperto.precisa} cartas e o baralho tem ${aperto.total}.`);
         e.gameRule = true; throw e;
       }
-      room.game = createGame(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), { nivelRobos: room.nivelRobos || 'normal' });
+      room.game = motor.createGame(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), { nivelRobos: room.nivelRobos || 'normal' });
       room.gameSeq++;
-      const events = startRound(room.game);
+      const events = motor.startRound(room.game);
       broadcastLobby(room);
       broadcastState(room, events);
       scheduleBots(room);
@@ -1029,7 +1060,7 @@ function handle(ws, msg) {
         if (agora - (ws.pedidosDesde || 0) > 1000) { ws.pedidosDesde = agora; ws.pedidos = 0; }
         if (++ws.pedidos > 6) return;
       }
-      const events = applyAction(room.game, player.id, msg.action || {});
+      const events = motorDe(room).applyAction(room.game, player.id, msg.action || {});
       // Ação sem efeito (ex.: pedido de compra atrasado) não gera rebroadcast:
       // junto com a chave do timer em scheduleBots, isso impede que spam de
       // mensagens inofensivas congele os bots ou inunde os outros clientes.
@@ -1093,7 +1124,7 @@ function handle(ws, msg) {
       currentPlayer(ws, room);
       if (!room.game) return;
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode avançar a rodada.'); e.gameRule = true; throw e; }
-      const events = actNextRound(room.game);
+      const events = motorDe(room).actNextRound(room.game);
       broadcastState(room, events);
       scheduleBots(room);
       break;
@@ -1101,7 +1132,7 @@ function handle(ws, msg) {
     case 'playAgain': {
       const room = currentRoom(ws);
       currentPlayer(ws, room);
-      if (!room.game || room.game.phase !== 'gameEnd') return;
+      if (!room.game || room.game.phase !== 'gameEnd' || motorDe(room) !== MODOS.cacamba) return;
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode recomeçar.'); e.gameRule = true; throw e; }
       room.game = createGame(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), { nivelRobos: room.nivelRobos || 'normal' });
       room.gameSeq++;

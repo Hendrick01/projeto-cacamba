@@ -60,16 +60,44 @@
   </defs>
 </svg>
 
-<!-- ======================= TELA INICIAL ======================= -->
-<section id="screen-home" class="screen">
+<!-- ======================= ESCOLHA DO MODO ======================= -->
+<!-- A porta da casa. O Caçamba é o jogo da casa e vem grande, primeiro; o
+     Presidente é a outra mesa. Escolher aqui não baixa nada: o código de cada
+     modo só vem quando se senta à mesa dele. -->
+<section id="screen-modos" class="screen">
   <div class="ui-shell">
-    <header class="ui-top"><div class="ui-brand">Caçamba</div><div class="ui-top-right"><span data-connection role="status">Conectando…</span><span class="ui-version" data-interface-version>UI 07.09 / R1</span></div></header>
+    <header class="ui-top"><div class="ui-brand">Caçamba</div><div class="ui-top-right"><span data-connection role="status">Conectando…</span></div></header>
+    <main class="modos">
+      <p class="ui-eyebrow">Toda sexta, mesa aberta</p>
+      <h1 class="modos-titulo">Qual mesa hoje?</h1>
+      <button id="modo-cacamba" type="button" class="modo modo-principal" data-modo="cacamba">
+        <span class="modo-selo">O jogo da casa</span>
+        <strong>Caçamba</strong>
+        <span class="modo-texto">Tradicional do muquifão: 7 rodadas de contrato, trincas e sequências. Menos pontos, mais perto da vitória.</span>
+        <span class="modo-fatos"><span><b>2–8</b> jogadores</span><span><b>7</b> rodadas</span></span>
+        <span class="modo-ir">Jogar Caçamba →</span>
+      </button>
+      <button id="modo-presidente" type="button" class="modo" data-modo="presidente">
+        <strong>Presidente</strong>
+        <span class="modo-texto">Livre-se das cartas primeiro e vire Presidente. Quem sobra por último vira o Cu, e na rodada seguinte entrega as melhores.</span>
+        <span class="modo-fatos"><span><b>3–8</b> jogadores</span><span><b>3 … A, 2</b> a mais forte</span></span>
+        <span class="modo-ir">Jogar Presidente →</span>
+      </button>
+    </main>
+    <footer class="ui-footer"><span>Mesmo baralho, mesma gelera.</span><span>A cúpula criadora joga aqui.</span></footer>
+  </div>
+</section>
+
+<!-- ======================= TELA INICIAL ======================= -->
+<section id="screen-home" class="screen" hidden>
+  <div class="ui-shell">
+    <header class="ui-top"><button id="btn-modos" type="button" class="ui-brand btn-modos" aria-label="Trocar de jogo">‹ <span id="home-marca">Caçamba</span></button><div class="ui-top-right"><span data-connection role="status">Conectando…</span><span class="ui-version" data-interface-version>UI 07.09 / R1</span></div></header>
     <main class="ui-grid">
       <div class="ui-hero">
         <p class="ui-eyebrow">Toda sexta, mesa aberta</p>
-        <h1>Caçamba<br><em>tradicional do muquifão</em></h1>
+        <h1 id="home-titulo">Caçamba<br><em>tradicional do muquifão</em></h1>
         <p class="ui-description">Junte a gelera, escolhe um dos personagens da grande cúpula criadora e aproveite.</p>
-        <div class="ui-stats"><span><strong>2–8</strong>jogadores</span><span><strong>7</strong>rodadas</span><span><strong>Menos pontos</strong>mais perto da vitória</span></div>
+        <div id="home-fatos" class="ui-stats"><span><strong>2–8</strong>jogadores</span><span><strong>7</strong>rodadas</span><span><strong>Menos pontos</strong>mais perto da vitória</span></div>
         <div class="ui-stage" aria-hidden="true"><div class="palco-inicio"><img id="persona-figura" alt=""></div><span class="ui-mini-card">A<br>♠</span><span class="ui-mini-card">7<br>♥</span></div>
       </div>
       <div class="ui-entry">
@@ -135,6 +163,7 @@
 
 <section id="screen-lobby" class="screen" hidden>
   <div class="home-box">
+    <p id="lobby-modo" class="lobby-modo"></p>
     <p class="lobby-label">Código da sala</p>
     <div id="lobby-code" class="lobby-code">····</div>
     <img id="lobby-qr" class="lobby-qr" alt="QR para entrar na sala" hidden>

@@ -315,6 +315,26 @@ carta exata.
 
 ---
 
+## Modos de jogo: Caçamba e Presidente (15/10/2026)
+
+A página abre na **escolha do modo** (`#screen-modos`): o Caçamba é o jogo da
+casa e vem grande, primeiro; o Presidente é a outra mesa. Quem chega por
+convite (`?sala=`) pula a escolha — a sala já tem modo, e é ela que manda.
+
+- A sala nasce num modo (`room.modo`, vindo do `create`) e não muda. O servidor
+  escolhe o motor por `motorDe(room)`; mensagem ou retrato sem `modo` é Caçamba.
+- `shared/presidente.js` é o motor do Presidente, com a mesma interface que o
+  servidor usa do `engine.js` (`createGame`, `startRound`, `applyAction`,
+  `viewFor`, `botNextAction`, `actNextRound`) e as regras no topo do arquivo.
+  Testes em `test/presidente.test.js`.
+- `public/presidente-mesa.js` + `public/presidente.css` são a mesa 2D do
+  Presidente. São carregados com `import()` só quando alguém escolhe o modo ou
+  cai numa sala dele: quem joga Caçamba nunca baixa esses arquivos. A mesa
+  reaproveita cenário, assentos, leque da mão, cartas, modais e emotes do
+  `client.js` (ver `contextoDaMesa`).
+- A mesa 3D ainda é só do Caçamba: `mesa3d.js` manda sala de Presidente de
+  volta para a 2D.
+
 ## `shared/engine.js` — motor de regras
 
 Módulo puro: recebe estado e devolve estado + lista de eventos. Nunca faz rede,
