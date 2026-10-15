@@ -173,6 +173,15 @@ function handleMessage(msg) {
         }
         break;
       }
+      if (msg.view?.modo === 'poker' && !mesaPoker) {
+        filaPoker.push(msg);
+        if (filaPoker.length === 1) {
+          carregaPoker()
+            .then(() => { const fila = filaPoker.splice(0); for (const m of fila) handleMessage(m); })
+            .catch(() => { filaPoker.length = 0; toast('Não deu para abrir a mesa do Poker. Recarregue a página.'); });
+        }
+        break;
+      }
       view = msg.view;
       controlesVoz.presenca(view.players);
       showScreen('game');
@@ -269,6 +278,12 @@ const MODOS = {
     min: 2, max: 6,
     niveis: ['facil', 'normal', 'dificil'],
   },
+  poker: {
+    nome: 'Poker',
+    titulo: 'Poker<br><em>Texas Hold\'em valendo fichas</em>',
+    fatos: '<span><strong>2–8</strong>jogadores</span><span><strong>1.000</strong>em fichas para cada um</span><span><strong>Leva tudo</strong>quem ficar com todas</span>',
+    min: 2,
+  },
 };
 let modoDaCasa = 'cacamba';
 function telaInicial() { return params.get('sala') ? 'home' : 'modos'; }
@@ -292,6 +307,10 @@ $('modo-domino').onclick = () => {
 $('modo-bazuca').onclick = () => {
   escolheModo('bazuca');
   carregaBazuca().catch(() => {});
+};
+$('modo-poker').onclick = () => {
+  escolheModo('poker');
+  carregaPoker().catch(() => {});
 };
 $('btn-modos').onclick = () => showScreen('modos');
 
@@ -334,6 +353,19 @@ function carregaBazuca() {
   return carregandoBazuca;
 }
 const ehBazuca = () => view?.modo === 'bazuca';
+
+// A MESA DO POKER, no mesmo esquema.
+let mesaPoker = null;
+let carregandoPoker = null;
+const filaPoker = [];
+function carregaPoker() {
+  carregandoPoker ||= import('./poker-mesa.js').then((mod) => {
+    mesaPoker = mod.criaMesaPoker(contextoDaMesa());
+    return mesaPoker;
+  });
+  return carregandoPoker;
+}
+const ehPoker = () => view?.modo === 'poker';
 $('name-input').value = localStorage.getItem('cacamba-name') || '';
 
 function myNameInput() {
@@ -441,6 +473,7 @@ $('btn-rules-home').onclick = () => {
   if (modoDaCasa === 'presidente') carregaPresidente().then((m) => m.regras()).catch(() => {});
   else if (modoDaCasa === 'domino') carregaDomino().then((m) => m.regras()).catch(() => {});
   else if (modoDaCasa === 'bazuca') carregaBazuca().then((m) => m.regras()).catch(() => {});
+  else if (modoDaCasa === 'poker') carregaPoker().then((m) => m.regras()).catch(() => {});
   else showRules();
 };
 
@@ -666,7 +699,10 @@ function renderLobby() {
     $('btn-nivel-robos').title = isHost() ? 'Toque para trocar. Fácil esquece quase tudo; médio às vezes acerta; difícil tem boa memória, mas também erra.' : 'Quem criou a sala escolhe o nível dos robôs.';
   } else {
     $('btn-nivel-robos').textContent = facil ? 'Robôs: fáceis' : 'Robôs: normais';
-    $('btn-nivel-robos').title = isHost() ? 'Toque para trocar. Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.' : 'Quem criou a sala escolhe o nível dos robôs.';
+    const comoEFacil = modoDaSala === 'poker'
+      ? 'Fácil: o robô lê mal a própria mão, paga demais e quase não aumenta.'
+      : 'Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.';
+    $('btn-nivel-robos').title = isHost() ? `Toque para trocar. ${comoEFacil}` : 'Quem criou a sala escolhe o nível dos robôs.';
   }
   $('btn-start').hidden = !isHost();
   const faltam = MODOS[modoDaSala].min - lobby.players.length;
@@ -1108,6 +1144,12 @@ function renderMesa() {
   $('screen-game').classList.toggle('modo-presidente', ehPresidente());
   $('screen-game').classList.toggle('modo-domino', ehDomino());
   $('screen-game').classList.toggle('modo-bazuca', ehBazuca());
+  $('screen-game').classList.toggle('modo-poker', ehPoker());
+  if (ehPoker()) {
+    mesaPoker.render();
+    notifyTurn();
+    return;
+  }
   if (ehBazuca()) {
     mesaBazuca.render();
     notifyTurn();
@@ -1373,6 +1415,7 @@ function mostraOponente(playerId) {
   if (ehPresidente()) { mesaPresidente.mostraJogador(playerId); return; }
   if (ehDomino()) { mesaDomino.mostraJogador(playerId); return; }
   if (ehBazuca()) { mesaBazuca.mostraJogador(playerId); return; }
+  if (ehPoker()) { mesaPoker.mostraJogador(playerId); return; }
   const p = view.players.find((x) => x.id === playerId);
   if (!p) return;
   const prog = progressoDoContrato(p);
@@ -1495,8 +1538,8 @@ function atualizaBanner() {
     banner.className = 'turn-banner evento';
     return;
   }
-  if (ehPresidente() || ehDomino() || ehBazuca()) {
-    const t = (ehBazuca() ? mesaBazuca : ehDomino() ? mesaDomino : mesaPresidente).textoDaVez();
+  if (ehPresidente() || ehDomino() || ehBazuca() || ehPoker()) {
+    const t = (ehPoker() ? mesaPoker : ehBazuca() ? mesaBazuca : ehDomino() ? mesaDomino : mesaPresidente).textoDaVez();
     banner.textContent = t.texto;
     banner.className = `turn-banner${t.minha ? ' me' : ''}`;
     return;
@@ -1872,6 +1915,7 @@ function montaLeque(fila, cartas, largura) {
     el.onclick = () => {
       // Se o dedo arrastou, o gesto foi de arrumar: não seleciona.
       if (el.dataset.arrastou === '1') { delete el.dataset.arrastou; return; }
+      if (ehPoker()) return;   // no poker as duas cartas não se escolhem: a aposta é nos botões
       if (ehPresidente()) mesaPresidente.toca(card, selected);
       else if (selected.has(card.id)) selected.delete(card.id);
       else selected.add(card.id);
@@ -2141,8 +2185,8 @@ $('btn-sort').onclick = () => {
   render();
 };
 
-$('btn-rules').onclick = () => (ehBazuca() ? mesaBazuca.regras() : ehDomino() ? mesaDomino.regras() : ehPresidente() ? mesaPresidente.regras() : showRules());
-$('btn-score').onclick = () => (ehBazuca() ? mesaBazuca.placar() : ehDomino() ? mesaDomino.placar() : ehPresidente() ? mesaPresidente.placar() : showScore());
+$('btn-rules').onclick = () => (ehPoker() ? mesaPoker.regras() : ehBazuca() ? mesaBazuca.regras() : ehDomino() ? mesaDomino.regras() : ehPresidente() ? mesaPresidente.regras() : showRules());
+$('btn-score').onclick = () => (ehPoker() ? mesaPoker.placar() : ehBazuca() ? mesaBazuca.placar() : ehDomino() ? mesaDomino.placar() : ehPresidente() ? mesaPresidente.placar() : showScore());
 // A mesa em 3D é outra janela para a MESMA partida: entra com a sessão
 // guardada e conversa com o mesmo servidor. A biblioteca dela (three.js) só é
 // baixada quando se abre — a mesa normal continua leve.
@@ -2330,6 +2374,7 @@ function announce(ev) {
   if (ehPresidente() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaPresidente.anuncia(ev); return; }
   if (ehDomino() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaDomino.anuncia(ev); return; }
   if (ehBazuca() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaBazuca.anuncia(ev); return; }
+  if (ehPoker() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaPoker.anuncia(ev); return; }
   switch (ev.e) {
     case 'roundStart':
       distribuirPendente = true;

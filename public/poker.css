@@ -1,0 +1,193 @@
+/* Poker — o que muda na mesa 2D. Baixado só com o modo (poker-mesa.js).
+   A mesa, os assentos, a mão e os modais continuam os do Caçamba (style.css). */
+
+/* Sem monte nem meio para comprar, sem jogos baixados, sem ordenar duas
+   cartas e sem mesa 3D (ainda). O número de cartas no assento é sempre 2: no
+   lugar dele vão as fichas, embaixo do nome. */
+#screen-game.modo-poker .piles,
+#screen-game.modo-poker #btn-claim,
+#screen-game.modo-poker #my-melds,
+#screen-game.modo-poker #btn-sort,
+#screen-game.modo-poker #btn-3d,
+#screen-game.modo-poker .assento .cartas { display: none !important; }
+#screen-game:not(.modo-poker) .pk-centro,
+#screen-game:not(.modo-poker) .pk-btn,
+#screen-game:not(.modo-poker) .pk-eu,
+#screen-game:not(.modo-poker) .pk-bandeja,
+#screen-game:not(.modo-poker) .pk-aposta { display: none !important; }
+
+/* ---- As fichas ------------------------------------------------------------
+   Cada cor tem um valor (shared/poker.js, FICHAS). Vistas de cima, com as
+   marcas brancas da borda que toda ficha de verdade tem; empilhadas, cada uma
+   sobe 3 px sobre a de baixo. */
+.f-vermelha { --ficha: #c62f2f; --ficha-borda: #f5f1e6; --ficha-tinta: #fff; }
+.f-verde    { --ficha: #2e8b4e; --ficha-borda: #f5f1e6; --ficha-tinta: #fff; }
+.f-preta    { --ficha: #262626; --ficha-borda: #f5f1e6; --ficha-tinta: #fff; }
+.f-roxa     { --ficha: #6d3fa0; --ficha-borda: #f5f1e6; --ficha-tinta: #fff; }
+.f-amarela  { --ficha: #d99a17; --ficha-borda: #fff3d1; --ficha-tinta: #2a1b12; }
+
+.pk-pilhas { display: inline-flex; align-items: flex-end; gap: 2px; vertical-align: bottom; }
+.pk-pilha { display: flex; flex-direction: column-reverse; }
+.pk-ficha {
+  display: block; width: 16px; height: 16px; border-radius: 50%;
+  background: radial-gradient(circle, var(--ficha) 0 34%, var(--ficha-borda) 35% 41%, var(--ficha) 42%);
+  border: 2px dashed var(--ficha-borda);
+  box-shadow: 0 1.5px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px var(--ficha);
+  box-sizing: border-box;
+}
+.pk-ficha + .pk-ficha { margin-bottom: -13px; }
+
+/* ---- O meio da mesa -------------------------------------------------------- */
+.pk-centro {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 2px 0 4px;
+}
+.pk-etapa {
+  margin: 0; min-height: 1em;
+  font-size: 0.62rem; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--sage);
+}
+.pk-board {
+  display: flex; gap: 5px; justify-content: center;
+  perspective: 700px; perspective-origin: 50% 20%;
+}
+.pk-board > * { transform: rotateX(18deg); }
+.pk-vaga {
+  width: 50px; height: 69px; border-radius: 7px; flex-shrink: 0;
+  border: 2px dashed var(--felt-line);
+  background: rgba(6, 32, 26, 0.35);
+}
+.pk-board .card.mini { box-shadow: var(--shadow), 0 12px 16px -10px rgba(0, 0, 0, 0.9); }
+.pk-board .card.pk-cai { animation: pkCai 0.4s cubic-bezier(0.2, 0.8, 0.3, 1) backwards; }
+@keyframes pkCai {
+  0%   { transform: rotateX(18deg) translateY(-34px) scale(1.15); opacity: 0; }
+  60%  { opacity: 1; }
+  100% { transform: rotateX(18deg); opacity: 1; }
+}
+.pk-board .card.pk-acesa { outline: 2px solid var(--gold); outline-offset: 1px; transform: rotateX(18deg) translateY(-4px); }
+.pk-board .card.pk-apagada { filter: brightness(0.5) saturate(0.6); }
+@media (prefers-reduced-motion: reduce) { .pk-board .card.pk-cai { animation: none; } }
+
+.pk-pote {
+  display: inline-flex; align-items: flex-end; gap: 8px;
+  padding: 4px 12px 4px 8px; border-radius: 999px;
+  background: rgba(6, 32, 26, 0.6); border: 1px solid var(--felt-line);
+}
+.pk-pote-valor {
+  font-size: 0.78rem; font-weight: 900; color: var(--cream);
+  font-variant-numeric: tabular-nums; line-height: 1.4;
+}
+
+/* O resultado da mão: fica no lugar do pote até sumir ou alguém tocar. */
+.pk-resultado {
+  display: block; width: min(100%, 360px); margin: 0 auto;
+  padding: 8px 10px 6px; border-radius: 14px;
+  background: rgba(20, 13, 8, 0.93); border: 1px solid rgba(242, 193, 78, 0.45);
+  box-shadow: var(--shadow);
+  color: var(--cream); font: inherit; text-align: center; cursor: pointer;
+  max-height: min(44vh, 300px); overflow: auto;
+  /* numa corrida o painel espera as cartas abrirem (--atraso) */
+  animation: pkAparece 0.35s ease-out backwards; animation-delay: var(--atraso, 0s);
+}
+@keyframes pkAparece { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .pk-resultado { animation: none; } }
+.pk-res-titulo { margin: 0 0 3px; font-size: 0.78rem; font-weight: 800; line-height: 1.3; }
+.pk-res-titulo b { color: var(--gold); font-variant-numeric: tabular-nums; }
+.pk-res-titulo span { color: var(--sage); font-weight: 700; }
+.pk-res-titulo.meu { color: var(--gold); }
+.pk-res-maos { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; }
+.pk-res-maos li {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto;
+  column-gap: 6px; align-items: center; text-align: left;
+  padding: 2px 6px; border-radius: 9px; background: rgba(255, 255, 255, 0.04);
+}
+.pk-res-maos li.venceu { background: rgba(242, 193, 78, 0.14); box-shadow: inset 0 0 0 1px rgba(242, 193, 78, 0.5); }
+.pk-res-maos .avatar { grid-row: span 2; width: 22px; height: 22px; }
+.pk-res-nome { font-size: 0.72rem; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk-res-mao { grid-column: 2; font-size: 0.66rem; font-weight: 700; color: var(--sage); }
+.pk-res-maos li.venceu .pk-res-mao { color: var(--gold); }
+.pk-res-cartas { grid-row: span 2; grid-column: 3; display: flex; gap: 2px; }
+.pk-res-cartas .card.mini { width: 27px; height: 37px; border-radius: 4px; }
+.pk-res-cartas .card.mini .idx { top: 2px; left: 2px; transform: scale(0.75); transform-origin: 0 0; }
+.pk-res-dica { display: block; margin-top: 4px; font-size: 0.6rem; font-weight: 700; color: var(--sage); opacity: 0.8; }
+
+/* ---- Os assentos ------------------------------------------------------------ */
+.marcas .pk-pos {
+  padding: 0 4px; border-radius: 6px; line-height: 1.35;
+  background: rgba(157, 187, 173, 0.18); color: var(--sage);
+}
+.marcas .pk-pos.botao { background: var(--cream); color: var(--ink); }
+.marcas .pk-pilha-num { color: var(--cream); }
+.assento.pk-correu .figura { opacity: 0.5; filter: grayscale(0.5); }
+.assento.pk-correu .nome { color: #9c9088; }
+.assento.pk-eliminado { opacity: 0.45; }
+.assento.pk-eliminado .personagem { filter: grayscale(1); animation: none; }
+
+/* A aposta desta rua, na frente de cada um (embaixo do assento). */
+.pk-aposta {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  margin-top: 1px; z-index: 2;
+  display: inline-flex; align-items: flex-end; gap: 3px;
+  white-space: nowrap; pointer-events: none;
+  font-size: 0.62rem; font-weight: 900; color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+.pk-aposta[hidden] { display: none; }
+.pk-aposta .pk-ficha { width: 12px; height: 12px; border-width: 1.5px; }
+.pk-aposta .pk-ficha + .pk-ficha { margin-bottom: -10px; }
+.meu-assento .pk-aposta { top: auto; bottom: 16px; left: 100%; transform: none; margin: 0 0 0 4px; }
+.meu-assento .marcas { justify-content: center; margin-top: 1px; }
+.meu-assento.pk-correu .figura { opacity: 0.5; filter: grayscale(0.5); }
+
+/* ---- As suas fichas ------------------------------------------------------------ */
+.pk-eu {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; max-width: 760px; margin: 0 auto; padding: 4px 16px 6px;
+  box-sizing: border-box; min-height: 36px;
+}
+.pk-eu .pk-pilhas { min-width: 0; }
+.pk-eu-texto { display: flex; flex-direction: column; line-height: 1.15; }
+.pk-eu-rotulo { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sage); }
+.pk-eu-valor { font-size: 1rem; font-weight: 900; color: var(--cream); font-variant-numeric: tabular-nums; }
+.pk-eu-nota { margin-left: auto; font-size: 0.68rem; font-weight: 800; color: #9c9088; }
+.pk-eu-nota.ouro { color: var(--gold); }
+#hand.pk-correu .card { filter: brightness(0.55) grayscale(0.4); }
+
+/* ---- A bandeja de apostar ------------------------------------------------------- */
+.pk-bandeja {
+  width: 100%; max-width: 760px; margin: 0 auto; box-sizing: border-box;
+  padding: 8px 14px 4px;
+  background: rgba(27, 17, 11, 0.95); border-top: 1px solid rgba(242, 193, 78, 0.4);
+  display: grid; gap: 7px;
+}
+.pk-bandeja[hidden] { display: none; }
+.pk-band-topo { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.pk-band-rotulo { font-size: 0.68rem; font-weight: 800; color: var(--sage); align-self: center; }
+.pk-band-valor { font-size: 1.4rem; font-weight: 900; color: var(--gold); line-height: 1; font-variant-numeric: tabular-nums; }
+.pk-band-dica { margin-left: auto; font-size: 0.64rem; font-weight: 700; color: var(--sage); align-self: center; }
+.pk-band-fichas { display: flex; justify-content: space-between; gap: 6px; }
+.pk-ficha-btn {
+  width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center; padding: 0; cursor: pointer;
+  background: radial-gradient(circle, var(--ficha) 0 46%, var(--ficha-borda) 47% 51%, var(--ficha) 52%);
+  border: 4px dashed var(--ficha-borda);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.6), inset 0 0 0 2px var(--ficha), var(--shadow);
+  color: var(--ficha-tinta); font: inherit;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.pk-ficha-btn:active:not(:disabled) { transform: translateY(2px) scale(0.96); }
+.pk-ficha-btn:disabled { opacity: 0.3; cursor: default; }
+.pk-ficha-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.pk-ficha-valor { font-size: 0.7rem; font-weight: 900; letter-spacing: -0.02em; }
+.pk-band-atalhos, .pk-band-acoes { display: flex; gap: 6px; }
+#screen-game .pk-band-atalhos .btn { flex: 1; min-height: 34px; padding: 6px 4px; font-size: 0.72rem; }
+#screen-game .pk-band-acoes .btn { min-height: 42px; padding: 8px 12px; font-size: 0.8rem; white-space: nowrap; }
+#screen-game .pk-band-acoes .pk-confirma { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Com a bandeja aberta, a mão desce: a mesa precisa da altura. */
+#screen-game.modo-poker:has(.pk-bandeja:not([hidden])) .hand { padding-top: 8px; }
+#screen-game .action-bar .pk-btn-ouro { border-color: rgba(242, 193, 78, 0.7); color: var(--gold); }
+
+/* As fichas nas regras */
+.pk-regra-fichas { display: flex; flex-wrap: wrap; gap: 10px; }
+.pk-regra-ficha { display: inline-flex; align-items: center; gap: 5px; font-weight: 800; }
+.pk-regra-ficha .pk-ficha { width: 20px; height: 20px; }

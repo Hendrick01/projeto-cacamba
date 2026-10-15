@@ -123,6 +123,12 @@ html.debug .ui-version { display: inline; }
 }
 .modo-obj.viradas img { position: static; width: 30px; height: 42px; border-radius: 4px; }
 .modo-obj.viradas img:nth-child(3) { transform: translateY(-5px) rotate(-8deg); box-shadow: 0 0 0 2px #f2c14e, 0 8px 14px -6px rgba(0, 0, 0, 0.8); }
+/* Poker: Ás e Rei de espadas, e as pilhas de fichas de cada cor */
+.modo-obj.fichas { right: 12px; top: 12px; width: 112px; height: 74px; }
+.modo-obj.fichas img { width: 34px; height: 47px; top: 0; border-radius: 4px; }
+.modo-obj.fichas img:nth-child(1) { left: 0; transform: rotate(-10deg); }
+.modo-obj.fichas img:nth-child(2) { left: 20px; transform: rotate(6deg); }
+.modo-obj.fichas svg { position: absolute; right: 0; bottom: 0; width: 70px; height: 38px; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.6)); }
 .modo-principal { padding-top: 132px; }
 .modo:not(.modo-principal) { padding-top: 92px; }
 @media (min-width: 761px) {

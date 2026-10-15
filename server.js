@@ -21,6 +21,7 @@ import {
 import * as Presidente from './shared/presidente.js';
 import * as Domino from './shared/domino.js';
 import * as Bazuca from './shared/bazuca.js';
+import * as Poker from './shared/poker.js';
 import { personagemValido } from './shared/elenco.js';
 import { emoteDe } from './shared/emotes.js';
 import { chaveDasSalas, sela, abre } from './lib/selo-sala.js';
@@ -65,6 +66,15 @@ const MODOS = {
     tempoReal: true, tick: Bazuca.tick, proximoPrazo: Bazuca.proximoPrazo,
     planosDosRobos: Bazuca.planosDosRobos, retoma: Bazuca.retoma,
     niveis: Bazuca.NIVEIS_DE_ROBO,
+  },
+  // Poker (Texas Hold'em sem limite, valendo fichas): a mão seguinte começa
+  // sozinha, sem o anfitrião avançar; `pausaDoRobo` segura os robôs enquanto a
+  // mesa mostra o resultado da mão anterior ou a carta que acabou de abrir.
+  poker: {
+    createGame: Poker.createGame, startRound: Poker.startRound, applyAction: Poker.applyAction,
+    actNextRound: Poker.actNextRound, viewFor: Poker.viewFor, botNextAction: Poker.botNextAction,
+    FASES_DE_VEZ: Poker.FASES_DE_VEZ, MIN: Poker.MIN_JOGADORES, MAX: Poker.MAX_JOGADORES,
+    pausaDoRobo: Poker.pausaDoRobo,
   },
 };
 const modoValido = (m) => (Object.hasOwn(MODOS, m) ? m : 'cacamba');
@@ -704,6 +714,14 @@ function robosReagem(room, events) {
     } else if (ev.e === 'saiu' && ev.pos === 0) {
       if (ehRobo(ev.p)) roboFala(room, 'muito-bem', ev.p);
       else if (Math.random() < 0.6) roboFala(room, Math.random() < 0.5 ? 'palmas' : 'nojo');
+    } else if (ev.e === 'maoFim' && !ev.semShowdown && ev.potes?.[0]) {
+      // poker: pote grande disputado no showdown
+      const quem = ev.potes[0].vencedores[0];
+      if (ev.pote < 400 || Math.random() > 0.6) continue;
+      if (ehRobo(quem)) roboFala(room, Math.random() < 0.5 ? 'muito-bem' : 'pisca', quem);
+      else roboFala(room, Math.random() < 0.5 ? 'palmas' : 'nojo');
+    } else if ((ev.e === 'aumentou' || ev.e === 'apostou') && ev.allIn && !ehRobo(ev.p) && Math.random() < 0.3) {
+      roboFala(room, 'quer-tudo');
     }
   }
 }
@@ -779,7 +797,7 @@ function scheduleBots(room) {
   // jogadas dos outros acontecendo antes de dar tempo de ler o que houve.
   const delay = away
     ? (currentPlayer.awayActed ? 1400 : AWAY_TAKEOVER_MS)
-    : (buyWindow ? 3200 : 1500 + Math.random() * 1300) * RITMO_DOS_ROBOS;
+    : (buyWindow ? 3200 : 1500 + Math.random() * 1300 + (motor.pausaDoRobo?.(game) || 0)) * RITMO_DOS_ROBOS;
 
   room.botTimer = setTimeout(() => {
     room.botTimer = null;

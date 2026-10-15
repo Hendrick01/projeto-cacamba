@@ -449,6 +449,54 @@ arquivo; testes em `test/bazuca.test.js`), mesa 2D em `public/bazuca-mesa.js`
   descarte rápido fora da vez, que o BAZUCA acaba a rodada sem punição, e
   joga duas rodadas inteiras.
 
+## Poker (15/10/2026)
+
+O quinto modo, pedido como "fichas com valores e as regras de poker": Texas
+Hold'em sem limite, de torneio. Mesmo esquema dos outros: `room.modo =
+'poker'`, motor em `shared/poker.js` (regras e regras da casa no topo; testes
+em `test/poker.test.js`), mesa 2D em `public/poker-mesa.js` +
+`public/poker.css`, baixadas com `import()` só com o modo. 2 a 8 jogadores.
+
+- **As fichas.** `FICHAS` dá a cor e o valor de cada uma (5 vermelha, 25
+  verde, 100 preta, 500 roxa, 1.000 amarela); toda aposta é múltiplo da menor
+  (`FICHA_MINIMA`). `emFichas(valor)` é a pilha como fica na mesa — um pouco
+  de cada cor, como no começo de um torneio (1.000 = 1×500, 4×100, 3×25,
+  5×5) —, e é com ela que a mesa desenha o pote, a aposta na frente de cada
+  assento e as suas fichas. Cada um começa com `FICHAS_INICIAIS` (1.000).
+- **Mão = rodada.** `round` conta as mãos. Botão, small e big blind giram uma
+  cadeira por mão (no mano a mano o botão é o small blind); os blinds sobem a
+  cada `MAOS_POR_NIVEL` (6) mãos pela tabela `BLINDS`. Ações: `correr`,
+  `mesa`, `pagar`, `aumentar` (com `para` = a aposta total da rua, não o
+  acréscimo) e `allin`. O aumento mínimo é o último aumento; all-in que não
+  completa um aumento não reabre a aposta para quem já falou (`viuAoAgir`,
+  `podeAumentar`). Sem ninguém para apostar, a mesa abre sozinha até o river
+  (eventos `etapa` com `corrida: true`).
+- **Potes.** `montaPotes` faz um nível por all-in de quem ainda disputa; o
+  pote com um só disputando é **devolução** só se ninguém mais pôs ficha nele
+  (`pagantes`), senão é pote GANHO por quem ficou. Empate divide, e a ficha que
+  não divide vai ao primeiro vencedor à esquerda do botão. Quem zera sai
+  (`fora`, `lugar`); com um só com fichas, `gameEnd` e o `playAgain` genérico.
+- **A mão seguinte começa sozinha**: `fimDaMao` grava `ultimaMao` (mesa,
+  potes, mãos mostradas com o nome em português, ganhos) e já chama
+  `startRound`. A mesa SEGURA o resultado uns segundos (ou até um toque) com a
+  mesa da mão que acabou, as cinco que ganharam acesas e a sua mão antiga; o
+  servidor segura os robôs no mesmo tanto com o gancho opcional
+  `pausaDoRobo(game)` do motor, somado ao atraso de `scheduleBots`.
+- **Robôs.** `equidade` sorteia as cartas que ninguém viu (Monte Carlo) e o
+  robô compara com as odds do pote; `facil` lê mal a mão e paga demais. Quem
+  caiu ou saiu da partida nunca aposta: dá mesa ou corre até ser engolido
+  pelos blinds.
+- **Na tela**: cinco vagas na mesa, o pote em fichas, a etapa; nos assentos,
+  D/SB/BB, as fichas de cada um e a aposta da rua na frente; um balão curto
+  com o que cada um fez. "Aumentar" abre a bandeja: toca-se nas fichas para
+  somar, com atalhos (mínimo, ½ pote, pote, all-in) e desfazer. Sem mesa 3D
+  por enquanto (o botão some, como no Dominó).
+- `npm run test:poker` sobe um servidor próprio (`RITMO_DOS_ROBOS=0.05`; com
+  uma porta como argumento usa um que já está no ar), joga mãos com dois
+  humanos e dois robôs, confere que o juiz recusa aumento abaixo do mínimo,
+  que nenhuma ficha some, que quem saiu só dá mesa ou corre, e leva uma mesa
+  de all-in até o fim do jogo e o "jogar de novo".
+
 ## `shared/engine.js` — motor de regras
 
 Módulo puro: recebe estado e devolve estado + lista de eventos. Nunca faz rede,
