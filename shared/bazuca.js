@@ -31,10 +31,12 @@
 //    voltam, e você leva mais uma.
 //  - Quem fica sem nenhuma carta BATE: vence na hora — até de quem só tem um
 //    coringa — e a rodada acaba ali.
-//  - BAZUCA: no começo da vez, em vez de comprar. Quem grita afirma que tem a
-//    menor soma da mesa, sem empate. Certo: vence e acaba. Errado: a rodada
-//    NÃO acaba — ele leva mais uma carta e o jogo segue.
-//  - Sem fim de partida: conta-se quantas rodadas cada um venceu.
+//  - BAZUCA (corrigido por ele no mesmo dia): grita-se na SUA vez, a qualquer
+//    momento dela, e a rodada acaba na hora — vai direto para a contagem.
+//    Soma-se tudo e a menor soma vence, tenha gritado ou não. Não há punição.
+//  - A partida vai até alguém somar 4 vitórias (VITORIAS_PARA_GANHAR), com
+//    quantas rodadas forem precisas; aí acaba, e o anfitrião recomeça se a
+//    mesa quiser jogar de novo — como no Caçamba.
 //  - Nenhuma ajuda: a visão de cada jogador só traz o que ele está vendo
 //    agora. Nada marca carta já vista, nada avisa descarte possível.
 //
@@ -42,10 +44,12 @@
 //  - Estourou os 35 s: a carta comprada é descartada, sem poder; se o poder
 //    estava pendente, ele se perde.
 //  - O par na vez não substitui a compra.
-//  - Bazuca errado passa a vez.
 //  - Carta de punição entra numa posição nova, no fim da fileira.
 //  - Toda rodada começa por sorteio.
 //  - Se monte e descarte acabarem, a rodada fecha pela menor soma.
+//  - Empate na menor soma (no bazuca ou no fim do monte): ninguém leva.
+//  - Bazuca com carta comprada na mão: ela vai para o descarte e não conta;
+//    com troca de carta pendente (alguém deve uma), espera-se a troca.
 //
 // O TEMPO. Este é o único motor com relógio: espiada de 5 s, vez de 35 s,
 // carta mostrada por um instante. O motor não tem timer — ele guarda prazos
@@ -57,6 +61,7 @@ export const MIN_JOGADORES = 2;
 export const MAX_JOGADORES = 6;
 export const NIVEIS_DE_ROBO = ['facil', 'normal', 'dificil'];
 
+export const VITORIAS_PARA_GANHAR = 4;
 export const CARTAS_INICIAIS = 4;
 export const PERTO = [2, 3];          // as duas posições mais perto do jogador
 export const ESPIADA_INICIAL_MS = 5000;
@@ -104,7 +109,8 @@ export function createGame(players, opts = {}) {
       memoria: {},        // só os robôs usam: "id:posição" → valor que acham que está lá
     })),
     round: -1,
-    phase: 'lobby',       // 'espiar' → 'play' → 'roundEnd'
+    phase: 'lobby',       // 'espiar' → 'play' → 'roundEnd' (… → 'gameEnd')
+    campeao: null,        // quem chegou a VITORIAS_PARA_GANHAR
     turn: 0,
     turnNo: 0,
     etapa: null,          // na vez: 'comprar' → 'decidir' → ('poder')
@@ -215,29 +221,42 @@ function confereBatida(state, events) {
   return events;
 }
 
-function fimDaRodada(state, events, motivo, vencedor) {
+// A menor soma da mesa, se for de um só (empate na menor: ninguém).
+function menorSoma(state, somas) {
+  const menor = Math.min(...Object.values(somas));
+  const com = state.players.filter((p) => somas[p.id] === menor);
+  return com.length === 1 ? com[0].id : null;
+}
+
+// `vencedor` só vem pronto na batida; no bazuca e no fim do monte é a conta.
+function fimDaRodada(state, events, motivo, vencedor = null, gritou = null) {
+  if (state.comprada) poeNoDescarte(state, state.comprada);   // quem estava decidindo larga a carta
+  state.comprada = null;
   const somas = Object.fromEntries(state.players.map((p) => [p.id, soma(p)]));
-  if (motivo === 'monte') {
-    const menor = Math.min(...Object.values(somas));
-    const com = state.players.filter((p) => somas[p.id] === menor);
-    vencedor = com.length === 1 ? com[0].id : null;
-  }
+  if (motivo !== 'bateu') vencedor = menorSoma(state, somas);
   const v = vencedor ? playerById(state, vencedor) : null;
   if (v) v.vitorias++;
-  if (state.comprada) poeNoDescarte(state, state.comprada);   // quem estava decidindo larga a carta
+  if (v && v.vitorias >= VITORIAS_PARA_GANHAR) state.campeao = v.id;
   state.phase = 'roundEnd';
-  state.etapa = null; state.comprada = null; state.poder = null; state.prazo = null;
+  state.etapa = null; state.poder = null; state.prazo = null;
   state.espiadas = []; state.reveladas = []; state.dividas = [];
   state.lastRound = {
-    motivo, vencedor: vencedor || null, somas,
+    motivo, vencedor: vencedor || null, somas, gritou,
+    campeao: state.campeao,
     maos: Object.fromEntries(state.players.map((p) => [p.id, p.slots.slice()])),
   };
-  events.push({ e: 'roundEnd', motivo, vencedor: vencedor || null, round: state.round });
+  events.push({ e: 'roundEnd', motivo, vencedor: vencedor || null, round: state.round, campeao: state.campeao });
   return events;
 }
 
+// Depois da rodada: a próxima — ou, se alguém chegou às 4 vitórias, o fim da
+// partida (o anfitrião recomeça com `playAgain`, no servidor).
 export function actNextRound(state, agora = Date.now()) {
   if (state.phase !== 'roundEnd') return [];
+  if (state.campeao) {
+    state.phase = 'gameEnd';
+    return [{ e: 'gameEnd', campeao: state.campeao }];
+  }
   return startRound(state, agora);
 }
 
@@ -361,16 +380,16 @@ export function actPar(state, playerId, i, j, agora = Date.now()) {
   return confereBatida(state, events);
 }
 
-// BAZUCA: no começo da vez, no lugar da compra.
+// BAZUCA: na sua vez, a qualquer momento dela. A rodada acaba na hora e vai
+// para a contagem: a menor soma vence, de quem gritou ou não. `certo` diz se
+// quem gritou tinha mesmo a menor (sozinho) — é o que a mesa comemora.
 export function actBazuca(state, playerId, agora = Date.now()) {
-  const p = exigeVez(state, playerId, 'comprar');
-  if (state.dividas.some((d) => d.de === p.id || d.para === p.id)) fail('Espere a troca de cartas terminar.');
+  const p = exigeVez(state, playerId);
+  // carta a caminho de alguém: a soma ainda não fecha
+  if (state.dividas.length) fail('Espere a troca de cartas terminar.');
   const minha = soma(p);
   const certo = state.players.every((x) => x.id === p.id || soma(x) > minha);
-  const events = [{ e: 'bazuca', p: p.id, certo }];
-  if (certo) return fimDaRodada(state, events, 'bazuca', p.id);
-  punicao(state, p, events);
-  return passaAVez(state, events, agora);
+  return fimDaRodada(state, [{ e: 'bazuca', p: p.id, certo }], 'bazuca', null, p.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -517,6 +536,23 @@ export function applyAction(state, playerId, action, agora = Date.now()) {
   }
 }
 
+// O título e a linha do fim de rodada — as duas mesas (2D e 3D) dizem igual.
+// `nome(id)` devolve o nome de quem for (já escapado, na 2D); `eu`, quem olha.
+export function contaDaRodada(lr, nome, eu) {
+  const q = lr.vencedor, g = lr.gritou;
+  if (lr.motivo === 'bateu') {
+    return { titulo: q === eu ? 'Você bateu!' : `${nome(q)} bateu!`, texto: 'Ficou sem nenhuma carta: vence na hora.' };
+  }
+  if (lr.motivo === 'bazuca') {
+    const gritou = !g ? 'Alguém gritou' : g === eu ? 'Você gritou' : `${nome(g)} gritou`;
+    if (q && q === g) return { titulo: q === eu ? 'Bazuca certeiro!' : `Bazuca certeiro de ${nome(q)}!`, texto: `${gritou} BAZUCA e tinha mesmo a menor soma da mesa.` };
+    if (q) return { titulo: q === eu ? 'Você tinha a menor soma!' : `${nome(q)} tinha a menor soma`, texto: `${gritou} BAZUCA, mas quem tinha menos era ${q === eu ? 'você' : nome(q)}.` };
+    return { titulo: 'Empate na menor soma: ninguém leva', texto: `${gritou} BAZUCA e a contagem empatou.` };
+  }
+  return q ? { titulo: q === eu ? 'Você tinha a menor soma!' : `${nome(q)} tinha a menor soma`, texto: 'O monte e o descarte acabaram: vale a menor soma.' }
+    : { titulo: 'Empate: ninguém leva', texto: 'O monte e o descarte acabaram e a menor soma empatou.' };
+}
+
 // O servidor não agenda vez neste modo: quem cuida do tempo e dos robôs é o
 // `tick` e os `planosDosRobos` (ver agendaTempoReal no server.js).
 export const FASES_DE_VEZ = [];
@@ -527,7 +563,7 @@ export const FASES_DE_VEZ = [];
 export function viewFor(state, playerId, agora = Date.now()) {
   const me = playerById(state, playerId);
   const resta = (t) => Math.max(0, t - agora);
-  const fim = state.phase === 'roundEnd';
+  const fim = state.phase === 'roundEnd' || state.phase === 'gameEnd';
   const minhaVez = state.players[state.turn]?.id === playerId && state.phase === 'play';
   const devo = state.dividas.find((d) => d.de === playerId);
   return {
@@ -546,6 +582,12 @@ export function viewFor(state, playerId, agora = Date.now()) {
     reveladas: state.reveladas.map((x) => ({ p: x.p, i: x.i, card: x.card, ms: resta(x.ate) })),
     dividas: state.dividas.map((d) => ({ de: d.de, para: d.para, i: d.i })),
     lastRound: fim ? state.lastRound : (state.lastRound ? { motivo: state.lastRound.motivo, vencedor: state.lastRound.vencedor } : null),
+    meta: VITORIAS_PARA_GANHAR,
+    campeao: state.campeao || null,
+    // no fim da partida, do mais vitorioso para o menos (o formato do Caçamba)
+    ranking: state.phase === 'gameEnd'
+      ? [...state.players].sort((a, b) => b.vitorias - a.vitorias).map((p) => ({ id: p.id, name: p.name, score: p.vitorias }))
+      : null,
     claims: [], contract: null,
     you: me ? {
       id: me.id,

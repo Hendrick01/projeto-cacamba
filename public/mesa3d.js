@@ -104,6 +104,31 @@ function carregaPresidente() {
   });
   return carregandoPresidente;
 }
+// O BAZUCA na 3D (15/10/2026), no mesmo esquema: bazuca-3d.js só é baixado
+// quando a sala é dele. Lá não há mão — as cartas de todos ficam viradas no
+// feltro —, então o que entra por aqui são o toque nelas, os botões, o placar
+// e o monte e o descarte de sempre, com os números da visão dele.
+let bz = null, carregandoBazuca = null;
+function carregaBazuca() {
+  carregandoBazuca ||= import('./bazuca-3d.js').then((mod) => {
+    document.title = 'Bazuca em 3D';
+    bz = mod.criaBazuca3D({
+      THREE, scene, camera, MESA_TOPO, CARTA_L, CARTA_A, ESCALA_TAMPO, geoCarta, geoSombra, texturaTapete, materialVerso, semMovimento,
+      view: () => view, me, assentos, posicaoDoAssento, monte, descarte, topoDoMonte,
+      materialDaCarta, rotulo, trocaRotulo,
+      corDe: (id) => CORES_DE_ASSENTO[assentoDe(id) % CORES_DE_ASSENTO.length],
+      lequeDe, pontoDaMaoAtiva, temGesto, gestoCarta,
+      botao, aviso, sendAction, enviaAoServidor, souAnfitriao: () => hostId === me(),
+      atualizaBotoes: () => montaBotoes(),
+      // compra e descarte da carta comprada dos OUTROS são os gestos de sempre
+      reage: (ev) => reageAoEvento(ev),
+      verbo: (id, texto) => { const a = assentos.get(id); if (a) { a.aviso = texto; a.avisoAte = performance.now() + 1800; a.avisoEmote = false; } },
+      cara: fazCara,
+      palcoDe, cabecalho, linhaDoPlacar, acaoDoPlacar, nomeDe,
+    });
+  });
+  return carregandoBazuca;
+}
 function trataEstado(msg) {
   const primeira = !view;
   view = msg.view;
@@ -124,6 +149,7 @@ function conecta() {
       // Sala de Presidente: o código dele só é baixado agora, e os estados que
       // chegarem enquanto ele carrega esperam na mesma fila, em ordem.
       if (msg.view?.modo === 'presidente' && !pres) { carregaPresidente().then(() => trataEstado(msg)); return; }
+      if (msg.view?.modo === 'bazuca' && !bz) { carregaBazuca().then(() => trataEstado(msg)); return; }
       trataEstado(msg);
     } else if (msg.t === 'lobby') {
 
@@ -1962,6 +1988,7 @@ const ponteiro = new THREE.Vector2();
 let layoutDaMao = null;
 let arrasto3d = null;
 let toqueNoJogo = null;
+let toqueNoBz = null;
 const LIMIAR_ARRASTO = 10;
 
 // converte o X do dedo para o X do espaço da câmera, na distância do leque —
@@ -1982,6 +2009,10 @@ canvas.addEventListener('pointerdown', (e) => {
     arrasto3d = { id: hits[0].object.userData.cardId, x0: e.clientX, y0: e.clientY, ativo: false };
     return;
   }
+  // no Bazuca as cartas de todos estão viradas no feltro: o toque escolhe uma
+  // (de quem for), e o monte compra
+  const alvoBz = bz?.alvo(raycaster, e.clientX, e.clientY);
+  if (alvoBz) { toqueNoBz = { alvo: alvoBz, x0: e.clientX, y0: e.clientY }; return; }
   // toque num jogo do feltro: abre o visor naquele jogador. É o caminho para
   // ler carta por carta numa mesa cheia — e para encaixar sem sair da 3D.
   const noJogo = raycaster.intersectObjects(jogosNaMesa.children, true).find((h) => h.object.userData.jogo);
@@ -2007,6 +2038,12 @@ window.addEventListener('pointermove', (e) => {
 });
 
 window.addEventListener('pointerup', (e) => {
+  if (toqueNoBz) {
+    const { alvo, x0, y0 } = toqueNoBz;
+    toqueNoBz = null;
+    if (Math.hypot(e.clientX - x0, e.clientY - y0) < LIMIAR_ARRASTO) bz.toca(alvo);
+    return;
+  }
   if (toqueNoJogo) {
     const { dono, x0, y0 } = toqueNoJogo;
     toqueNoJogo = null;
@@ -2037,7 +2074,7 @@ window.addEventListener('pointerup', (e) => {
   ordemManual = ordem;
   sincronizaMao();
 });
-window.addEventListener('pointercancel', () => { arrasto3d = null; toqueNoJogo = null; arrastoOlhar = null; sincronizaMao(); });
+window.addEventListener('pointercancel', () => { arrasto3d = null; toqueNoJogo = null; toqueNoBz = null; arrastoOlhar = null; sincronizaMao(); });
 
 // leve paralaxe: a cabeça mexe um pouco com o dedo/mouse, como quem se inclina
 let olharX = 0;
@@ -2156,6 +2193,7 @@ function montaBotoes() {
     return;
   }
   if (pres) { pres.botoes(barra); return; }
+  if (bz) { bz.botoes(barra); return; }
   // o visor de jogos sempre à mão: na mesa cheia é por ele que se lê carta por
   // carta, e com uma carta escolhida é por ele que se encaixa
   if (view.players.some((p) => p.melds?.length)) {
@@ -2418,6 +2456,7 @@ function desenhaPlacar() {
   corpo.textContent = ''; acoes.textContent = '';
   if (!view) return;
   if (pres) { pres.desenhaPlacar(corpo, acoes); return; }
+  if (bz) { bz.desenhaPlacar(corpo, acoes); return; }
   const souAnfitriao = hostId === me();
   const tabela = document.createElement('table');
   const jogador = (id) => view.players.find((p) => p.id === id);
@@ -2469,7 +2508,7 @@ async function sincroniza(primeira) {
   if (sincronizando) return;
   sincronizando = true;
   try {
-    if (!pres) {
+    if (!pres && !bz) {
       $('rot-rodada').textContent = `Rodada ${view.round + 1}/${view.totalRounds}`;
       $('rot-contrato').textContent = view.contract ? view.contract.label : '—';
     }
@@ -2497,12 +2536,16 @@ async function sincroniza(primeira) {
 
       trocaRotulo(a.contagem, `${p.handCount}`);
       trocaRotulo(a.nome, view.claims?.includes(p.id) ? `${p.name} · pediu` : p.name);
+      // No Bazuca as cartas de cada um estão no feltro: na mão só fica a que
+      // ele comprou, enquanto decide — e o selo de contagem não tem o que dizer.
+      const naMao = bz ? bz.naMaoDe(p.id) : p.handCount;
+      a.contagem.visible = !bz;
       // os LEQUE_MAX primeiros filhos são as cartas; o selo fica sempre. Até
       // cinco, a abertura é a de sempre; acima, o leque reabre no mesmo arco
       // com as cartas mais juntas — mão cheia se vê de longe.
-      if (a.assento?.modelo) arrumaLeque(a.leque, p.handCount);
+      if (a.assento?.modelo) arrumaLeque(a.leque, naMao);
       else {
-      const nCartas = Math.min(LEQUE_MAX, p.handCount);
+      const nCartas = Math.min(LEQUE_MAX, naMao);
       const passo = nCartas <= 5 ? 0.17 : 0.68 / (nCartas - 1);
       a.leque.children.forEach((c, i) => {
         if (i >= LEQUE_MAX) return;
@@ -2513,7 +2556,7 @@ async function sincroniza(primeira) {
         c.rotation.z = -ang;
       });
       }
-      a.leque.visible = p.handCount > 0;
+      a.leque.visible = naMao > 0;
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
       a.proximo = (pres ? pres.proximoId() : view.players[(view.players.findIndex((q) => q.id === view.turnId) + 1) % view.players.length]?.id) === p.id
         && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
@@ -2550,8 +2593,10 @@ async function sincroniza(primeira) {
     for (const o of [monte.caixa, monte.num, monte.sombra, descarte.grupo, descarte.sombra]) o.visible = !pres;
     if (pres) pres.sincroniza();
     else {
-    trocaRotulo(monte.num, String(view.deckCount));
-    const alturaMonte = Math.max(0.02, Math.min(0.12, view.deckCount * 0.0013));
+    // o Bazuca tem monte e descarte de verdade, com outros nomes na visão
+    const nMonte = bz ? view.monte : view.deckCount;
+    trocaRotulo(monte.num, String(nMonte));
+    const alturaMonte = Math.max(0.02, Math.min(0.12, nMonte * 0.0013));
     monte.caixa.scale.y = alturaMonte / 0.2;
     monte.caixa.position.y = MESA_TOPO + alturaMonte / 2;
     // o número senta na caixa; solto no ar ele era mais uma coisa flutuando
@@ -2563,7 +2608,7 @@ async function sincroniza(primeira) {
     // e o leve inclinar para a câmera. Antes ela ficava de pé, porque a 17° a
     // carta deitada virava uma lasca ilegível — e é a carta mais importante da
     // mesa: decide a compra a cada turno.
-    const topo = view.discardTop;
+    const topo = bz ? view.topo : view.discardTop;
     const topoId = topo ? topo.id : null;
     if (topoId !== descarte.topoId) {
       descarte.topoId = topoId;
@@ -2571,7 +2616,7 @@ async function sincroniza(primeira) {
       for (const c of descarte.grupo.children) if (c.geometry && c.geometry !== geoCarta) c.geometry.dispose();
       descarte.grupo.clear();
       if (topo) {
-        const alturaPilha = 0.012 + view.discardCount * 0.001;
+        const alturaPilha = 0.012 + (bz ? view.descarteN : view.discardCount) * 0.001;
         const base = new THREE.Mesh(
           new THREE.BoxGeometry(CARTA_L * ESCALA_TAMPO, alturaPilha, CARTA_A * ESCALA_TAMPO),
           materialBorda,
@@ -2607,6 +2652,8 @@ async function sincroniza(primeira) {
       }
     }
     }
+    // as grades de cartas viradas, a comprada e os voos dos lances (bazuca-3d.js)
+    if (bz) bz.sincroniza();
 
     // Jogos baixados: cartas DEITADAS no feltro na frente de quem baixou
     // (decisão do usuário, 2026-09-04 e de novo em 08/09: nada de erguer,
@@ -2778,7 +2825,9 @@ async function sincroniza(primeira) {
     // da sua beirada e foram para os LADOS do leque, então a coluna do meio é
     // só dela — e é onde o polegar alcança.
     {
-      const base = parseFloat(document.body.style.getPropertyValue('--hand-height')) || 160;
+      // no Bazuca não há leque: a barra desce até o pé da tela e a sua grade
+      // de cartas fica com a faixa de baixo
+      const base = bz ? 0 : parseFloat(document.body.style.getPropertyValue('--hand-height')) || 160;
       document.body.style.setProperty('--acao-fundo', `${Math.round(base + 14)}px`);
     }
     montaBotoes();
@@ -2792,8 +2841,8 @@ async function sincroniza(primeira) {
     } else if (placarMostrado) { placarMostrado = null; clearTimeout(placarTimer); fechaPlacar(); }
 
     // aviso da vez
-    if (pres) {
-      const texto = pres.textoDaVez();
+    if (pres || bz) {
+      const texto = (pres || bz).textoDaVez();
       if (texto) aviso(texto, true);
     } else if (view.phase === 'draw' || view.phase === 'play') {
       if (view.turnId === me()) {
@@ -2829,6 +2878,7 @@ function trocaRotulo(sprite, texto, corFundo = 'rgba(27,17,11,0.9)', corTexto = 
 // reações: cara e pulo, como na mesa normal
 function reageAoEvento(ev) {
   pres?.evento(ev);
+  bz?.evento(ev);
   if (ev.e === 'roundStart') {
     ordemManual = []; selecionadas.clear();
     jogosVistos.clear();
@@ -2844,8 +2894,9 @@ function reageAoEvento(ev) {
     cartasDaMao.clear();
     descarte.topoId = undefined;
     // distribuir: três cartas viradas por assento saem do monte, escalonadas —
-    // as de verdade não vão (com oito na mesa seriam quase cem), como na 2D
-    if (!semMovimento) {
+    // as de verdade não vão (com oito na mesa seriam quase cem), como na 2D.
+    // No Bazuca elas vão para o feltro, cada uma ao seu lugar (bazuca-3d.js).
+    if (!semMovimento && !bz) {
       let k = 0;
       for (const a of assentos.values()) {
         for (let c = 0; c < 3; c++) {
@@ -3162,6 +3213,7 @@ function quadro(t) {
   }
 
   pres?.quadro();
+  bz?.quadro(t);
 
   // a carta do meio chega girando e assenta no lugar de pé
   const face = descarte.grupo.children[1];
@@ -3268,6 +3320,7 @@ window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, 
   // armar o gesto da pinça sem servidor: a próxima saída dessa carta do leque vai com a mão
   armaJogada(id, varias = false) { jogadaMinha = varias ? { multi: true, destino: posicaoDoMeuJogoNovo } : { cardId: id, destino: descarte.grupo.position.clone().setY(MESA_TOPO + 0.08) }; },
   get gestoPinca() { return gestoPinca ? { modo: gestoPinca.modo, desde: performance.now() - gestoPinca.t0, soltou: !!gestoPinca.soltouEm, outras: gestoPinca.extras.length } : null; },
+  get bz() { return bz; },
   olharPara: (id) => escolheOlhar(id), get pescoco() { return { escolhido: olharEscolhido, livre: giroLivre, giro: pescoco.giro, inclina: pescoco.inclina }; } };
 
 // interface-2026-09-07-r1

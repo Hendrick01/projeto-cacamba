@@ -5,7 +5,8 @@
 //   4. nenhuma visão traz valor de carta virada (o jogo não ajuda);
 //   5. o descarte rápido fora da vez é aceito (certo ou errado, com punição);
 //   6. duas rodadas inteiras com 2 humanos e robôs difíceis, sem jogada
-//      recusada pelo juiz, e a contagem de vitórias fecha.
+//      recusada pelo juiz, e a contagem de vitórias fecha;
+//   7. BAZUCA gritado na vez acaba a rodada na hora, sem punição.
 //   node test/bazuca.mjs
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -39,8 +40,8 @@ function cliente(nome) {
     if (m.t === 'state') {
       c.view = m.view; c.views++;
       for (const e of m.events || []) c.eventos.push(e);
-      // 4. carta virada nunca chega com valor, fora do fim da rodada
-      if (m.view.phase !== 'roundEnd' && m.view.players.some((p) => p.slots.some((x) => x !== true && x !== false))) vazamentos.push(`${nome}: slot com valor`);
+      // 4. carta virada nunca chega com valor, fora do fim da rodada (ou da partida)
+      if (m.view.phase !== 'roundEnd' && m.view.phase !== 'gameEnd' && m.view.players.some((p) => p.slots.some((x) => x !== true && x !== false))) vazamentos.push(`${nome}: slot com valor`);
       if (m.view.you?.espiadas.some((e) => m.view.phase === 'espiar' && e.p !== m.view.you.id)) vazamentos.push(`${nome}: espiada de outro na abertura`);
     }
   });
@@ -113,9 +114,15 @@ try {
   confere(A.view.you.espiadas.length === 0, 'e as cartas viram de volta');
 
   // 5 e 6. duas rodadas
-  let rodadas = 0, tentouRapido = false;
+  let rodadas = 0, tentouRapido = false, gritou = false;
   const fim = Date.now() + 150000;
   while (rodadas < 2 && Date.now() < fim) {
+    // 7. na segunda rodada a Ana grita na primeira vez dela
+    if (!gritou && A.view?.round === 1 && A.view.phase === 'play' && A.view.turnId === id(A) && !A.view.you.devo && !A.view.dividas.length) {
+      gritou = true;
+      manda(A, { t: 'action', action: { a: 'bazuca' } });
+      await ate(() => A.view.phase !== 'play', 2000);
+    }
     for (const c of [A, B]) {
       const a = lance(c);
       if (a && c.ultimo !== JSON.stringify([c.view.turnNo, c.view.etapa, c.views, a])) {
@@ -145,6 +152,13 @@ try {
   confere(vit === fins.filter((f) => f.vencedor).length, `vitórias batem com as rodadas (${vit})`);
   confere(fins.every((f) => ['bateu', 'bazuca', 'monte'].includes(f.motivo)), `motivos: ${fins.map((f) => f.motivo).join(', ')}`);
   confere(A.eventos.some((e) => e.e === 'rapido' || e.e === 'errou'), 'houve descarte rápido na mesa');
+  const iGrito = A.eventos.findIndex((e) => e.e === 'bazuca' && e.p === id(A));
+  if (gritou) {
+    const depois = A.eventos.slice(iGrito + 1);
+    confere(iGrito >= 0 && depois[0]?.e === 'roundEnd' && depois[0].motivo === 'bazuca', 'bazuca na vez acaba a rodada na hora');
+    confere(!depois.slice(0, 1).some((e) => e.e === 'punicao'), 'e sem carta de punição');
+    confere(A.view.lastRound?.gritou === id(A), 'o fim da rodada diz quem gritou');
+  } else confere(rodadas < 2 || A.view.round > 1, 'a Ana não pegou a vez na 2ª rodada (bateram antes)');
   confere(vazamentos.length === 0, `nenhuma visão vazou carta virada ${vazamentos.slice(0, 3).join(' | ')}`);
   const recusas = [...A.erros, ...B.erros];
   confere(recusas.length === 0, `nenhuma jogada recusada (${recusas.slice(0, 3).join(' | ')})`);

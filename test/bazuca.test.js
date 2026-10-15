@@ -181,23 +181,67 @@ test('bater dando a última carta para outro', () => {
   assert.equal(g.lastRound.vencedor, 'p1');
 });
 
-test('bazuca certo vence; empate ou soma maior não vence, pune e o jogo segue', () => {
-  const g = montado([[1, 3], [4, 0], [9]]);
-  B.applyAction(g, 'p0', { a: 'bazuca' }, T0);
-  assert.equal(g.phase, 'play', 'empatou com 4: não vence');
-  assert.equal(g.players[0].slots.length, 3);
-  assert.equal(g.players[g.turn].id, 'p1');
-  const g2 = montado([[1, 2], [4, 0], [9]]);
-  const ev = B.applyAction(g2, 'p0', { a: 'bazuca' }, T0);
+test('bazuca sempre acaba a rodada: a menor soma vence, gritando ou não', () => {
+  // certo: quem gritou tem a menor
+  const g = montado([[1, 2], [4, 0], [9]]);
+  const ev = B.applyAction(g, 'p0', { a: 'bazuca' }, T0);
   assert.deepEqual(ev[0], { e: 'bazuca', p: 'p0', certo: true });
-  assert.equal(g2.lastRound.vencedor, 'p0');
-  assert.equal(g2.lastRound.motivo, 'bazuca');
+  assert.equal(g.phase, 'roundEnd');
+  assert.equal(g.lastRound.vencedor, 'p0');
+  assert.equal(g.lastRound.motivo, 'bazuca');
+  assert.equal(g.lastRound.gritou, 'p0');
+  // errado: a rodada acaba do mesmo jeito, sem punição, e leva quem tem menos
+  const g2 = montado([[5, 6], [1, 0], [9]]);
+  const ev2 = B.applyAction(g2, 'p0', { a: 'bazuca' }, T0);
+  assert.equal(ev2[0].certo, false);
+  assert.equal(g2.phase, 'roundEnd');
+  assert.equal(g2.players[0].slots.length, 2, 'sem carta de punição');
+  assert.equal(g2.lastRound.vencedor, 'p1');
+  assert.equal(g2.players[1].vitorias, 1);
+  // empate na menor soma: ninguém leva
+  const g3 = montado([[1, 3], [4, 0], [9]]);
+  B.applyAction(g3, 'p0', { a: 'bazuca' }, T0);
+  assert.equal(g3.phase, 'roundEnd');
+  assert.equal(g3.lastRound.vencedor, null);
+  assert.ok(g3.players.every((p) => p.vitorias === 0));
 });
 
-test('bazuca só no começo da vez', () => {
+test('bazuca vale a vez inteira — com a comprada na mão ela vai para o descarte', () => {
   const g = montado([[1, 2], [4, 0]], { deck: [5] });
   B.applyAction(g, 'p0', { a: 'comprar' }, T0);
-  assert.throws(() => B.applyAction(g, 'p0', { a: 'bazuca' }, T0), /carta comprada/);
+  B.applyAction(g, 'p0', { a: 'bazuca' }, T0);
+  assert.equal(g.phase, 'roundEnd');
+  assert.equal(g.descarte.at(-1).rank, 5);
+  assert.equal(g.lastRound.somas.p0, 3, 'a comprada não conta');
+  assert.equal(total(g), 5, 'nenhuma carta some: 4 na mesa + a comprada no descarte');
+  // fora da vez, não
+  const g2 = montado([[1, 2], [4, 0]]);
+  assert.throws(() => B.applyAction(g2, 'p1', { a: 'bazuca' }, T0), /vez/);
+});
+
+test('a partida vai a 4 vitórias, com quantas rodadas precisar; depois, fim de jogo', () => {
+  const g = montado([[1], [9]]);
+  g.players[0].vitorias = 3;
+  g.players[1].vitorias = 3;
+  B.applyAction(g, 'p0', { a: 'bazuca' }, T0);
+  assert.equal(g.players[0].vitorias, 4);
+  assert.equal(g.lastRound.campeao, 'p0');
+  assert.equal(B.viewFor(g, 'p1', T0).campeao, 'p0');
+  const ev = B.actNextRound(g, T0);
+  assert.deepEqual(ev, [{ e: 'gameEnd', campeao: 'p0' }]);
+  assert.equal(g.phase, 'gameEnd');
+  const v = B.viewFor(g, 'p1', T0);
+  assert.equal(v.meta, B.VITORIAS_PARA_GANHAR);
+  assert.deepEqual(v.ranking.map((r) => [r.id, r.score]), [['p0', 4], ['p1', 3]]);
+  assert.equal(B.proximoPrazo(g), null, 'sem relógio no fim');
+  assert.deepEqual(B.planosDosRobos(g, ['p0', 'p1'], T0), []);
+  // com 3, a rodada seguinte começa normalmente
+  const g2 = montado([[1], [9]]);
+  g2.players[0].vitorias = 2;
+  B.applyAction(g2, 'p0', { a: 'bazuca' }, T0);
+  assert.equal(g2.lastRound.campeao, null);
+  B.actNextRound(g2, T0);
+  assert.equal(g2.phase, 'espiar');
 });
 
 test('35 s: estourou, a comprada vai para o descarte sem poder', () => {
@@ -243,6 +287,8 @@ function simula(n, nivel, rodadas = 3, limite = 400000) {
   let passos = 0;
   while (fins.length < rodadas && passos++ < limite) {
     if (g.phase === 'roundEnd') { fins.push(g.lastRound); B.actNextRound(g, agora); planos.clear(); continue; }
+    // alguém chegou às 4 vitórias: a mesa joga de novo (o `playAgain` do servidor)
+    if (g.phase === 'gameEnd') { for (const p of g.players) p.vitorias = 0; g.campeao = null; B.startRound(g, agora); continue; }
     for (const pl of B.planosDosRobos(g, [], agora)) {
       if (!planos.has(pl.chave)) planos.set(pl.chave, pl.action ? { em: agora + pl.atraso, pl } : null);
     }

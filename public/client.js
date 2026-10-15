@@ -265,7 +265,7 @@ const MODOS = {
   bazuca: {
     nome: 'Bazuca',
     titulo: 'Bazuca<br><em>memória, reflexo e coragem de gritar</em>',
-    fatos: '<span><strong>2–6</strong>jogadores</span><span><strong>Menor soma</strong>ganha</span><span><strong>Sem ajuda</strong>a memória é sua</span>',
+    fatos: '<span><strong>2–6</strong>jogadores</span><span><strong>Menor soma</strong>leva a rodada</span><span><strong>4 vitórias</strong>fecham a partida</span>',
     min: 2, max: 6,
     niveis: ['facil', 'normal', 'dificil'],
   },

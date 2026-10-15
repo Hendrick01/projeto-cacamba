@@ -2,7 +2,7 @@
 // imprime a sessão para colar no navegador — é o caminho mais curto para VER a
 // mesa 3D, que sem partida em andamento não desenha ninguém.
 //
-//   node test/mesa-qa.mjs [robôs=3] [porta=3000] [modo=cacamba|presidente]
+//   node test/mesa-qa.mjs [robôs=3] [porta=3000] [modo=cacamba|presidente|bazuca]
 //
 // Depois, no console da página (ou pelo painel do navegador):
 //   localStorage.setItem('cacamba-session', '<a linha impressa aqui>')
@@ -14,7 +14,7 @@ const PORT = process.argv[3] || 3000;
 const ws = new WebSocket(`ws://localhost:${PORT}`);
 let sessao = null;
 
-const MODO = process.argv[4] || 'cacamba';   // 'presidente' abre a 3D do Presidente
+const MODO = process.argv[4] || 'cacamba';   // 'presidente' ou 'bazuca' abrem a 3D deles
 ws.on('open', () => ws.send(JSON.stringify({ t: 'create', name: 'Matheus', avatar: 'matheus', modo: MODO })));
 ws.on('error', (e) => { console.error('não conectou:', e.message); process.exit(1); });
 ws.on('message', (raw) => {

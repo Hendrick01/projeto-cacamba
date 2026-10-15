@@ -14,7 +14,7 @@
 // cima, que é a jogada de reflexo.
 // ============================================================================
 
-import { rotulo } from '/shared/bazuca.js';
+import { rotulo, contaDaRodada } from '/shared/bazuca.js';
 
 const NOME_DO_PODER = { J: 'valete', Q: 'dama', K: 'rei' };
 
@@ -145,7 +145,7 @@ export function criaMesaBazuca(ctx) {
   // A carta que ESTÁ à vista agora nesta posição, ou null.
   function aVista(p, i) {
     const vw = v();
-    if (vw.phase === 'roundEnd') {
+    if (vw.phase === 'roundEnd' || vw.phase === 'gameEnd') {
       const c = vw.players.find((x) => x.id === p)?.slots[i];
       return c && typeof c === 'object' ? { card: c, tipo: 'fim' } : null;
     }
@@ -222,7 +222,7 @@ export function criaMesaBazuca(ctx) {
       lugar.style.setProperty('--anel', ctx.corDoJogador(p.id));
       if (vw.turnId === p.id) lugar.classList.add('vez');
       if (!p.isBot && p.connected === false) lugar.classList.add('fora');
-      if (vw.lastRound && vw.phase === 'roundEnd' && vw.lastRound.vencedor === p.id) lugar.classList.add('venceu');
+      if (vw.lastRound && vw.phase !== 'play' && vw.lastRound.vencedor === p.id) lugar.classList.add('venceu');
       const topo = document.createElement('div');
       topo.className = 'bz-lugar-topo';
       topo.appendChild(ctx.avatarEl(p.id, vw.players, 24));
@@ -371,7 +371,9 @@ export function criaMesaBazuca(ctx) {
       bDar.textContent = `Dar esta carta a ${ctx.playerName(devo.para)}`;
       return;
     }
-    if (vez && vw.etapa === 'comprar') { bComprar.hidden = false; bBazuca.hidden = false; }
+    if (vez && vw.etapa === 'comprar') bComprar.hidden = false;
+    // o grito vale a vez inteira: antes de comprar, decidindo ou no poder
+    if (vez) bBazuca.hidden = false;
     if (vez && vw.etapa === 'decidir') {
       bJogaFora.hidden = false;
       bTrocar.hidden = !(m.length === 1 && sel.length === 1);
@@ -394,7 +396,7 @@ export function criaMesaBazuca(ctx) {
     const vw = v();
     $('round-label').textContent = `Bazuca · Rodada ${vw.round + 1}`;
     const minhas = vw.players.find((p) => p.id === eu())?.vitorias || 0;
-    $('contract-label').textContent = `${minhas} vitória${minhas === 1 ? '' : 's'}`;
+    $('contract-label').textContent = `${minhas} de ${vw.meta || 4} vitórias`;
   }
 
   // ---- fim de rodada ---------------------------------------------------------
@@ -419,10 +421,11 @@ export function criaMesaBazuca(ctx) {
   let modalDaRodada = null;
   function modalDeFase() {
     const vw = v();
-    const chave = vw.phase === 'roundEnd' ? `fim:${vw.round}` : null;
+    const chave = vw.phase === 'roundEnd' || vw.phase === 'gameEnd' ? `${vw.phase}:${vw.round}` : null;
     if (chave) {
       if (modalDaRodada === chave) return;
       modalDaRodada = chave;
+      if (vw.phase === 'gameEnd') { fimDaPartida(); return; }
       // um instante para a última carta cair antes de cobrir a mesa
       setTimeout(() => { if (v()?.phase === 'roundEnd' && modalDaRodada === chave) fimDaRodada(); }, 900);
     } else if (modalDaRodada !== null) {
@@ -435,14 +438,9 @@ export function criaMesaBazuca(ctx) {
     const vw = v();
     const lr = vw.lastRound;
     if (!lr) return;
+    const { titulo, texto } = contaDaRodada(lr, (id) => ctx.escapeHTML(nome(id)), eu());
     const q = lr.vencedor;
-    const quem = q ? ctx.escapeHTML(nome(q)) : '';
-    const titulo = lr.motivo === 'bateu' ? (q === eu() ? 'Você bateu!' : `${quem} bateu!`)
-      : lr.motivo === 'bazuca' ? (q === eu() ? 'Bazuca certeiro!' : `Bazuca certeiro de ${quem}!`)
-        : q ? `${quem} tinha a menor soma` : 'Empate: ninguém leva';
-    const texto = lr.motivo === 'bateu' ? 'Ficou sem nenhuma carta: vence na hora.'
-      : lr.motivo === 'bazuca' ? 'Gritou e tinha mesmo a menor soma da mesa.'
-        : 'O monte e o descarte acabaram: vale a menor soma.';
+    const fechou = !!lr.campeao;   // alguém chegou às 4: o próximo passo é o resultado final
     ctx.showModal(
       `${q ? `<div class="palco-vencedor"><img src="${ctx.figuraFeliz(q)}" alt=""></div>` : ''}
        <h2>${titulo}</h2>
@@ -450,7 +448,24 @@ export function criaMesaBazuca(ctx) {
        ${maosReveladas(lr)}
        ${tabela()}
        ${ctx.isHost() ? '' : '<p style="margin-top:10px">Esperando o anfitrião continuar…</p>'}`,
-      ctx.isHost() ? [{ label: 'Próxima rodada', cls: 'btn-primary', fn: () => ctx.sendMsg({ t: 'nextRound' }) }] : [],
+      ctx.isHost() ? [{ label: fechou ? 'Ver resultado final' : 'Próxima rodada', cls: 'btn-primary', fn: () => ctx.sendMsg({ t: 'nextRound' }) }] : [],
+    );
+  }
+
+  // Quem chegou às 4 vitórias leva a partida; o anfitrião decide se a mesa
+  // joga de novo, como no Caçamba.
+  function fimDaPartida() {
+    const vw = v();
+    const q = vw.campeao;
+    const acoes = ctx.isHost() ? [{ label: 'Jogar de novo', cls: 'btn-primary', fn: () => ctx.sendMsg({ t: 'playAgain' }) }] : [];
+    acoes.push({ label: 'Sair da sala', cls: 'btn-ghost', fn: ctx.saiDaSala });
+    ctx.showModal(
+      `${q ? `<div class="palco-vencedor grande"><img src="${ctx.figuraFeliz(q)}" alt=""></div>` : ''}
+       <h2>${q === eu() ? 'Você venceu a partida!' : `${ctx.escapeHTML(nome(q))} venceu a partida!`}</h2>
+       <p>Chegou a ${vw.meta || 4} vitórias.</p>
+       ${tabela()}
+       ${ctx.isHost() ? '' : '<p style="margin-top:10px">Esperando o anfitrião decidir…</p>'}`,
+      acoes,
     );
   }
 
@@ -619,8 +634,8 @@ export function criaMesaBazuca(ctx) {
           ctx.toast(`${nome(ev.p)} errou o par (${rot(ev.cards[0])} e ${rot(ev.cards[1])}). Leva mais uma.`);
           break;
         case 'bazuca':
+          // a rodada acaba aqui; o fim dela conta quem tinha a menor soma
           gritaBazuca(ev.p);
-          if (!ev.certo) setTimeout(() => ctx.toast(`${ev.p === eu() ? 'Você não tinha' : `${nome(ev.p)} não tinha`} a menor soma: leva mais uma e o jogo segue.`), 1200);
           break;
         case 'estourou':
           ctx.toast(ev.p === eu() ? 'Seu tempo acabou.' : `O tempo de ${nome(ev.p)} acabou.`);
@@ -658,7 +673,7 @@ export function criaMesaBazuca(ctx) {
     placar() {
       ctx.showModal(
         `<h2>Placar</h2>${tabela()}
-         <p class="modal-hint">Cada rodada vale uma vitória para quem bate ou acerta o bazuca. A partida não tem fim: joga-se quanto quiser.</p>`,
+         <p class="modal-hint">Cada rodada vale uma vitória para quem bate ou tem a menor soma na contagem. A partida vai até alguém chegar a ${v().meta || 4} vitórias.</p>`,
         [{ label: 'Fechar', fn: ctx.closeModal }],
         ctx.closeModal,
       );
@@ -674,7 +689,8 @@ export function criaMesaBazuca(ctx) {
          <p><strong>Descarte em cima:</strong> a qualquer momento, qualquer um descarta uma carta de mesmo valor da que está em cima — a sua ou a de outro jogador. Pegou a de outro? Dê uma das suas para ele. Errou? A carta aparece para todos e você leva mais uma. Dois toques numa carta descartam na hora.</p>
          <p><strong>Par:</strong> na sua vez, dá para descartar um par seu de uma vez.</p>
          <p><strong>Bateu:</strong> quem fica sem nenhuma carta vence na hora.</p>
-         <p><strong>BAZUCA!</strong> No começo da sua vez, em vez de comprar. Você afirma que tem a menor soma da mesa — empate não vale. Acertou, vence. Errou, leva mais uma carta e o jogo segue.</p>
+         <p><strong>BAZUCA!</strong> Na sua vez, a qualquer momento dela. A rodada acaba na hora e vai para a contagem: soma-se tudo e quem tiver a menor soma vence — tenha gritado ou não. Empate na menor soma: ninguém leva.</p>
+         <p><strong>Partida:</strong> cada rodada vale uma vitória; quem chegar a 4 vitórias ganha, com quantas rodadas forem precisas.</p>
          <p class="modal-hint">O jogo não ajuda: nada marca carta já vista nem avisa descarte possível. A memória é sua.</p>`,
         [{ label: 'Entendi', cls: 'btn-primary', fn: ctx.closeModal }],
         ctx.closeModal,

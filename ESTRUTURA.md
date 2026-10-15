@@ -409,10 +409,35 @@ arquivo; testes em `test/bazuca.test.js`), mesa 2D em `public/bazuca-mesa.js`
   entra numa posição nova.
 - **Lupa.** Carta de adversário à vista (dama ou descarte errado) aparece
   grande no meio da tela, com o dono e um mapinha da grade dele.
-- A mesa 3D ainda não tem Bazuca: o botão 3D some nessa sala.
+- **BAZUCA acaba a rodada** (regra corrigida pelo dono no mesmo dia): grita-se
+  em qualquer etapa da sua vez, sem punição; `fimDaRodada` soma tudo e a
+  menor soma vence, de quem gritou ou não (empate na menor: ninguém leva).
+  `lastRound.gritou` diz quem gritou, e `contaDaRodada(lr, nome, eu)` (no
+  motor) é o título e a linha do fim de rodada nas duas mesas.
+- **Partida até 4 vitórias** (`VITORIAS_PARA_GANHAR`), com quantas rodadas
+  forem precisas: quem chega vira `state.campeao`, o "Próxima rodada" vira
+  "Ver resultado final", e `actNextRound` leva a `gameEnd` (com `ranking` na
+  visão). O anfitrião recomeça com o `playAgain` genérico do servidor.
+- **Mesa 3D** em `public/bazuca-3d.js`, baixada pelo `mesa3d.js`
+  (`carregaBazuca`) quando chega visão com `modo: 'bazuca'`, como a do
+  Presidente. Sem leque: as cartas de cada um ficam deitadas na frente da
+  cadeira em duas fileiras (0 e 1 para o meio, 2 e 3 do lado do dono, a
+  punição em coluna nova, buraco onde a carta saiu), e a grade de cada
+  adversário é a dele vista de onde você senta. A sua fica no pé da tela,
+  logo acima da barra (que desce até o fim, `--acao-fundo` sem leque); o
+  meio (monte, descarte e a SUA comprada, de cara para cima) vai para trás
+  dela, e o anel dos outros abre o bastante para não encostar (`medidas`). A
+  comprada dos outros fica no leque dele, uma carta só. Toque escolhe, dois
+  toques descartam em cima (ou dão a carta devida), toque no monte compra;
+  a carta vira (girando) quando entra ou sai da vista, os lances voam de
+  lugar em lugar e o aro em volta da carta diz o que houve (dourado =
+  escolhida, creme = sua espiada, vermelho = errou, azul/roxo/branco = o que
+  os outros fizeram). Lupa e grito são HTML por cima; o relógio fica no
+  painel. Para ver: `node test/mesa-qa.mjs 3 3000 bazuca`.
 - `npm run test:bazuca` sobe um servidor próprio (`RITMO_DOS_ROBOS=0.05`),
   confere a espiada, o teto de 6, que nenhuma visão vaza carta virada, o
-  descarte rápido fora da vez e joga duas rodadas inteiras.
+  descarte rápido fora da vez, que o BAZUCA acaba a rodada sem punição, e
+  joga duas rodadas inteiras.
 
 ## `shared/engine.js` — motor de regras
 
