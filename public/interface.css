@@ -91,11 +91,11 @@ button:focus-visible,a:focus-visible,input:focus-visible { outline:3px solid var
 .voice-panel small { display:block;font-size:.68rem;color:#b0c0a7;margin:10px 0;line-height:1.5; }
 .voice-panel button:disabled { opacity:.45; }
 /* Shared 3D HUD. No forced camera movement or changes to the GLBs. */
-body.ui-3d .painel { background:linear-gradient(#0a221df5,#0a221d00);padding:14px 18px 28px;gap:10px; }
+body.ui-3d .painel { background:linear-gradient(#1b110bf2,#1b110b00);padding:14px 18px 28px;gap:10px; }
 body.ui-3d .painel small { color:#cad6be; }
 body.ui-3d .painel strong { color:#f5d28b; }
-body.ui-3d .voltar { border-radius:10px;border:1px solid #d2c59766;background:#0b241dbb;min-height:40px; }
-body.ui-3d .aviso { background:#102f24ed;border:1px solid #c5b46c88;color:#f7edcf;border-radius:12px; }
+body.ui-3d .voltar { border-radius:10px;border:1px solid rgba(201,162,78,.35);background:rgba(27,17,11,.8);min-height:40px; }
+body.ui-3d .aviso { background:rgba(27,17,11,.93);border:1px solid rgba(201,162,78,.45);color:#f7edcf;border-radius:12px; }
 body.ui-3d .ui-3d-footer { position:fixed;bottom:max(5px,env(safe-area-inset-bottom));left:12px;font:700 10px sans-serif;color:#e1d9c3;pointer-events:none;opacity:.75;z-index:5; }
 /* acima do leque e, quando você tem jogo baixado, acima dele também (a mesa
    3D calcula a altura em `--acao-fundo` a cada estado) */

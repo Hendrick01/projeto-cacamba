@@ -110,7 +110,7 @@
 <!-- ======================= TELA INICIAL ======================= -->
 <section id="screen-home" class="screen" hidden>
   <div class="ui-shell">
-    <header class="ui-top"><button id="btn-modos" type="button" class="ui-brand btn-modos" aria-label="Trocar de jogo">‹ <span id="home-marca">Caçamba</span></button><div class="ui-top-right"><span data-connection role="status">Conectando…</span><span class="ui-version" data-interface-version>UI 07.09 / R1</span></div></header>
+    <header class="ui-top"><button id="btn-modos" type="button" class="ui-brand btn-modos" title="Trocar de jogo"><span class="sr-only">Trocar de jogo: </span>‹ <span id="home-marca">Caçamba</span></button><div class="ui-top-right"><span data-connection role="status">Conectando…</span><span class="ui-version" data-interface-version>UI 07.09 / R1</span></div></header>
     <main class="ui-grid">
       <div class="ui-hero">
         <p class="ui-eyebrow">Toda sexta, mesa aberta</p>
@@ -130,7 +130,7 @@
           <button id="btn-rules-home" type="button" class="btn btn-ghost">Como se joga</button>
           <button id="btn-loja" type="button" class="btn btn-ghost">Loja</button>
         </div>
-        <button id="btn-apoiar" type="button" class="btn btn-ghost" hidden>Apoiar o Caçamba ♥</button>
+        <button id="btn-apoiar" type="button" class="btn btn-ghost" hidden>Apoiar o Caçamba ♥︎</button>
         <p id="home-error" class="error" role="alert" hidden></p>
       </div>
     </main>
@@ -178,7 +178,7 @@
     <p class="loja-nota">O jogo é de graça e continua sendo. O que se vende aqui é enfeite: não dá carta, não dá ponto, não dá vantagem.</p>
     <div id="loja-conta" class="loja-conta"></div>
     <ul id="loja-prateleira" class="loja-prateleira"></ul>
-    <p class="loja-legal"><a href="/termos.html" target="_blank" rel="noopener">Termos</a> · <a href="/politica.html" target="_blank" rel="noopener">Privacidade</a></p>
+    <p class="loja-legal"><a href="/termos.html">Termos</a> · <a href="/politica.html">Privacidade</a></p>
   </div>
 </section>
 
@@ -195,7 +195,7 @@
       <img id="lobby-qr" class="lobby-qr" width="112" height="112" alt="QR para entrar na sala" hidden>
       <div class="lado">
         <p>Aponte a câmera para o código ou mande o convite para a gelera.</p>
-        <button id="btn-convite" type="button" class="btn"><svg class="ico" aria-hidden="true"><use href="#i-copiar"/></svg><span id="convite-rotulo">Copiar convite</span></button>
+        <button id="btn-convite" type="button" class="btn"><svg class="ico" aria-hidden="true"><use href="#i-copiar"/></svg><span id="convite-rotulo" aria-live="polite">Copiar convite</span></button>
       </div>
     </div>
     <p id="lobby-url" class="lobby-url"></p>
@@ -365,7 +365,7 @@
   <header class="topbar">
     <!-- A rodada é também o botão do placar: o Σ saiu da fileira de ícones,
          que não cabia em 375 px (o botão de sair ficava cortado na borda). -->
-    <button id="btn-score" type="button" class="round-pill" title="Ver o placar"><span class="sigma" aria-hidden="true">Σ</span><span class="linhas"><span id="round-label">Rodada 1/7</span><strong id="contract-label">2 trincas</strong></span></button>
+    <button id="btn-score" type="button" class="round-pill" title="Ver o placar"><span class="sigma" aria-hidden="true">Σ</span><span class="sr-only">Ver o placar. </span><span class="linhas"><span id="round-label">Rodada 1/7</span><strong id="contract-label">2 trincas</strong></span></button>
     <div class="topbar-btns">
       <button id="btn-rules" class="icon-btn" title="Regras" aria-label="Regras"><svg class="ico" aria-hidden="true"><use href="#i-ajuda"/></svg></button>
       <button id="btn-voz" class="icon-btn" title="Ligar o microfone (chat de voz)" aria-label="Chat de voz"><svg class="ico" aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button>
@@ -395,7 +395,7 @@
         </button>
       </div>
       <button id="btn-claim" class="btn btn-claim" hidden><svg class="ico" aria-hidden="true"><use href="#i-carrinho"/></svg>Quero essa carta!</button>
-      <p id="turn-banner" class="turn-banner">…</p>
+      <p id="turn-banner" class="turn-banner" role="status" aria-live="polite">…</p>
     </div>
 
     <div id="meu-assento" class="assento meu-assento" hidden></div>
@@ -412,7 +412,7 @@
     <button id="btn-discard" class="btn btn-danger" hidden>Descartar</button>
     <button id="btn-meld-discard" class="btn" hidden>Descartar de jogo</button>
     <button id="btn-cancel-mode" class="btn btn-ghost" hidden>Cancelar</button>
-    <button id="btn-sort" class="btn btn-ghost">A↔♠</button>
+    <button id="btn-sort" class="btn btn-ghost" aria-label="Ordenar a mão">A↔♠︎</button>
   </div>
 
   <!-- As suas mãos, atrás das cartas. Desenhadas aqui e não geradas em arquivo
@@ -459,7 +459,7 @@
 
   <div id="anuncio-rodada" class="anuncio-rodada" hidden aria-live="polite"></div>
 
-  <div id="toasts" class="toasts"></div>
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 </section>
 
 <!-- ======================= MODAIS ======================= -->

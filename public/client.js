@@ -100,16 +100,6 @@ function sendAction(action) { sendMsg({ t: 'action', action }); }
 // O módulo mede e conecta; aqui só se decide o botão e quem acende no assento.
 const voz = criaVoz({ meuId: () => me(), enviar: (to, dados) => sendMsg({ t: 'voz', to, dados }) });
 
-function atualizaBotaoVoz() {
-  const b = $('btn-voz');
-  if (!b) return;
-  b.classList.toggle('voz-on', voz.ligado() && !voz.mudo);
-  b.classList.toggle('voz-mudo', voz.ligado() && voz.mudo);
-  b.textContent = voz.ligado() ? (voz.mudo ? '🔇' : '🎙') : '🎙';
-  b.title = !voz.ligado() ? 'Ligar o microfone (chat de voz)'
-    : voz.mudo ? 'Microfone mudo — toque para voltar a falar; segure para desligar'
-    : 'Falando — toque para ficar mudo';
-}
 // Um botão, três estados: desligado → ligado → mudo → desligado. Ligar pede o
 // microfone ao navegador, e isso só pode acontecer num toque de verdade.
 const controlesVoz = ligaControlesVoz(voz, { botao: $('btn-voz'), avisar: toast });
@@ -668,7 +658,7 @@ function desenhaDuplas(cadeiras) {
         el.dataset.playerId = p.id;
         el.appendChild(avatarEl(p.id, lobby.players, 28));
         const nome = p.id === me() ? `${p.name} (você)` : p.name;
-        el.appendChild(document.createTextNode(p.isBot ? `🤖 ${nome}` : nome));
+        el.appendChild(document.createTextNode(p.isBot ? `${nome} (robô)` : nome));
         if (!p.connected && !p.isBot) el.classList.add('fora');
       } else {
         el.textContent = `Cadeira ${i + 1} · vaga, entra robô`;
@@ -1345,7 +1335,11 @@ function renderCenter() {
   const minha = !!view.discardTop && view.discardTop.by === me();
   $('discard-pile').classList.toggle('minha', minha && !trancado);
   $('discard-pile').querySelector('.pile-count').textContent =
-    trancado ? '🔒 trancado' : (minha ? 'sua' : 'meio');
+    trancado ? 'trancado' : (minha ? 'sua' : 'meio');
+  // o leitor de tela lia só "55" e "meio": os dois montes ganham nome de verdade
+  $('deck-pile').setAttribute('aria-label', `Puxar do monte, ${view.deckCount} cartas`);
+  $('discard-pile').setAttribute('aria-label', !view.discardTop ? 'Meio vazio'
+    : `Carta do meio: ${cardText(view.discardTop)}${trancado ? ', trancada' : ''}`);
 
   // Compra fora da vez — coringa no topo não é comprável por ninguém
   const claimable = view.phase === 'draw' && !myTurn() && view.discardFresh && view.discardBuyable
@@ -2541,7 +2535,7 @@ function showRules() {
      <p>Quando alguém descarta, os outros jogadores podem pedir a carta: leva <strong>quem apertar primeiro</strong>, e ele fica só com a carta pedida (não puxa nem descarta). Mas <strong>quem está na vez tem preferência</strong> sobre todos — se ele também quiser a carta, ela é dele.</p>
      <p><strong>Quem descartou não pede de volta:</strong> a carta que saiu da sua mão não volta para ela, nem pela compra da vez nem pelo pedido. Numa mesa de dois isso quer dizer que a compra fora da vez não acontece — o único que não está na vez é justamente quem acabou de descartar.</p>
      <h3>Falar sem microfone</h3>
-     <p>O botão <strong>💬</strong> abre emotes e frases prontas (“Bora!”, “Demora demais…”, “Nojo!”). O balão aparece em cima de você para todo mundo da mesa. O <strong>🎙</strong> liga o chat de voz.</p>
+     <p>O botão do balão <svg class="ico" aria-hidden="true"><use href="#i-fala"/></svg> abre emotes e frases prontas (“Bora!”, “Demora demais…”, “Nojo!”). O balão aparece em cima de você para todo mundo da mesa. O do microfone liga o chat de voz.</p>
      <h3>Na mesa 3D</h3>
      <p><strong>Toque num jogador</strong> para virar e olhar para ele; toque de novo, ou no tampo, para voltar à mesa. <strong>Arraste o fundo</strong> e a cabeça segue o dedo. Os outros veem a sua cabeça virar. Toque num jogo do tampo para ver as cartas de perto e encaixar.</p>
      <h3>Se a conexão cair</h3>
