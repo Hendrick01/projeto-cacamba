@@ -126,6 +126,38 @@ function carregaBazuca() {
   });
   return carregandoBazuca;
 }
+// O POKER na 3D (15/10/2026), no mesmo esquema: poker-3d.js só é baixado
+// quando a sala é dele. As cartas na mão ficam (duas); o que entra por aqui
+// são as cinco da mesa, as fichas, os botões e a bandeja de apostar (os
+// mesmos da 2D), o placar e a sua mão — que, enquanto o resultado da mão
+// anterior está na mesa, ainda é a de antes.
+let pk = null, carregandoPoker = null;
+function carregaPoker() {
+  carregandoPoker ||= import('./poker-3d.js').then((mod) => {
+    document.title = 'Poker em 3D';
+    pk = mod.criaPoker3D({
+      THREE, scene, camera, MESA_TOPO, CARTA_L, CARTA_A, geoCarta, geoSombra, materialVerso, semMovimento,
+      view: () => view, me, assentos, posicaoDoAssento,
+      materialDaCarta, rotulo, trocaRotulo,
+      corDe: (id) => CORES_DE_ASSENTO[assentoDe(id) % CORES_DE_ASSENTO.length],
+      avatarDe: (id) => { const p = view?.players.find((q) => q.id === id); return p ? caraDe(personagemDe(p)) : ''; },
+      voa, lequeDe, pontoDaMaoAtiva, temGesto, gestoCarta,
+      botao, aviso, sendAction, enviaAoServidor, souAnfitriao: () => hostId === me(),
+      atualizaBotoes: () => montaBotoes(),
+      // o resultado saiu: a mesa volta à mão de agora
+      atualiza: () => { if (view) sincroniza(false); },
+      // as cartas novas da sua mão vêm voando deste ponto do tampo
+      chegaNaMao: (origem) => { entradaNaMao = origem.clone(); },
+      // correu: a pinça leva as suas duas para o meio
+      armaPinca: (destino) => { jogadaMinha = { multi: true, destino }; },
+      pincaVaiLevar: () => !semMovimento && !!(maos.tridi && maos.dir),
+      verbo: (id, texto) => { const a = assentos.get(id); if (a) { a.aviso = texto; a.avisoAte = performance.now() + 1800; a.avisoEmote = false; } },
+      cara: fazCara,
+      palcoDe, cabecalho, linhaDoPlacar, acaoDoPlacar, nomeDe,
+    });
+  });
+  return carregandoPoker;
+}
 // O QUE CADA MODO HERDA DA MESA DO CAÇAMBA. A mesa base é a do Caçamba; o
 // módulo de um modo diz, em `recursos`, o que dela NÃO é dele — o que não
 // disser, herda. "Cada um deve ter sua independência" (usuário, 15/10/2026):
@@ -133,8 +165,12 @@ function carregaBazuca() {
 // leque nas mãos dos personagens.
 //   maoEmPrimeiraPessoa  — as suas mãos segurando o leque, e a pinça na jogada
 //   cartasNaMaoDosOutros — o leque (e o selo da contagem) nas mãos de cada um
+//   contagemDaMao        — só o selo com o número de cartas do leque
+//   monteEDescarte       — o monte e o descarte no meio da mesa
+//   distribuicao         — as três cartas que voam do monte a cada assento
+//                          quando a rodada começa
 function herda(recurso) {
-  return (bz || pres)?.recursos?.[recurso] ?? true;
+  return (bz || pres || pk)?.recursos?.[recurso] ?? true;
 }
 function trataEstado(msg) {
   const primeira = !view;
@@ -157,6 +193,7 @@ function conecta() {
       // chegarem enquanto ele carrega esperam na mesma fila, em ordem.
       if (msg.view?.modo === 'presidente' && !pres) { carregaPresidente().then(() => trataEstado(msg)); return; }
       if (msg.view?.modo === 'bazuca' && !bz) { carregaBazuca().then(() => trataEstado(msg)); return; }
+      if (msg.view?.modo === 'poker' && !pk) { carregaPoker().then(() => trataEstado(msg)); return; }
       trataEstado(msg);
     } else if (msg.t === 'lobby') {
 
@@ -1159,7 +1196,8 @@ let selecionadas = new Set();
 let ordemManual = [];
 
 function maoOrdenada() {
-  const hand = [...(view.you?.hand || [])];
+  // no Poker, enquanto o resultado da mão anterior está na mesa, a mão é a de antes
+  const hand = pk ? pk.mao(view.you?.hand || []) : [...(view.you?.hand || [])];
   if (ordemManual.length) {
     const pos = new Map(ordemManual.map((id, i) => [id, i]));
     return hand.sort((a, b) => (pos.get(a.id) ?? 1e6) - (pos.get(b.id) ?? 1e6));
@@ -1955,7 +1993,8 @@ function sincronizaMao() {
     mesh.scale.setScalar(p.escala); mesh.position.set(p.x,p.y + (selecionadas.has(card.id) ? 14 * plano.unidade : 0),p.z + i * 0.0006);
     mesh.rotation.set(0,0,p.giro);
     if (nova && entradaNaMao && !semMovimento) {
-      const origem = entradaNaMao === 'meio' ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.06) : topoDoMonte();
+      const origem = entradaNaMao === 'meio' ? descarte.grupo.position.clone().setY(MESA_TOPO + 0.06)
+        : entradaNaMao.isVector3 ? entradaNaMao.clone() : topoDoMonte();
       segueACamera();
       voa(mesh,noEspacoDaMao(origem),mesh.position.clone(),{dur:400,arco:0.04});
       chegaram.push(mesh);
@@ -2204,6 +2243,7 @@ function montaBotoes() {
   }
   if (pres) { pres.botoes(barra); return; }
   if (bz) { bz.botoes(barra); return; }
+  if (pk) { pk.botoes(barra); return; }
   // o visor de jogos sempre à mão: na mesa cheia é por ele que se lê carta por
   // carta, e com uma carta escolhida é por ele que se encaixa
   if (view.players.some((p) => p.melds?.length)) {
@@ -2467,6 +2507,7 @@ function desenhaPlacar() {
   if (!view) return;
   if (pres) { pres.desenhaPlacar(corpo, acoes); return; }
   if (bz) { bz.desenhaPlacar(corpo, acoes); return; }
+  if (pk) { pk.desenhaPlacar(corpo, acoes); return; }
   const souAnfitriao = hostId === me();
   const tabela = document.createElement('table');
   const jogador = (id) => view.players.find((p) => p.id === id);
@@ -2518,7 +2559,7 @@ async function sincroniza(primeira) {
   if (sincronizando) return;
   sincronizando = true;
   try {
-    if (!pres && !bz) {
+    if (!pres && !bz && !pk) {
       $('rot-rodada').textContent = `Rodada ${view.round + 1}/${view.totalRounds}`;
       $('rot-contrato').textContent = view.contract ? view.contract.label : '—';
     }
@@ -2549,8 +2590,9 @@ async function sincroniza(primeira) {
       // Modo em que ninguém segura carta (o Bazuca, com tudo no feltro): sem
       // leque nas mãos e sem o selo da contagem
       const comLeque = herda('cartasNaMaoDosOutros');
-      const naMao = comLeque ? p.handCount : 0;
-      a.contagem.visible = comLeque;
+      // (no Poker, enquanto o resultado está na mesa, ninguém segura carta)
+      const naMao = comLeque ? (pk ? pk.cartasNaMao(p) : p.handCount) : 0;
+      a.contagem.visible = comLeque && herda('contagemDaMao');
       // os LEQUE_MAX primeiros filhos são as cartas; o selo fica sempre. Até
       // cinco, a abertura é a de sempre; acima, o leque reabre no mesmo arco
       // com as cartas mais juntas — mão cheia se vê de longe.
@@ -2569,10 +2611,11 @@ async function sincroniza(primeira) {
       }
       a.leque.visible = naMao > 0;
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
-      a.proximo = (pres ? pres.proximoId() : view.players[(view.players.findIndex((q) => q.id === view.turnId) + 1) % view.players.length]?.id) === p.id
+      a.proximo = ((pres || pk) ? (pres || pk).proximoId() : view.players[(view.players.findIndex((q) => q.id === view.turnId) + 1) % view.players.length]?.id) === p.id
         && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
       minhaVez = view.turnId === me() && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
-      a.apagado = (p.desistiu || (!p.isBot && !p.connected));
+      // `fora`: no Poker, quem ficou sem fichas
+      a.apagado = (p.desistiu || p.fora || (!p.isBot && !p.connected));
       for (const m of a.materiais) {
         const transparent = a.apagado || !!m.userData.transparentBase;
         if (m.transparent !== transparent) { m.transparent = transparent; m.needsUpdate = true; }
@@ -2601,9 +2644,11 @@ async function sincroniza(primeira) {
 
     // no Presidente não há monte nem meio para comprar: o baralho foi todo
     // distribuído, e o meio da mesa é a jogada a cobrir (presidente-3d.js)
-    for (const o of [monte.caixa, monte.num, monte.sombra, descarte.grupo, descarte.sombra]) o.visible = !pres;
+    // (e no Poker o baralho é do dealer: ninguém compra nem descarta)
+    const comMonte = !pres && herda('monteEDescarte');
+    for (const o of [monte.caixa, monte.num, monte.sombra, descarte.grupo, descarte.sombra]) o.visible = comMonte;
     if (pres) pres.sincroniza();
-    else {
+    else if (comMonte) {
     // o Bazuca tem monte e descarte de verdade, com outros nomes na visão
     const nMonte = bz ? view.monte : view.deckCount;
     trocaRotulo(monte.num, String(nMonte));
@@ -2665,6 +2710,8 @@ async function sincroniza(primeira) {
     }
     // as grades de cartas viradas, a comprada e os voos dos lances (bazuca-3d.js)
     if (bz) bz.sincroniza();
+    // as cinco da mesa, as fichas, o botão do dealer e o resultado (poker-3d.js)
+    if (pk) pk.sincroniza();
 
     // Jogos baixados: cartas DEITADAS no feltro na frente de quem baixou
     // (decisão do usuário, 2026-09-04 e de novo em 08/09: nada de erguer,
@@ -2845,15 +2892,17 @@ async function sincroniza(primeira) {
     if (!visor.hidden) desenhaVisor();   // com o visor aberto, ele segue a mesa
     // fim de rodada ou de jogo: o placar abre aqui mesmo, uma vez por fase — com
     // um fôlego, para a comemoração de quem bateu aparecer na mesa antes
-    if (view.phase === 'roundEnd' || view.phase === 'gameEnd') {
+    // (no Poker o fim do jogo chega junto com o resultado da última mão: o
+    // placar espera o resultado sair da mesa)
+    if ((view.phase === 'roundEnd' || view.phase === 'gameEnd') && !pk?.segurando()) {
       const chave = view.phase === 'gameEnd' ? 'gameEnd' : `round-${view.round}`;
       if (placarMostrado !== chave) { placarMostrado = chave; clearTimeout(placarTimer); placarTimer = setTimeout(abrePlacar, primeira ? 0 : 1400); }
       else if (!placar.hidden) desenhaPlacar();
     } else if (placarMostrado) { placarMostrado = null; clearTimeout(placarTimer); fechaPlacar(); }
 
     // aviso da vez
-    if (pres || bz) {
-      const texto = (pres || bz).textoDaVez();
+    if (pres || bz || pk) {
+      const texto = (pres || bz || pk).textoDaVez();
       if (texto) aviso(texto, true);
     } else if (view.phase === 'draw' || view.phase === 'play') {
       if (view.turnId === me()) {
@@ -2890,6 +2939,7 @@ function trocaRotulo(sprite, texto, corFundo = 'rgba(27,17,11,0.9)', corTexto = 
 function reageAoEvento(ev) {
   pres?.evento(ev);
   bz?.evento(ev);
+  pk?.evento(ev);
   if (ev.e === 'roundStart') {
     ordemManual = []; selecionadas.clear();
     jogosVistos.clear();
@@ -2906,8 +2956,9 @@ function reageAoEvento(ev) {
     descarte.topoId = undefined;
     // distribuir: três cartas viradas por assento saem do monte, escalonadas —
     // as de verdade não vão (com oito na mesa seriam quase cem), como na 2D.
-    // No Bazuca elas vão para o feltro, cada uma ao seu lugar (bazuca-3d.js).
-    if (!semMovimento && !bz) {
+    // No Bazuca elas vão para o feltro, cada uma ao seu lugar (bazuca-3d.js);
+    // no Poker são duas, dadas pelo poker-3d.js depois do resultado.
+    if (!semMovimento && !bz && herda('distribuicao')) {
       let k = 0;
       for (const a of assentos.values()) {
         for (let c = 0; c < 3; c++) {
@@ -3225,6 +3276,7 @@ function quadro(t) {
 
   pres?.quadro();
   bz?.quadro(t);
+  pk?.quadro(t);
 
   // a carta do meio chega girando e assenta no lugar de pé
   const face = descarte.grupo.children[1];
@@ -3332,6 +3384,7 @@ window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, 
   armaJogada(id, varias = false) { jogadaMinha = varias ? { multi: true, destino: posicaoDoMeuJogoNovo } : { cardId: id, destino: descarte.grupo.position.clone().setY(MESA_TOPO + 0.08) }; },
   get gestoPinca() { return gestoPinca ? { modo: gestoPinca.modo, desde: performance.now() - gestoPinca.t0, soltou: !!gestoPinca.soltouEm, outras: gestoPinca.extras.length } : null; },
   get bz() { return bz; },
+  get pk() { return pk; },
   olharPara: (id) => escolheOlhar(id), get pescoco() { return { escolhido: olharEscolhido, livre: giroLivre, giro: pescoco.giro, inclina: pescoco.inclina }; } };
 
 // interface-2026-09-07-r1

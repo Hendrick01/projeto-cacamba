@@ -489,8 +489,37 @@ em `test/poker.test.js`), mesa 2D em `public/poker-mesa.js` +
 - **Na tela**: cinco vagas na mesa, o pote em fichas, a etapa; nos assentos,
   D/SB/BB, as fichas de cada um e a aposta da rua na frente; um balão curto
   com o que cada um fez. "Aumentar" abre a bandeja: toca-se nas fichas para
-  somar, com atalhos (mínimo, ½ pote, pote, all-in) e desfazer. Sem mesa 3D
-  por enquanto (o botão some, como no Dominó).
+  somar, com atalhos (mínimo, ½ pote, pote, all-in) e desfazer.
+- **Uma lógica de tela, duas mesas.** O que é regra de tela fica exportado no
+  topo do `poker-mesa.js`, fora de `criaMesaPoker`: `posicaoDe` (D/SB/BB),
+  `textoDaVez`, `botoesDaVez` (quais botões e o que dizem), `falaDoLance`,
+  `linhasDoResultado` e `cartasVencedoras` (o resultado), `msDaSegura`,
+  `classificacao`, `pilhas` (fichas em HTML) e `criaBandeja` (a bandeja
+  inteira, com o DOM e as classes do poker.css). A 2D e a 3D chamam as mesmas.
+- **Mesa 3D** em `public/poker-3d.js`, baixada pelo `mesa3d.js`
+  (`carregaPoker`) quando chega visão com `modo: 'poker'`, como a do
+  Presidente e a do Bazuca. As cartas na mão ficam (as suas duas em primeira
+  pessoa, o leque de duas na mão de cada um); em `recursos` o módulo diz o que
+  não herda do Caçamba: `monteEDescarte` (o baralho é do dealer),
+  `contagemDaMao` (o selo seria sempre 2: no lugar dele, uma placa sob o nome
+  com D/SB/BB e as fichas) e `distribuicao` (a mão nova é dada de duas em
+  duas, pelo módulo, só depois que o resultado da anterior sai). No meio, as
+  cinco da mesa DEITADAS, com as vagas tracejadas antes de abrir — caem
+  viradas e se viram ao pousar, do tamanho que couber na largura da tela —, e
+  o pote; a aposta da rua na frente de cada um e o disco D na frente do dealer.
+  As fichas são 3D, nas cores de `FICHAS` e nas pilhas de `emFichas`, uma
+  malha instanciada por cor; cada montinho tem `valor` (o da visão) e
+  `mostrado` (o que está na mesa), que só alcança o valor quando as fichas a
+  caminho pousam: da mão de quem aposta para a frente dele, da frente de
+  todos para o pote quando a rua fecha, do pote para quem levou. O resultado
+  (`maoFim`) segura a mesa como na 2D: as cinco que ganharam com aro dourado
+  e as outras apagadas, as mãos mostradas deitadas na frente de cada um, a sua
+  mão ainda a antiga (`mao(hand)`), ninguém com leque (`cartasNaMao`), e o
+  painel do resultado (o `.pk-resultado` da 2D) no canto de baixo — toque
+  nele solta. O placar só abre no fim do jogo, depois do resultado
+  (`segurando`). Botões Correr / Mesa / Pagar / Aumentar na barra; a bandeja
+  da 2D no canto direito (deitada) ou no pé da tela (em pé), para não tapar
+  as cinco. Para ver: `node test/mesa-qa.mjs 3 3000 poker`.
 - `npm run test:poker` sobe um servidor próprio (`RITMO_DOS_ROBOS=0.05`; com
   uma porta como argumento usa um que já está no ar), joga mãos com dois
   humanos e dois robôs, confere que o juiz recusa aumento abaixo do mínimo,

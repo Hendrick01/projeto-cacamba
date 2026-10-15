@@ -11,12 +11,228 @@
 // A mão seguinte começa sozinha no servidor. Para dar tempo de ver quem levou,
 // o resultado SEGURA o meio da mesa e a sua mão uns segundos (ou até um
 // toque); o servidor segura os robôs no mesmo tanto (pausaDoRobo).
+//
+// A mesa 3D (poker-3d.js) usa a mesma lógica: o que é regra de tela (textos,
+// botões da vez, o resultado, a bandeja de fichas) está exportado aqui em
+// cima, fora de criaMesaPoker, e as duas mesas chamam as mesmas funções.
 // ============================================================================
 
 import { emFichas, FICHAS, NOME_DA_ETAPA } from '/shared/poker.js';
 
-const fmt = (n) => Number(n || 0).toLocaleString('pt-BR');
-const SEGURA_MS = { semShowdown: 2200, showdown: 5200, corrida: 6800 };
+export const fmt = (n) => Number(n || 0).toLocaleString('pt-BR');
+export const SEGURA_MS = { semShowdown: 2200, showdown: 5200, corrida: 6800 };
+// quanto o resultado de uma mão segura a mesa: numa corrida (todos all-in) as
+// ruas ainda vão cair uma a uma
+export const msDaSegura = (ev, corrida) => (ev.semShowdown ? SEGURA_MS.semShowdown : corrida ? SEGURA_MS.corrida : SEGURA_MS.showdown);
+
+const el = (tag, cls, txt) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt != null) e.textContent = txt;
+  return e;
+};
+
+// ---- regras de tela, as mesmas nas duas mesas ---------------------------------
+
+// D, SB, BB (ou D·SB no mano a mano) de quem está na mão
+export function posicaoDe(vw, id) {
+  if (vw.phase !== 'play') return '';
+  if (id === vw.botao) return id === vw.sb ? 'D·SB' : 'D';
+  if (id === vw.sb) return 'SB';
+  if (id === vw.bb) return 'BB';
+  return '';
+}
+
+// O que cada um fez, curto: o balão da 2D e a placa da 3D.
+export function falaDoLance(ev) {
+  switch (ev.e) {
+    case 'mesa': return { texto: 'mesa' };
+    case 'correu': return { texto: 'corro' };
+    case 'pagou': return { texto: ev.allIn ? 'all-in!' : `pago ${fmt(ev.valor)}`, gesto: ev.allIn ? 'treme' : null };
+    case 'apostou': return { texto: ev.allIn ? 'all-in!' : `aposto ${fmt(ev.para)}`, gesto: ev.allIn ? 'treme' : null };
+    case 'aumentou': return { texto: ev.allIn ? 'all-in!' : `aumento p/ ${fmt(ev.para)}`, gesto: ev.allIn ? 'treme' : 'pula' };
+    default: return null;
+  }
+}
+
+// O texto da vez (o banner da 2D, o aviso da 3D).
+export function textoDaVez(vw, eu, nome, segurando) {
+  if (segurando) return { minha: false, texto: 'Fim da mão. Toque no resultado para seguir.' };
+  if (vw.phase === 'gameEnd') return { minha: false, texto: 'Fim de jogo.' };
+  if (vw.phase !== 'play') return { minha: false, texto: '' };
+  const meu = vw.players.find((p) => p.id === eu);
+  if (meu?.fora) return { minha: false, texto: `Você está fora. Vez de ${nome(vw.turnId)}…` };
+  if (vw.turnId !== eu) return { minha: false, texto: meu?.foldou ? `Você correu. Vez de ${nome(vw.turnId)}…` : `Vez de ${nome(vw.turnId)}…` };
+  const y = vw.you;
+  if (y.podeMesa) return { minha: true, texto: vw.apostaAtual === 0 ? 'Sua vez: dê mesa ou aposte.' : 'Sua vez: dê mesa ou aumente.' };
+  return { minha: true, texto: `Sua vez: pague ${fmt(y.paraPagar)}${y.podeAumentar ? ', aumente' : ''} ou corra.` };
+}
+
+// Os botões da vez: quais aparecem e o que dizem. Null quando não é hora de
+// agir (não é a sua vez, ou o resultado da mão anterior ainda está na mesa).
+export function botoesDaVez(vw, eu, segurando) {
+  const y = vw.you;
+  if (!y || segurando || vw.phase !== 'play' || vw.turnId !== eu) return null;
+  const tudo = y.paraPagar >= y.fichas;
+  return {
+    correr: !y.podeMesa, mesa: y.podeMesa, pagar: !y.podeMesa, aumentar: y.podeAumentar,
+    textoPagar: tudo ? `Pagar all-in (${fmt(y.paraPagar)})` : `Pagar ${fmt(y.paraPagar)}`,
+    textoAumentar: vw.apostaAtual === 0 ? 'Apostar' : 'Aumentar',
+  };
+}
+
+// O resultado de uma mão, em linhas: potes que foram para os mesmos
+// vencedores viram uma linha só. `antes` é o texto até o valor ("Pote
+// paralelo: Ana e Você dividem"), sem HTML — quem desenha escapa.
+export function linhasDoResultado(ev, eu, nome) {
+  let disputados = ev.potes.filter((x) => !x.devolvido);
+  const chave = (pt) => pt.vencedores.join(',');
+  if (disputados.length > 1 && disputados.every((pt) => chave(pt) === chave(disputados[0]))) {
+    disputados = [{ ...disputados[0], valor: disputados.reduce((s, pt) => s + pt.valor, 0) }];
+  }
+  return disputados.map((pt, k) => {
+    const quem = pt.vencedores.map((id) => (id === eu ? 'Você' : nome(id))).join(' e ');
+    const verbo = pt.vencedores.length > 1 ? 'dividem' : 'leva';
+    const qual = disputados.length > 1 ? (k === 0 ? 'Pote principal: ' : `Pote paralelo${disputados.length > 2 ? ` ${k}` : ''}: `) : '';
+    return { antes: `${qual}${quem} ${verbo}`, valor: pt.valor, mao: pt.mao, meu: pt.vencedores.includes(eu), vencedores: pt.vencedores };
+  });
+}
+
+// As cinco que ganharam (as do primeiro pote disputado), para acender na mesa.
+export function cartasVencedoras(ev) {
+  const acesas = new Set();
+  if (ev.semShowdown) return acesas;
+  const ganhou = ev.potes.find((x) => !x.devolvido)?.vencedores || [];
+  for (const m of ev.mostradas) if (ganhou.includes(m.p)) for (const id of m.cinco) acesas.add(id);
+  return acesas;
+}
+
+// Quem ainda joga, do mais rico ao mais pobre; depois os que saíram, pela colocação.
+export const classificacao = (players) => [...players].sort((a, b) => (a.fora === b.fora ? 0 : a.fora ? 1 : -1)
+  || (a.fora ? a.lugar - b.lugar : b.fichas - a.fichas));
+
+// ---- as fichas em HTML ----------------------------------------------------------
+
+// Um valor em pilhas de fichas coloridas, uma pilha por cor. Pilha alta
+// demais é cortada no desenho (o número ao lado diz o valor certo).
+export function pilhas(valor, alturaMax = 6) {
+  const box = el('span', 'pk-pilhas');
+  box.setAttribute('aria-hidden', 'true');
+  for (const f of emFichas(valor)) {
+    const pilha = el('span', `pk-pilha f-${f.cor}`);
+    pilha.title = `${f.n} × ${fmt(f.valor)}`;
+    for (let i = 0; i < Math.min(f.n, alturaMax); i++) pilha.appendChild(el('i', 'pk-ficha'));
+    box.appendChild(pilha);
+  }
+  return box;
+}
+
+// Ficha grande, com o valor escrito: é o botão da bandeja.
+function fichaGrande(f) {
+  const b = el('button', `pk-ficha-btn f-${f.cor}`);
+  b.type = 'button';
+  b.innerHTML = `<span class="pk-ficha-valor">${fmt(f.valor)}</span>`;
+  b.setAttribute('aria-label', `Somar uma ficha ${f.cor} de ${fmt(f.valor)}`);
+  return b;
+}
+
+// ---- a bandeja de montar a aposta -------------------------------------------------
+// "Aumentar" abre a bandeja: toca-se nas fichas para somar, com atalhos
+// (mínimo, ½ pote, pote, all-in) e desfazer. `v()` dá a visão atual,
+// `aoMudar` redesenha quem a hospeda quando ela abre ou fecha, `avisa` mostra
+// o recado de aposta abaixo do mínimo.
+export function criaBandeja({ v, sendAction, avisa, aoMudar }) {
+  const bandeja = el('div', 'pk-bandeja');
+  bandeja.hidden = true;
+  bandeja.setAttribute('role', 'group');
+  bandeja.setAttribute('aria-label', 'Montar a aposta');
+
+  let alvo = 0;           // "aumentar PARA" (a aposta total desta rua)
+  let historico = [];
+  const bandTopo = el('div', 'pk-band-topo');
+  const bandFichas = el('div', 'pk-band-fichas');
+  const bandAtalhos = el('div', 'pk-band-atalhos');
+  const bandAcoes = el('div', 'pk-band-acoes');
+  bandeja.append(bandTopo, bandFichas, bandAtalhos, bandAcoes);
+
+  const limites = () => {
+    const y = v().you;
+    return { min: y.minPara, max: y.maxPara };
+  };
+  const fichasDaBandeja = [...FICHAS].reverse().map((f) => {
+    const b = fichaGrande(f);
+    b.onclick = () => { historico.push(alvo); alvo = Math.min(limites().max, alvo + f.valor); desenha(); };
+    bandFichas.appendChild(b);
+    return { b, f };
+  });
+  const atalho = (texto, fn) => {
+    const b = el('button', 'btn btn-ghost pk-atalho', texto);
+    b.type = 'button';
+    b.onclick = () => { historico.push(alvo); alvo = fn(); desenha(); };
+    bandAtalhos.appendChild(b);
+    return b;
+  };
+  const fracaoDoPote = (fr) => {
+    const vw = v();
+    const { min, max } = limites();
+    const para = vw.apostaAtual + Math.round(((vw.pote + vw.you.paraPagar) * fr) / 5) * 5;
+    return Math.max(min, Math.min(max, para));
+  };
+  const aMin = atalho('Mínimo', () => limites().min);
+  atalho('½ pote', () => fracaoDoPote(0.5));
+  atalho('Pote', () => fracaoDoPote(1));
+  const aTudo = atalho('All-in', () => limites().max);
+  const bDesfaz = el('button', 'btn btn-ghost pk-desfaz', 'Desfazer');
+  bDesfaz.type = 'button';
+  bDesfaz.onclick = () => { if (historico.length) alvo = historico.pop(); desenha(); };
+  const bVolta = el('button', 'btn btn-ghost pk-volta', 'Voltar');
+  bVolta.type = 'button';
+  bVolta.onclick = () => fecha();
+  const bConfirma = el('button', 'btn btn-primary pk-confirma', 'Aumentar');
+  bConfirma.type = 'button';
+  bConfirma.onclick = () => {
+    const { min, max } = limites();
+    if (alvo < min && alvo !== max) { avisa(`O mínimo é ${fmt(min)}.`); return; }
+    sendAction({ a: 'aumentar', para: alvo });
+    fecha();
+  };
+  bandAcoes.append(bVolta, bDesfaz, bConfirma);
+
+  function abre() {
+    alvo = limites().min;
+    historico = [];
+    bandeja.hidden = false;
+    aoMudar();
+    bConfirma.focus({ preventScroll: true });
+  }
+  function fecha() {
+    if (bandeja.hidden) return;
+    bandeja.hidden = true;
+    aoMudar();
+  }
+
+  function desenha() {
+    const vw = v();
+    const { min, max } = limites();
+    const tudo = alvo >= max;
+    const abreAposta = vw.apostaAtual === 0;
+    bandTopo.innerHTML = '';
+    bandTopo.append(
+      el('span', 'pk-band-rotulo', abreAposta ? 'Apostar' : 'Aumentar para'),
+      el('strong', 'pk-band-valor', fmt(alvo)),
+      pilhas(alvo - (vw.you.aposta || 0), 5),
+      el('span', 'pk-band-dica', `mín. ${fmt(min)} · você tem ${fmt(max)}`),
+    );
+    for (const { b, f } of fichasDaBandeja) b.disabled = alvo + f.valor > max;
+    aMin.disabled = alvo === min;
+    aTudo.disabled = tudo;
+    bDesfaz.disabled = !historico.length;
+    bConfirma.textContent = tudo ? `All-in (${fmt(max)})` : `${abreAposta ? 'Apostar' : 'Aumentar para'} ${fmt(alvo)}`;
+    bConfirma.classList.toggle('soft-disabled', alvo < min && !tudo);
+  }
+
+  return { el: bandeja, abre, fecha, desenha, get aberta() { return !bandeja.hidden; } };
+}
 
 export function criaMesaPoker(ctx) {
   const { $ } = ctx;
@@ -25,13 +241,6 @@ export function criaMesaPoker(ctx) {
   css.rel = 'stylesheet';
   css.href = '/poker.css';
   document.head.appendChild(css);
-
-  const el = (tag, cls, txt) => {
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (txt != null) e.textContent = txt;
-    return e;
-  };
 
   // ---- o meio da mesa: as cinco da mesa e o pote -----------------------------
   const centro = el('div', 'pk-centro');
@@ -46,14 +255,15 @@ export function criaMesaPoker(ctx) {
   centro.append(etapaEl, board, pote, resultado);
   $('screen-game').querySelector('.table-center').prepend(centro);
 
+  const v = () => ctx.view;
+  const me = () => ctx.me();
+  const nome = (id) => ctx.playerName(id);
+
   // ---- as suas fichas, e a bandeja de apostar -------------------------------
   const eu = el('div', 'pk-eu');
-  const bandeja = el('div', 'pk-bandeja');
-  bandeja.hidden = true;
-  bandeja.setAttribute('role', 'group');
-  bandeja.setAttribute('aria-label', 'Montar a aposta');
+  const bandeja = criaBandeja({ v, sendAction: ctx.sendAction, avisa: ctx.toast, aoMudar: () => ctx.render() });
   $('screen-game').insertBefore(eu, $('action-bar'));
-  $('screen-game').insertBefore(bandeja, $('action-bar'));
+  $('screen-game').insertBefore(bandeja.el, $('action-bar'));
 
   const barra = $('action-bar');
   const botao = (id, texto, cls) => {
@@ -67,125 +277,10 @@ export function criaMesaPoker(ctx) {
   const bPagar = botao('pk-pagar', 'Pagar', 'btn-primary');
   const bAumentar = botao('pk-aumentar', 'Aumentar', 'pk-btn-ouro');
 
-  const v = () => ctx.view;
-  const me = () => ctx.me();
-  const nome = (id) => ctx.playerName(id);
-  const minhaVez = () => v()?.phase === 'play' && v()?.turnId === me();
-
-  // ---- as fichas ---------------------------------------------------------------
-
-  // Um valor em pilhas de fichas coloridas, uma pilha por cor. Pilha alta
-  // demais é cortada no desenho (o número ao lado diz o valor certo).
-  function pilhas(valor, alturaMax = 6) {
-    const box = el('span', 'pk-pilhas');
-    box.setAttribute('aria-hidden', 'true');
-    for (const f of emFichas(valor)) {
-      const pilha = el('span', `pk-pilha f-${f.cor}`);
-      pilha.title = `${f.n} × ${fmt(f.valor)}`;
-      for (let i = 0; i < Math.min(f.n, alturaMax); i++) pilha.appendChild(el('i', 'pk-ficha'));
-      box.appendChild(pilha);
-    }
-    return box;
-  }
-
-  // Ficha grande, com o valor escrito: é o botão da bandeja.
-  function fichaGrande(f) {
-    const b = el('button', `pk-ficha-btn f-${f.cor}`);
-    b.type = 'button';
-    b.innerHTML = `<span class="pk-ficha-valor">${fmt(f.valor)}</span>`;
-    b.setAttribute('aria-label', `Somar uma ficha ${f.cor} de ${fmt(f.valor)}`);
-    return b;
-  }
-
-  // ---- a bandeja ----------------------------------------------------------------
-  let alvo = 0;           // "aumentar PARA" (a aposta total desta rua)
-  let historico = [];
-  const bandTopo = el('div', 'pk-band-topo');
-  const bandFichas = el('div', 'pk-band-fichas');
-  const bandAtalhos = el('div', 'pk-band-atalhos');
-  const bandAcoes = el('div', 'pk-band-acoes');
-  bandeja.append(bandTopo, bandFichas, bandAtalhos, bandAcoes);
-
-  const fichasDaBandeja = [...FICHAS].reverse().map((f) => {
-    const b = fichaGrande(f);
-    b.onclick = () => { historico.push(alvo); alvo = Math.min(limites().max, alvo + f.valor); desenhaBandeja(); };
-    bandFichas.appendChild(b);
-    return { b, f };
-  });
-  const atalho = (texto, fn) => {
-    const b = el('button', 'btn btn-ghost pk-atalho', texto);
-    b.type = 'button';
-    b.onclick = () => { historico.push(alvo); alvo = fn(); desenhaBandeja(); };
-    bandAtalhos.appendChild(b);
-    return b;
-  };
-  const limites = () => {
-    const y = v().you;
-    return { min: y.minPara, max: y.maxPara };
-  };
-  const fracaoDoPote = (fr) => {
-    const vw = v();
-    const { min, max } = limites();
-    const para = vw.apostaAtual + Math.round(((vw.pote + vw.you.paraPagar) * fr) / 5) * 5;
-    return Math.max(min, Math.min(max, para));
-  };
-  const aMin = atalho('Mínimo', () => limites().min);
-  atalho('½ pote', () => fracaoDoPote(0.5));
-  atalho('Pote', () => fracaoDoPote(1));
-  const aTudo = atalho('All-in', () => limites().max);
-  const bDesfaz = el('button', 'btn btn-ghost pk-desfaz', 'Desfazer');
-  bDesfaz.type = 'button';
-  bDesfaz.onclick = () => { if (historico.length) alvo = historico.pop(); desenhaBandeja(); };
-  const bVolta = el('button', 'btn btn-ghost', 'Voltar');
-  bVolta.type = 'button';
-  bVolta.onclick = () => fechaBandeja();
-  const bConfirma = el('button', 'btn btn-primary pk-confirma', 'Aumentar');
-  bConfirma.type = 'button';
-  bConfirma.onclick = () => {
-    const { min, max } = limites();
-    if (alvo < min && alvo !== max) { ctx.toast(`O mínimo é ${fmt(min)}.`); return; }
-    ctx.sendAction({ a: 'aumentar', para: alvo });
-    fechaBandeja();
-  };
-  bandAcoes.append(bVolta, bDesfaz, bConfirma);
-
-  function abreBandeja() {
-    alvo = limites().min;
-    historico = [];
-    bandeja.hidden = false;
-    ctx.render();
-    bConfirma.focus({ preventScroll: true });
-  }
-  function fechaBandeja() {
-    if (bandeja.hidden) return;
-    bandeja.hidden = true;
-    ctx.render();
-  }
-
-  function desenhaBandeja() {
-    const vw = v();
-    const { min, max } = limites();
-    const tudo = alvo >= max;
-    const abre = vw.apostaAtual === 0;
-    bandTopo.innerHTML = '';
-    bandTopo.append(
-      el('span', 'pk-band-rotulo', abre ? 'Apostar' : 'Aumentar para'),
-      el('strong', 'pk-band-valor', fmt(alvo)),
-      pilhas(alvo - (vw.you.aposta || 0), 5),
-      el('span', 'pk-band-dica', `mín. ${fmt(min)} · você tem ${fmt(max)}`),
-    );
-    for (const { b, f } of fichasDaBandeja) b.disabled = alvo + f.valor > max;
-    aMin.disabled = alvo === min;
-    aTudo.disabled = tudo;
-    bDesfaz.disabled = !historico.length;
-    bConfirma.textContent = tudo ? `All-in (${fmt(max)})` : `${abre ? 'Apostar' : 'Aumentar para'} ${fmt(alvo)}`;
-    bConfirma.classList.toggle('soft-disabled', alvo < min && !tudo);
-  }
-
   bCorrer.onclick = () => ctx.sendAction({ a: 'correr' });
   bMesa.onclick = () => ctx.sendAction({ a: 'mesa' });
   bPagar.onclick = () => ctx.sendAction({ a: 'pagar' });
-  bAumentar.onclick = () => abreBandeja();
+  bAumentar.onclick = () => bandeja.abre();
 
   // ---- o resultado da mão (segura a mesa uns segundos) --------------------------
   let segura = null;          // { ev, ate, corrida: [{ etapa, n }] }
@@ -210,15 +305,6 @@ export function criaMesaPoker(ctx) {
     $('contract-label').textContent = vw.phase === 'gameEnd' ? 'Fim de jogo' : `Blinds ${fmt(sb)}/${fmt(bb)}${sobe}`;
   }
 
-  const posicaoDe = (id) => {
-    const vw = v();
-    if (vw.phase !== 'play') return '';
-    if (id === vw.botao) return id === vw.sb ? 'D·SB' : 'D';
-    if (id === vw.sb) return 'SB';
-    if (id === vw.bb) return 'BB';
-    return '';
-  };
-
   // A aposta desta rua na frente do assento: fichas e valor.
   function apostaNaFrente(caixa, valor) {
     let a = caixa.querySelector('.pk-aposta');
@@ -234,7 +320,7 @@ export function criaMesaPoker(ctx) {
       const p = vw.players.find((x) => x.id === id);
       if (!p) continue;
       const marcas = caixa.querySelector('.marcas');
-      const pos = posicaoDe(id);
+      const pos = posicaoDe(vw, id);
       if (pos) marcas.appendChild(el('span', `pk-pos${pos.startsWith('D') ? ' botao' : ''}`, pos));
       marcas.appendChild(p.fora ? el('span', 'm-off', `${p.lugar}º`) : p.allIn && vw.phase === 'play' ? el('span', 'm-gold', 'all-in') : el('span', 'pk-pilha-num', fmt(p.fichas)));
       caixa.classList.toggle('pk-correu', vw.phase === 'play' && p.foldou);
@@ -250,7 +336,7 @@ export function criaMesaPoker(ctx) {
       let m = meu.querySelector('.marcas');
       if (!m) { m = el('span', 'marcas'); meu.appendChild(m); }
       m.innerHTML = '';
-      const pos = posicaoDe(me());
+      const pos = posicaoDe(vw, me());
       if (pos) m.appendChild(el('span', `pk-pos${pos.startsWith('D') ? ' botao' : ''}`, pos));
       meu.classList.toggle('pk-correu', vw.phase === 'play' && eu_.foldou);
       apostaNaFrente(meu, segurando() ? 0 : eu_.aposta);
@@ -286,11 +372,7 @@ export function criaMesaPoker(ctx) {
     if (chave === mesaChave) return;
     mesaChave = chave;
     if (vistasDaMao !== n) { vistas.clear(); vistasDaMao = n; }
-    const vencedoras = new Set();
-    if (s && !s.ev.semShowdown) {
-      const ganhou = s.ev.potes.find((x) => !x.devolvido)?.vencedores || [];
-      for (const m of s.ev.mostradas) if (ganhou.includes(m.p)) for (const id of m.cinco) vencedoras.add(id);
-    }
+    const vencedoras = s ? cartasVencedoras(s.ev) : new Set();
     // numa corrida, flop, turn e river caem um de cada vez
     const primeiraRua = s && s.corrida.length ? 3 - s.corrida.length : 0;
     const rua = (i) => (i < 3 ? 0 : i - 2);
@@ -334,20 +416,9 @@ export function criaMesaPoker(ctx) {
     const ev = segura.ev;
     const atraso = segura.corrida.length ? segura.corrida.length * 0.9 + 0.2 : 0;
     resultado.style.setProperty('--atraso', `${ctx.semMovimento() ? 0 : atraso}s`);
-    // potes que foram para os mesmos vencedores viram uma linha só
-    let disputados = ev.potes.filter((x) => !x.devolvido);
-    const chave = (pt) => pt.vencedores.join(',');
-    if (disputados.length > 1 && disputados.every((pt) => chave(pt) === chave(disputados[0]))) {
-      disputados = [{ ...disputados[0], valor: disputados.reduce((s, pt) => s + pt.valor, 0) }];
-    }
-    const linhas = [];
-    disputados.forEach((pt, k) => {
-      const quem = pt.vencedores.map((id) => (id === me() ? 'Você' : ctx.escapeHTML(nome(id)))).join(' e ');
-      const verbo = pt.vencedores.length > 1 ? 'dividem' : 'leva';
-      const qual = disputados.length > 1 ? (k === 0 ? 'Pote principal: ' : `Pote paralelo${disputados.length > 2 ? ` ${k}` : ''}: `) : '';
-      linhas.push(`<p class="pk-res-titulo${pt.vencedores.includes(me()) ? ' meu' : ''}">${qual}${quem} ${verbo} <b>${fmt(pt.valor)}</b>${pt.mao ? ` <span>com ${ctx.escapeHTML(pt.mao)}</span>` : ''}</p>`);
-    });
-    const vencedores = new Set(disputados.flatMap((x) => x.vencedores));
+    const potes = linhasDoResultado(ev, me(), nome);
+    const linhas = potes.map((l) => `<p class="pk-res-titulo${l.meu ? ' meu' : ''}">${ctx.escapeHTML(l.antes)} <b>${fmt(l.valor)}</b>${l.mao ? ` <span>com ${ctx.escapeHTML(l.mao)}</span>` : ''}</p>`);
+    const vencedores = new Set(potes.flatMap((x) => x.vencedores));
     const mostradas = ev.mostradas.map((m) => {
       const cartas = m.cards.map((c) => ctx.cardEl(c, true).outerHTML).join('');
       return `<li class="${vencedores.has(m.p) ? 'venceu' : ''}">
@@ -362,20 +433,18 @@ export function criaMesaPoker(ctx) {
 
   function botoes() {
     const vw = v();
-    const y = vw.you;
-    const agir = minhaVez() && !segurando() && y;
+    const b = botoesDaVez(vw, me(), segurando());
     for (const id of ['btn-draw-deck', 'btn-draw-discard', 'btn-queimar', 'btn-baixar', 'btn-discard', 'btn-meld-discard', 'btn-cancel-mode']) $(id).hidden = true;
-    const comBandeja = agir && !bandeja.hidden && y.podeAumentar;
-    if (!comBandeja) bandeja.hidden = true;
-    bCorrer.hidden = !agir || comBandeja || y.podeMesa;
-    bMesa.hidden = !agir || comBandeja || !y.podeMesa;
-    bPagar.hidden = !agir || comBandeja || y.podeMesa;
-    bAumentar.hidden = !agir || comBandeja || !y.podeAumentar;
-    if (!agir) return;
-    const tudo = y.paraPagar >= y.fichas;
-    bPagar.textContent = tudo ? `Pagar all-in (${fmt(y.paraPagar)})` : `Pagar ${fmt(y.paraPagar)}`;
-    bAumentar.textContent = vw.apostaAtual === 0 ? 'Apostar' : 'Aumentar';
-    if (comBandeja) desenhaBandeja();
+    const comBandeja = !!b && bandeja.aberta && b.aumentar;
+    if (!comBandeja) bandeja.el.hidden = true;
+    bCorrer.hidden = !b || comBandeja || !b.correr;
+    bMesa.hidden = !b || comBandeja || !b.mesa;
+    bPagar.hidden = !b || comBandeja || !b.pagar;
+    bAumentar.hidden = !b || comBandeja || !b.aumentar;
+    if (!b) return;
+    bPagar.textContent = b.textoPagar;
+    bAumentar.textContent = b.textoAumentar;
+    if (comBandeja) bandeja.desenha();
   }
 
   let modalDoFim = null;
@@ -399,13 +468,10 @@ export function criaMesaPoker(ctx) {
       <td class="num">${direita}</td></tr>`;
   }
 
-  const classificacao = () => [...v().players].sort((a, b) => (a.fora === b.fora ? 0 : a.fora ? 1 : -1)
-    || (a.fora ? a.lugar - b.lugar : b.fichas - a.fichas));
-
   function fimDeJogo() {
     const vw = v();
     const campeao = vw.vencedor;
-    const linhas = classificacao().map((p) => linha(p, `${p.lugar || 1}º`)).join('');
+    const linhas = classificacao(vw.players).map((p) => linha(p, `${p.lugar || 1}º`)).join('');
     ctx.showModal(
       `<div class="palco-vencedor"><img src="${ctx.figuraFeliz(campeao)}" alt=""></div>
        <h2>${campeao === me() ? 'Você ficou com todas as fichas!' : `${ctx.escapeHTML(nome(campeao))} ficou com todas as fichas!`}</h2>
@@ -449,16 +515,7 @@ export function criaMesaPoker(ctx) {
     },
 
     textoDaVez() {
-      const vw = v();
-      if (segurando()) return { minha: false, texto: 'Fim da mão. Toque no resultado para seguir.' };
-      if (vw.phase === 'gameEnd') return { minha: false, texto: 'Fim de jogo.' };
-      if (vw.phase !== 'play') return { minha: false, texto: '' };
-      const eu_ = vw.players.find((p) => p.id === me());
-      if (eu_?.fora) return { minha: false, texto: `Você está fora. Vez de ${nome(vw.turnId)}…` };
-      if (!minhaVez()) return { minha: false, texto: eu_?.foldou ? `Você correu. Vez de ${nome(vw.turnId)}…` : `Vez de ${nome(vw.turnId)}…` };
-      const y = vw.you;
-      if (y.podeMesa) return { minha: true, texto: vw.apostaAtual === 0 ? 'Sua vez: dê mesa ou aposte.' : 'Sua vez: dê mesa ou aumente.' };
-      return { minha: true, texto: `Sua vez: pague ${fmt(y.paraPagar)}${y.podeAumentar ? ', aumente' : ''} ou corra.` };
+      return textoDaVez(v(), me(), nome, segurando());
     },
 
     anuncia(ev) {
@@ -466,20 +523,20 @@ export function criaMesaPoker(ctx) {
       switch (ev.e) {
         case 'roundStart':
           ctx.novaRodada();
-          bandeja.hidden = true;
+          bandeja.el.hidden = true;
           if (ev.subiu) ctx.toast(`Os blinds subiram: ${fmt(ev.blinds[0])}/${fmt(ev.blinds[1])}.`);
           break;
-        case 'mesa': fala(ev.p, 'mesa'); break;
-        case 'correu': fala(ev.p, 'corro'); break;
-        case 'pagou': fala(ev.p, ev.allIn ? 'all-in!' : `pago ${fmt(ev.valor)}`, ev.allIn ? 'treme' : null); break;
-        case 'apostou': fala(ev.p, ev.allIn ? 'all-in!' : `aposto ${fmt(ev.para)}`, ev.allIn ? 'treme' : null); break;
-        case 'aumentou': fala(ev.p, ev.allIn ? 'all-in!' : `aumento p/ ${fmt(ev.para)}`, ev.allIn ? 'treme' : 'pula'); break;
+        case 'mesa': case 'correu': case 'pagou': case 'apostou': case 'aumentou': {
+          const f = falaDoLance(ev);
+          fala(ev.p, f.texto, f.gesto);
+          break;
+        }
         case 'etapa':
           if (ev.corrida) corridaPendente.push({ etapa: ev.etapa, n: ev.cards.length });
           break;
         case 'maoFim': {
           const corrida = corridaPendente.splice(0);
-          const ms = ev.semShowdown ? SEGURA_MS.semShowdown : corrida.length ? SEGURA_MS.corrida : SEGURA_MS.showdown;
+          const ms = msDaSegura(ev, corrida.length);
           segura = { ev, ate: Date.now() + ms, corrida };
           resultado.dataset.mao = '';
           clearTimeout(timerSegura);
@@ -514,7 +571,7 @@ export function criaMesaPoker(ctx) {
 
     placar() {
       const vw = v();
-      const linhas = classificacao().map((p) => linha(p, p.fora ? `fora (${p.lugar}º)` : fmt(p.fichas))).join('');
+      const linhas = classificacao(vw.players).map((p) => linha(p, p.fora ? `fora (${p.lugar}º)` : fmt(p.fichas))).join('');
       const [sb, bb] = vw.blinds;
       ctx.showModal(
         `<h2>Fichas na mesa</h2>
@@ -524,7 +581,6 @@ export function criaMesaPoker(ctx) {
         ctx.closeModal,
       );
     },
-
     regras() {
       const fichas = [...FICHAS].reverse().map((f) => `<span class="pk-regra-ficha f-${f.cor}"><i class="pk-ficha"></i>${fmt(f.valor)}</span>`).join('');
       ctx.showModal(

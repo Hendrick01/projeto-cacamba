@@ -1,14 +1,13 @@
 /* Poker — o que muda na mesa 2D. Baixado só com o modo (poker-mesa.js).
    A mesa, os assentos, a mão e os modais continuam os do Caçamba (style.css). */
 
-/* Sem monte nem meio para comprar, sem jogos baixados, sem ordenar duas
-   cartas e sem mesa 3D (ainda). O número de cartas no assento é sempre 2: no
-   lugar dele vão as fichas, embaixo do nome. */
+/* Sem monte nem meio para comprar, sem jogos baixados e sem ordenar duas
+   cartas. O número de cartas no assento é sempre 2: no lugar dele vão as
+   fichas, embaixo do nome. (A mesa 3D é a do poker-3d.js.) */
 #screen-game.modo-poker .piles,
 #screen-game.modo-poker #btn-claim,
 #screen-game.modo-poker #my-melds,
 #screen-game.modo-poker #btn-sort,
-#screen-game.modo-poker #btn-3d,
 #screen-game.modo-poker .assento .cartas { display: none !important; }
 #screen-game:not(.modo-poker) .pk-centro,
 #screen-game:not(.modo-poker) .pk-btn,
