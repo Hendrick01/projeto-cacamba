@@ -85,6 +85,7 @@ export function criaMesaPresidente(ctx) {
       const marcas = el.querySelector('.marcas');
       if (p.saiu >= 0) marcas.prepend(marca(`${p.saiu + 1}º`, 'm-gold'));
       else if (p.passou) marcas.prepend(marca('passou', 'm-off'));
+      else if (p.jogouNaVolta && vw.phase === 'play') marcas.prepend(marca('jogou', 'm-off'));
       if (p.titulo && p.titulo !== 'neutro') marcas.prepend(marca(`${SELO[p.titulo]} ${TITULOS[p.titulo]}`, 'pres-titulo'));
       el.setAttribute('aria-label', `${p.name}, ${p.handCount} cartas${p.titulo ? `, ${TITULOS[p.titulo]}` : ''}.`);
     }
@@ -291,7 +292,8 @@ export function criaMesaPresidente(ctx) {
           if (ev.cards.length && forca(ev.cards[0]) === 12) ctx.reage(ev.p, 'levou');
           break;
         case 'limpou':
-          ctx.toast(ev.p === eu ? 'Ninguém cobriu: mesa limpa, você começa.' : `Mesa limpa: ${nome(ev.p)} começa.`);
+          if (ev.motivo === 'dois') ctx.toast(ev.p === eu ? '2 na mesa: ninguém cobre. Você começa de novo.' : `2 na mesa: ninguém cobre. ${nome(ev.p)} começa.`);
+          else ctx.toast(ev.p === eu ? 'Volta fechada: mesa limpa, você começa.' : `Volta fechada: ${nome(ev.p)} começa.`);
           break;
         case 'saiu':
           ctx.toast(ev.pos === 0
@@ -343,7 +345,8 @@ export function criaMesaPresidente(ctx) {
          <p><strong>Objetivo:</strong> ficar sem cartas primeiro. O baralho inteiro é distribuído.</p>
          <p><strong>Força:</strong> 3 4 5 6 7 8 9 10 J Q K A <strong>2</strong> — o 2 é a mais forte. Naipe não conta.</p>
          <p><strong>Na vez:</strong> jogue 1, 2, 3 ou 4 cartas do mesmo valor. Para cobrir, a mesma quantidade e de valor mais alto. Não quer ou não pode? Passe.</p>
-         <p><strong>Mesa limpa:</strong> quando todos passam, quem jogou por último recolhe e começa de novo, com o que quiser.</p>
+         <p><strong>Uma vez por volta:</strong> cada um joga <em>ou</em> passa uma vez só. Quem já jogou não joga de novo até a mesa limpar, e a vez não volta. Quando todos agiram, quem jogou por último recolhe e começa de novo, com o que quiser.</p>
+         <p><strong>O 2 fecha a mesa:</strong> nada cobre o 2. Jogou 2, de qualquer naipe, a mesa limpa na hora e quem jogou começa de novo.</p>
          <p><strong>Títulos:</strong> quem sai primeiro é o <strong>Presidente</strong>, o segundo é o <strong>Vice</strong>; o penúltimo é o <strong>Vice-cu</strong> e o último, o <strong>Cu</strong>. Com 3 na mesa não há vices.</p>
          <p><strong>Troca:</strong> na rodada seguinte, o Cu entrega as 2 cartas mais fortes ao Presidente, que devolve 2 à escolha dele. O Vice-cu entrega a mais forte ao Vice, que devolve 1. O Cu abre a rodada.</p>
          <p class="modal-hint">A primeira rodada abre quem tem o 3 de paus.</p>`,

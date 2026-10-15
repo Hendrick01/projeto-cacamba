@@ -9,8 +9,12 @@
 //  - Força: 3 4 5 6 7 8 9 10 J Q K A 2 (o 2 é a mais forte). Naipe não conta.
 //  - Joga-se 1, 2, 3 ou 4 cartas do MESMO valor. Para cobrir, a mesma
 //    quantidade e de valor MAIS ALTO. Quem não quer ou não pode, passa.
-//    Todos passaram depois da última jogada: quem jogou por último limpa a
-//    mesa e começa de novo (se ele já saiu, começa o próximo que tem carta).
+//  - UMA ação por volta (dono do jogo, 15/10/2026): cada um joga OU passa uma
+//    vez só; quem já jogou não joga de novo até a mesa limpar, e a vez não
+//    volta para ninguém. Quando todos agiram, a mesa limpa e começa quem
+//    jogou por último (se ele já saiu, o próximo que tem carta).
+//  - O 2, de qualquer naipe, limpa a mesa NA HORA — nada cobre o 2 — e quem
+//    jogou o 2 começa de novo.
 //  - Quem esvazia a mão sai; a ordem de saída dá o título: Presidente, Vice,
 //    Neutro(s), Vice-cu e Cu. Com 3 jogadores não há vices.
 //  - Da 2ª rodada em diante: o Cu entrega as 2 cartas mais fortes ao
@@ -19,8 +23,6 @@
 //
 // REGRAS DA CASA ainda não confirmadas (ajustáveis aqui):
 //  - Quem abre a 1ª rodada é quem tem o 3 de paus; as seguintes, o Cu.
-//  - Passar não tranca: quem passou pode jogar quando a vez voltar, enquanto
-//    a mesa não limpou.
 // ============================================================================
 
 export const MODO = 'presidente';
@@ -89,7 +91,8 @@ export function createGame(players, opts = {}) {
     deck: [],           // o retrato da sala confere que existe; aqui fica vazio
     mesa: null,         // { n, forca, cards, by } — a jogada a cobrir
     lances: [],         // jogadas desde a última limpeza: [{ p, cards }]
-    passes: [],         // quem passou desde a última jogada
+    passes: [],         // quem passou nesta volta
+    jogaram: [],        // quem jogou nesta volta (não joga de novo até limpar)
     saidas: [],         // ids na ordem em que esvaziaram a mão
     trocas: [],         // pendentes: [{ de, para, n }] — quem devolve escolhe
     lastRound: null,    // { ordem: [ids], titulos: { id: titulo } }
@@ -129,7 +132,7 @@ export function startRound(state) {
   const n = state.players.length;
   for (let i = 0; deck.length; i++) state.players[(state.round + i) % n].hand.push(deck.pop());
 
-  state.mesa = null; state.lances = []; state.passes = []; state.saidas = [];
+  state.mesa = null; state.lances = []; state.passes = []; state.jogaram = []; state.saidas = [];
   state.trocas = []; state.turnNo = 0;
   const events = [{ e: 'roundStart', round: state.round }];
 
@@ -222,7 +225,7 @@ export function actJogar(state, playerId, cardIds) {
   p.hand = p.hand.filter((c) => !cartas.includes(c));
   state.mesa = { n: cartas.length, forca: forca(cartas[0]), cards: cartas, by: p.id };
   state.lances.push({ p: p.id, cards: cartas });
-  state.passes = [];
+  (state.jogaram ||= []).push(p.id);
   state.turnNo++;
   const events = [{ e: 'jogou', p: p.id, cards: cartas }];
 
@@ -231,12 +234,24 @@ export function actJogar(state, playerId, cardIds) {
     events.push({ e: 'saiu', p: p.id, pos: state.saidas.length - 1 });
     if (ativos(state).length <= 1) return fimDaRodada(state, events);
   }
-  // Ninguém mais pode cobrir? Só se todos os outros ativos passarem — mas se
-  // o único que sobrou é quem jogou, a mesa limpa na hora.
-  const outros = ativos(state).filter((x) => x.id !== p.id);
-  if (!outros.length) return limpa(state, events);
-  state.turn = proximoAtivo(state, state.turn);
-  return events;
+  // nada cobre o 2: a mesa limpa na hora, e quem jogou começa de novo
+  if (forca(cartas[0]) === FORCA_DO_DOIS) return limpa(state, events, 'dois');
+  return proximaVez(state, events);
+}
+
+const FORCA_DO_DOIS = 12;
+
+// Quem já agiu nesta volta (jogou ou passou) não tem outra vez. Sem ninguém
+// para agir, a volta acabou e a mesa limpa.
+function proximaVez(state, events) {
+  const agiu = new Set([...(state.jogaram || []), ...state.passes]);
+  const n = state.players.length;
+  for (let k = 1; k <= n; k++) {
+    const j = (state.turn + k) % n;
+    const x = state.players[j];
+    if (x.hand.length > 0 && !agiu.has(x.id)) { state.turn = j; return events; }
+  }
+  return limpa(state, events, 'volta');
 }
 
 export function actPassar(state, playerId) {
@@ -246,18 +261,15 @@ export function actPassar(state, playerId) {
   if (!state.mesa) fail('A mesa está limpa: você abre, jogue alguma carta.');
   if (!state.passes.includes(p.id)) state.passes.push(p.id);
   state.turnNo++;
-  const events = [{ e: 'passou', p: p.id }];
-  const precisam = ativos(state).filter((x) => x.id !== state.mesa.by);
-  if (precisam.every((x) => state.passes.includes(x.id))) return limpa(state, events);
-  state.turn = proximoAtivo(state, state.turn);
-  return events;
+  return proximaVez(state, [{ e: 'passou', p: p.id }]);
 }
 
-function limpa(state, events) {
+// `motivo`: 'volta' (todos agiram) ou 'dois' (o 2 fecha a mesa).
+function limpa(state, events, motivo) {
   const dono = idxDe(state, state.mesa.by);
   state.turn = state.players[dono].hand.length > 0 ? dono : proximoAtivo(state, dono);
-  state.mesa = null; state.lances = []; state.passes = [];
-  events.push({ e: 'limpou', p: state.players[state.turn].id });
+  state.mesa = null; state.lances = []; state.passes = []; state.jogaram = [];
+  events.push({ e: 'limpou', p: state.players[state.turn].id, motivo });
   return events;
 }
 
@@ -274,7 +286,7 @@ function fimDaRodada(state, events) {
     p.vezes[t] = (p.vezes[t] || 0) + 1;
   });
   state.phase = 'roundEnd';
-  state.mesa = null; state.lances = []; state.passes = [];
+  state.mesa = null; state.lances = []; state.passes = []; state.jogaram = [];
   state.lastRound = { ordem: state.saidas.slice(), titulos };
   events.push({ e: 'roundEnd', ordem: state.saidas.slice(), titulos, round: state.round });
   return events;
@@ -323,6 +335,7 @@ export function viewFor(state, playerId) {
       vezes: p.vezes,
       saiu: state.saidas.indexOf(p.id),
       passou: state.passes.includes(p.id),
+      jogouNaVolta: (state.jogaram || []).includes(p.id),
       baixou: false, baixados: null, melds: [],
     })),
   };

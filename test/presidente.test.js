@@ -66,25 +66,63 @@ test('todos passam: quem jogou por último limpa a mesa e abre', () => {
   assert.throws(() => applyAction(s, 'p0', { a: 'passar' }), /limpa/);
 });
 
-test('quem passou ainda joga quando a vez volta, se a mesa não limpou', () => {
-  const quatro = c(4), rei = c('K'), cinco = c(5), dois = c(2), seis = c(6), tres = c(3);
-  const s = montada([[quatro, rei], [cinco, dois], [seis, tres]]);
-  applyAction(s, 'p0', { a: 'jogar', cardIds: [quatro.id] });
-  applyAction(s, 'p1', { a: 'passar' });
-  applyAction(s, 'p2', { a: 'jogar', cardIds: [seis.id] });
-  applyAction(s, 'p0', { a: 'jogar', cardIds: [rei.id] });
-  // p1 tinha passado no 4, mas pode cobrir o K com o 2
-  applyAction(s, 'p1', { a: 'jogar', cardIds: [dois.id] });
-  assert.equal(s.mesa.by, 'p1');
+test('uma ação por volta: quem já jogou não joga de novo, e a vez não volta', () => {
+  // O exemplo do dono do jogo: abro com 3 de paus, alguém cobre com Ás de
+  // espadas, os outros não cobrem — a volta acaba ali, sem voltar para mim.
+  const tres = c(3, '♣'), rei = c('K'), as = c('A', '♠'), quatro = c(4), cinco = c(5), seis = c(6);
+  const s = montada([[tres, rei], [as, quatro], [cinco, seis]]);
+  applyAction(s, 'p0', { a: 'jogar', cardIds: [tres.id] });
+  applyAction(s, 'p1', { a: 'jogar', cardIds: [as.id] });
+  const ev = applyAction(s, 'p2', { a: 'passar' });
+  // p0 ainda tinha o K, mas já jogou nesta volta: não tem outra vez
+  assert.ok(ev.some((e) => e.e === 'limpou' && e.p === 'p1' && e.motivo === 'volta'));
+  assert.equal(s.mesa, null);
+  assert.equal(s.players[s.turn].id, 'p1');
 });
 
-test('quem sai jogando a última carta: se ninguém cobre, abre o próximo com carta', () => {
-  const s = montada([[c(2)], [c(5), c(6)], [c(3), c(8)]]);
+test('quem passou também não volta a jogar na mesma volta', () => {
+  const quatro = c(4), rei = c('K'), cinco = c(5), as = c('A'), seis = c(6), tres = c(3);
+  const s = montada([[quatro, rei], [cinco, as], [seis, tres]]);
+  applyAction(s, 'p0', { a: 'jogar', cardIds: [quatro.id] });
+  applyAction(s, 'p1', { a: 'passar' });
+  const ev = applyAction(s, 'p2', { a: 'jogar', cardIds: [seis.id] });
+  // todos agiram uma vez: limpa, e começa quem jogou por último (p2)
+  assert.ok(ev.some((e) => e.e === 'limpou' && e.p === 'p2'));
+  assert.equal(s.players[s.turn].id, 'p2');
+});
+
+test('o 2 limpa a mesa na hora, e quem jogou o 2 começa de novo', () => {
+  const tres = c(3), dois = c(2, '♥'), quatro = c(4), cinco = c(5), seis = c(6), sete = c(7);
+  const s = montada([[tres, sete], [dois, quatro], [cinco, seis]]);
+  applyAction(s, 'p0', { a: 'jogar', cardIds: [tres.id] });
+  const ev = applyAction(s, 'p1', { a: 'jogar', cardIds: [dois.id] });
+  assert.ok(ev.some((e) => e.e === 'limpou' && e.p === 'p1' && e.motivo === 'dois'));
+  assert.equal(s.mesa, null);
+  assert.equal(s.players[s.turn].id, 'p1');
+  assert.throws(() => applyAction(s, 'p2', { a: 'passar' }), /vez/);
+});
+
+test('par de 2 também limpa na hora', () => {
+  const d1 = c(2), d2 = c(2, '♦'), x = c(9), y = c(9, '♥');
+  const s = montada([[x, y, c(5)], [d1, d2, c(6)], [c(7), c(8)]]);
+  applyAction(s, 'p0', { a: 'jogar', cardIds: [x.id, y.id] });
+  const ev = applyAction(s, 'p1', { a: 'jogar', cardIds: [d1.id, d2.id] });
+  assert.ok(ev.some((e) => e.e === 'limpou' && e.motivo === 'dois' && e.p === 'p1'));
+});
+
+test('quem sai com a última carta: se a volta fecha, abre o próximo com carta', () => {
+  const s = montada([[c('K')], [c(5), c(6)], [c(3), c(8)]]);
   const ev = applyAction(s, 'p0', { a: 'jogar', cardIds: [s.players[0].hand[0].id] });
   assert.ok(ev.some((e) => e.e === 'saiu' && e.p === 'p0' && e.pos === 0));
   applyAction(s, 'p1', { a: 'passar' });
   const ev2 = applyAction(s, 'p2', { a: 'passar' });
   assert.ok(ev2.some((e) => e.e === 'limpou' && e.p === 'p1'));
+});
+
+test('quem sai com um 2: a mesa limpa e abre o próximo com carta', () => {
+  const s = montada([[c(2)], [c(5), c(6)], [c(3), c(8)]]);
+  const ev = applyAction(s, 'p0', { a: 'jogar', cardIds: [s.players[0].hand[0].id] });
+  assert.ok(ev.some((e) => e.e === 'limpou' && e.motivo === 'dois' && e.p === 'p1'));
 });
 
 test('títulos pela ordem de saída', () => {
@@ -95,10 +133,9 @@ test('títulos pela ordem de saída', () => {
 
 test('fim de rodada distribui títulos e pontos; troca 2/1 na seguinte', () => {
   const s = montada([[c(2)], [c('A')], [c(3)], [c(5), c(6)]]);
-  applyAction(s, 'p0', { a: 'jogar', cardIds: [s.players[0].hand[0].id] });
-  for (const id of ['p1', 'p2', 'p3']) applyAction(s, id, { a: 'passar' });
-  applyAction(s, 'p1', { a: 'jogar', cardIds: [s.players[1].hand[0].id] });
-  for (const id of ['p2', 'p3']) applyAction(s, id, { a: 'passar' });
+  applyAction(s, 'p0', { a: 'jogar', cardIds: [s.players[0].hand[0].id] });   // 2: sai e limpa
+  applyAction(s, 'p1', { a: 'jogar', cardIds: [s.players[1].hand[0].id] });   // A: sai
+  for (const id of ['p2', 'p3']) applyAction(s, id, { a: 'passar' });          // volta fecha
   const ev = applyAction(s, 'p2', { a: 'jogar', cardIds: [s.players[2].hand[0].id] });
   const fim = ev.find((e) => e.e === 'roundEnd');
   assert.ok(fim);
