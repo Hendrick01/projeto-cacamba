@@ -19,6 +19,7 @@ import {
   podeComprarDoDescarte, topoDoDescarte,
 } from './shared/engine.js';
 import * as Presidente from './shared/presidente.js';
+import * as Domino from './shared/domino.js';
 import { personagemValido } from './shared/elenco.js';
 import { emoteDe } from './shared/emotes.js';
 import { chaveDasSalas, sela, abre } from './lib/selo-sala.js';
@@ -42,6 +43,15 @@ const MODOS = {
     createGame: Presidente.createGame, startRound: Presidente.startRound, applyAction: Presidente.applyAction,
     actNextRound: Presidente.actNextRound, viewFor: Presidente.viewFor, botNextAction: Presidente.botNextAction,
     FASES_DE_VEZ: Presidente.FASES_DE_VEZ, MIN: Presidente.MIN_JOGADORES, MAX: Presidente.MAX_JOGADORES,
+  },
+  // Dominó de ponto: sempre 4, em duplas fixas (cadeiras 0+2 contra 1+3). A
+  // sala tem CADEIRAS: o anfitrião arruma quem senta onde, e as vazias viram
+  // robô na hora de começar.
+  domino: {
+    createGame: Domino.createGame, startRound: Domino.startRound, applyAction: Domino.applyAction,
+    actNextRound: Domino.actNextRound, viewFor: Domino.viewFor, botNextAction: Domino.botNextAction,
+    FASES_DE_VEZ: Domino.FASES_DE_VEZ, MIN: Domino.MIN_JOGADORES, MAX: Domino.MAX_JOGADORES,
+    cadeiras: true,
   },
 };
 const modoValido = (m) => (Object.hasOwn(MODOS, m) ? m : 'cacamba');
@@ -385,6 +395,7 @@ function retratoDaSala(room) {
     v: 1, seq: room.seloSeq, em: Date.now(),
     code: room.code, origin: room.origin, gameSeq: room.gameSeq, createdAt: room.createdAt, nivelRobos: room.nivelRobos || 'normal',
     modo: modoValido(room.modo),
+    ...(room.cadeiras ? { cadeiras: room.cadeiras } : {}),
     players: room.players.map(({ ws, ...p }) => p),   // sem o socket
     game: room.game,                                   // `rnd` é função: some no JSON, volta na restauração
   };
@@ -418,6 +429,7 @@ function recriaSala(d, origin) {
     seloSeq: d.seq || 0, restauradaEm: Date.now(), mexeu: false,
     nivelRobos: NIVEIS_DE_ROBO.includes(d.nivelRobos) ? d.nivelRobos : 'normal',
     modo: modoValido(d.modo),
+    cadeiras: Array.isArray(d.cadeiras) ? d.cadeiras.slice(0, 8) : undefined,
   };
   if (room.game) room.game.rnd = Math.random;
   rooms.set(room.code, room);
@@ -523,6 +535,53 @@ function hostOf(room) {
   return human ? human.id : null;
 }
 
+// AS CADEIRAS (modos de mesa fixa, como o dominó). `room.players` continua na
+// ordem de chegada — é dela que sai o anfitrião, e trocar alguém de lugar não
+// pode trocar o dono da sala. As cadeiras são outra lista, de ids ou null, que
+// é arrumada aqui a cada consulta: quem saiu deixa a cadeira vaga, quem chegou
+// senta na primeira vaga. É também a ordem da partida, e no dominó a ordem é
+// a dupla (cadeiras 0+2 contra 1+3).
+function sentaNasCadeiras(room) {
+  const motor = motorDe(room);
+  if (!motor.cadeiras) return null;
+  const ids = new Set(room.players.map((p) => p.id));
+  const sentados = new Set();
+  const c = Array.from({ length: motor.MAX }, (_, i) => {
+    const id = room.cadeiras?.[i];
+    if (typeof id !== 'string' || !ids.has(id) || sentados.has(id)) return null;
+    sentados.add(id);
+    return id;
+  });
+  for (const p of room.players) {
+    if (sentados.has(p.id)) continue;
+    const vaga = c.indexOf(null);
+    if (vaga < 0) break;
+    c[vaga] = p.id; sentados.add(p.id);
+  }
+  room.cadeiras = c;
+  return c;
+}
+
+function novoRobo(room) {
+  const emUso = new Set(room.players.map((p) => p.name));
+  const nome = BOT_NAMES.find((n) => !emUso.has(n)) || `Robô ${room.players.length + 1}`;
+  const robo = {
+    id: `bot-${crypto.randomUUID()}`, name: nome, token: '',
+    isBot: true, ws: null, connected: true, lastSeen: Date.now(),
+  };
+  room.players.push(robo);
+  return robo;
+}
+
+// Quem joga, na ordem da mesa. Nos modos de cadeira, as vagas viram robô aqui,
+// no começo da partida: o dominó é sempre de 4.
+function jogadoresDaPartida(room) {
+  const c = sentaNasCadeiras(room);
+  if (!c) return room.players;
+  for (let i = 0; i < c.length; i++) if (!c[i]) c[i] = novoRobo(room).id;
+  return c.map((id) => room.players.find((p) => p.id === id));
+}
+
 function send(ws, msg) {
   if (!ws || ws.readyState !== 1) return;
   if (ws.bufferedAmount > 256 * 1024) { ws.terminate(); return; }
@@ -545,6 +604,7 @@ function lobbyView(room) {
     qr: room.qr,
     started: !!room.game,
     modo: modoValido(room.modo),
+    ...(motorDe(room).cadeiras ? { cadeiras: sentaNasCadeiras(room) } : {}),
     nivelRobos: room.nivelRobos || 'normal',
     players: room.players.map((p) => ({
       id: p.id, name: p.name, isBot: p.isBot, connected: p.isBot || p.connected,
@@ -611,7 +671,10 @@ function robosReagem(room, events) {
     } else if (ev.e === 'claimVoid' && ehRobo(ev.p) && Math.random() < 0.5) roboFala(room, 'perdao', ev.p);
     else if (ev.e === 'baixou' && ev.completa && !ehRobo(ev.p) && Math.random() < 0.35) roboFala(room, 'quer-tudo');
     else if (ev.e === 'buy' && ehRobo(ev.p) && Math.random() < 0.25) roboFala(room, 'pisca', ev.p);
-    else if (ev.e === 'saiu' && ev.pos === 0) {
+    else if (ev.e === 'bateu') {
+      if (ehRobo(ev.p)) roboFala(room, 'muito-bem', ev.p);
+      else if (Math.random() < 0.6) roboFala(room, Math.random() < 0.5 ? 'palmas' : 'nojo');
+    } else if (ev.e === 'saiu' && ev.pos === 0) {
       if (ehRobo(ev.p)) roboFala(room, 'muito-bem', ev.p);
       else if (Math.random() < 0.6) roboFala(room, Math.random() < 0.5 ? 'palmas' : 'nojo');
     }
@@ -633,6 +696,9 @@ function armaCobranca(room, game, atual) {
 // Quanto tempo um humano da vez pode ficar caído antes de o jogo jogar por
 // ele (até ele reconectar). Sem isso, uma queda definitiva travaria a sala.
 const AWAY_TAKEOVER_MS = 45_000;
+// Só para teste: RITMO_DOS_ROBOS=0.02 faz o robô jogar 50× mais rápido (uma
+// partida de dominó até 240 tem uns 250 lances). Nunca deixa mais lento.
+const RITMO_DOS_ROBOS = Math.min(1, Math.max(0.01, Number(process.env.RITMO_DOS_ROBOS) || 1));
 
 function scheduleBots(room) {
   const game = room.game;
@@ -685,7 +751,7 @@ function scheduleBots(room) {
   // jogadas dos outros acontecendo antes de dar tempo de ler o que houve.
   const delay = away
     ? (currentPlayer.awayActed ? 1400 : AWAY_TAKEOVER_MS)
-    : (buyWindow ? 3200 : 1500 + Math.random() * 1300);
+    : (buyWindow ? 3200 : 1500 + Math.random() * 1300) * RITMO_DOS_ROBOS;
 
   room.botTimer = setTimeout(() => {
     room.botTimer = null;
@@ -907,7 +973,8 @@ function handle(ws, msg) {
       const room = rooms.get(String(msg.code || '').toUpperCase().trim());
       if (!room) { const e = new Error('Sala não encontrada. Confira o código.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('Essa partida já começou.'); e.gameRule = true; throw e; }
-      if (room.players.length >= DEFAULT_OPTS.maxPlayers) { const e = new Error(`A sala está cheia (${DEFAULT_OPTS.maxPlayers} jogadores).`); e.gameRule = true; throw e; }
+      const max = motorDe(room).MAX;
+      if (room.players.length >= max) { const e = new Error(`A sala está cheia (${max} jogadores).`); e.gameRule = true; throw e; }
       const player = {
         id: crypto.randomUUID(), name: sanitizeName(msg.name), token: crypto.randomUUID(),
         avatar: personagemEscolhido(msg.avatar),
@@ -994,13 +1061,23 @@ function handle(ws, msg) {
       const room = currentRoom(ws);
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode mexer nos robôs.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
-      if (room.players.length >= DEFAULT_OPTS.maxPlayers) { const e = new Error(`A sala está cheia (${DEFAULT_OPTS.maxPlayers} jogadores).`); e.gameRule = true; throw e; }
-      const emUso = new Set(room.players.map((p) => p.name));
-      const nome = BOT_NAMES.find((n) => !emUso.has(n)) || `Robô ${room.players.length + 1}`;
-      room.players.push({
-        id: `bot-${crypto.randomUUID()}`, name: nome, token: '',
-        isBot: true, ws: null, connected: true, lastSeen: Date.now(),
-      });
+      const max = motorDe(room).MAX;
+      if (room.players.length >= max) { const e = new Error(`A sala está cheia (${max} jogadores).`); e.gameRule = true; throw e; }
+      novoRobo(room);
+      broadcastLobby(room);
+      break;
+    }
+    // Trocar de cadeira (dominó): o anfitrião troca o que há em duas cadeiras
+    // — gente, robô ou vaga. É assim que se escolhe a dupla antes de começar.
+    case 'cadeira': {
+      const room = currentRoom(ws);
+      if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala troca os lugares.'); e.gameRule = true; throw e; }
+      if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
+      const c = sentaNasCadeiras(room);
+      const de = Number(msg.de), para = Number(msg.para);
+      if (!c || !Number.isInteger(de) || !Number.isInteger(para) || de === para
+        || de < 0 || para < 0 || de >= c.length || para >= c.length) return;
+      [c[de], c[para]] = [c[para], c[de]];
       broadcastLobby(room);
       break;
     }
@@ -1027,7 +1104,7 @@ function handle(ws, msg) {
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode começar.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
       const motor = motorDe(room);
-      if (room.players.length < motor.MIN) {
+      if (!motor.cadeiras && room.players.length < motor.MIN) {
         const faltam = motor.MIN - room.players.length;
         const e = new Error(`Chame pelo menos mais ${faltam} jogador${faltam > 1 ? 'es' : ''} (ou adicione robô).`); e.gameRule = true; throw e;
       }
@@ -1038,7 +1115,7 @@ function handle(ws, msg) {
         const e = new Error(`Não dá para jogar com ${room.players.length} jogadores: a rodada ${aperto.round + 1} precisaria de ${aperto.precisa} cartas e o baralho tem ${aperto.total}.`);
         e.gameRule = true; throw e;
       }
-      room.game = motor.createGame(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), { nivelRobos: room.nivelRobos || 'normal' });
+      room.game = motor.createGame(jogadoresDaPartida(room).map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), { nivelRobos: room.nivelRobos || 'normal' });
       room.gameSeq++;
       const events = motor.startRound(room.game);
       broadcastLobby(room);
@@ -1132,11 +1209,14 @@ function handle(ws, msg) {
     case 'playAgain': {
       const room = currentRoom(ws);
       currentPlayer(ws, room);
-      if (!room.game || room.game.phase !== 'gameEnd' || motorDe(room) !== MODOS.cacamba) return;
+      if (!room.game || room.game.phase !== 'gameEnd') return;
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode recomeçar.'); e.gameRule = true; throw e; }
-      room.game = createGame(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), { nivelRobos: room.nivelRobos || 'normal' });
+      // Mesma mesa, mesmos lugares: no dominó, as mesmas duplas.
+      const motor = motorDe(room);
+      const mesa = room.game.players.map((gp) => room.players.find((p) => p.id === gp.id)).filter(Boolean);
+      room.game = motor.createGame(mesa.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), { nivelRobos: room.nivelRobos || 'normal' });
       room.gameSeq++;
-      const events = startRound(room.game);
+      const events = motor.startRound(room.game);
       broadcastState(room, events);
       scheduleBots(room);
       break;

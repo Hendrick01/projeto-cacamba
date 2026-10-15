@@ -165,6 +165,15 @@ function handleMessage(msg) {
         }
         break;
       }
+      if (msg.view?.modo === 'domino' && !mesaDomino) {
+        filaDomino.push(msg);
+        if (filaDomino.length === 1) {
+          carregaDomino()
+            .then(() => { const fila = filaDomino.splice(0); for (const m of fila) handleMessage(m); })
+            .catch(() => { filaDomino.length = 0; toast('⚠️ Não deu para abrir a mesa do Dominó. Recarregue a página.'); });
+        }
+        break;
+      }
       view = msg.view;
       controlesVoz.presenca(view.players);
       showScreen('game');
@@ -248,6 +257,12 @@ const MODOS = {
     fatos: '<span><strong>3–8</strong>jogadores</span><span><strong>3 … A, 2</strong>a mais forte</span><span><strong>Cu</strong>entrega as melhores</span>',
     min: 3,
   },
+  domino: {
+    nome: 'Dominó',
+    titulo: 'Dominó<br><em>de ponto, em dupla</em>',
+    fatos: '<span><strong>4</strong>em dupla</span><span><strong>Múltiplo de 5</strong>nas pontas marca</span><span><strong>240</strong>fecha a partida</span>',
+    min: 1,   // as cadeiras vazias viram robô na hora de começar
+  },
 };
 let modoDaCasa = 'cacamba';
 function telaInicial() { return params.get('sala') ? 'home' : 'modos'; }
@@ -264,6 +279,10 @@ $('modo-presidente').onclick = () => {
   escolheModo('presidente');
   carregaPresidente().catch(() => {});   // já vai baixando enquanto a pessoa digita o nome
 };
+$('modo-domino').onclick = () => {
+  escolheModo('domino');
+  carregaDomino().catch(() => {});
+};
 $('btn-modos').onclick = () => showScreen('modos');
 
 // A MESA DO PRESIDENTE. Só é baixada quando alguém escolhe o modo ou cai numa
@@ -279,6 +298,19 @@ function carregaPresidente() {
   return carregandoPresidente;
 }
 const ehPresidente = () => view?.modo === 'presidente';
+
+// A MESA DO DOMINÓ, no mesmo esquema: só vem com o modo.
+let mesaDomino = null;
+let carregandoDomino = null;
+const filaDomino = [];
+function carregaDomino() {
+  carregandoDomino ||= import('./domino-mesa.js').then((mod) => {
+    mesaDomino = mod.criaMesaDomino(contextoDaMesa());
+    return mesaDomino;
+  });
+  return carregandoDomino;
+}
+const ehDomino = () => view?.modo === 'domino';
 $('name-input').value = localStorage.getItem('cacamba-name') || '';
 
 function myNameInput() {
@@ -384,6 +416,7 @@ montaMiniaturas();
 pintaBotaoPersonagem();
 $('btn-rules-home').onclick = () => {
   if (modoDaCasa === 'presidente') carregaPresidente().then((m) => m.regras()).catch(() => {});
+  else if (modoDaCasa === 'domino') carregaDomino().then((m) => m.regras()).catch(() => {});
   else showRules();
 };
 
@@ -570,7 +603,10 @@ function renderLobby() {
 
   const list = $('lobby-players');
   list.innerHTML = '';
-  for (const p of lobby.players) {
+  const cadeiras = modoDaSala === 'domino' && Array.isArray(lobby.cadeiras) ? lobby.cadeiras : null;
+  list.hidden = !!cadeiras;
+  desenhaDuplas(cadeiras);
+  for (const p of cadeiras ? [] : lobby.players) {
     const li = document.createElement('li');
     const dot = document.createElement('span');
     dot.className = 'dot' + (p.connected ? '' : ' off');
@@ -593,9 +629,10 @@ function renderLobby() {
     list.appendChild(li);
   }
 
-  $('btn-add-bot').hidden = !isHost() || lobby.players.length >= DEFAULT_OPTS.maxPlayers;
-  // o nível dos robôs: quem criou a sala escolhe; os outros só leem
-  const temRobo = lobby.players.some((p) => p.isBot), facil = lobby.nivelRobos === 'facil';
+  $('btn-add-bot').hidden = !isHost() || !!cadeiras || lobby.players.length >= DEFAULT_OPTS.maxPlayers;
+  // o nível dos robôs: quem criou a sala escolhe; os outros só leem. No
+  // dominó sempre há robô a caminho (as vagas), então o botão fica à vista.
+  const temRobo = !!cadeiras || lobby.players.some((p) => p.isBot), facil = lobby.nivelRobos === 'facil';
   $('btn-nivel-robos').hidden = !temRobo;
   $('btn-nivel-robos').disabled = !isHost();
   $('btn-nivel-robos').textContent = facil ? '🤖 Robôs: fáceis' : '🤖 Robôs: normais';
@@ -603,6 +640,58 @@ function renderLobby() {
   $('btn-start').hidden = !isHost();
   $('btn-start').disabled = lobby.players.length < MODOS[modoDaSala].min;
   $('lobby-wait').hidden = isHost();
+}
+
+// As duas duplas do dominó: cadeiras 1 e 3 contra 2 e 4. O anfitrião toca
+// numa cadeira e depois noutra para trocar o que há nelas (gente, robô ou
+// vaga); os outros só veem. Vaga vira robô quando a partida começa.
+let cadeiraEscolhida = null;
+function desenhaDuplas(cadeiras) {
+  const box = $('lobby-duplas');
+  box.hidden = !cadeiras;
+  box.innerHTML = '';
+  if (!cadeiras) { cadeiraEscolhida = null; return; }
+  const anfitriao = isHost();
+  if (!anfitriao) cadeiraEscolhida = null;
+  [[0, 2], [1, 3]].forEach((par, d) => {
+    const dupla = document.createElement('div');
+    dupla.className = 'lobby-dupla';
+    const h = document.createElement('h4');
+    h.textContent = `Dupla ${d + 1}`;
+    dupla.appendChild(h);
+    for (const i of par) {
+      const p = lobby.players.find((x) => x.id === cadeiras[i]);
+      const el = document.createElement(anfitriao ? 'button' : 'div');
+      if (anfitriao) el.type = 'button';
+      el.className = `lobby-cadeira${p ? '' : ' vaga'}${cadeiraEscolhida === i ? ' escolhida' : ''}`;
+      if (p) {
+        el.dataset.playerId = p.id;
+        el.appendChild(avatarEl(p.id, lobby.players, 28));
+        const nome = p.id === me() ? `${p.name} (você)` : p.name;
+        el.appendChild(document.createTextNode(p.isBot ? `🤖 ${nome}` : nome));
+        if (!p.connected && !p.isBot) el.classList.add('fora');
+      } else {
+        el.textContent = `Cadeira ${i + 1} · vaga, entra robô`;
+      }
+      if (anfitriao) {
+        el.setAttribute('aria-pressed', String(cadeiraEscolhida === i));
+        el.onclick = () => {
+          if (cadeiraEscolhida === null) { cadeiraEscolhida = i; renderLobby(); return; }
+          if (cadeiraEscolhida !== i) sendMsg({ t: 'cadeira', de: cadeiraEscolhida, para: i });
+          cadeiraEscolhida = null;
+          renderLobby();
+        };
+      }
+      dupla.appendChild(el);
+    }
+    box.appendChild(dupla);
+  });
+  const dica = document.createElement('p');
+  dica.className = 'lobby-duplas-dica';
+  dica.textContent = anfitriao
+    ? (cadeiraEscolhida === null ? 'Toque em duas cadeiras para trocar quem senta onde.' : 'Agora toque na cadeira para onde vai.')
+    : 'Quem criou a sala arruma as duplas.';
+  box.appendChild(dica);
 }
 
 $('btn-add-bot').onclick = () => sendMsg({ t: 'addBot' });
@@ -888,6 +977,12 @@ function mandaPresenca() {
 function render() {
   if (!view) return;
   $('screen-game').classList.toggle('modo-presidente', ehPresidente());
+  $('screen-game').classList.toggle('modo-domino', ehDomino());
+  if (ehDomino()) {
+    mesaDomino.render();
+    notifyTurn();
+    return;
+  }
   if (ehPresidente()) {
     marcaCartasNovas();
     selected = new Set([...selected].filter((id) => (view.you?.hand || []).some((c) => c.id === id)));
@@ -930,9 +1025,18 @@ function progressoDoContrato(p) {
 // jogada de robô, e a mesa piscaria inteira.
 const assentos = new Map();
 
+// No dominó a mesa é de dupla: o parceiro senta à sua frente, no meio, e quem
+// joga depois de você fica à sua direita (a vez corre pela direita).
+function ordemDosAdversarios() {
+  const outros = view.players.filter((p) => p.id !== me());
+  const eu = view.players.findIndex((p) => p.id === me());
+  if (!ehDomino() || eu < 0 || view.players.length !== 4) return outros;
+  return [3, 2, 1].map((k) => view.players[(eu + k) % 4]);
+}
+
 function renderOpponents() {
   const box = $('opponents');
-  const adversarios = view.players.filter((p) => p.id !== me());
+  const adversarios = ordemDosAdversarios();
   const lugares = posicoesDeAssento(adversarios.length);
   const alturaAssentos = alturaDaMesa(adversarios.length);
   box.style.height = `${alturaAssentos}px`;
@@ -1056,13 +1160,13 @@ function atualizaAssento(el, p, lugar) {
   marcas.innerHTML = '';
   const prog = progressoDoContrato(p);
   if (prog) marcas.appendChild(marca(prog.completo ? '✔' : prog.texto, 'm-gold'));
-  if (view.claims.includes(p.id)) marcas.appendChild(marca('🛒', 'm-cart'));
+  if (view.claims?.includes(p.id)) marcas.appendChild(marca('🛒', 'm-cart'));
   if (p.desistiu) marcas.appendChild(marca('saiu', 'm-off'));
   else if (!p.isBot && !p.connected) marcas.appendChild(marca('fora', 'm-off'));
 
   // Gestos de uma vez só, disparados pela mudança e não pelo estado
   const feitos = p.baixados ? p.baixados.t + p.baixados.s : 0;
-  if (view.claims.includes(p.id) && !antes.pedidos.has(p.id)) repete(el, 'pediu');
+  if (view.claims?.includes(p.id) && !antes.pedidos.has(p.id)) repete(el, 'pediu');
   if (feitos > (antes.baixados.get(p.id) || 0)) repete(el, 'baixou-agora');
   antes.baixados.set(p.id, feitos);
   if (naVez(p)) el.dataset.daVez = '1'; else delete el.dataset.daVez;
@@ -1126,6 +1230,7 @@ function renderMeuAssento() {
 // para encaixar carta os jogos dos outros já aparecem na fileira de baixo.
 function mostraOponente(playerId) {
   if (ehPresidente()) { mesaPresidente.mostraJogador(playerId); return; }
+  if (ehDomino()) { mesaDomino.mostraJogador(playerId); return; }
   const p = view.players.find((x) => x.id === playerId);
   if (!p) return;
   const prog = progressoDoContrato(p);
@@ -1242,8 +1347,8 @@ function atualizaBanner() {
     banner.className = 'turn-banner evento';
     return;
   }
-  if (ehPresidente()) {
-    const t = mesaPresidente.textoDaVez();
+  if (ehPresidente() || ehDomino()) {
+    const t = (ehDomino() ? mesaDomino : mesaPresidente).textoDaVez();
     banner.textContent = t.texto;
     banner.className = `turn-banner${t.minha ? ' me' : ''}`;
     return;
@@ -1866,8 +1971,8 @@ $('btn-sort').onclick = () => {
   render();
 };
 
-$('btn-rules').onclick = () => (ehPresidente() ? mesaPresidente.regras() : showRules());
-$('btn-score').onclick = () => (ehPresidente() ? mesaPresidente.placar() : showScore());
+$('btn-rules').onclick = () => (ehDomino() ? mesaDomino.regras() : ehPresidente() ? mesaPresidente.regras() : showRules());
+$('btn-score').onclick = () => (ehDomino() ? mesaDomino.placar() : ehPresidente() ? mesaPresidente.placar() : showScore());
 // A mesa em 3D é outra janela para a MESMA partida: entra com a sessão
 // guardada e conversa com o mesmo servidor. A biblioteca dela (three.js) só é
 // baixada quando se abre — a mesa normal continua leve.
@@ -1959,6 +2064,10 @@ const REACOES = {
   presidente: { texto: 'sou o presidente!', gesto: 'pula', cara: 'feliz' },
   livre:      { texto: 'tô fora!',          gesto: 'pula', cara: 'feliz' },
   cu:         { texto: 'ah, não…',          gesto: 'murcha', cara: 'bravo' },
+  // Dominó
+  ponto:      { texto: 'na conta!',         gesto: 'pula', cara: 'feliz' },
+  passo:      { texto: 'passo…',            gesto: 'murcha', cara: null },
+  trancou:    { texto: 'tranquei…',         gesto: 'murcha', cara: 'bravo' },
 };
 
 // EMOTES e frases prontas (17/09/2026): o mesmo balão das reações, maior e
@@ -1969,7 +2078,7 @@ function mostraEmote(playerId, k) {
   if (!e) return;
   // na sala de espera o balão sai ao lado do nome de quem falou
   if (!$('screen-lobby').hidden) {
-    const li = [...document.querySelectorAll('#lobby-players li')].find((x) => x.dataset.playerId === playerId);
+    const li = [...document.querySelectorAll('#lobby-players li, #lobby-duplas .lobby-cadeira')].find((x) => x.dataset.playerId === playerId);
     if (li) {
       let b = li.querySelector('.balao-lobby');
       if (!b) { b = document.createElement('span'); b.className = 'balao-lobby'; li.appendChild(b); }
@@ -2049,6 +2158,7 @@ let lastTurnWasMine = false;
 
 function announce(ev) {
   if (ehPresidente() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaPresidente.anuncia(ev); return; }
+  if (ehDomino() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaDomino.anuncia(ev); return; }
   switch (ev.e) {
     case 'roundStart':
       distribuirPendente = true;
@@ -2424,6 +2534,8 @@ function contextoDaMesa() {
     corDoJogador: (id) => CORES_DE_ASSENTO[assentoDe(id, view.players) % CORES_DE_ASSENTO.length],
     get view() { return view; },
     get selected() { return selected; },
+    adversarios: ordemDosAdversarios,
+    saiDaSala() { saveSession(null); location.reload(); },
     novaRodada() { selected.clear(); ordemManual = []; cartasNovas.clear(); maoAnterior = null; },
   };
 }

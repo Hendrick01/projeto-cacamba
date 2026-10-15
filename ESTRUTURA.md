@@ -335,6 +335,33 @@ convite (`?sala=`) pula a escolha — a sala já tem modo, e é ela que manda.
 - A mesa 3D ainda é só do Caçamba: `mesa3d.js` manda sala de Presidente de
   volta para a 2D.
 
+## Dominó de ponto (15/10/2026)
+
+O terceiro modo, ao lado do Presidente, no mesmo esquema: `room.modo =
+'domino'`, motor em `shared/domino.js` (regras no topo do arquivo, testes em
+`test/domino.test.js`), mesa 2D em `public/domino-mesa.js` + `public/domino.css`,
+baixadas com `import()` só quando alguém escolhe o modo ou cai numa sala dele.
+
+- **Cadeiras.** O dominó é sempre de 4, em duplas fixas (cadeiras 0+2 contra
+  1+3). A sala guarda `room.cadeiras` (ids ou null) à parte de `room.players`,
+  que continua na ordem de chegada — é dela que sai o anfitrião, e trocar de
+  lugar não pode trocar o dono da sala. `sentaNasCadeiras` arruma a lista a
+  cada consulta (quem saiu vaga, quem chegou senta na primeira vaga). O
+  anfitrião troca o conteúdo de duas cadeiras com `{ t: 'cadeira', de, para }`;
+  no `start`, as vagas viram robô (`jogadoresDaPartida`) e a ordem das cadeiras
+  é a ordem da partida. `playAgain` repete a mesma mesa.
+- **A cobra.** SVG em "casas" (meia pedra = 1×1), enquadrado por `viewBox`. A
+  carroça de saída fica em pé no centro (a cruz); cada ramo segue reto e dobra
+  uma vez, sempre para o mesmo lado (esquerda sobe, cima vai para a direita,
+  direita desce, baixo vai para a esquerda), e por isso nenhum ramo cruza
+  outro. Com pedra que encaixa em mais de uma ponta, as pontas viram alvo de
+  toque na mesa, além dos botões.
+- Na mesa 2D o parceiro senta à sua frente (`ordemDosAdversarios` em
+  client.js) e quem joga depois de você fica à direita.
+- A mesa 3D ainda não tem dominó: o botão 3D some nessa sala.
+- `npm run test:domino` sobe um servidor próprio com `RITMO_DOS_ROBOS=0.01`
+  (só teste: o robô joga 100× mais rápido) e joga uma partida inteira até 240.
+
 ## `shared/engine.js` — motor de regras
 
 Módulo puro: recebe estado e devolve estado + lista de eventos. Nunca faz rede,

@@ -62,7 +62,7 @@
 
 <!-- ======================= ESCOLHA DO MODO ======================= -->
 <!-- A porta da casa. O Caçamba é o jogo da casa e vem grande, primeiro; o
-     Presidente é a outra mesa. Escolher aqui não baixa nada: o código de cada
+     Presidente e o Dominó são as outras mesas. Escolher aqui não baixa nada: o código de cada
      modo só vem quando se senta à mesa dele. -->
 <section id="screen-modos" class="screen">
   <div class="ui-shell">
@@ -82,6 +82,12 @@
         <span class="modo-texto">Livre-se das cartas primeiro e vire Presidente. Quem sobra por último vira o Cu, e na rodada seguinte entrega as melhores.</span>
         <span class="modo-fatos"><span><b>3–8</b> jogadores</span><span><b>3 … A, 2</b> a mais forte</span></span>
         <span class="modo-ir">Jogar Presidente →</span>
+      </button>
+      <button id="modo-domino" type="button" class="modo" data-modo="domino">
+        <strong>Dominó de ponto</strong>
+        <span class="modo-texto">Pedra na mesa e conta nas pontas: deu múltiplo de 5, a dupla marca. Quem bate leva o que sobrou na mão dos outros.</span>
+        <span class="modo-fatos"><span><b>4</b> jogadores em dupla</span><span>até <b>240</b></span></span>
+        <span class="modo-ir">Jogar Dominó →</span>
       </button>
     </main>
     <footer class="ui-footer"><span>Mesmo baralho, mesma gelera.</span><span>A cúpula criadora joga aqui.</span></footer>
@@ -170,6 +176,9 @@
     <p id="lobby-url" class="lobby-url"></p>
 
     <ul id="lobby-players" class="lobby-players"></ul>
+    <!-- Dominó: quatro cadeiras em duas duplas. O anfitrião toca em duas para
+         trocar quem senta onde; vaga vira robô quando a partida começa. -->
+    <div id="lobby-duplas" class="lobby-duplas" hidden></div>
 
     <div class="lobby-actions">
       <button id="btn-add-bot" class="btn" hidden>+ Robô</button>

@@ -1,0 +1,121 @@
+/* Dominó de ponto — o que muda na mesa 2D. Baixado só com o modo
+   (domino-mesa.js). A mesa, os assentos e os modais continuam os do Caçamba
+   (style.css). */
+
+/* Sem monte nem meio, sem jogos baixados, sem ordenar cartas e sem a mesa 3D,
+   que ainda não tem dominó. As mãos desenhadas seguram leque de carta: com
+   pedra em pé, ficam de fora. */
+#screen-game.modo-domino .piles,
+#screen-game.modo-domino #btn-claim,
+#screen-game.modo-domino #my-melds,
+#screen-game.modo-domino #btn-sort,
+#screen-game.modo-domino #btn-3d,
+#screen-game.modo-domino .maos { display: none !important; }
+#screen-game:not(.modo-domino) .dom-centro,
+#screen-game:not(.modo-domino) .dom-btn { display: none !important; }
+
+/* O meio cresce para ocupar a folga da mesa: a cobra precisa de espaço. */
+#screen-game.modo-domino .mesa .table-center {
+  flex: 1; display: flex; flex-direction: column; margin: 0;
+}
+.dom-centro { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+/* ---- Placar das duplas --------------------------------------------------- */
+.dom-placar {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin: 0 auto 4px; padding: 0 4px; max-width: 100%;
+}
+.dom-time {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: baseline;
+  flex: 0 1 150px; min-width: 0;
+  padding: 4px 12px; border-radius: 12px;
+  background: rgba(6, 32, 26, 0.6); border: 1px solid var(--felt-line);
+  text-align: left;
+}
+.dom-time.nosso { border-color: rgba(242, 193, 78, 0.55); }
+.dom-time.venceu { box-shadow: 0 0 0 2px var(--gold); }
+.dom-time-nome { font-size: 0.66rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sage); }
+.dom-time.nosso .dom-time-nome { color: var(--gold); }
+.dom-time-pts { font-family: var(--font-display); font-weight: 400; font-size: 1.35rem; color: var(--cream); line-height: 1.1; grid-row: span 2; text-align: right; }
+.dom-time-quem { font-size: 0.66rem; color: var(--sage); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.dom-meta { font-size: 0.66rem; font-weight: 800; color: var(--sage); white-space: nowrap; }
+
+/* ---- A cobra --------------------------------------------------------------- */
+/* Sem inclinar: são 28 pedras pequenas, os pontos precisam continuar
+   contáveis, e o SVG inclinado em 3D sai borrado no celular. */
+.dom-palco { flex: 1; min-height: 150px; position: relative; }
+.dom-cobra {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  overflow: visible;
+}
+.pedra-face { fill: var(--cream); stroke: #6f6450; stroke-width: 0.05; }
+.pedra-sombra { fill: rgba(0, 0, 0, 0.55); }
+.pedra-risca { stroke: #8c8068; stroke-width: 0.05; stroke-linecap: round; }
+.pedra-ponto { fill: var(--ink); }
+.pedra.cruz .pedra-face { stroke: var(--gold-soft); stroke-width: 0.07; }
+.pedra.ultima .pedra-face { stroke: var(--gold); stroke-width: 0.1; }
+.pedra.cai { animation: domCai 0.38s cubic-bezier(0.2, 0.8, 0.3, 1); transform-box: fill-box; transform-origin: center; }
+@keyframes domCai {
+  0% { transform: scale(1.35); opacity: 0.1; }
+  60% { opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .pedra.cai { animation: none; } }
+
+.dom-vazia rect { fill: none; stroke: var(--felt-line); stroke-width: 0.08; stroke-dasharray: 0.2 0.15; }
+.dom-vazia text { fill: var(--sage); font-size: 0.7px; font-weight: 800; font-family: var(--font-body); }
+
+/* As pontas abertas: o número que está valendo em cada uma. Com pedra que
+   encaixa em mais de uma, a ponta vira alvo de toque e pulsa em ouro. */
+.dom-ponta circle { fill: rgba(6, 32, 26, 0.75); stroke: var(--felt-line); stroke-width: 0.06; }
+.dom-ponta text { fill: var(--sage); font-size: 0.55px; font-weight: 900; font-family: var(--font-body); pointer-events: none; }
+.dom-ponta.cabe circle { stroke: var(--gold); }
+.dom-ponta.alvo { cursor: pointer; }
+.dom-ponta.alvo circle { fill: var(--gold); stroke: #fff6; stroke-width: 0.08; animation: domAlvo 1.1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.dom-ponta.alvo text { fill: var(--ink); font-size: 0.7px; }
+.dom-ponta.alvo:focus-visible { outline: none; }
+.dom-ponta.alvo:focus-visible circle { stroke: var(--cream); stroke-width: 0.14; }
+@keyframes domAlvo { 50% { transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .dom-ponta.alvo circle { animation: none; } }
+
+/* ---- A mão: pedras em pé ---------------------------------------------------- */
+.dom-mao {
+  display: flex; justify-content: center; align-items: flex-end; gap: 6px;
+  flex-wrap: nowrap; max-width: 100%;
+}
+.dom-pedra-mao {
+  flex: 0 1 46px; min-width: 34px; aspect-ratio: 1.16 / 2.2;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.6));
+  transition: transform 0.12s ease, filter 0.12s ease, opacity 0.12s ease;
+}
+.dom-pedra-mao svg { width: 100%; height: 100%; display: block; }
+.dom-pedra-mao.sel { transform: translateY(-16px) scale(1.06); }
+.dom-pedra-mao.sel .pedra-face { stroke: var(--gold); stroke-width: 0.1; }
+.dom-pedra-mao.apagada { opacity: 0.45; filter: saturate(0.4) drop-shadow(0 4px 4px rgba(0, 0, 0, 0.5)); }
+.dom-pedra-mao:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 6px; }
+@media (min-width: 700px) { .dom-pedra-mao { flex-basis: 54px; } }
+#screen-game.modo-domino .hand { padding-top: 26px; }
+
+/* ---- Assentos ------------------------------------------------------------------ */
+/* O verso da pedra no leque de quem senta: estreita e clara, não carta. */
+#screen-game.modo-domino .carta-virada {
+  width: 9px; height: 17px; margin: 0 -1px; border-radius: 2px;
+  background: linear-gradient(180deg, #f5f1e6, #d9cfb8); border: 1px solid #5c4f3a;
+}
+.dom-parceiro, .dom-contra { white-space: nowrap; }
+.dom-parceiro { color: var(--gold); }
+.dom-contra { color: var(--sage); }
+.assento.dom-dupla .figura { filter: drop-shadow(0 0 6px rgba(242, 193, 78, 0.35)); }
+
+/* ---- Fim de mão e de partida ---------------------------------------------------- */
+.dom-sobras { list-style: none; margin: 8px 0 10px; padding: 0; display: grid; gap: 4px; font-size: 0.82rem; }
+.dom-sobras li { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.dom-sobra-nome { font-weight: 800; min-width: 64px; }
+.dom-sobra-total { margin-left: auto; font-weight: 900; color: var(--gold); }
+.dom-mini {
+  display: inline-block; padding: 1px 4px; border-radius: 4px;
+  background: var(--cream); color: var(--ink); font-size: 0.72rem; font-weight: 900;
+}
+.dom-vencedores { display: flex; justify-content: center; gap: 4px; }
+.dom-vencedores img { max-width: 48%; }

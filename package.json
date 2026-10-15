@@ -14,7 +14,8 @@
     "db:migra": "node -e \"import('./lib/banco.js').then(m=>m.migra().then(ok=>{console.log(ok?'esquema aplicado':'sem DATABASE_URL');return m.fecha()}))\"",
     "test:webhook": "node test/webhook-live.mjs",
     "test:reinicio": "node test/reinicio.mjs",
-    "test:presidente": "node test/presidente.mjs"
+    "test:presidente": "node test/presidente.mjs",
+    "test:domino": "node test/domino.mjs"
   },
   "engines": {
     "node": ">=20"
