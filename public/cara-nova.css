@@ -116,6 +116,13 @@ html.debug .ui-version { display: inline; }
 }
 .modo-obj.pedra i { display: block; width: 2px; height: 28px; background: rgba(42, 27, 18, 0.65); }
 .modo-obj.pedra svg { width: 100%; height: 28px; }
+/* Bazuca: as quatro viradas, uma delas espiada */
+.modo-obj.viradas {
+  right: 16px; top: 12px; width: 70px; height: 92px;
+  display: grid; grid-template-columns: repeat(2, 30px); gap: 5px; transform: rotate(6deg);
+}
+.modo-obj.viradas img { position: static; width: 30px; height: 42px; border-radius: 4px; }
+.modo-obj.viradas img:nth-child(3) { transform: translateY(-5px) rotate(-8deg); box-shadow: 0 0 0 2px #f2c14e, 0 8px 14px -6px rgba(0, 0, 0, 0.8); }
 .modo-principal { padding-top: 132px; }
 .modo:not(.modo-principal) { padding-top: 92px; }
 @media (min-width: 761px) {

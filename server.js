@@ -20,6 +20,7 @@ import {
 } from './shared/engine.js';
 import * as Presidente from './shared/presidente.js';
 import * as Domino from './shared/domino.js';
+import * as Bazuca from './shared/bazuca.js';
 import { personagemValido } from './shared/elenco.js';
 import { emoteDe } from './shared/emotes.js';
 import { chaveDasSalas, sela, abre } from './lib/selo-sala.js';
@@ -54,11 +55,24 @@ const MODOS = {
     cadeiras: true,
     lugares: (room) => Domino.FORMATOS[room.formato] || Domino.MAX_JOGADORES,
   },
+  // Bazuca: o único modo com relógio e com jogada FORA da vez (o descarte
+  // rápido). Não passa pelo agendador de vez: o motor guarda prazos e planos
+  // de robô, e agendaTempoReal cuida dos dois.
+  bazuca: {
+    createGame: Bazuca.createGame, startRound: Bazuca.startRound, applyAction: Bazuca.applyAction,
+    actNextRound: Bazuca.actNextRound, viewFor: Bazuca.viewFor, botNextAction: Bazuca.botNextAction,
+    FASES_DE_VEZ: Bazuca.FASES_DE_VEZ, MIN: Bazuca.MIN_JOGADORES, MAX: Bazuca.MAX_JOGADORES,
+    tempoReal: true, tick: Bazuca.tick, proximoPrazo: Bazuca.proximoPrazo,
+    planosDosRobos: Bazuca.planosDosRobos, retoma: Bazuca.retoma,
+    niveis: Bazuca.NIVEIS_DE_ROBO,
+  },
 };
 const modoValido = (m) => (Object.hasOwn(MODOS, m) ? m : 'cacamba');
 const motorDe = (room) => MODOS[modoValido(room.modo)];
 // Quantos sentam: o máximo do modo, ou o do formato escolhido (dominó 1v1).
 const lugaresDe = (room) => { const m = motorDe(room); return m.lugares ? m.lugares(room) : m.MAX; };
+// O nível dos robôs: cada modo diz os que tem (o Bazuca tem o difícil).
+const nivelValido = (modo, n) => ((MODOS[modoValido(modo)].niveis || NIVEIS_DE_ROBO).includes(n) ? n : 'normal');
 const formatoValido = (f) => (Object.hasOwn(Domino.FORMATOS, f) ? f : '2v2');
 const cliValue = (name) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
 const PORT = Number(process.env.PORT || cliValue('--port')) || 3000;
@@ -431,12 +445,14 @@ function recriaSala(d, origin) {
     origin: origin || d.origin || LAN_HOST,
     createdAt: d.createdAt || Date.now(),
     seloSeq: d.seq || 0, restauradaEm: Date.now(), mexeu: false,
-    nivelRobos: NIVEIS_DE_ROBO.includes(d.nivelRobos) ? d.nivelRobos : 'normal',
+    nivelRobos: nivelValido(d.modo, d.nivelRobos),
     modo: modoValido(d.modo),
     cadeiras: Array.isArray(d.cadeiras) ? d.cadeiras.slice(0, 8) : undefined,
     formato: formatoValido(d.formato),
   };
   if (room.game) room.game.rnd = Math.random;
+  // os prazos do retrato venceram enquanto o servidor estava fora
+  if (room.game && motorDe(room).retoma) motorDe(room).retoma(room.game, Date.now());
   rooms.set(room.code, room);
   QRCode.toDataURL(`${room.origin}/?sala=${room.code}`, { margin: 1, width: 220 })
     .then((dataUrl) => { room.qr = dataUrl; broadcastLobby(room); })
@@ -679,6 +695,12 @@ function robosReagem(room, events) {
     else if (ev.e === 'bateu') {
       if (ehRobo(ev.p)) roboFala(room, 'muito-bem', ev.p);
       else if (Math.random() < 0.6) roboFala(room, Math.random() < 0.5 ? 'palmas' : 'nojo');
+    } else if (ev.e === 'bazuca') {
+      if (ev.certo) roboFala(room, ehRobo(ev.p) ? 'muito-bem' : (Math.random() < 0.5 ? 'palmas' : 'nojo'), ehRobo(ev.p) ? ev.p : null);
+      else if (ehRobo(ev.p)) roboFala(room, 'perdao', ev.p);
+      else if (Math.random() < 0.6) roboFala(room, 'pisca');
+    } else if (ev.e === 'roundEnd' && ev.motivo === 'bateu' && ehRobo(ev.vencedor)) {
+      roboFala(room, 'muito-bem', ev.vencedor);
     } else if (ev.e === 'saiu' && ev.pos === 0) {
       if (ehRobo(ev.p)) roboFala(room, 'muito-bem', ev.p);
       else if (Math.random() < 0.6) roboFala(room, Math.random() < 0.5 ? 'palmas' : 'nojo');
@@ -708,6 +730,7 @@ const RITMO_DOS_ROBOS = Math.min(1, Math.max(0.01, Number(process.env.RITMO_DOS_
 function scheduleBots(room) {
   const game = room.game;
   const motor = motorDe(room);
+  if (motor.tempoReal) { agendaTempoReal(room); return; }
   if (!game || !motor.FASES_DE_VEZ.includes(game.phase)) {
     if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; room.botTimerKey = null; }
     return;
@@ -784,6 +807,59 @@ function scheduleBots(room) {
       console.error('erro de bot:', err);
     }
   }, delay);
+}
+
+// O RELÓGIO E OS ROBÔS DO BAZUCA. Dois timers por sala: um para o próximo
+// prazo do motor (fim da espiada, da vez, da carta mostrada) e um por plano de
+// robô. Os planos têm chave de momento: cada chave é sorteada uma vez só e
+// executada depois do atraso dela, se ainda valer — é o que deixa robô
+// descartar fora da vez sem que cada mensagem da mesa reinicie o reflexo dele.
+// Quem desistiu da partida também é jogado pelo robô.
+function agendaTempoReal(room) {
+  const game = room.game;
+  const motor = motorDe(room);
+  clearTimeout(room.prazoTimer); room.prazoTimer = null;
+  room.planos ||= new Map();
+  if (!game) { limpaPlanos(room); return; }
+
+  const prox = motor.proximoPrazo(game);
+  if (prox != null) {
+    room.prazoTimer = setTimeout(() => {
+      room.prazoTimer = null;
+      if (room.game !== game) return;
+      try {
+        const events = motor.tick(game, Date.now());
+        if (events.length) broadcastState(room, events);
+      } catch (err) { console.error('erro no relógio do bazuca:', err); }
+      agendaTempoReal(room);
+    }, Math.max(0, prox - Date.now()) + 20);
+    room.prazoTimer.unref?.();
+  }
+
+  const controlados = room.players.filter((p) => p.isBot || p.desistiu).map((p) => p.id);
+  const planos = motor.planosDosRobos(game, controlados, Date.now());
+  const vivas = new Set(planos.map((p) => p.chave));
+  for (const [k, t] of room.planos) if (!vivas.has(k)) { clearTimeout(t); room.planos.delete(k); }
+  for (const pl of planos) {
+    if (room.planos.has(pl.chave)) continue;
+    if (!pl.action) { room.planos.set(pl.chave, null); continue; }
+    const t = setTimeout(() => {
+      room.planos.set(pl.chave, null);
+      if (room.game !== game) return;
+      try {
+        const events = motor.applyAction(game, pl.botId, pl.action, Date.now());
+        if (events.length) broadcastState(room, events);
+      } catch { /* o momento passou: alguém foi mais rápido */ }
+      agendaTempoReal(room);
+    }, pl.atraso * RITMO_DOS_ROBOS);
+    t.unref?.();
+    room.planos.set(pl.chave, t);
+  }
+}
+function limpaPlanos(room) {
+  clearTimeout(room.prazoTimer); room.prazoTimer = null;
+  for (const t of room.planos?.values() || []) clearTimeout(t);
+  room.planos?.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -1050,6 +1126,7 @@ function handle(ws, msg) {
         // tempo devolvendo de propósito um retrato velho)
         room.game = d.game || null;
         if (room.game) room.game.rnd = Math.random;
+        if (room.game && motorDe(room).retoma) motorDe(room).retoma(room.game, Date.now());
         room.gameSeq = d.gameSeq || 0; room.seloSeq = d.seq; room.seloMarca = null;
         for (const p of room.players) { const n = d.players.find((x) => x.id === p.id); if (n) { p.desistiu = !!n.desistiu; p.token = n.token; } }
         if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; room.botTimerKey = null; }
@@ -1104,7 +1181,7 @@ function handle(ws, msg) {
       const room = currentRoom(ws);
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode mexer nos robôs.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
-      room.nivelRobos = NIVEIS_DE_ROBO.includes(msg.nivel) ? msg.nivel : 'normal';
+      room.nivelRobos = nivelValido(room.modo, msg.nivel);
       broadcastLobby(room);
       break;
     }
@@ -1254,6 +1331,7 @@ setInterval(() => {
     const lastSeen = Math.max(room.createdAt, ...humans.map((p) => p.lastSeen || 0));
     if (!active && now - lastSeen > 30 * 60 * 1000) {
       if (room.botTimer) clearTimeout(room.botTimer);
+      limpaPlanos(room);
       rooms.delete(code);
     }
   }
@@ -1286,6 +1364,7 @@ for (const sinal of ['SIGTERM', 'SIGINT']) {
     // no processo que vem depois (ver lib/selo-sala.js).
     for (const room of rooms.values()) {
       if (room.botTimer) clearTimeout(room.botTimer);
+      limpaPlanos(room);
       try { enviaSelo(room); for (const p of room.players) if (!p.isBot) send(p.ws, { t: 'reinicio' }); } catch { /* fechar é mais importante */ }
     }
     setTimeout(() => { for (const c of wss.clients) { try { c.close(1012, 'reinicio'); } catch { /* já foi */ } } wss.close(); server.close(() => process.exit(0)); }, 350);

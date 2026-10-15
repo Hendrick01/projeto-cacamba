@@ -35,7 +35,7 @@ test('JSON nulo, arrays e ações sem estrutura não chegam ao motor', () => {
   // presença: dois inteiros pequenos ou nada; qualquer outra coisa é recusada
   for (const m of [{t:'presenca'}, {t:'presenca',sel:3}, {t:'presenca',sel:null,olha:0}, {t:'presenca',sel:40,olha:15}]) assert.ok(validMessage(m), JSON.stringify(m));
   for (const m of [{t:'presenca',sel:-1}, {t:'presenca',sel:41}, {t:'presenca',sel:1.5}, {t:'presenca',sel:'3'}, {t:'presenca',olha:16}, {t:'presenca',olha:{}}]) assert.equal(validMessage(m), false, JSON.stringify(m));
-  for (const m of [{t:'nivelRobos',nivel:'facil'}, {t:'nivelRobos',nivel:'normal'}]) assert.ok(validMessage(m));
+  for (const m of [{t:'nivelRobos',nivel:'facil'}, {t:'nivelRobos',nivel:'normal'}, {t:'nivelRobos',nivel:'dificil'}]) assert.ok(validMessage(m));
   for (const m of [{t:'nivelRobos'}, {t:'nivelRobos',nivel:'impossivel'}, {t:'nivelRobos',nivel:1}]) assert.equal(validMessage(m), false);
   // emote: só uma chave curta de catálogo — nada de texto livre
   for (const m of [{t:'emote',k:'joinha'}, {t:'emote',k:'faz-certo'}, {t:'emote',k:'kkk'}]) assert.ok(validMessage(m), JSON.stringify(m));

@@ -15,7 +15,8 @@
     "test:webhook": "node test/webhook-live.mjs",
     "test:reinicio": "node test/reinicio.mjs",
     "test:presidente": "node test/presidente.mjs",
-    "test:domino": "node test/domino.mjs"
+    "test:domino": "node test/domino.mjs",
+    "test:bazuca": "node test/bazuca.mjs"
   },
   "engines": {
     "node": ">=20"

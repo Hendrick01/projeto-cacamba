@@ -368,6 +368,43 @@ baixadas com `import()` só quando alguém escolhe o modo ou cai numa sala dele.
 - `npm run test:domino` sobe um servidor próprio com `RITMO_DOS_ROBOS=0.01`
   (só teste: o robô joga 100× mais rápido) e joga uma partida inteira até 240.
 
+## Bazuca (15/10/2026)
+
+O quarto modo, no mesmo esquema dos outros: `room.modo = 'bazuca'`, motor em
+`shared/bazuca.js` (as regras do dono do jogo e as da casa estão no topo do
+arquivo; testes em `test/bazuca.test.js`), mesa 2D em `public/bazuca-mesa.js`
++ `public/bazuca.css`, baixadas com `import()` só com o modo. 2 a 6 jogadores.
+
+- **O único modo com relógio e com jogada fora da vez.** O motor não tem
+  timer: guarda prazos (`state.prazo` da espiada de 5 s e da vez de 35 s,
+  `espiadas[].ate`, `reveladas[].ate`, `dividas[].prazo`) e o servidor chama
+  `tick(state, agora)` quando `proximoPrazo(state)` vence. O descarte rápido
+  (`{ a: 'descartar', p, i }`) vale para qualquer jogador a qualquer momento
+  da fase `play`. Por isso o motor declara `FASES_DE_VEZ = []` e
+  `tempoReal: true`, e o `scheduleBots` do servidor passa a vez para
+  `agendaTempoReal(room)`.
+- **Robôs por planos.** `planosDosRobos(state, controlados, agora)` devolve,
+  para cada robô (e para quem desistiu), planos com **chave de momento**
+  (`bate:<robô>:<descarteSeq>`, `vez:<robô>:<turnNo>:<etapa>`, `dar:…`) e um
+  atraso. O servidor sorteia cada chave uma vez só e executa depois do atraso
+  se ela ainda valer; é o que deixa o reflexo do robô correr sem ser
+  reiniciado a cada mensagem da mesa. A memória do robô (`players[].memoria`,
+  "id:posição" → valor) é alimentada pelo motor nos mesmos momentos em que um
+  humano veria a carta, e se apaga a cada vez dele conforme o nível:
+  `facil` / `normal` (médio) / `dificil`. Só este modo tem o difícil
+  (`nivelValido` no servidor).
+- **Sem assistência.** `viewFor` só põe valor de carta no que está à vista
+  agora: a de cima do descarte, a sua comprada, a sua espiada (com `ms`
+  restantes), a mostrada a todos por um erro, e tudo no fim da rodada. As
+  posições são fixas: carta que sai deixa buraco (`null`) e a de punição
+  entra numa posição nova.
+- **Lupa.** Carta de adversário à vista (dama ou descarte errado) aparece
+  grande no meio da tela, com o dono e um mapinha da grade dele.
+- A mesa 3D ainda não tem Bazuca: o botão 3D some nessa sala.
+- `npm run test:bazuca` sobe um servidor próprio (`RITMO_DOS_ROBOS=0.05`),
+  confere a espiada, o teto de 6, que nenhuma visão vaza carta virada, o
+  descarte rápido fora da vez e joga duas rodadas inteiras.
+
 ## `shared/engine.js` — motor de regras
 
 Módulo puro: recebe estado e devolve estado + lista de eventos. Nunca faz rede,

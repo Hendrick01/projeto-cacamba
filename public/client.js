@@ -155,6 +155,15 @@ function handleMessage(msg) {
         }
         break;
       }
+      if (msg.view?.modo === 'bazuca' && !mesaBazuca) {
+        filaBazuca.push(msg);
+        if (filaBazuca.length === 1) {
+          carregaBazuca()
+            .then(() => { const fila = filaBazuca.splice(0); for (const m of fila) handleMessage(m); })
+            .catch(() => { filaBazuca.length = 0; toast('Não deu para abrir a mesa do Bazuca. Recarregue a página.'); });
+        }
+        break;
+      }
       if (msg.view?.modo === 'domino' && !mesaDomino) {
         filaDomino.push(msg);
         if (filaDomino.length === 1) {
@@ -253,6 +262,13 @@ const MODOS = {
     fatos: '<span><strong>1v1 ou 2v2</strong>à escolha da sala</span><span><strong>Múltiplo de 5</strong>nas pontas marca</span><span><strong>240</strong>fecha a partida</span>',
     min: 1,   // as cadeiras vazias viram robô na hora de começar
   },
+  bazuca: {
+    nome: 'Bazuca',
+    titulo: 'Bazuca<br><em>memória, reflexo e coragem de gritar</em>',
+    fatos: '<span><strong>2–6</strong>jogadores</span><span><strong>Menor soma</strong>ganha</span><span><strong>Sem ajuda</strong>a memória é sua</span>',
+    min: 2, max: 6,
+    niveis: ['facil', 'normal', 'dificil'],
+  },
 };
 let modoDaCasa = 'cacamba';
 function telaInicial() { return params.get('sala') ? 'home' : 'modos'; }
@@ -272,6 +288,10 @@ $('modo-presidente').onclick = () => {
 $('modo-domino').onclick = () => {
   escolheModo('domino');
   carregaDomino().catch(() => {});
+};
+$('modo-bazuca').onclick = () => {
+  escolheModo('bazuca');
+  carregaBazuca().catch(() => {});
 };
 $('btn-modos').onclick = () => showScreen('modos');
 
@@ -301,6 +321,19 @@ function carregaDomino() {
   return carregandoDomino;
 }
 const ehDomino = () => view?.modo === 'domino';
+
+// A MESA DO BAZUCA, no mesmo esquema.
+let mesaBazuca = null;
+let carregandoBazuca = null;
+const filaBazuca = [];
+function carregaBazuca() {
+  carregandoBazuca ||= import('./bazuca-mesa.js').then((mod) => {
+    mesaBazuca = mod.criaMesaBazuca(contextoDaMesa());
+    return mesaBazuca;
+  });
+  return carregandoBazuca;
+}
+const ehBazuca = () => view?.modo === 'bazuca';
 $('name-input').value = localStorage.getItem('cacamba-name') || '';
 
 function myNameInput() {
@@ -407,6 +440,7 @@ pintaBotaoPersonagem();
 $('btn-rules-home').onclick = () => {
   if (modoDaCasa === 'presidente') carregaPresidente().then((m) => m.regras()).catch(() => {});
   else if (modoDaCasa === 'domino') carregaDomino().then((m) => m.regras()).catch(() => {});
+  else if (modoDaCasa === 'bazuca') carregaBazuca().then((m) => m.regras()).catch(() => {});
   else showRules();
 };
 
@@ -619,14 +653,21 @@ function renderLobby() {
     list.appendChild(li);
   }
 
-  $('btn-add-bot').hidden = !isHost() || !!cadeiras || lobby.players.length >= DEFAULT_OPTS.maxPlayers;
+  $('btn-add-bot').hidden = !isHost() || !!cadeiras || lobby.players.length >= (MODOS[modoDaSala].max || DEFAULT_OPTS.maxPlayers);
   // o nível dos robôs: quem criou a sala escolhe; os outros só leem. No
   // dominó sempre há robô a caminho (as vagas), então o botão fica à vista.
   const temRobo = !!cadeiras || lobby.players.some((p) => p.isBot), facil = lobby.nivelRobos === 'facil';
   $('btn-nivel-robos').hidden = !temRobo;
   $('btn-nivel-robos').disabled = !isHost();
-  $('btn-nivel-robos').textContent = facil ? 'Robôs: fáceis' : 'Robôs: normais';
-  $('btn-nivel-robos').title = isHost() ? 'Toque para trocar. Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.' : 'Quem criou a sala escolhe o nível dos robôs.';
+  if (modoDaSala === 'bazuca') {
+    // três níveis, e o do meio se chama "médio": no Bazuca o robô é memória
+    const rotulos = { facil: 'fáceis', normal: 'médios', dificil: 'difíceis' };
+    $('btn-nivel-robos').textContent = `Robôs: ${rotulos[lobby.nivelRobos] || 'médios'}`;
+    $('btn-nivel-robos').title = isHost() ? 'Toque para trocar. Fácil esquece quase tudo; médio às vezes acerta; difícil tem boa memória, mas também erra.' : 'Quem criou a sala escolhe o nível dos robôs.';
+  } else {
+    $('btn-nivel-robos').textContent = facil ? 'Robôs: fáceis' : 'Robôs: normais';
+    $('btn-nivel-robos').title = isHost() ? 'Toque para trocar. Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.' : 'Quem criou a sala escolhe o nível dos robôs.';
+  }
   $('btn-start').hidden = !isHost();
   const faltam = MODOS[modoDaSala].min - lobby.players.length;
   $('btn-start').disabled = faltam > 0;
@@ -715,7 +756,11 @@ function desenhaDuplas(cadeiras) {
 }
 
 $('btn-add-bot').onclick = () => sendMsg({ t: 'addBot' });
-$('btn-nivel-robos').onclick = () => sendMsg({ t: 'nivelRobos', nivel: lobby?.nivelRobos === 'facil' ? 'normal' : 'facil' });
+$('btn-nivel-robos').onclick = () => {
+  const niveis = MODOS[lobby?.modo]?.niveis || ['facil', 'normal'];
+  const k = niveis.indexOf(lobby?.nivelRobos);
+  sendMsg({ t: 'nivelRobos', nivel: niveis[(k + 1) % niveis.length] });
+};
 $('btn-start').onclick = () => sendMsg({ t: 'start' });
 
 // O convite. O endereço comprido quebrava em duas linhas na sala; virou um
@@ -1062,6 +1107,12 @@ function renderMesa() {
   if (!view) return;
   $('screen-game').classList.toggle('modo-presidente', ehPresidente());
   $('screen-game').classList.toggle('modo-domino', ehDomino());
+  $('screen-game').classList.toggle('modo-bazuca', ehBazuca());
+  if (ehBazuca()) {
+    mesaBazuca.render();
+    notifyTurn();
+    return;
+  }
   if (ehDomino()) {
     mesaDomino.render();
     notifyTurn();
@@ -1321,6 +1372,7 @@ function renderMeuAssento() {
 function mostraOponente(playerId) {
   if (ehPresidente()) { mesaPresidente.mostraJogador(playerId); return; }
   if (ehDomino()) { mesaDomino.mostraJogador(playerId); return; }
+  if (ehBazuca()) { mesaBazuca.mostraJogador(playerId); return; }
   const p = view.players.find((x) => x.id === playerId);
   if (!p) return;
   const prog = progressoDoContrato(p);
@@ -1443,8 +1495,8 @@ function atualizaBanner() {
     banner.className = 'turn-banner evento';
     return;
   }
-  if (ehPresidente() || ehDomino()) {
-    const t = (ehDomino() ? mesaDomino : mesaPresidente).textoDaVez();
+  if (ehPresidente() || ehDomino() || ehBazuca()) {
+    const t = (ehBazuca() ? mesaBazuca : ehDomino() ? mesaDomino : mesaPresidente).textoDaVez();
     banner.textContent = t.texto;
     banner.className = `turn-banner${t.minha ? ' me' : ''}`;
     return;
@@ -2089,8 +2141,8 @@ $('btn-sort').onclick = () => {
   render();
 };
 
-$('btn-rules').onclick = () => (ehDomino() ? mesaDomino.regras() : ehPresidente() ? mesaPresidente.regras() : showRules());
-$('btn-score').onclick = () => (ehDomino() ? mesaDomino.placar() : ehPresidente() ? mesaPresidente.placar() : showScore());
+$('btn-rules').onclick = () => (ehBazuca() ? mesaBazuca.regras() : ehDomino() ? mesaDomino.regras() : ehPresidente() ? mesaPresidente.regras() : showRules());
+$('btn-score').onclick = () => (ehBazuca() ? mesaBazuca.placar() : ehDomino() ? mesaDomino.placar() : ehPresidente() ? mesaPresidente.placar() : showScore());
 // A mesa em 3D é outra janela para a MESMA partida: entra com a sessão
 // guardada e conversa com o mesmo servidor. A biblioteca dela (three.js) só é
 // baixada quando se abre — a mesa normal continua leve.
@@ -2277,6 +2329,7 @@ let lastTurnWasMine = false;
 function announce(ev) {
   if (ehPresidente() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaPresidente.anuncia(ev); return; }
   if (ehDomino() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaDomino.anuncia(ev); return; }
+  if (ehBazuca() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaBazuca.anuncia(ev); return; }
   switch (ev.e) {
     case 'roundStart':
       distribuirPendente = true;
