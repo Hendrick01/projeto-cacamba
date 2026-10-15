@@ -117,17 +117,24 @@ function carregaBazuca() {
       view: () => view, me, assentos, posicaoDoAssento, monte, descarte, topoDoMonte,
       materialDaCarta, rotulo, trocaRotulo,
       corDe: (id) => CORES_DE_ASSENTO[assentoDe(id) % CORES_DE_ASSENTO.length],
-      lequeDe, pontoDaMaoAtiva, temGesto, gestoCarta,
       botao, aviso, sendAction, enviaAoServidor, souAnfitriao: () => hostId === me(),
       atualizaBotoes: () => montaBotoes(),
-      // compra e descarte da carta comprada dos OUTROS são os gestos de sempre
-      reage: (ev) => reageAoEvento(ev),
       verbo: (id, texto) => { const a = assentos.get(id); if (a) { a.aviso = texto; a.avisoAte = performance.now() + 1800; a.avisoEmote = false; } },
       cara: fazCara,
       palcoDe, cabecalho, linhaDoPlacar, acaoDoPlacar, nomeDe,
     });
   });
   return carregandoBazuca;
+}
+// O QUE CADA MODO HERDA DA MESA DO CAÇAMBA. A mesa base é a do Caçamba; o
+// módulo de um modo diz, em `recursos`, o que dela NÃO é dele — o que não
+// disser, herda. "Cada um deve ter sua independência" (usuário, 15/10/2026):
+// no Bazuca ninguém segura carta, então nada de mão em primeira pessoa nem de
+// leque nas mãos dos personagens.
+//   maoEmPrimeiraPessoa  — as suas mãos segurando o leque, e a pinça na jogada
+//   cartasNaMaoDosOutros — o leque (e o selo da contagem) nas mãos de cada um
+function herda(recurso) {
+  return (bz || pres)?.recursos?.[recurso] ?? true;
 }
 function trataEstado(msg) {
   const primeira = !view;
@@ -1958,9 +1965,12 @@ function sincronizaMao() {
   // vai buscá-la e a traz para o leque. Várias de uma vez é a distribuição.
   if (chegaram.length === 1 && maos.tridi && maos.dir && !gestoPinca) iniciaGestoTraz(chegaram[0]);
   entradaNaMao = null; baixadaDe = null;
-  sincronizaMaos();
-  poeAsMaos(plano, hand);
-  atualizaGestoDaMao();
+  // modo sem mão (o Bazuca): o modelo das mãos nem é baixado
+  if (herda('maoEmPrimeiraPessoa')) {
+    sincronizaMaos();
+    poeAsMaos(plano, hand);
+    atualizaGestoDaMao();
+  }
   mandaPresenca();
 }
 
@@ -2536,10 +2546,11 @@ async function sincroniza(primeira) {
 
       trocaRotulo(a.contagem, `${p.handCount}`);
       trocaRotulo(a.nome, view.claims?.includes(p.id) ? `${p.name} · pediu` : p.name);
-      // No Bazuca as cartas de cada um estão no feltro: na mão só fica a que
-      // ele comprou, enquanto decide — e o selo de contagem não tem o que dizer.
-      const naMao = bz ? bz.naMaoDe(p.id) : p.handCount;
-      a.contagem.visible = !bz;
+      // Modo em que ninguém segura carta (o Bazuca, com tudo no feltro): sem
+      // leque nas mãos e sem o selo da contagem
+      const comLeque = herda('cartasNaMaoDosOutros');
+      const naMao = comLeque ? p.handCount : 0;
+      a.contagem.visible = comLeque;
       // os LEQUE_MAX primeiros filhos são as cartas; o selo fica sempre. Até
       // cinco, a abertura é a de sempre; acima, o leque reabre no mesmo arco
       // com as cartas mais juntas — mão cheia se vê de longe.

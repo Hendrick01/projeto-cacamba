@@ -425,9 +425,14 @@ arquivo; testes em `test/bazuca.test.js`), mesa 2D em `public/bazuca-mesa.js`
   punição em coluna nova, buraco onde a carta saiu), e a grade de cada
   adversário é a dele vista de onde você senta. A sua fica no pé da tela,
   logo acima da barra (que desce até o fim, `--acao-fundo` sem leque); o
-  meio (monte, descarte e a SUA comprada, de cara para cima) vai para trás
-  dela, e o anel dos outros abre o bastante para não encostar (`medidas`). A
-  comprada dos outros fica no leque dele, uma carta só. Toque escolhe, dois
+  meio (monte, descarte e a comprada da vez — a sua de cara para cima, a dos
+  outros virada) vai para trás dela, e o anel dos outros abre o bastante para
+  não encostar (`medidas`). Ninguém segura carta: o módulo declara em
+  `recursos` o que NÃO herda da mesa do Caçamba (`maoEmPrimeiraPessoa`,
+  `cartasNaMaoDosOutros`), e o `mesa3d.js` pergunta por `herda(recurso)` —
+  sem leque nas mãos dos personagens, sem as suas mãos em primeira pessoa
+  (o modelo nem é baixado) e sem gesto de braço. Cada modo tem a sua
+  independência; o que não declarar, herda. Toque escolhe, dois
   toques descartam em cima (ou dão a carta devida), toque no monte compra;
   a carta vira (girando) quando entra ou sai da vista, os lances voam de
   lugar em lugar e o aro em volta da carta diz o que houve (dourado =

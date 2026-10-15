@@ -10,8 +10,10 @@
 //    nova; carta que sai deixa o buraco no lugar. A grade de cada adversário é
 //    a dele vista de onde você senta — a esquerda dele é a sua direita —, e a
 //    face, quando aparece, vem virada para você;
-//  - a carta que você comprou, de cara para cima no meio, ao lado do descarte
-//    (a dos outros fica na mão de quem comprou, no leque dele);
+//  - a carta comprada, no meio, ao lado do descarte, enquanto quem comprou
+//    decide: a sua de cara para cima, a dos outros virada. Aqui ninguém
+//    segura carta — nem os personagens, nem você em primeira pessoa (ver
+//    `recursos`: o que a mesa do Caçamba tem e este modo não herda);
 //  - os botões, a lupa (carta de adversário à vista sai grande na tela), o
 //    grito com o efeito e o som, e o relógio da vez no painel.
 //
@@ -369,17 +371,28 @@ export function criaBazuca3D(ctx) {
   let compradaId = null;
   const pontoDaComprada = () => comprada.position.clone().setY(MESA_TOPO + 0.02);
 
+  // A comprada de quem está decidindo: a sua (a carta), a dos outros
+  // ('virada', que você não vê), ou nenhuma.
+  function compradaDaVez() {
+    const vw = v();
+    if (vw?.phase !== 'play' || vw.etapa !== 'decidir') return null;
+    return vw.you?.comprada || 'virada';
+  }
+  function mostraComprada(c) {
+    comprada.visible = !!c;
+    aroDaComprada.visible = !!c && c !== 'virada';   // o aro é só da sua
+  }
   function arrumaComprada() {
     const z = plano_.zPilhas;
     comprada.position.set(X_COMPRADA, MESA_TOPO + 0.012, z);
     aroDaComprada.position.set(X_COMPRADA, MESA_TOPO + 0.005, z);
-    const c = v().you?.comprada || null;
-    if (idDe(c) !== compradaId) {
-      compradaId = idDe(c);
-      if (c) comprada.material = ctx.materialDaCarta(c);
+    const c = compradaDaVez();
+    const chave = c === 'virada' ? 'virada' : idDe(c);
+    if (chave !== compradaId) {
+      compradaId = chave;
+      if (c) comprada.material = c === 'virada' ? ctx.materialVerso : ctx.materialDaCarta(c);
     }
-    const ok = !!c && !(compradaOcultaAte > performance.now());
-    comprada.visible = ok; aroDaComprada.visible = ok;
+    mostraComprada(compradaOcultaAte > performance.now() ? null : c);
   }
 
   // ---- voos ---------------------------------------------------------------
@@ -427,20 +440,12 @@ export function criaBazuca3D(ctx) {
   }
   function limpaVoos() { for (const o of voos) scene.remove(o.m); voos.length = 0; }
 
-  // de onde sai a carta da mão de alguém (o leque dele, ou a mão do modelo)
-  function maoDe(pid) {
-    const a = ctx.assentos.get(pid);
-    if (!a) return ctx.topoDoMonte();
-    return a.assento?.modelo ? ctx.pontoDaMaoAtiva(a) : ctx.lequeDe(a);
-  }
-  function gesto(pid, tipo, alvo) {
-    const m = ctx.assentos.get(pid)?.assento?.modelo;
-    if (m && !ctx.semMovimento) ctx.gestoCarta(m, tipo, alvo);
-  }
-  // uma carta de uma casa (ou de outro ponto) para o descarte, de cara para cima
-  function vaiAoDescarte(card, de, yaw, esc, atraso = 0) {
+  // Uma carta de uma casa (ou do meio) para o descarte, de cara para cima. A
+  // que estava virada (a comprada de outro) vira no caminho.
+  function vaiAoDescarte(card, de, yaw, esc, atraso = 0, virada = false) {
     const dur = 440;
-    voa(ctx.materialDaCarta(card), { de, para: pontoDoDescarte(), yawDe: yaw, yawPara: 0, escDe: esc, escPara: ctx.ESCALA_TAMPO, dur, atraso });
+    const face = ctx.materialDaCarta(card);
+    voa(virada ? ctx.materialVerso : face, { de, para: pontoDoDescarte(), yawDe: yaw, yawPara: 0, escDe: esc, escPara: ctx.ESCALA_TAMPO, dur, atraso, virarPara: virada ? face : null });
     seguraDescarte(atraso + dur);
   }
   // uma carta virada até uma casa, que só aparece quando ela chega
@@ -724,7 +729,7 @@ export function criaBazuca3D(ctx) {
     quadro(t) {
       animaVoos(t);
       const agora = t;   // o tempo do laço (o mesmo relógio de performance.now)
-      if (compradaOcultaAte && agora >= compradaOcultaAte) { compradaOcultaAte = 0; if (v()?.you?.comprada) { comprada.visible = true; aroDaComprada.visible = true; } }
+      if (compradaOcultaAte && agora >= compradaOcultaAte) { compradaOcultaAte = 0; mostraComprada(compradaDaVez()); }
       for (const g of grades.values()) {
         for (const c of g.casas.values()) {
           if (c.ocultoAte && agora >= c.ocultoAte) c.ocultoAte = 0;
@@ -761,11 +766,10 @@ export function criaBazuca3D(ctx) {
       }
     },
 
-    // a do outro jogador fica na mão dele enquanto ele decide
-    naMaoDe(id) {
-      const vw = v();
-      return vw?.phase === 'play' && vw.etapa === 'decidir' && vw.turnId === id ? 1 : 0;
-    },
+    // O que este modo NÃO herda da mesa do Caçamba: aqui ninguém segura
+    // carta. Sem a sua mão em primeira pessoa (nem a pinça) e sem leque nas
+    // mãos dos personagens — tudo está no feltro.
+    recursos: { maoEmPrimeiraPessoa: false, cartasNaMaoDosOutros: false },
 
     // o que está sob o dedo: uma carta do feltro, a sua comprada ou o monte
     alvo(raycaster, x, y) {
@@ -773,7 +777,7 @@ export function criaBazuca3D(ctx) {
       if (!vw || vw.phase !== 'play') return null;
       const alvos = [];
       for (const g of grades.values()) for (const c of g.casas.values()) if (c.cheio && c.carta.visible) alvos.push(c.carta);
-      if (comprada.visible) alvos.push(comprada);
+      if (comprada.visible && vw.you?.comprada) alvos.push(comprada);
       const comprar = minhaVez() && vw.etapa === 'comprar';
       if (comprar) alvos.push(ctx.monte.caixa);
       const hit = raycaster.intersectObjects(alvos, false)[0];
@@ -879,16 +883,16 @@ export function criaBazuca3D(ctx) {
           anuncia(ev.p === eu ? 'Sorteado: você começa.' : `Sorteado: ${nomeDe(ev.p)} começa.`);
           break;
         case 'comprou':
-          if (ev.p === eu) {
-            // do monte para o meio, virando de cara para cima no caminho
-            pendentes.push(() => {
-              const c = v().you?.comprada;
-              if (!c || ctx.semMovimento) return;
-              voa(ctx.materialVerso, { de: ctx.topoDoMonte(), para: pontoDaComprada(), escDe: ctx.ESCALA_TAMPO, escPara: ESC_COMPRADA, dur: 420, virarPara: ctx.materialDaCarta(c) });
-              compradaOcultaAte = performance.now() + 420;
-              comprada.visible = false; aroDaComprada.visible = false;
-            });
-          } else ctx.reage({ e: 'draw', p: ev.p, source: 'deck' });   // a carta vai para a mão dele
+          // do monte para o meio: a sua vira de cara para cima no caminho; a
+          // dos outros chega virada
+          if (ev.p !== eu) ctx.verbo(ev.p, 'COMPROU');
+          pendentes.push(() => {
+            if (ctx.semMovimento) return;
+            const c = v().you?.comprada;
+            voa(ctx.materialVerso, { de: ctx.topoDoMonte(), para: pontoDaComprada(), escDe: ctx.ESCALA_TAMPO, escPara: ESC_COMPRADA, dur: 420, virarPara: c ? ctx.materialDaCarta(c) : null });
+            compradaOcultaAte = performance.now() + 420;
+            mostraComprada(null);
+          });
           break;
         case 'trocou': {
           const { p, i, card } = ev;
@@ -898,13 +902,10 @@ export function criaBazuca3D(ctx) {
           pendentes.push(() => {
             const lugar = pontoDaCasa(p, i);
             vaiAoDescarte(card, lugar, yawDaCasa(p), escalaDaCasa(p));
-            if (p === eu) {
-              // a sua comprada vai do meio para o lugar, virando para baixo
-              vaiParaCasa(p, i, pontoDaComprada(), { escDe: ESC_COMPRADA, atraso: 140, material: minha ? ctx.materialDaCarta(minha) : ctx.materialVerso, virarPara: ctx.materialVerso });
-            } else {
-              vaiParaCasa(p, i, maoDe(p), { yawDe: yawDaCasa(p), escDe: 0.3, atraso: 140 });
-              gesto(p, 'baixar', lugar);
-            }
+            // a comprada vai do meio para o lugar (a sua virando para baixo)
+            vaiParaCasa(p, i, pontoDaComprada(), { escDe: ESC_COMPRADA, atraso: 140,
+              material: p === eu && minha ? ctx.materialDaCarta(minha) : ctx.materialVerso,
+              virarPara: p === eu && minha ? ctx.materialVerso : null });
           });
           break;
         }
@@ -913,9 +914,11 @@ export function criaBazuca3D(ctx) {
             // o tempo acabou antes de comprar: a carta vai direto do monte
             pendentes.push(() => vaiAoDescarte(ev.card, ctx.topoDoMonte(), 0, ctx.ESCALA_TAMPO));
             ctx.verbo(ev.p, 'DESCARTOU');
-          } else if (ev.p === eu) {
-            pendentes.push(() => vaiAoDescarte(ev.card, pontoDaComprada(), 0, ESC_COMPRADA));
-          } else ctx.reage({ e: 'discard', p: ev.p, card: ev.card });   // sai da mão dele
+          } else {
+            // do meio para o descarte (a dos outros vira no caminho)
+            pendentes.push(() => vaiAoDescarte(ev.card, pontoDaComprada(), 0, ESC_COMPRADA, 0, ev.p !== eu));
+            if (ev.p !== eu) ctx.verbo(ev.p, 'DESCARTOU');
+          }
           if (ev.semPoder) anuncia(`${Nome(ev.p)} descartou ${rot(ev.card)} (sem poder).`);
           break;
         case 'poder':
@@ -943,7 +946,6 @@ export function criaBazuca3D(ctx) {
             const a = pontoDaCasa(p, i), b = pontoDaCasa(alvo, j);
             vaiParaCasa(alvo, j, a, { yawDe: yawDaCasa(p), escDe: escalaDaCasa(p), dur: 560 });
             vaiParaCasa(p, i, b, { yawDe: yawDaCasa(alvo), escDe: escalaDaCasa(alvo), dur: 560 });
-            gesto(p, 'baixar', b);
           });
           break;
         }
@@ -956,7 +958,6 @@ export function criaBazuca3D(ctx) {
           pendentes.push(() => {
             const lugar = pontoDaCasa(p, i);
             vaiAoDescarte(card, lugar, yawDaCasa(p), escalaDaCasa(p));
-            if (ev.quem !== eu) gesto(ev.quem, 'descartar', lugar);
           });
           break;
         }
