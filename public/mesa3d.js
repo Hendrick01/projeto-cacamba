@@ -68,13 +68,6 @@ const voz = criaVoz({
   meuId: () => me(),
   enviar: (to, dados) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'voz', to, dados })); },
 });
-function atualizaBotaoVoz() {
-  const b = document.getElementById('btn-voz');
-  if (!b) return;
-  b.classList.toggle('voz-on', voz.ligado() && !voz.mudo);
-  b.classList.toggle('voz-mudo', voz.ligado() && voz.mudo);
-  b.textContent = !voz.ligado() ? '🎙 voz' : voz.mudo ? '🔇 mudo' : '🎙 falando';
-}
 const controlesVoz = ligaControlesVoz(voz, { botao: $('btn-voz'), avisar: texto => aviso(texto,true) });
 
 let tentouRestaurar = false, versaoCarregada = null;
@@ -82,10 +75,43 @@ function avisaVersaoNova() {
   if (document.getElementById('faixa-versao')) return;
   const b = document.createElement('button');
   b.id = 'faixa-versao'; b.type = 'button'; b.className = 'faixa-versao';
-  b.textContent = '✨ Saiu versão nova do jogo. Toque para atualizar.';
+  b.textContent = 'Saiu versão nova do jogo. Toque para atualizar.';
   b.onclick = () => location.reload();
   document.body.appendChild(b);
 }
+// O PRESIDENTE na 3D (15/10/2026): mesma mesa, mesmo elenco, outra regra. O
+// que muda mora em presidente-3d.js, baixado só quando a sala é dele — como a
+// 2D faz com presidente-mesa.js. Com `pres` nulo, tudo aqui é o Caçamba.
+let pres = null, carregandoPresidente = null;
+function carregaPresidente() {
+  carregandoPresidente ||= import('./presidente-3d.js').then((mod) => {
+    document.title = 'Presidente em 3D';
+    pres = mod.criaPresidente3D({
+      THREE, scene, MESA_TOPO, CARTA_L, CARTA_A, geoCarta, geoSombra, texturaTapete, semMovimento,
+      view: () => view, me, assentos, selecionadas: () => selecionadas,
+      materialDaCarta, sombraDeContato, rotulo, trocaRotulo,
+      corDe: (id) => CORES_DE_ASSENTO[assentoDe(id) % CORES_DE_ASSENTO.length],
+      voa, lequeDe, pontoDaMaoAtiva, temGesto, gestoCarta,
+      botao, aviso, sendAction, enviaAoServidor, souAnfitriao: () => hostId === me(),
+      atualizaMao: () => { sincronizaMao(); montaBotoes(); },
+      // a pinça leva as minhas cartas ao meio (todas, a primeira com a mão)
+      armaPinca: (destino) => { jogadaMinha = { multi: true, destino }; },
+      pincaVaiLevar: () => !semMovimento && !!(maos.tridi && maos.dir),
+      verbo: (id, texto) => { const a = assentos.get(id); if (a) { a.aviso = texto; a.avisoAte = performance.now() + 1800; a.avisoEmote = false; } },
+      cara: fazCara,
+      palcoDe, cabecalho, linhaDoPlacar, acaoDoPlacar, nomeDe,
+    });
+  });
+  return carregandoPresidente;
+}
+function trataEstado(msg) {
+  const primeira = !view;
+  view = msg.view;
+  controlesVoz.presenca(view.players);
+  for (const ev of msg.events || []) reageAoEvento(ev);
+  sincroniza(primeira);
+}
+
 function conecta() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}`);
@@ -95,14 +121,12 @@ function conecta() {
   ws.onmessage = (e) => {
     let msg; try { msg = JSON.parse(e.data); } catch { return; }
     if (msg.t === 'state') {
-      // A mesa 3D ainda é só do Caçamba: sala de Presidente volta para a 2D.
-      if (msg.view?.modo === 'presidente') { location.replace('/'); return; }
-      const primeira = !view;
-      view = msg.view;
-      controlesVoz.presenca(view.players);
-      for (const ev of msg.events || []) reageAoEvento(ev);
-      sincroniza(primeira);
+      // Sala de Presidente: o código dele só é baixado agora, e os estados que
+      // chegarem enquanto ele carrega esperam na mesma fila, em ordem.
+      if (msg.view?.modo === 'presidente' && !pres) { carregaPresidente().then(() => trataEstado(msg)); return; }
+      trataEstado(msg);
     } else if (msg.t === 'lobby') {
+
       // o anfitrião pode mudar no meio (o antigo caiu): o placar aberto ganha
       // ou perde o botão de continuar na hora
       hostId = msg.hostId;
@@ -128,7 +152,7 @@ function conecta() {
       // segundos e depois o corpo dele volta ao repouso sozinho
       presencas.set(msg.from, { sel: msg.sel ?? null, olha: msg.olha ?? null, at: performance.now() });
     } else if (msg.t === 'error') {
-      aviso(`⚠️ ${msg.msg}`);
+      aviso(msg.msg);
     } else if (msg.t === 'gone') {
       // o servidor reiniciou: devolve o retrato da sala, uma vez só
       let selo = null; try { selo = JSON.parse(localStorage.getItem('cacamba-selo')); } catch { /* sem retrato */ }
@@ -967,7 +991,7 @@ const monte = (() => {
   num.position.set(-0.2, MESA_TOPO + 0.2, 0.15);
   num.scale.set(0.3, 0.09, 1);
   scene.add(num);
-  return { caixa, num };
+  return { caixa, num, sombra };
 })();
 
 const descarte = (() => {
@@ -978,7 +1002,7 @@ const descarte = (() => {
   const sombra = sombraDeContato(0.42, 0.55);
   sombra.position.x = 0.2; sombra.position.z = 0;
   scene.add(sombra);
-  return { grupo, topoId: null };
+  return { grupo, topoId: null, sombra };
 })();
 
 const jogosNaMesa = new THREE.Group();
@@ -1107,6 +1131,7 @@ function maoOrdenada() {
     const pos = new Map(ordemManual.map((id, i) => [id, i]));
     return hand.sort((a, b) => (pos.get(a.id) ?? 1e6) - (pos.get(b.id) ?? 1e6));
   }
+  if (pres) return pres.ordena(hand);
   return hand.sort((a, b) => a.suit - b.suit || a.rank - b.rank);
 }
 
@@ -1992,8 +2017,10 @@ window.addEventListener('pointerup', (e) => {
   const { id, ativo } = arrasto3d;
   arrasto3d = null;
   if (!ativo) {
-    // foi toque: seleciona/desseleciona
-    if (selecionadas.has(id)) selecionadas.delete(id);
+    // foi toque: seleciona/desseleciona (no Presidente, já separa o par/trinca)
+    const carta = pres && view?.you?.hand.find((c) => c.id === id);
+    if (carta) pres.toca(carta);
+    else if (selecionadas.has(id)) selecionadas.delete(id);
     else selecionadas.add(id);
     sincronizaMao();
     montaBotoes();
@@ -2125,14 +2152,15 @@ function montaBotoes() {
   if (!view || !view.you) return;
   const minhaVez = view.turnId === me() && (view.phase === 'draw' || view.phase === 'play');
   if (view.phase === 'roundEnd' || view.phase === 'gameEnd') {
-    barra.appendChild(botao(view.phase === 'gameEnd' ? '🏁 Resultado final' : '📋 Placar da rodada', 'primario', abrePlacar));
+    barra.appendChild(botao(view.phase === 'gameEnd' ? 'Resultado final' : 'Placar da rodada', 'primario', abrePlacar));
     return;
   }
+  if (pres) { pres.botoes(barra); return; }
   // o visor de jogos sempre à mão: na mesa cheia é por ele que se lê carta por
   // carta, e com uma carta escolhida é por ele que se encaixa
   if (view.players.some((p) => p.melds?.length)) {
     const comCarta = selecionadas.size === 1 && view.turnId === me() && view.phase === 'play';
-    barra.appendChild(botao(comCarta ? '🃏 Encaixar num jogo' : '🃏 Ver os jogos', comCarta ? 'primario' : 'normal', () => abreVisor(null)));
+    barra.appendChild(botao(comCarta ? 'Encaixar num jogo' : 'Ver os jogos', comCarta ? 'primario' : 'normal', () => abreVisor(null)));
   }
   // compra fora da vez: a mesma regra da mesa normal (carta fresca e
   // comprável no meio, fase de puxar, não é a sua vez)
@@ -2140,7 +2168,7 @@ function montaBotoes() {
     const podePedir = view.phase === 'draw' && view.discardFresh && view.discardBuyable && view.discardTop;
     if (podePedir) {
       const pedi = view.claims.includes(me());
-      barra.appendChild(botao(pedi ? '✓ Pedido feito — toque para desistir' : `🛒 Quero o ${cardLabel(view.discardTop)} do meio`, pedi ? 'normal' : 'primario', () => sendAction({ a: pedi ? 'unclaim' : 'claim' })));
+      barra.appendChild(botao(pedi ? '✓ Pedido feito — toque para desistir' : `Quero o ${cardLabel(view.discardTop)} do meio`, pedi ? 'normal' : 'primario', () => sendAction({ a: pedi ? 'unclaim' : 'claim' })));
     }
     return;
   }
@@ -2389,6 +2417,7 @@ function desenhaPlacar() {
   const corpo = placar.querySelector('.visor-corpo'), acoes = placar.querySelector('.placar-acoes');
   corpo.textContent = ''; acoes.textContent = '';
   if (!view) return;
+  if (pres) { pres.desenhaPlacar(corpo, acoes); return; }
   const souAnfitriao = hostId === me();
   const tabela = document.createElement('table');
   const jogador = (id) => view.players.find((p) => p.id === id);
@@ -2401,21 +2430,20 @@ function desenhaPlacar() {
     tabela.innerHTML = '<tr><th>Jogador</th><th style="text-align:right">Rodada</th><th style="text-align:right">Total</th></tr>';
     for (const p of view.players) {
       const pts = lr.scores?.[p.id];
-      tabela.appendChild(linhaDoPlacar(p, `${lr.winnerId === p.id ? '🏆 ' : ''}${nomeDe(p)}`, lr.winnerId === p.id, pts == null ? '' : `+${pts}`, p.score));
+      tabela.appendChild(linhaDoPlacar(p, `${nomeDe(p)}${lr.winnerId === p.id ? ' · bateu' : ''}`, lr.winnerId === p.id, pts == null ? '' : `+${pts}`, p.score));
     }
     corpo.appendChild(tabela);
     const ultima = view.round + 1 >= view.totalRounds;
     if (souAnfitriao) acoes.appendChild(acaoDoPlacar(ultima ? 'Ver resultado final' : 'Próxima rodada', true, () => enviaAoServidor({ t: 'nextRound' })));
     else { const e = document.createElement('p'); e.className = 'espera'; e.textContent = 'Esperando o anfitrião continuar…'; corpo.appendChild(e); }
   } else if (view.phase === 'gameEnd' && view.ranking?.length) {
-    const medalhas = ['🥇', '🥈', '🥉', '🏳️'];
     const campeao = jogador(view.ranking[0].id);
     if (campeao) corpo.appendChild(palcoDe(campeao));
     corpo.append(...cabecalho('Fim de jogo!', 'Menos pontos ganha — cartas na mão contam contra você.'));
     tabela.innerHTML = '<tr><th>Jogador</th><th style="text-align:right">Pontos</th></tr>';
     view.ranking.forEach((r, i) => {
       const p = jogador(r.id) || r;
-      tabela.appendChild(linhaDoPlacar(p, `${medalhas[i] || ''} ${nomeDe(p)}`, i === 0, r.score));
+      tabela.appendChild(linhaDoPlacar(p, `${i + 1}º ${nomeDe(p)}`, i === 0, r.score));
     });
     corpo.appendChild(tabela);
     if (souAnfitriao) acoes.appendChild(acaoDoPlacar('Jogar de novo', true, () => enviaAoServidor({ t: 'playAgain' })));
@@ -2441,8 +2469,10 @@ async function sincroniza(primeira) {
   if (sincronizando) return;
   sincronizando = true;
   try {
-    $('rot-rodada').textContent = `Rodada ${view.round + 1}/${view.totalRounds}`;
-    $('rot-contrato').textContent = view.contract ? view.contract.label : '—';
+    if (!pres) {
+      $('rot-rodada').textContent = `Rodada ${view.round + 1}/${view.totalRounds}`;
+      $('rot-contrato').textContent = view.contract ? view.contract.label : '—';
+    }
     if (primeira) $('aviso').hidden = true;
 
     const outros = view.players.filter((p) => p.id !== me());
@@ -2466,7 +2496,7 @@ async function sincroniza(primeira) {
       a.naBeirada.rotation.y = -pos.ang;
 
       trocaRotulo(a.contagem, `${p.handCount}`);
-      trocaRotulo(a.nome, view.claims?.includes(p.id) ? `🛒 ${p.name}` : p.name);
+      trocaRotulo(a.nome, view.claims?.includes(p.id) ? `${p.name} · pediu` : p.name);
       // os LEQUE_MAX primeiros filhos são as cartas; o selo fica sempre. Até
       // cinco, a abertura é a de sempre; acima, o leque reabre no mesmo arco
       // com as cartas mais juntas — mão cheia se vê de longe.
@@ -2485,7 +2515,7 @@ async function sincroniza(primeira) {
       }
       a.leque.visible = p.handCount > 0;
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
-      a.proximo = view.players[(view.players.findIndex((q) => q.id === view.turnId) + 1) % view.players.length]?.id === p.id
+      a.proximo = (pres ? pres.proximoId() : view.players[(view.players.findIndex((q) => q.id === view.turnId) + 1) % view.players.length]?.id) === p.id
         && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
       minhaVez = view.turnId === me() && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
       a.apagado = (p.desistiu || (!p.isBot && !p.connected));
@@ -2515,6 +2545,11 @@ async function sincroniza(primeira) {
       }
     }
 
+    // no Presidente não há monte nem meio para comprar: o baralho foi todo
+    // distribuído, e o meio da mesa é a jogada a cobrir (presidente-3d.js)
+    for (const o of [monte.caixa, monte.num, monte.sombra, descarte.grupo, descarte.sombra]) o.visible = !pres;
+    if (pres) pres.sincroniza();
+    else {
     trocaRotulo(monte.num, String(view.deckCount));
     const alturaMonte = Math.max(0.02, Math.min(0.12, view.deckCount * 0.0013));
     monte.caixa.scale.y = alturaMonte / 0.2;
@@ -2570,6 +2605,7 @@ async function sincroniza(primeira) {
         descarteDe = null;
         descarte.grupo.add(base, face);
       }
+    }
     }
 
     // Jogos baixados: cartas DEITADAS no feltro na frente de quem baixou
@@ -2756,7 +2792,10 @@ async function sincroniza(primeira) {
     } else if (placarMostrado) { placarMostrado = null; clearTimeout(placarTimer); fechaPlacar(); }
 
     // aviso da vez
-    if (view.phase === 'draw' || view.phase === 'play') {
+    if (pres) {
+      const texto = pres.textoDaVez();
+      if (texto) aviso(texto, true);
+    } else if (view.phase === 'draw' || view.phase === 'play') {
       if (view.turnId === me()) {
         aviso(view.phase === 'draw' ? 'Sua vez: puxe uma carta.' : 'Baixe ou descarte.', true);
       } else {
@@ -2789,6 +2828,7 @@ function trocaRotulo(sprite, texto, corFundo = 'rgba(27,17,11,0.9)', corTexto = 
 
 // reações: cara e pulo, como na mesa normal
 function reageAoEvento(ev) {
+  pres?.evento(ev);
   if (ev.e === 'roundStart') {
     ordemManual = []; selecionadas.clear();
     jogosVistos.clear();
@@ -2867,19 +2907,22 @@ function reageAoEvento(ev) {
   const feliz = ['baixou', 'swapJoker', 'pegouCoringa'].includes(ev.e)
     || (ev.e === 'roundEnd' && ev.reason === 'bateu');
   const bravo = ev.e === 'claimVoid';
-  if (feliz || bravo) {
-    a.bocas.neutra.visible = false;
-    a.bocas.feliz.visible = feliz;
-    a.bocas.brava.visible = bravo;
-    a.cara?.mostra(feliz ? 'feliz' : 'brava');
-    const m = a.assento?.modelo;
-    if (m) {
-      const qual = feliz ? 'feliz' : 'bravo';
-      reage(m, qual);   // clip e/ou morph, os mesmos do provador
-    }
-    a.caraAte = performance.now() + 1900;
-    a.pulo = performance.now();
-  }
+  if (feliz || bravo) fazCara(alvo, feliz ? 'feliz' : 'bravo');
+}
+
+// a cara (e o pulo) de quem comemora ou se irrita
+function fazCara(id, humor) {
+  const a = assentos.get(id);
+  if (!a) return;
+  const feliz = humor === 'feliz';
+  a.bocas.neutra.visible = false;
+  a.bocas.feliz.visible = feliz;
+  a.bocas.brava.visible = !feliz;
+  a.cara?.mostra(feliz ? 'feliz' : 'brava');
+  const m = a.assento?.modelo;
+  if (m) reage(m, feliz ? 'feliz' : 'bravo');   // clip e/ou morph, os mesmos do provador
+  a.caraAte = performance.now() + 1900;
+  a.pulo = performance.now();
 }
 
 // ---------------------------------------------------------------------------
@@ -3111,12 +3154,14 @@ function quadro(t) {
     // volta a dizer de quem é a vez. Some quando não há nada a dizer.
     {
       if (a.avisoAte && t > a.avisoAte) { a.aviso = null; a.avisoAte = 0; a.avisoEmote = false; }
-      const texto = a.aviso || (a.apagado ? 'FORA' : a.naVez ? 'JOGANDO' : a.proximo ? 'PRÓXIMO' : '');
+      const texto = a.aviso || (a.apagado ? 'FORA' : a.naVez ? 'JOGANDO' : a.marca || (a.proximo ? 'PRÓXIMO' : ''));
       const cor = a.aviso ? (a.avisoEmote ? 'rgba(38,84,124,0.96)' : 'rgba(58,102,74,0.95)') : a.naVez ? 'rgba(207,138,42,0.95)' : 'rgba(27,17,11,0.8)';
       a.estado.visible = !!texto;
       if (texto) trocaRotulo(a.estado, texto, cor, '#fff6e2');
     }
   }
+
+  pres?.quadro();
 
   // a carta do meio chega girando e assenta no lugar de pé
   const face = descarte.grupo.children[1];
@@ -3207,7 +3252,7 @@ function mostraEmote3D(id, k) {
 }
 montaEmotes({
   botao: document.getElementById('btn-emote'),
-  envia: (k) => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'emote', k })); aviso(`💬 ${textoDoEmote(emoteDe(k))}`); },
+  envia: (k) => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'emote', k })); aviso(`Você: ${textoDoEmote(emoteDe(k))}`); },
 });
 
 // para olhar de fora (console), como o provador: os assentos, a cena e a câmera

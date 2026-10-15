@@ -1,12 +1,11 @@
 /* Presidente — o que muda na mesa 2D. Baixado só com o modo (presidente-mesa.js).
    A mesa, os assentos e a mão continuam os do Caçamba (style.css). */
 
-/* Sem monte nem meio para comprar, sem jogos baixados, e sem a mesa 3D, que
-   ainda é só do Caçamba. */
+/* Sem monte nem meio para comprar e sem jogos baixados. A mesa 3D vale para
+   os dois modos (presidente-3d.js). */
 #screen-game.modo-presidente .piles,
 #screen-game.modo-presidente #btn-claim,
-#screen-game.modo-presidente #my-melds,
-#screen-game.modo-presidente #btn-3d { display: none !important; }
+#screen-game.modo-presidente #my-melds { display: none !important; }
 #screen-game:not(.modo-presidente) .pres-centro,
 #screen-game:not(.modo-presidente) .pres-btn { display: none !important; }
 

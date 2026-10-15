@@ -332,8 +332,17 @@ convite (`?sala=`) pula a escolha — a sala já tem modo, e é ela que manda.
   cai numa sala dele: quem joga Caçamba nunca baixa esses arquivos. A mesa
   reaproveita cenário, assentos, leque da mão, cartas, modais e emotes do
   `client.js` (ver `contextoDaMesa`).
-- A mesa 3D ainda é só do Caçamba: `mesa3d.js` manda sala de Presidente de
-  volta para a 2D.
+- `public/presidente-3d.js` é a mesa 3D do Presidente, baixada pelo
+  `mesa3d.js` (`carregaPresidente`) só quando chega uma visão com
+  `modo: 'presidente'`; com `pres` nulo, a 3D é o Caçamba de sempre. Esconde
+  monte e descarte; no meio (z −0,4, para não cair atrás da barra de botões)
+  fica a jogada a cobrir, deitada, com as duas anteriores apagadas por baixo e
+  o tapete na cor de quem jogou; a minha vai ao meio pela pinça. Botões Jogar /
+  Passar / Devolver, título sob o nome de cada um, placa JOGOU / PASSOU / SAIU EM Nº
+  (uma ação por volta); quando a mesa limpa, o lance que a fechou (o 2, ou a
+  última ação da volta) fica 1,5 s por cima antes de o meio ser varrido,
+  e o placar da rodada na caixa da 3D. Para ver: `node test/mesa-qa.mjs 3 3000
+  presidente`.
 
 ## Dominó de ponto (15/10/2026)
 
