@@ -557,7 +557,7 @@ export function criaMesaDomino(ctx) {
           modalDaMao = null;
           ultimaPedra = null;
           ctx.closeModal();
-          if (ev.round > 0) ctx.toast(`🁫 Mão ${ev.round + 1}`);
+          if (ev.round > 0) ctx.toast(`Mão ${ev.round + 1}`);
           break;
         case 'abre': {
           const p = vw.you?.hand.find((x) => x.id === ev.pedraId);
@@ -578,14 +578,14 @@ export function criaMesaDomino(ctx) {
           ctx.reage(ev.p, 'passo');
           break;
         case 'bateu':
-          ctx.toast(`🁫 ${ev.p === eu() ? 'Você bateu' : `${nome(ev.p)} bateu`}! +${ev.pts}`);
+          ctx.toast(`${ev.p === eu() ? 'Você bateu' : `${nome(ev.p)} bateu`}! +${ev.pts}`);
           ctx.reage(ev.p, 'bateu');
           break;
         case 'comprou':
           if (ev.p !== eu()) ctx.toast(`${nome(ev.p)} comprou do dorme (sobram ${ev.resta}).`);
           break;
         case 'trancou':
-          ctx.toast(`🔒 ${ev.p === eu() ? 'Você trancou' : `${nome(ev.p)} trancou`} a mesa: +40 para ${paraTime(1 - timeDe(ev.p))}.`);
+          ctx.toast(`${ev.p === eu() ? 'Você trancou' : `${nome(ev.p)} trancou`} a mesa: +40 para ${paraTime(1 - timeDe(ev.p))}.`);
           ctx.reage(ev.p, 'trancou');
           break;
         default:

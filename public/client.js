@@ -5,7 +5,7 @@
 import { arteDaCarta } from './baralho.js';
 import {
   planBaixada, layoffOption, layoffEnds, removableCards, SUITS, SUIT_NAMES, SUIT_RED, rankLabel,
-  isJoker, JOKER_LABEL, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
+  isJoker, coringaNaSequencia, cardCobreCoringa, SWAP_JOKER_SAME_TURN,
   DEFAULT_OPTS, sobraFechaJogo, coringaLiberadoPeloEncaixe, trocasNaTrinca,
   CONTRACTS as CONTRATOS, TOTAL_ROUNDS,
 } from '/shared/engine.js';
@@ -151,7 +151,7 @@ function handleMessage(msg) {
         if (filaPresidente.length === 1) {
           carregaPresidente()
             .then(() => { const fila = filaPresidente.splice(0); for (const m of fila) handleMessage(m); })
-            .catch(() => { filaPresidente.length = 0; toast('⚠️ Não deu para abrir a mesa do Presidente. Recarregue a página.'); });
+            .catch(() => { filaPresidente.length = 0; toast('Não deu para abrir a mesa do Presidente. Recarregue a página.'); });
         }
         break;
       }
@@ -160,7 +160,7 @@ function handleMessage(msg) {
         if (filaDomino.length === 1) {
           carregaDomino()
             .then(() => { const fila = filaDomino.splice(0); for (const m of fila) handleMessage(m); })
-            .catch(() => { filaDomino.length = 0; toast('⚠️ Não deu para abrir a mesa do Dominó. Recarregue a página.'); });
+            .catch(() => { filaDomino.length = 0; toast('Não deu para abrir a mesa do Dominó. Recarregue a página.'); });
         }
         break;
       }
@@ -180,7 +180,7 @@ function handleMessage(msg) {
       mostraEmote(msg.from, msg.k);
       break;
     case 'error':
-      toast(`⚠️ ${msg.msg}`);
+      toast(msg.msg);
       break;
     case 'gone':
       // o servidor reiniciou e não conhece a sala: devolve o retrato que ele
@@ -205,7 +205,7 @@ function avisaVersaoNova() {
   if (document.getElementById('faixa-versao')) return;
   const b = document.createElement('button');
   b.id = 'faixa-versao'; b.type = 'button'; b.className = 'faixa-versao';
-  b.textContent = '✨ Saiu versão nova do jogo. Toque para atualizar.';
+  b.textContent = 'Saiu versão nova do jogo. Toque para atualizar.';
   b.onclick = () => location.reload();
   document.body.appendChild(b);
 }
@@ -433,7 +433,7 @@ function desenhaLoja() {
     // vez de promessa. Enquanto não estiver à venda, o item mostra o símbolo.
     const arte = item.arquivo && item.estado === 'a-venda'
       ? `<img class="loja-arte" src="${item.arquivo}" alt="" loading="lazy">`
-      : `<span class="loja-arte loja-arte-vazia" aria-hidden="true">${item.tipo === 'cenario' ? '🪑' : '🂠'}</span>`;
+      : `<span class="loja-arte loja-arte-vazia" aria-hidden="true"></span>`;
     return `<li class="loja-item ${item.estado}">
       ${arte}
       <div class="loja-texto">
@@ -628,8 +628,19 @@ function renderLobby() {
   $('btn-nivel-robos').textContent = facil ? 'Robôs: fáceis' : 'Robôs: normais';
   $('btn-nivel-robos').title = isHost() ? 'Toque para trocar. Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.' : 'Quem criou a sala escolhe o nível dos robôs.';
   $('btn-start').hidden = !isHost();
-  $('btn-start').disabled = lobby.players.length < MODOS[modoDaSala].min;
+  const faltam = MODOS[modoDaSala].min - lobby.players.length;
+  $('btn-start').disabled = faltam > 0;
   $('lobby-wait').hidden = isHost();
+  // Botão apagado sem dizer por quê parecia defeito: o motivo fica escrito.
+  let motivo = '';
+  if (isHost() && faltam > 0) {
+    motivo = `${MODOS[modoDaSala].nome} precisa de pelo menos ${MODOS[modoDaSala].min} jogadores: `
+      + `falta${faltam > 1 ? 'm' : ''} ${faltam}. Adicione um robô ou mande o convite.`;
+  } else if (!isHost() && temRobo) {
+    motivo = 'Quem criou a sala escolhe o nível dos robôs.';
+  }
+  $('lobby-motivo').textContent = motivo;
+  $('lobby-motivo').hidden = !motivo;
 }
 
 // As cadeiras do dominó. No 2v2 são duas duplas, cadeiras 1 e 3 contra 2 e 4;
@@ -835,9 +846,7 @@ function cardEl(card, mini = false) {
   // O naipe deixou de ser texto, então a carta precisa dizer em palavras o que
   // é: sem isto o leitor de tela passava a ler um retângulo mudo.
   el.setAttribute('role', 'img');
-  el.setAttribute('aria-label', joker
-    ? 'coringa'
-    : `${rankLabel(card.rank)} de ${SUIT_NAMES[card.suit]}`);
+  el.setAttribute('aria-label', cartaFalada(card));
   // Os dois cantos são o mesmo desenho; o de baixo é o de cima girado meia
   // volta, como em qualquer baralho — é o que faz a carta ler como carta e
   // não como etiqueta.
@@ -858,8 +867,13 @@ function cardEl(card, mini = false) {
   return el;
 }
 
+// A carta em palavras, para o leitor de tela: "7 de copas", e não "7♥".
+function cartaFalada(card) {
+  return isJoker(card) ? 'coringa' : `${rankLabel(card.rank)} de ${SUIT_NAMES[card.suit]}`;
+}
+
 function cardText(card) {
-  return isJoker(card) ? `${JOKER_LABEL} coringa` : rankLabel(card.rank) + SUITS[card.suit];
+  return isJoker(card) ? 'coringa' : rankLabel(card.rank) + SUITS[card.suit];
 }
 
 // Rótulo de um valor de sequência (14 = Ás alto) com o naipe do jogo
@@ -910,10 +924,9 @@ function noJogoDe(meld) {
   return dono.id === me() ? 'no seu jogo' : `no jogo de ${escapeHTML(dono.name)}`;
 }
 
-// Na listagem de um jogo o coringa é só o símbolo: "5♠ 6♠ 🃏 8♠" lê melhor
-// que "5♠ 6♠ 🃏 coringa 8♠".
+// Na listagem de um jogo o coringa é só a palavra: "5♠ 6♠ coringa 8♠".
 function cartasDoJogo(meld) {
-  return meld.cards.map((c) => (isJoker(c) ? JOKER_LABEL : cardText(c))).join(' ');
+  return meld.cards.map((c) => cardText(c)).join(' ');
 }
 
 function descreveDestino({ meld, opt }) {
@@ -1015,7 +1028,37 @@ function mandaPresenca() {
   presencaTimer = setTimeout(() => { presencaEnviada = chave; sendMsg({ t: 'presenca', sel: sel >= 0 ? sel : null, olha: null }); }, 150);
 }
 
+// Cada estado novo redesenha a mesa, e o elemento com foco some junto: quem
+// joga pelo teclado voltava para o começo da página a cada jogada de robô.
+// Antes de redesenhar anota-se QUEM tinha o foco (id, ou carta/jogo dentro
+// de que caixa); depois o foco volta para o equivalente, se ele ainda existir.
+function anotaFoco() {
+  const a = document.activeElement;
+  if (!a || a === document.body || !$('screen-game').contains(a)) return null;
+  if (a.id) return `#${CSS.escape(a.id)}`;
+  const caixa = a.parentElement?.closest('[id]');
+  if (!caixa) return null;
+  if (a.dataset.cardId) return `#${CSS.escape(caixa.id)} [data-card-id="${a.dataset.cardId}"]`;
+  if (a.dataset.meldId) return `#${CSS.escape(caixa.id)} [data-meld-id="${a.dataset.meldId}"]`;
+  return null;
+}
+function devolveFoco(seletor) {
+  if (!seletor || !$('modal-backdrop').hidden) return;
+  if (document.activeElement && document.activeElement !== document.body) return;
+  // a carta que tinha o foco pode ter saído dela (veio para a mão, foi
+  // descartada): o foco cai na mão, que é de onde sai a próxima jogada
+  const alvo = document.querySelector(seletor);
+  const destino = alvo && alvo.tabIndex >= 0 && !alvo.disabled ? alvo : document.querySelector('#hand [tabindex="0"]');
+  destino?.focus({ preventScroll: true });
+}
+
 function render() {
+  const foco = anotaFoco();
+  renderMesa();
+  devolveFoco(foco);
+}
+
+function renderMesa() {
   if (!view) return;
   $('screen-game').classList.toggle('modo-presidente', ehPresidente());
   $('screen-game').classList.toggle('modo-domino', ehDomino());
@@ -1200,8 +1243,14 @@ function atualizaAssento(el, p, lugar) {
   const marcas = el.querySelector('.marcas');
   marcas.innerHTML = '';
   const prog = progressoDoContrato(p);
-  if (prog) marcas.appendChild(marca(prog.completo ? '✔' : prog.texto, 'm-gold'));
-  if (view.claims?.includes(p.id)) marcas.appendChild(marca('🛒', 'm-cart'));
+  if (prog) marcas.appendChild(marca(prog.completo ? '✓' : prog.texto, 'm-gold'));
+  if (view.claims?.includes(p.id)) {
+    // o carrinho desenhado (#i-carrinho), como no botão de pedir
+    const carrinho = marca('', 'm-cart');
+    carrinho.innerHTML = '<svg class="ico" aria-hidden="true"><use href="#i-carrinho"/></svg>';
+    carrinho.title = 'Pediu a carta do meio';
+    marcas.appendChild(carrinho);
+  }
   if (p.desistiu) marcas.appendChild(marca('saiu', 'm-off'));
   else if (!p.isBot && !p.connected) marcas.appendChild(marca('fora', 'm-off'));
 
@@ -1283,7 +1332,7 @@ function mostraOponente(playerId) {
     `<h3>${escapeHTML(p.name)}${naVez(p) ? ' — é a vez dele' : ''}</h3>`,
     `<p>${p.handCount} carta${p.handCount === 1 ? '' : 's'} na mão · ${situacao}</p>`,
   ];
-  if (view.claims.includes(p.id)) linhas.push('<p>🛒 Pediu a carta do meio.</p>');
+  if (view.claims.includes(p.id)) linhas.push('<p>Pediu a carta do meio.</p>');
   if (p.desistiu) linhas.push('<p class="modal-hint">Saiu da partida — o robô joga o resto por ele.</p>');
   else if (!p.isBot && !p.connected) linhas.push('<p class="modal-hint">Está fora no momento — se demorar, o jogo segue por ele.</p>');
   showModal(
@@ -1438,6 +1487,21 @@ function emptyCard() {
   return el;
 }
 
+// Carta mini (ou jogo inteiro) que virou alvo de toque: o teclado tem de
+// chegar nela como chega nas cartas da mão — Tab, e Enter ou Espaço aciona.
+// O rótulo diz o que o toque FAZ, não só que carta é.
+function acionavel(el, rotulo) {
+  el.setAttribute('role', 'button');
+  el.tabIndex = 0;
+  if (rotulo) el.setAttribute('aria-label', rotulo);
+  el.onkeydown = (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    e.stopPropagation(); // a carta dentro do jogo não aciona o jogo também
+    el.click();
+  };
+}
+
 function meldEl(meld, mini) {
   const el = document.createElement('div');
   el.className = 'meld';
@@ -1464,6 +1528,7 @@ function decorateMeld(el, meld) {
     for (const ce of el.children) {
       if (Number(ce.dataset.cardId) !== troca.info.joker.id) continue;
       ce.classList.add('swappable');
+      acionavel(ce, `Trocar o coringa deste jogo`);
       ce.onclick = (e) => {
         e.stopPropagation();
         abrirTrocaCoringa(meld.id);
@@ -1477,6 +1542,7 @@ function decorateMeld(el, meld) {
     for (const ce of el.children) {
       if (rem.includes(Number(ce.dataset.cardId))) {
         ce.classList.add('removable');
+        acionavel(ce, `Descartar ${cartaFalada(meld.cards.find((c) => c.id === Number(ce.dataset.cardId)))} deste jogo`);
         ce.onclick = () => {
           meldDiscardMode = false;
           sendAction({ a: 'meldDiscard', meldId: meld.id, cardId: Number(ce.dataset.cardId) });
@@ -1498,6 +1564,7 @@ function decorateMeld(el, meld) {
       if (!ce) continue;
       ce.classList.add('puxavel');
       ce.title = `Baixar com ${cardText(sobra)}`;
+      acionavel(ce, `Baixar com ${cartaFalada(sobra)}`);
       ce.onclick = (e) => {
         e.stopPropagation();
         sendAction({ a: 'baixar', cardIds: [...selected], sobra: { meldId: meld.id, cardId: sobra.id } });
@@ -1510,6 +1577,7 @@ function decorateMeld(el, meld) {
       if (!ce) continue;
       ce.classList.add('puxavel', 'para-mao');
       ce.title = `Trazer ${cardText(sobra)} para a mão`;
+      acionavel(ce, `Trazer ${cartaFalada(sobra)} para a mão`);
       ce.onclick = (e) => {
         e.stopPropagation();
         sendAction({ a: 'tomarSobra', meldId: meld.id, cardId: sobra.id });
@@ -1529,6 +1597,7 @@ function decorateMeld(el, meld) {
         if (!alvo || isJoker(alvo)) continue;
         ce.classList.add('puxavel');
         ce.title = `Trocar ${cardText(alvo)} pelo seu coringa`;
+        acionavel(ce, `Trocar ${cartaFalada(alvo)} pelo seu coringa`);
         ce.onclick = (e) => {
           e.stopPropagation();
           sendAction({ a: 'trocarPorCoringa', meldId: meld.id, cardId: alvo.id, coringaId: escolhida.id });
@@ -1543,6 +1612,7 @@ function decorateMeld(el, meld) {
     const card = view.you.hand.find((c) => c.id === [...selected][0]);
     if (card && layoffOption(card, meld)) {
       el.classList.add('droppable');
+      acionavel(el, `Encaixar ${cartaFalada(card)} neste jogo`);
       el.onclick = () => {
         // Coringa entra nas duas pontas (e um Ás pode servir nas duas também):
         // quando as duas valem, quem escolhe é o jogador.
@@ -1561,6 +1631,7 @@ function decorateMeld(el, meld) {
         if (!ce) continue;
         ce.classList.add('trocavel');
         ce.title = `Pôr ${cardText(card)} no lugar de ${cardText(sai)} e trazer ${cardText(sai)} para a mão`;
+        acionavel(ce, `Pôr ${cartaFalada(card)} no lugar de ${cartaFalada(sai)} e trazer ${cartaFalada(sai)} para a mão`);
         ce.onclick = (e) => {
           e.stopPropagation();
           selected.clear();
@@ -1585,11 +1656,11 @@ function encaixa(card, meld, end) {
   showModal(
     `<h3>Pegar o coringa?</h3>
      <p>Com <strong>${cardText(card)}</strong> ${noJogoDe(meld)}, a sequência fica com uma carta a mais — e o
-     ${JOKER_LABEL} da outra ponta passa a sobrar. Dá para trazer ele para a sua mão.</p>
+     coringa da outra ponta passa a sobrar. Dá para trazer ele para a sua mão.</p>
      <p class="modal-hint">Ele vale 20 pontos na mão no fim da rodada: só compensa se você for usar.</p>`,
     [
       {
-        label: `${JOKER_LABEL} Encaixar e pegar o coringa`,
+        label: 'Encaixar e pegar o coringa',
         cls: 'btn-primary',
         fn: () => {
           closeModal();
@@ -1741,7 +1812,7 @@ function montaLeque(fila, cartas, largura) {
     el.style.setProperty('--passo', `${passo - carta}px`);
     el.style.setProperty('--giro', n > 1 ? `${(i - meio) * (8 / (n - 1))}deg` : '0deg');
     el.setAttribute('role','button'); el.tabIndex = 0;
-    el.setAttribute('aria-label', cardText(card));
+    el.setAttribute('aria-label', cartaFalada(card));
     el.setAttribute('aria-pressed', String(selected.has(card.id)));
     el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } });
     if (cartasNovas.has(card.id)) el.classList.add('nova');
@@ -1953,8 +2024,8 @@ $('discard-pile').onclick = () => {
   if (!myTurn() || view.phase !== 'draw' || !view.discardTop) return;
   if (!view.discardBuyable) {
     toast(view.discardTop.by === me()
-      ? '↩️ Essa carta foi você que descartou: ela não volta para a sua mão.'
-      : '🔒 Coringa descoberto: o meio está travado até alguém descartar por cima.');
+      ? 'Essa carta foi você que descartou: ela não volta para a sua mão.'
+      : 'Coringa descoberto: o meio está travado até alguém descartar por cima.');
     return;
   }
   sendAction({ a: 'draw', source: 'discard' });
@@ -2212,7 +2283,7 @@ function announce(ev) {
       // O anúncio já diz a rodada e o contrato; o aviso fica só com o que ele
       // não diz — de quem é a primeira vez.
       anunciaRodada(ev.round);
-      toast(`🎴 ${playerName(ev.first)} começa.`);
+      toast(`${playerName(ev.first)} começa.`);
       meldDiscardMode = false;
       // Os ids das cartas recomeçam a cada rodada: seleção antiga poderia
       // "grudar" numa carta nova por coincidência de id e armar um descarte
@@ -2229,15 +2300,15 @@ function announce(ev) {
       }
       break;
     case 'claim':
-      if (ev.p !== me()) toast(`🛒 ${playerName(ev.p)} quer a carta do meio.`);
+      if (ev.p !== me()) toast(`${playerName(ev.p)} quer a carta do meio.`);
       reage(ev.p, 'pediu');
       break;
     case 'claimVoid':
-      if (ev.losers.includes(me())) toast(`😅 ${playerName(ev.by)} estava na vez e ficou com ${cardText(ev.card)}.`);
+      if (ev.losers.includes(me())) toast(`${playerName(ev.by)} estava na vez e ficou com ${cardText(ev.card)}.`);
       for (const perdedor of ev.losers || []) reage(perdedor, 'perdeu');
       break;
     case 'buy':
-      toast(`🛒 ${playerName(ev.p)} pediu primeiro e levou ${cardText(ev.card)}.`);
+      toast(`${playerName(ev.p)} pediu primeiro e levou ${cardText(ev.card)}.`);
       reage(ev.p, 'levou');
       break;
     case 'baixou': {
@@ -2250,17 +2321,17 @@ function announce(ev) {
       if (ev.extraS) extras.push(conta(ev.extraS, 'sequência', 'sequências'));
       const nome = playerName(ev.p);
       if (ev.completa && !pedacos.length && extras.length) {
-        toast(`🔻 ${nome} baixou ${extras.join(' e ')} a mais.`);
+        toast(`${nome} baixou ${extras.join(' e ')} a mais.`);
       } else if (ev.completa) {
-        toast(`🔻 ${nome} baixou o jogo!${extras.length ? ` E ${extras.join(' e ')} a mais.` : ''}`);
+        toast(`${nome} baixou o jogo!${extras.length ? ` E ${extras.join(' e ')} a mais.` : ''}`);
       } else if (pedacos.length || extras.length) {
         const tudo = [...pedacos, ...(extras.length ? [`${extras.join(' e ')} a mais`] : [])];
-        toast(`🔻 ${nome} baixou ${tudo.join(' e ')}.`);
+        toast(`${nome} baixou ${tudo.join(' e ')}.`);
       } else {
-        toast(`🔻 ${nome} baixou o jogo!`);
+        toast(`${nome} baixou o jogo!`);
       }
       if (ev.daMesa) {
-        toast(`🤏 ${playerName(ev.p)} puxou ${cardText(ev.daMesa)} que sobrava ${ev.deQuem === me() ? 'de um jogo seu' : 'da mesa'} e baixou com ela.`);
+        toast(`${playerName(ev.p)} puxou ${cardText(ev.daMesa)} que sobrava ${ev.deQuem === me() ? 'de um jogo seu' : 'da mesa'} e baixou com ela.`);
       }
       reage(ev.p, 'baixou');
       break;
@@ -2270,7 +2341,7 @@ function announce(ev) {
       else if (ev.coringaMudouDePonta) toast('O coringa mudou de ponta para a sua carta caber.');
       break;
     case 'pegouCoringa':
-      toast(`${JOKER_LABEL} ${playerName(ev.p)} esticou a sequência e levou o coringa que sobrou.`);
+      toast(`${playerName(ev.p)} esticou a sequência e levou o coringa que sobrou.`);
       reage(ev.p, 'coringa');
       break;
     case 'meldDiscard': {
@@ -2281,33 +2352,33 @@ function announce(ev) {
     }
     case 'trocouNaTrinca': {
       const dono = ev.deQuem === me() ? 'numa trinca SUA' : (ev.deQuem === ev.p ? 'na própria trinca' : `numa trinca de ${playerName(ev.deQuem)}`);
-      toast(`🔁 ${playerName(ev.p)} pôs ${cardText(ev.entra)} no lugar de ${cardText(ev.sai)} ${dono} e levou ${cardText(ev.sai)} para a mão.`);
+      toast(`${playerName(ev.p)} pôs ${cardText(ev.entra)} no lugar de ${cardText(ev.sai)} ${dono} e levou ${cardText(ev.sai)} para a mão.`);
       break;
     }
     case 'tomouSobra': {
       const dono = ev.deQuem === me() ? 'de um jogo SEU' : (ev.deQuem === ev.p ? 'de um jogo próprio' : `de um jogo de ${playerName(ev.deQuem)}`);
-      toast(`🤏 ${playerName(ev.p)} levou ${cardText(ev.card)} ${dono} para a mão.`);
+      toast(`${playerName(ev.p)} levou ${cardText(ev.card)} ${dono} para a mão.`);
       if (ev.deQuem === me() && ev.p !== me()) reage(me(), 'perdeu');
       break;
     }
     case 'swapJoker':
-      toast(`${JOKER_LABEL} ${playerName(ev.p)} pôs ${cardText(ev.card)} no lugar do coringa.`);
+      toast(`${playerName(ev.p)} pôs ${cardText(ev.card)} no lugar do coringa.`);
       reage(ev.p, 'coringa');
       break;
     case 'desistiu':
       voz.remover(ev.p);
-      toast(`🚪 ${playerName(ev.p)} saiu da partida — o robô assume o lugar.`);
+      toast(`${playerName(ev.p)} saiu da partida — o robô assume o lugar.`);
       reage(ev.p, 'saiu');
       break;
     case 'away':
-      toast(`📴 ${playerName(ev.p)} caiu — o jogo joga por ${ev.p === me() ? 'você' : 'ele'} até voltar.`);
+      toast(`${playerName(ev.p)} caiu — o jogo joga por ${ev.p === me() ? 'você' : 'ele'} até voltar.`);
       break;
     case 'reshuffle':
-      toast('🔄 O monte acabou — o meio foi embaralhado de volta.');
+      toast('O monte acabou — o meio foi embaralhado de volta.');
       break;
     case 'roundEnd':
-      if (ev.reason === 'bateu') { toast(`🏆 ${playerName(ev.winnerId)} bateu!`); reage(ev.winnerId, 'bateu'); }
-      else toast('🪦 O monte esgotou — a rodada terminou sem vencedor.');
+      if (ev.reason === 'bateu') { toast(`${playerName(ev.winnerId)} bateu!`); reage(ev.winnerId, 'bateu'); }
+      else toast('O monte esgotou — a rodada terminou sem vencedor.');
       break;
   }
 }
@@ -2338,7 +2409,7 @@ function notifyTurn() {
     // Só depois de um toque de verdade: antes disso o Chrome recusa e registra
     // um erro no console a cada chamada (77 numa partida dirigida por script).
     try { if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.(80); } catch { /* ok */ }
-    document.title = '🟡 Sua vez! — Caçamba';
+    document.title = 'Sua vez! — Caçamba';
   } else if (!mine) {
     document.title = 'Caçamba';
   }
@@ -2359,12 +2430,60 @@ function showModal(bodyHTML, actions = [], onclose = null, empilhado = false) {
     b.onclick = a.fn;
     box.appendChild(b);
   }
-  $('modal-backdrop').hidden = false;
-  $('modal-backdrop').onclick = (e) => {
-    if (e.target === $('modal-backdrop') && onclose) onclose();
+  const fundo = $('modal-backdrop');
+  // Quem abriu guarda o foco para recebê-lo de volta; um modal que troca de
+  // conteúdo aberto (placar sobre placar) não esquece quem o abriu.
+  if (fundo.hidden) focoAntesDoModal = document.activeElement;
+  modalAoFechar = onclose;
+  const titulo = $('modal-body').querySelector('h1, h2, h3');
+  if (titulo) { titulo.id = 'modal-titulo'; $('modal').setAttribute('aria-labelledby', 'modal-titulo'); }
+  else $('modal').removeAttribute('aria-labelledby');
+  fundo.hidden = false;
+  fundo.onclick = (e) => {
+    if (e.target === fundo && modalAoFechar) modalAoFechar();
   };
+  // O foco entra no primeiro controle — menos no de perigo ("Sair da
+  // partida"), para um Enter distraído não confirmar o que não se quis. Sem
+  // rolar: num texto longo (as regras) o "Fechar" fica no fim, e a leitura
+  // começa do começo.
+  const controles = focaveisDoModal();
+  (controles.find((c) => !c.classList.contains('btn-danger')) || controles[0] || $('modal')).focus({ preventScroll: true });
 }
-function closeModal() { $('modal-backdrop').hidden = true; }
+function closeModal() {
+  const fundo = $('modal-backdrop');
+  if (fundo.hidden) return;
+  fundo.hidden = true;
+  modalAoFechar = null;
+  const volta = focoAntesDoModal;
+  focoAntesDoModal = null;
+  if (volta?.isConnected && !volta.disabled) volta.focus();
+}
+
+let modalAoFechar = null;
+let focoAntesDoModal = null;
+function focaveisDoModal() {
+  return [...$('modal').querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter((c) => !c.disabled && !c.hidden && c.getClientRects().length);
+}
+// Esc fecha (quando o modal se deixa fechar pelo fundo) e o Tab dá a volta
+// dentro dele: com o modal aberto, a mesa por trás não é lugar para o foco.
+document.addEventListener('keydown', (e) => {
+  if ($('modal-backdrop').hidden) return;
+  if (e.key === 'Escape') {
+    if (modalAoFechar) { e.preventDefault(); modalAoFechar(); }
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  const controles = focaveisDoModal();
+  if (!controles.length) { e.preventDefault(); $('modal').focus(); return; }
+  const primeiro = controles[0], ultimo = controles[controles.length - 1];
+  const dentro = $('modal').contains(document.activeElement);
+  if (e.shiftKey && (!dentro || document.activeElement === primeiro || document.activeElement === $('modal'))) {
+    e.preventDefault(); ultimo.focus();
+  } else if (!e.shiftKey && (!dentro || document.activeElement === ultimo)) {
+    e.preventDefault(); primeiro.focus();
+  }
+});
 
 let modalPhaseShown = null;
 
@@ -2398,7 +2517,7 @@ function linhaDoPlacar(p, pts, total, venceu) {
   return `<tr class="${venceu ? 'winner' : ''}">
     <td><span class="quem">
       <img class="avatar" src="${caraDe(personagemDe(p.id, view.players))}" alt="" width="26" height="26" style="--anel:${cor}">
-      <span>${venceu ? '🏆 ' : ''}${escapeHTML(playerName(p.id))}</span>
+      <span>${escapeHTML(playerName(p.id))}</span>
     </span></td>
     <td class="num">${pts === null ? '' : `+${pts}`}</td>
     <td class="num">${total}</td>
@@ -2444,12 +2563,11 @@ function figuraFeliz(playerId) {
 }
 
 function showGameEnd() {
-  const medals = ['🥇', '🥈', '🥉', '🏳️'];
   const rows = view.ranking.map((r, i) => {
     const cor = CORES_DE_ASSENTO[assentoDe(r.id, view.players) % CORES_DE_ASSENTO.length];
     return `<tr class="${i === 0 ? 'winner' : ''}"><td><span class="quem">
       <img class="avatar" src="${caraDe(personagemDe(r.id, view.players))}" alt="" width="26" height="26" style="--anel:${cor}">
-      <span>${medals[i] || ''} ${escapeHTML(r.id === me() ? 'Você' : r.name)}</span>
+      <span>${i + 1}º ${escapeHTML(r.id === me() ? 'Você' : r.name)}</span>
     </span></td><td class="num">${r.score}</td></tr>`;
   }).join('');
   const campeao = view.ranking[0];
@@ -2533,13 +2651,13 @@ function showRules() {
        <li><strong>Quarta carta na trinca:</strong> só de um <strong>naipe que já está nela</strong>. Numa trinca de ♠ ♥ ♣ entra outro ♠, ♥ ou ♣ — nunca o ♦.</li>
        <li><strong>Troca na trinca:</strong> uma carta da mão do <strong>mesmo valor</strong> pode entrar <strong>no lugar</strong> de uma carta da trinca, que vem para a sua mão — sem passar a vez, e em trinca de qualquer jogador. A trinca tem de continuar com 3 naipes diferentes. É assim que o 5♦ entra numa trinca de ♠ ♥ ♣: no lugar do 5♠, que sai para você usar em outro jogo. Escolha a carta na mão e toque na carta da trinca marcada em azul.</li>
      </ul>
-     <h3>Coringa ${JOKER_LABEL}</h3>
+     <h3>Coringa</h3>
      <ul>
        <li>Vale <strong>só em sequência</strong> (nunca em trinca), no máximo <strong>1 por sequência</strong>.</li>
        <li>Nas rodadas só de trincas (1ª e 4ª) ele <strong>fica fora do baralho</strong>.</li>
        <li>Na sua vez, quem tem a <strong>carta exata</strong> que o coringa representa pode trocá-lo em qualquer sequência da mesa: a carta entra no lugar e o coringa <strong>vem para a mão</strong>.</li>
        <li>O coringa da mão também pode entrar <strong>no lugar de qualquer carta</strong> de uma sequência já baixada: a carta sai para a sua mão e a sequência não muda.</li>
-       <li>Coringa <strong>na ponta muda de ponta</strong>: em ${JOKER_LABEL}‑8‑9‑10 o coringa vale 7, mas se você tem o Q ele passa para o outro lado (8‑9‑10‑${JOKER_LABEL}) e o Q encaixa. Só acontece quando a sua carta não cabe de outro jeito.</li>
+       <li>Coringa <strong>na ponta muda de ponta</strong>: em coringa‑8‑9‑10 o coringa vale 7, mas se você tem o Q ele passa para o outro lado (8‑9‑10‑coringa) e o Q encaixa. Só acontece quando a sua carta não cabe de outro jeito.</li>
        <li>Coringa descartado <strong>tranca o meio</strong>: ninguém compra do descarte até alguém descartar por cima.</li>
        <li>Na mão ao fim da rodada, custa <strong>20 pontos</strong>.</li>
      </ul>

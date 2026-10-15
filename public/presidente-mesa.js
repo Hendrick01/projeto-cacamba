@@ -12,7 +12,6 @@
 import { forca, motivoDaRecusa, TITULOS, rotulo } from '/shared/presidente.js';
 
 const QTD = ['', 'uma carta', 'um par', 'uma trinca', 'uma quadra'];
-const SELO = { presidente: '👑', vice: '🎩', neutro: '', 'vice-cu': '🥄', cu: '💩' };
 
 export function criaMesaPresidente(ctx) {
   const { $ } = ctx;
@@ -86,7 +85,7 @@ export function criaMesaPresidente(ctx) {
       if (p.saiu >= 0) marcas.prepend(marca(`${p.saiu + 1}º`, 'm-gold'));
       else if (p.passou) marcas.prepend(marca('passou', 'm-off'));
       else if (p.jogouNaVolta && vw.phase === 'play') marcas.prepend(marca('jogou', 'm-off'));
-      if (p.titulo && p.titulo !== 'neutro') marcas.prepend(marca(`${SELO[p.titulo]} ${TITULOS[p.titulo]}`, 'pres-titulo'));
+      if (p.titulo && p.titulo !== 'neutro') marcas.prepend(marca(TITULOS[p.titulo], 'pres-titulo'));
       el.setAttribute('aria-label', `${p.name}, ${p.handCount} cartas${p.titulo ? `, ${TITULOS[p.titulo]}` : ''}.`);
     }
     // o seu título fica no seu assento
@@ -94,7 +93,7 @@ export function criaMesaPresidente(ctx) {
     if (meu) {
       let t = meu.querySelector('.pres-titulo');
       const eu = vw.players.find((x) => x.id === ctx.me());
-      const titulo = eu?.titulo && eu.titulo !== 'neutro' ? `${SELO[eu.titulo]} ${TITULOS[eu.titulo]}` : '';
+      const titulo = eu?.titulo && eu.titulo !== 'neutro' ? TITULOS[eu.titulo] : '';
       if (!t && titulo) { t = marca('', 'pres-titulo'); meu.appendChild(t); }
       if (t) { t.textContent = titulo; t.hidden = !titulo; }
     }
@@ -183,7 +182,7 @@ export function criaMesaPresidente(ctx) {
     return `<tr><td><span class="quem">
         <img class="avatar" src="${ctx.caraDoJogador(id)}" alt="" width="26" height="26" style="--anel:${ctx.corDoJogador(id)}">
         <span>${ctx.escapeHTML(nome(id))}</span></span></td>
-      <td>${p?.titulo ? `${SELO[p.titulo]} ${TITULOS[p.titulo]}` : ''}</td>
+      <td>${p?.titulo ? TITULOS[p.titulo] : ''}</td>
       <td class="num">${direita}</td></tr>`;
   }
 
@@ -275,7 +274,7 @@ export function criaMesaPresidente(ctx) {
           ctx.novaRodada();
           modalDaRodada = null;
           ctx.closeModal();
-          if (ev.round > 0) ctx.toast(`🃏 Rodada ${ev.round + 1}`);
+          if (ev.round > 0) ctx.toast(`Rodada ${ev.round + 1}`);
           break;
         case 'entregou':
           if (ev.p === eu) ctx.toast(`Você entregou ${ev.n === 1 ? 'a sua carta mais forte' : `as ${ev.n} mais fortes`} a ${nome(ev.para)}.`);
@@ -297,13 +296,13 @@ export function criaMesaPresidente(ctx) {
           break;
         case 'saiu':
           ctx.toast(ev.pos === 0
-            ? `👑 ${ev.p === eu ? 'Você saiu primeiro' : `${nome(ev.p)} saiu primeiro`}: Presidente!`
+            ? `${ev.p === eu ? 'Você saiu primeiro' : `${nome(ev.p)} saiu primeiro`}: Presidente!`
             : `${nome(ev.p)} saiu em ${ev.pos + 1}º.`);
           ctx.reage(ev.p, ev.pos === 0 ? 'presidente' : 'livre');
           break;
         case 'roundEnd': {
           const cu = ev.ordem[ev.ordem.length - 1];
-          ctx.toast(cu === eu ? '💩 Você ficou por último: é o Cu.' : `💩 ${nome(cu)} ficou por último: é o Cu.`);
+          ctx.toast(cu === eu ? 'Você ficou por último: é o Cu.' : `${nome(cu)} ficou por último: é o Cu.`);
           ctx.reage(cu, 'cu');
           break;
         }
@@ -314,11 +313,11 @@ export function criaMesaPresidente(ctx) {
       const p = v().players.find((x) => x.id === id);
       if (!p) return;
       const vezes = Object.entries(p.vezes || {}).filter(([, n]) => n)
-        .map(([t, n]) => `${SELO[t]} ${TITULOS[t]} ${n}×`).join(' · ');
+        .map(([t, n]) => `${TITULOS[t]} ${n}×`).join(' · ');
       ctx.showModal(
         `<div id="oponente-topo" class="oponente-topo"></div>
          <h3>${ctx.escapeHTML(p.name)}</h3>
-         <p>${p.handCount} carta${p.handCount === 1 ? '' : 's'} na mão${p.titulo ? ` · ${SELO[p.titulo]} ${TITULOS[p.titulo]}` : ''}</p>
+         <p>${p.handCount} carta${p.handCount === 1 ? '' : 's'} na mão${p.titulo ? ` · ${TITULOS[p.titulo]}` : ''}</p>
          <p>${p.pontos} ponto${p.pontos === 1 ? '' : 's'}${vezes ? ` · ${vezes}` : ''}</p>`,
         [{ label: 'Fechar', fn: ctx.closeModal }],
         ctx.closeModal,

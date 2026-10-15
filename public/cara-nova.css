@@ -298,3 +298,16 @@ html.debug .ui-version { display: inline; }
   #screen-game .round-pill { gap: 5px; padding-left: 3px; }
   #screen-game .round-pill .sigma { width: 22px; height: 26px; }
 }
+
+/* Foco do teclado nas cartas que dão jogada. Toda carta mini acionável já
+   tem o contorno de "toque aqui" (tracejado, pulsando), então o foco precisa
+   de outro sinal: contorno creme cheio, carta por cima das vizinhas e um
+   pouco mais alta. Vale também para o jogo inteiro (encaixe) e para a mão. */
+.meld .card.mini[role="button"]:focus-visible {
+  outline: 3px solid var(--cream, #f5f1e6);
+  outline-offset: 2px;
+  z-index: 3;
+  transform: translateY(-12px);
+}
+.meld[role="button"]:focus-visible { outline: 3px solid var(--cream, #f5f1e6); outline-offset: 3px; }
+.hand .card:focus-visible { outline: 3px solid var(--cream, #f5f1e6); outline-offset: 2px; }

@@ -11,14 +11,26 @@ export function montaEmotes({ botao, envia }) {
   fundo.className = 'emotes-fundo'; fundo.hidden = true;
   const painel = document.createElement('div');
   painel.className = 'emotes-painel';
-  painel.setAttribute('role', 'dialog'); painel.setAttribute('aria-label', 'Emotes e frases prontas');
+  painel.setAttribute('role', 'dialog'); painel.setAttribute('aria-modal', 'true'); painel.setAttribute('aria-label', 'Emotes e frases prontas');
   const roda = document.createElement('div'); roda.className = 'emotes-roda';
   const frases = document.createElement('div'); frases.className = 'emotes-frases';
-  const fecha = () => { fundo.hidden = true; botao.setAttribute('aria-expanded', 'false'); };
+  // Fechar devolve o foco ao botão que abriu — só se ele estava no painel:
+  // um toque fora não tem por que puxar o foco de onde o jogador está.
+  const fecha = () => {
+    if (fundo.hidden) return;
+    const estavaDentro = painel.contains(document.activeElement);
+    fundo.hidden = true; botao.setAttribute('aria-expanded', 'false');
+    if (estavaDentro) botao.focus();
+  };
   const escolhe = (k) => {
     fecha(); envia(k);
+    // botão desabilitado perde o foco; ele volta quando o descanso acaba
+    const tinhaFoco = document.activeElement === botao;
     botao.disabled = true;
-    setTimeout(() => { botao.disabled = false; }, 1500);
+    setTimeout(() => {
+      botao.disabled = false;
+      if (tinhaFoco && (document.activeElement === document.body || !document.activeElement)) botao.focus();
+    }, 1500);
   };
   EMOTES.forEach((e, i) => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'emotes-setor';
@@ -40,10 +52,22 @@ export function montaEmotes({ botao, envia }) {
   botao.setAttribute('aria-haspopup', 'dialog'); botao.setAttribute('aria-expanded', 'false');
   botao.addEventListener('click', (ev) => {
     ev.stopPropagation();
-    fundo.hidden = !fundo.hidden;
-    botao.setAttribute('aria-expanded', String(!fundo.hidden));
+    if (!fundo.hidden) return fecha();
+    fundo.hidden = false;
+    botao.setAttribute('aria-expanded', 'true');
+    roda.querySelector('button')?.focus();
   });
   fundo.addEventListener('pointerdown', (ev) => { if (ev.target === fundo) fecha(); });
-  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') fecha(); });
+  document.addEventListener('keydown', (ev) => {
+    if (fundo.hidden) return;
+    if (ev.key === 'Escape') { ev.preventDefault(); fecha(); return; }
+    // o Tab dá a volta dentro do painel
+    if (ev.key !== 'Tab') return;
+    const bs = [...painel.querySelectorAll('button')];
+    const primeiro = bs[0], ultimo = bs[bs.length - 1];
+    const dentro = painel.contains(document.activeElement);
+    if (ev.shiftKey && (!dentro || document.activeElement === primeiro)) { ev.preventDefault(); ultimo.focus(); }
+    else if (!ev.shiftKey && (!dentro || document.activeElement === ultimo)) { ev.preventDefault(); primeiro.focus(); }
+  });
   return { fecha };
 }

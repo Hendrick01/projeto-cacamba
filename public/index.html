@@ -207,9 +207,12 @@
 
     <div class="lobby-actions">
       <button id="btn-add-bot" class="btn" hidden>Adicionar robô</button>
-      <button id="btn-nivel-robos" class="btn btn-ghost" hidden></button>
+      <button id="btn-nivel-robos" class="btn btn-ghost" hidden aria-describedby="lobby-motivo"></button>
     </div>
-    <button id="btn-start" class="btn btn-primary" hidden>Começar partida</button>
+    <button id="btn-start" class="btn btn-primary" hidden aria-describedby="lobby-motivo">Começar partida</button>
+    <!-- por que um botão daqui está apagado, em texto à vista (o title só
+         aparece com mouse, e no celular ninguém via) -->
+    <p id="lobby-motivo" class="lobby-wait" hidden></p>
     <p id="lobby-wait" class="lobby-wait" hidden>Esperando quem criou a sala começar…</p>
     <div class="lobby-rodape">
       <button id="btn-emote-lobby" class="btn btn-ghost" title="Emotes e frases prontas" aria-label="Emotes e frases prontas"><svg class="ico" aria-hidden="true"><use href="#i-fala"/></svg>Frases</button>
@@ -464,7 +467,7 @@
 
 <!-- ======================= MODAIS ======================= -->
 <div id="modal-backdrop" class="modal-backdrop" hidden>
-  <div id="modal" class="modal">
+  <div id="modal" class="modal" role="dialog" aria-modal="true" tabindex="-1">
     <div id="modal-body"></div>
     <div id="modal-actions" class="modal-actions"></div>
   </div>
