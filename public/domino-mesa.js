@@ -174,6 +174,7 @@ export function criaMesaDomino(ctx) {
   };
   const bJogar = botao('dom-jogar', 'Jogar', 'btn-primary');
   const bRamos = Object.fromEntries(['esq', 'cima', 'baixo', 'dir'].map((r) => [r, botao(`dom-ramo-${r}`, '', 'btn-primary dom-ramo')]));
+  const bComprar = botao('dom-comprar', 'Comprar do dorme', 'btn-primary');
   const bPassar = botao('dom-passar', 'Passar', '');
 
   const v = () => ctx.view;
@@ -186,7 +187,14 @@ export function criaMesaDomino(ctx) {
   const meuTime = () => v()?.you?.time ?? 0;
   const timeDe = (id) => v()?.players.find((p) => p.id === id)?.time;
   const nomesDaDupla = (time) => v().players.filter((p) => p.time === time).map((p) => (p.id === eu() ? 'você' : p.name));
-  const rotuloDoTime = (time) => (time === meuTime() ? 'Nós' : 'Eles');
+  // 1v1 (mano a mano) ou 2v2 (em dupla): muda só como se fala dos lados.
+  const mano = () => v()?.formato === '1v1';
+  const rotuloDoTime = (time) => (time === meuTime() ? (mano() ? 'Você' : 'Nós') : (mano() ? 'Rival' : 'Eles'));
+  // "para nós" / "para eles" no 2v2; "para você" / "para Fulano" no 1v1
+  const paraTime = (time) => {
+    if (time === meuTime()) return mano() ? 'você' : 'nós';
+    return mano() ? nomesDaDupla(time).join('') : 'eles';
+  };
 
   const jogadasDa = (pedraId) => (v()?.you?.jogadas || []).filter((j) => j.pedraId === pedraId);
 
@@ -202,6 +210,7 @@ export function criaMesaDomino(ctx) {
   };
   for (const [ramo, b] of Object.entries(bRamos)) b.onclick = () => joga(escolhida, ramo);
   bPassar.onclick = () => { ctx.sendAction({ a: 'passar' }); escolhida = null; };
+  bComprar.onclick = () => ctx.sendAction({ a: 'comprar' });
 
   // ---- placar -----------------------------------------------------------
 
@@ -217,7 +226,8 @@ export function criaMesaDomino(ctx) {
       t.textContent = rotuloDoTime(time);
       const quem = document.createElement('span');
       quem.className = 'dom-time-quem';
-      quem.textContent = nomesDaDupla(time).join(' e ');
+      // no 1v1 o seu lado já diz "Você"; o do rival mostra o nome dele
+      quem.textContent = mano() && time === meu ? '' : nomesDaDupla(time).join(' e ');
       const pts = document.createElement('strong');
       pts.className = 'dom-time-pts';
       pts.textContent = vw.times[time];
@@ -226,7 +236,7 @@ export function criaMesaDomino(ctx) {
     }
     const meta = document.createElement('span');
     meta.className = 'dom-meta';
-    meta.textContent = `até ${vw.meta || META}`;
+    meta.textContent = `até ${vw.meta || META}${mano() ? ` · dorme ${vw.dorme}` : ''}`;
     placar.insertBefore(meta, placar.lastChild);
   }
 
@@ -374,10 +384,12 @@ export function criaMesaDomino(ctx) {
       b.hidden = !ramos.has(ramo);
       b.textContent = `${BOTAO_DO_RAMO[ramo]}${pontas[ramo] != null ? ` (${pontas[ramo]})` : ''}`;
     }
+    bComprar.hidden = !(vez && vw.you?.podeComprar);
+    if (!bComprar.hidden) bComprar.textContent = `Comprar do dorme (${vw.dorme})`;
     const pode = vez && vw.you?.podePassar;
     bPassar.hidden = !pode;
     if (pode) {
-      bPassar.textContent = vw.you.passeCusta ? `Passar (+${vw.you.passeCusta} para eles)` : 'Passar no escuro';
+      bPassar.textContent = vw.you.passeCusta ? `Passar (+${vw.you.passeCusta} para ${paraTime(1 - meuTime())})` : 'Passar no escuro';
       bPassar.classList.toggle('btn-danger', !!vw.you.passeCusta);
       bPassar.classList.toggle('btn-ghost', !vw.you.passeCusta);
     }
@@ -395,7 +407,7 @@ export function criaMesaDomino(ctx) {
       if (p.passou) marcas.prepend(marca('passou', 'm-off'));
       marcas.prepend(marca(p.time === meu ? 'parceiro' : 'contra', p.time === meu ? 'dom-parceiro' : 'dom-contra'));
       elA.classList.toggle('dom-dupla', p.time === meu);
-      elA.setAttribute('aria-label', `${p.name}, ${p.time === meu ? 'seu parceiro' : 'da outra dupla'}, ${p.handCount} pedra${p.handCount === 1 ? '' : 's'}.`);
+      elA.setAttribute('aria-label', `${p.name}, ${p.time === meu ? 'seu parceiro' : mano() ? 'seu rival' : 'da outra dupla'}, ${p.handCount} pedra${p.handCount === 1 ? '' : 's'}.`);
     }
   }
 
@@ -425,7 +437,7 @@ export function criaMesaDomino(ctx) {
 
   function tabelaDoPlacar() {
     const meu = meuTime();
-    return `<table class="score-table"><thead><tr><th>Dupla</th><th class="num">Pts</th></tr></thead>
+    return `<table class="score-table"><thead><tr><th>${mano() ? 'Jogador' : 'Dupla'}</th><th class="num">Pts</th></tr></thead>
       <tbody>${linhaDoTime(meu)}${linhaDoTime(1 - meu)}</tbody></table>`;
   }
 
@@ -445,10 +457,10 @@ export function criaMesaDomino(ctx) {
   function contaDaMao(lr) {
     if (!lr) return '';
     if (lr.motivo === 'batida') {
-      return `${nome(lr.por)} bateu e marcou ${lr.pontos}: sobraram ${lr.resto} nas mãos da outra dupla.`;
+      return `${nome(lr.por)} bateu e marcou ${lr.pontos}: sobraram ${lr.resto} ${mano() ? 'na mão do rival' : 'nas mãos da outra dupla'}.`;
     }
     if (lr.motivo === 'trancado') {
-      return `${nome(lr.por)} trancou a mesa: ${lr.pontos} para ${lr.time === meuTime() ? 'nós' : 'eles'}.`;
+      return `${nome(lr.por)} trancou a mesa: ${lr.pontos} para ${paraTime(lr.time)}.`;
     }
     return '';
   }
@@ -493,7 +505,7 @@ export function criaMesaDomino(ctx) {
     acoes.push({ label: 'Sair da sala', cls: 'btn-ghost', fn: ctx.saiDaSala });
     ctx.showModal(
       `<div class="palco-vencedor grande dom-vencedores">${dupla.map((p) => `<img src="${ctx.figuraFeliz(p.id)}" alt="">`).join('')}</div>
-       <h2>${ganhamos ? 'Vocês ganharam!' : `${ctx.escapeHTML(nomesDaDupla(vw.vencedor).join(' e '))} ganharam!`}</h2>
+       <h2>${ganhamos ? (mano() ? 'Você ganhou!' : 'Vocês ganharam!') : `${ctx.escapeHTML(nomesDaDupla(vw.vencedor).join(' e '))} ${mano() ? 'ganhou' : 'ganharam'}!`}</h2>
        <p>${ctx.escapeHTML(contaDaMao(lr) || `A partida vai a ${vw.meta || META}.`)}</p>
        ${tabelaDoPlacar()}
        ${ctx.isHost() ? '' : '<p style="margin-top:10px">Esperando o anfitrião decidir…</p>'}`,
@@ -528,8 +540,9 @@ export function criaMesaDomino(ctx) {
         const s = you.hand.find((p) => p.id === vw.saida);
         return { minha: true, texto: `Você sai: jogue a ${s ? txt(s) : 'carroça'}.` };
       }
+      if (!you.jogadas.length && you.podeComprar) return { minha: true, texto: 'Sem pedra que encaixe: compre do dorme.' };
       if (!you.jogadas.length) {
-        return { minha: true, texto: you.passeCusta ? `Sem pedra que encaixe: passe (+${you.passeCusta} para eles).` : 'Sem pedra que encaixe: passe.' };
+        return { minha: true, texto: you.passeCusta ? `Sem pedra que encaixe: passe (+${you.passeCusta} para ${paraTime(1 - meuTime())}).` : 'Sem pedra que encaixe: passe.' };
       }
       if (escolhida && jogadasDa(escolhida).length > 1) return { minha: true, texto: 'Escolha a ponta: toque nela na mesa.' };
       return { minha: true, texto: you.podePassar ? 'Sua vez: jogue uma pedra — ou passe no escuro.' : 'Sua vez: escolha uma pedra que encaixe.' };
@@ -559,7 +572,7 @@ export function criaMesaDomino(ctx) {
           break;
         case 'passou':
           if (!ev.escuro) {
-            const quem = timeDe(ev.p) === meuTime() ? 'eles' : 'nós';
+            const quem = paraTime(1 - timeDe(ev.p));
             ctx.toast(`${ev.p === eu() ? 'Você passou' : `${nome(ev.p)} passou`}: +10 para ${quem}.`);
           } else ctx.toast(`${ev.p === eu() ? 'Você passou' : `${nome(ev.p)} passou`} no escuro.`);
           ctx.reage(ev.p, 'passo');
@@ -568,8 +581,11 @@ export function criaMesaDomino(ctx) {
           ctx.toast(`🁫 ${ev.p === eu() ? 'Você bateu' : `${nome(ev.p)} bateu`}! +${ev.pts}`);
           ctx.reage(ev.p, 'bateu');
           break;
+        case 'comprou':
+          if (ev.p !== eu()) ctx.toast(`${nome(ev.p)} comprou do dorme (sobram ${ev.resta}).`);
+          break;
         case 'trancou':
-          ctx.toast(`🔒 ${ev.p === eu() ? 'Você trancou' : `${nome(ev.p)} trancou`} a mesa: +40 para ${timeDe(ev.p) === meuTime() ? 'eles' : 'nós'}.`);
+          ctx.toast(`🔒 ${ev.p === eu() ? 'Você trancou' : `${nome(ev.p)} trancou`} a mesa: +40 para ${paraTime(1 - timeDe(ev.p))}.`);
           ctx.reage(ev.p, 'trancou');
           break;
         default:
@@ -585,7 +601,7 @@ export function criaMesaDomino(ctx) {
       ctx.showModal(
         `<div id="oponente-topo" class="oponente-topo"></div>
          <h3>${ctx.escapeHTML(p.name)}${vw.turnId === p.id && vw.phase === 'play' ? ' — é a vez dele' : ''}</h3>
-         <p>${parceiro ? 'Seu parceiro' : 'Da outra dupla'} · ${p.handCount} pedra${p.handCount === 1 ? '' : 's'} na mão</p>
+         <p>${parceiro ? 'Seu parceiro' : mano() ? 'Seu rival' : 'Da outra dupla'} · ${p.handCount} pedra${p.handCount === 1 ? '' : 's'} na mão</p>
          ${p.passou ? '<p>Passou desde a última pedra.</p>' : ''}
          ${p.desistiu ? '<p class="modal-hint">Saiu da partida — o robô joga o resto por ele.</p>' : ''}`,
         [{ label: 'Fechar', fn: ctx.closeModal }],
@@ -608,7 +624,8 @@ export function criaMesaDomino(ctx) {
     regras() {
       ctx.showModal(
         `<h2>Como se joga o Dominó de ponto</h2>
-         <p><strong>Duplas:</strong> 4 na mesa, quem senta de frente é o seu parceiro. 7 pedras para cada um.</p>
+         <p><strong>2 contra 2:</strong> 4 na mesa, quem senta de frente é o seu parceiro. 7 pedras para cada um.</p>
+         <p><strong>1 contra 1:</strong> 7 pedras para cada um e 14 no dorme. Sem pedra que encaixe, compre do dorme até poder jogar; só passa quando ele acaba. A 1ª mão sai com a maior carroça.</p>
          <p><strong>Saída:</strong> toda mão abre com carroça. Na primeira, quem tem a 6|6; depois, quem bateu sai com a maior carroça que tiver.</p>
          <p><strong>A cruz:</strong> a primeira carroça abre para os quatro lados — em cima e embaixo depois que esquerda e direita têm pedra.</p>
          <p><strong>Pontos:</strong> depois de cada pedra, somam-se as pontas. Deu múltiplo de 5, a sua dupla marca a soma. Carroça na ponta conta dobrado.</p>

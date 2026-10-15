@@ -193,6 +193,12 @@ button.lobby-cadeira { cursor:pointer; }
 .lobby-cadeira.escolhida { border-color:var(--ui-gold,#f2c14e);box-shadow:0 0 0 2px #f2c14e55; }
 .lobby-cadeira .balao-lobby { margin-left:auto;padding:2px 9px;border-radius:10px;background:#f3ead2;color:#1d140c;font-size:.76rem;font-weight:900;white-space:nowrap; }
 .lobby-cadeira .balao-lobby[hidden] { display:none; }
+/* 2 contra 2 ou 1 contra 1: um interruptor de duas posições acima das cadeiras. */
+.lobby-formato { grid-column:1/-1;display:flex;gap:4px;padding:4px;border-radius:12px;background:#0004;border:1px solid var(--ui-line,#1c5440); }
+.lobby-formato button { flex:1;min-height:40px;border:0;border-radius:9px;background:none;color:#a9c0b0;font:inherit;font-size:.82rem;font-weight:900;cursor:pointer; }
+.lobby-formato button.ativo { background:var(--ui-gold,#f2c14e);color:#2d291d; }
+.lobby-formato button:disabled { cursor:default; }
+.lobby-formato button:disabled:not(.ativo) { opacity:.6; }
 .lobby-duplas-dica { grid-column:1/-1;margin:0;font-size:.74rem;color:#a9c0b0;text-align:center; }
 @media (max-width:760px) {
   .modos { grid-template-columns:1fr;gap:14px; }

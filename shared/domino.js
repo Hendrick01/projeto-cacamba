@@ -24,6 +24,10 @@
 //  - TRANCOU: quem joga a pedra que deixa ninguém com jogada dá 40 à dupla
 //    adversária, e a mão é refeita.
 //  - A partida vai a 240.
+//  - MANO A MANO (1v1, pedido em 15/10/2026): 2 na mesa, 7 pedras cada e 14
+//    no DORME. Sem pedra que encaixe, compra do dorme uma a uma até poder
+//    jogar; só passa (e o primeiro passe paga os 10) com o dorme vazio. A
+//    batida conta a mão do adversário. Mesma meta, 240.
 //
 // REGRAS DA CASA ainda não confirmadas (ajustáveis aqui):
 //  - Os lados de cima e de baixo da cruz só abrem depois de esquerda e direita
@@ -36,11 +40,15 @@
 //  - A partida acaba no instante em que uma dupla chega a 240, mesmo no meio
 //    da mão.
 //  - Mão com muitas carroças não é refeita.
+//  - 1v1: a 1ª mão sai com a maior carroça das mãos (a 6|6 pode estar no
+//    dorme); sem carroça nenhuma nas duas mãos, embaralha de novo. Trancou
+//    com o dorme no fim: os 40 vão contra quem jogou a última pedra.
 // ============================================================================
 
 export const MODO = 'domino';
-export const MIN_JOGADORES = 4;
-export const MAX_JOGADORES = 4;
+export const MIN_JOGADORES = 2;   // 1v1
+export const MAX_JOGADORES = 4;   // 2v2
+export const FORMATOS = { '1v1': 2, '2v2': 4 };
 export const NIVEIS_DE_ROBO = ['facil', 'normal'];
 export const META = 240;
 export const MULTA_DO_PASSE = 10;
@@ -81,6 +89,7 @@ export const timeDoAssento = (i) => i % 2;
 export const arredonda5 = (n) => Math.round(n / 5) * 5;
 
 export function createGame(players, opts = {}) {
+  if (players.length !== 2 && players.length !== 4) fail('O dominó é de 2 (mano a mano) ou de 4 (em dupla).');
   return {
     modo: MODO,
     opts: { nivelRobos: 'normal', meta: META, ...opts, rnd: undefined },
@@ -95,6 +104,7 @@ export function createGame(players, opts = {}) {
     turn: 0,
     turnNo: 0,
     deck: [],           // o retrato da sala confere que existe; aqui fica vazio
+    dorme: [],          // o que sobra fora das mãos (só no 1v1)
     mesa: null,         // { centro, ramos: { esq: [...], dir, cima, baixo } }
     saida: null,        // id da carroça com que a mão tem de abrir
     passes: [],         // quem passou desde a última pedra jogada
@@ -211,10 +221,17 @@ function quemSai(state) {
 export function startRound(state) {
   const rnd = state.rnd || Math.random;
   state.round++;
-  const pedras = embaralha(jogoDePedras(), rnd);
-  state.players.forEach((p, i) => { p.hand = pedras.slice(i * PEDRAS_NA_MAO, (i + 1) * PEDRAS_NA_MAO); });
+  let sai = null;
+  // No 2v2 as 7 carroças estão nas mãos; no 1v1 podem estar todas no dorme,
+  // e aí embaralha de novo (acontece uma vez a cada ~300 mãos).
+  while (!sai) {
+    const pedras = embaralha(jogoDePedras(), rnd);
+    state.players.forEach((p, i) => { p.hand = pedras.slice(i * PEDRAS_NA_MAO, (i + 1) * PEDRAS_NA_MAO); });
+    state.dorme = pedras.slice(state.players.length * PEDRAS_NA_MAO);
+    sai = quemSai(state);
+  }
   state.mesa = null; state.passes = []; state.lances = []; state.turnNo = 0;
-  const { i, pedra } = quemSai(state);
+  const { i, pedra } = sai;
   state.saida = pedra.id;
   state.turn = i;
   state.phase = 'play';
@@ -269,8 +286,34 @@ export function actJogar(state, playerId, pedraId, ramo) {
   if (marca(state, p.time, pts, 'pontas', events, p.id)) return events;
 
   if (!p.hand.length) return batida(state, p, events);
-  if (state.players.every((x) => !temJogada(state, x.hand))) return trancou(state, p, events);
+  if (trancada(state)) return trancou(state, p, events);
   state.turn = (state.turn + 1) % state.players.length;
+  return events;
+}
+
+// Ninguém tem jogada e não há o que comprar.
+const trancada = (state) => !(state.dorme?.length) && state.players.every((x) => !temJogada(state, x.hand));
+
+// 1v1: sem pedra que encaixe, compra uma do dorme. A vez continua com quem
+// comprou — compra de novo ou joga.
+export function actComprar(state, playerId) {
+  if (state.phase !== 'play') fail('Não é hora de jogar.');
+  const p = state.players[state.turn];
+  if (!p || p.id !== playerId) fail('Não é a sua vez.');
+  if (!state.mesa) fail('A mão abre com carroça: é você quem sai.');
+  if (!state.dorme?.length) fail('O dorme acabou.');
+  if (temJogada(state, p.hand)) fail('Você tem pedra que encaixa: jogue.');
+  const pedra = state.dorme.pop();
+  p.hand.push(pedra);
+  state.turnNo++;
+  const events = [{ e: 'comprou', p: p.id, resta: state.dorme.length }];
+  // Comprou a última e ninguém tem jogada: a mesa já estava trancada pela
+  // última pedra jogada.
+  if (trancada(state)) {
+    const ultimo = state.lances[state.lances.length - 1];
+    const por = ultimo ? playerById(state, ultimo.p) : p;
+    return trancou(state, por, events);
+  }
   return events;
 }
 
@@ -280,6 +323,7 @@ export function actPassar(state, playerId) {
   if (!p || p.id !== playerId) fail('Não é a sua vez.');
   if (!state.mesa) fail('A mão abre com carroça: é você quem sai.');
   const pode = temJogada(state, p.hand);
+  if (!pode && state.dorme?.length) fail('Sem pedra que encaixe: compre do dorme.');
   const primeiro = state.passes.length === 0;
   if (pode && primeiro) fail('Você tem jogada. Só passa no escuro depois que alguém passar.');
   if (pode && state.passes.includes(p.id)) fail('Você já passou nesta volta: agora tem de jogar.');
@@ -337,6 +381,7 @@ export function applyAction(state, playerId, action) {
   switch (action.a) {
     case 'jogar': return actJogar(state, playerId, action.pedraId, action.ramo ?? null);
     case 'passar': return actPassar(state, playerId);
+    case 'comprar': return actComprar(state, playerId);
     default: fail('Ação desconhecida.');
   }
 }
@@ -378,6 +423,8 @@ export function viewFor(state, playerId) {
     mesa,
     saida: state.mesa ? null : state.saida,
     passes: state.passes.slice(),
+    formato: state.players.length === 2 ? '1v1' : '2v2',
+    dorme: state.dorme?.length || 0,
     lances: state.lances.slice(),
     lastRound: resumoDaMao(state),
     you: me
@@ -385,7 +432,8 @@ export function viewFor(state, playerId) {
         id: me.id, time: me.time, hand: me.hand,
         jogadas: minhaVez ? jogadasPossiveis(state, me.hand) : [],
         podePassar: !!minhaVez && !!state.mesa && (!temJogada(state, me.hand)
-          ? true : state.passes.length > 0 && !state.passes.includes(me.id)),
+          ? !state.dorme?.length : state.passes.length > 0 && !state.passes.includes(me.id)),
+        podeComprar: !!minhaVez && !!state.mesa && !!state.dorme?.length && !temJogada(state, me.hand),
         passeCusta: minhaVez && state.passes.length === 0 ? MULTA_DO_PASSE : 0,
       }
       : null,
@@ -423,7 +471,7 @@ export function botNextAction(state, playerId) {
   const p = state.players[state.turn];
   if (!p || p.id !== playerId || state.phase !== 'play') return null;
   const jogadas = jogadasPossiveis(state, p.hand);
-  if (!jogadas.length) return { a: 'passar' };
+  if (!jogadas.length) return state.mesa && state.dorme?.length ? { a: 'comprar' } : { a: 'passar' };
   const rnd = state.rnd || Math.random;
   if (state.opts?.nivelRobos === 'facil') {
     const j = jogadas[Math.floor(rnd() * jogadas.length)];

@@ -6,7 +6,9 @@
 //   5. a partida vai até 240 — os humanos jogam, os robôs jogam, o anfitrião
 //      chama a próxima mão — sem nenhuma jogada recusada pelo juiz;
 //   6. "jogar de novo" mantém as mesmas duplas;
-//   7. sala sem modo continua nascendo Caçamba.
+//   7. sala sem modo continua nascendo Caçamba;
+//   8. 1v1: o anfitrião troca o formato, o robô completa a outra cadeira e
+//      a partida vai até 240 comprando do dorme.
 //   node test/domino.mjs
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -47,6 +49,12 @@ const falhou = [];
 function confere(ok, texto) {
   console.log(`${ok ? '  ok  ' : ' FALHA'} · ${texto}`);
   if (!ok) falhou.push(texto);
+}
+// O lance de um humano simples: a primeira jogada; sem jogada, compra ou passa.
+function lance(v) {
+  const j = v.you.jogadas[0];
+  if (j) return { a: 'jogar', pedraId: j.pedraId, ramo: j.ramo };
+  return v.you.podeComprar ? { a: 'comprar' } : { a: 'passar' };
 }
 async function ate(pred, ms = 3000) {
   const fim = Date.now() + ms;
@@ -126,9 +134,8 @@ try {
     if (daVez) {
       const meu = daVez.view;
       if (meu.turnNo !== v.turnNo || meu.turnId !== id(daVez)) { await espera(5); continue; }
-      const j = meu.you.jogadas[0];
       const antes = v.turnNo;
-      manda(daVez, { t: 'action', action: j ? { a: 'jogar', pedraId: j.pedraId, ramo: j.ramo } : { a: 'passar' } });
+      manda(daVez, { t: 'action', action: lance(meu) });
       await ate(() => A.view.turnNo !== antes || A.view.phase !== 'play' || A.view.round !== v.round);
     } else {
       await espera(10);
@@ -140,6 +147,7 @@ try {
   confere(humanos.every((c) => c.erros.every((e) => /Só quem criou|cheia/.test(e))), 'nenhuma jogada recusada pelo juiz');
   const tipos = new Set(A.eventos.map((e) => e.e));
   confere(tipos.has('jogou') && tipos.has('marcou') && (tipos.has('bateu') || tipos.has('trancou')), `houve pedra, ponto e fim de mão (${[...tipos].join(', ')})`);
+  await ate(() => B.view.phase === 'gameEnd');   // o estado chega a cada um no seu tempo
   confere(B.view.phase === 'gameEnd' && B.view.times.join() === vf.times.join(), 'a parceira vê o mesmo placar final');
 
   // 6. jogar de novo, mesmas duplas
@@ -153,6 +161,60 @@ try {
   confere(A.view.players.map((p) => p.id).join() === ordem, 'mesmas cadeiras, mesmas duplas');
 
   for (const c of [A, B]) c.ws.close();
+
+  // 8. mano a mano
+  const M = await cliente('M');
+  manda(M, { t: 'create', name: 'Mano', modo: 'domino' });
+  await ate(() => M.lobby);
+  confere(M.lobby.formato === '2v2', 'a sala de dominó nasce 2v2');
+  const N = await cliente('N'); manda(N, { t: 'join', code: M.sessao.code, name: 'Nando' });
+  const O = await cliente('O'); manda(O, { t: 'join', code: M.sessao.code, name: 'Olga' });
+  await ate(() => M.lobby.players.length === 3);
+  manda(N, { t: 'formato', f: '1v1' });
+  await ate(() => N.erros.length);
+  confere(N.erros.some((e) => /Só quem criou/.test(e)), 'só o anfitrião escolhe o formato');
+  manda(M, { t: 'formato', f: '1v1' });
+  await ate(() => M.erros.length);
+  confere(M.erros.some((e) => /gente demais/.test(e)) && M.lobby.formato === '2v2', 'com 3 na sala não vira 1v1');
+  manda(N, { t: 'leave' }); manda(O, { t: 'leave' });
+  await ate(() => M.lobby.players.length === 1);
+  manda(M, { t: 'formato', f: '1v1' });
+  await ate(() => M.lobby.formato === '1v1');
+  confere(M.lobby.formato === '1v1' && M.lobby.cadeiras.length === 2, 'virou 1v1, com duas cadeiras');
+  const X = await cliente('X'); manda(X, { t: 'join', code: M.sessao.code, name: 'Xis' });
+  const Y = await cliente('Y'); manda(Y, { t: 'join', code: M.sessao.code, name: 'Ípsilon' });
+  await ate(() => Y.erros.length && M.lobby.players.length === 2);
+  confere(Y.erros.some((e) => /cheia \(2/.test(e)), 'no 1v1 o terceiro não entra');
+  manda(X, { t: 'leave' }); Y.ws.close();
+  await ate(() => M.lobby.players.length === 1);
+  manda(M, { t: 'start' });
+  await ate(() => M.view);
+  confere(M.view?.formato === '1v1' && M.view.players.length === 2 && M.view.players[1].isBot, '1v1 começa com um robô do outro lado');
+  confere(M.view?.dorme === 14 && M.view.you.hand.length === 7, '7 na mão e 14 no dorme');
+  const ini = Date.now();
+  let comprou = 0, mm = 1, travou1 = false;
+  while (M.view.phase !== 'gameEnd') {
+    if (Date.now() - ini > 120000) { travou1 = true; break; }
+    const v = M.view;
+    if (v.phase === 'roundEnd') {
+      const r = v.round;
+      manda(M, { t: 'nextRound' });
+      await ate(() => M.view.round > r || M.view.phase === 'gameEnd');
+      mm++;
+      continue;
+    }
+    if (v.turnId !== id(M)) { await espera(10); continue; }
+    const acao = lance(v);
+    if (acao.a === 'comprar') comprou++;
+    const antes = v.turnNo;
+    manda(M, { t: 'action', action: acao });
+    await ate(() => M.view.turnNo !== antes || M.view.phase !== 'play' || M.view.round !== v.round);
+  }
+  const vm = M.view;
+  confere(!travou1 && vm.phase === 'gameEnd' && vm.times[vm.vencedor] >= 240, `1v1 até o fim: ${vm.times.join(' × ')} em ${mm} mãos`);
+  confere(M.erros.every((e) => /gente demais/.test(e)), 'nenhuma jogada recusada no 1v1');
+  confere(comprou > 0 || M.eventos.some((e) => e.e === 'comprou'), 'alguém comprou do dorme');
+  M.ws.close();
 } catch (e) {
   console.error(e);
   falhou.push(String(e?.message || e));

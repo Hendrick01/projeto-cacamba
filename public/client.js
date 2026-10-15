@@ -249,8 +249,8 @@ const MODOS = {
   },
   domino: {
     nome: 'Dominó',
-    titulo: 'Dominó<br><em>de ponto, em dupla</em>',
-    fatos: '<span><strong>4</strong>em dupla</span><span><strong>Múltiplo de 5</strong>nas pontas marca</span><span><strong>240</strong>fecha a partida</span>',
+    titulo: 'Dominó<br><em>de ponto, mano a mano ou em dupla</em>',
+    fatos: '<span><strong>1v1 ou 2v2</strong>à escolha da sala</span><span><strong>Múltiplo de 5</strong>nas pontas marca</span><span><strong>240</strong>fecha a partida</span>',
     min: 1,   // as cadeiras vazias viram robô na hora de começar
   },
 };
@@ -632,9 +632,10 @@ function renderLobby() {
   $('lobby-wait').hidden = isHost();
 }
 
-// As duas duplas do dominó: cadeiras 1 e 3 contra 2 e 4. O anfitrião toca
-// numa cadeira e depois noutra para trocar o que há nelas (gente, robô ou
-// vaga); os outros só veem. Vaga vira robô quando a partida começa.
+// As cadeiras do dominó. No 2v2 são duas duplas, cadeiras 1 e 3 contra 2 e 4;
+// no 1v1, uma contra a outra. O anfitrião escolhe o formato e toca numa
+// cadeira e depois noutra para trocar o que há nelas (gente, robô ou vaga);
+// os outros só veem. Vaga vira robô quando a partida começa.
 let cadeiraEscolhida = null;
 function desenhaDuplas(cadeiras) {
   const box = $('lobby-duplas');
@@ -642,12 +643,30 @@ function desenhaDuplas(cadeiras) {
   box.innerHTML = '';
   if (!cadeiras) { cadeiraEscolhida = null; return; }
   const anfitriao = isHost();
-  if (!anfitriao) cadeiraEscolhida = null;
-  [[0, 2], [1, 3]].forEach((par, d) => {
+  if (!anfitriao || cadeiraEscolhida >= cadeiras.length) cadeiraEscolhida = null;
+  const mano = lobby.formato === '1v1';
+
+  const formato = document.createElement('div');
+  formato.className = 'lobby-formato';
+  formato.setAttribute('role', 'group');
+  formato.setAttribute('aria-label', 'Formato da partida');
+  for (const [f, texto] of [['2v2', '2 contra 2'], ['1v1', '1 contra 1']]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = texto;
+    b.className = (lobby.formato || '2v2') === f ? 'ativo' : '';
+    b.setAttribute('aria-pressed', String((lobby.formato || '2v2') === f));
+    b.disabled = !anfitriao;
+    b.onclick = () => { cadeiraEscolhida = null; sendMsg({ t: 'formato', f }); };
+    formato.appendChild(b);
+  }
+  box.appendChild(formato);
+
+  (mano ? [[0], [1]] : [[0, 2], [1, 3]]).forEach((par, d) => {
     const dupla = document.createElement('div');
     dupla.className = 'lobby-dupla';
     const h = document.createElement('h4');
-    h.textContent = `Dupla ${d + 1}`;
+    h.textContent = mano ? `Lado ${d + 1}` : `Dupla ${d + 1}`;
     dupla.appendChild(h);
     for (const i of par) {
       const p = lobby.players.find((x) => x.id === cadeiras[i]);
@@ -680,7 +699,7 @@ function desenhaDuplas(cadeiras) {
   dica.className = 'lobby-duplas-dica';
   dica.textContent = anfitriao
     ? (cadeiraEscolhida === null ? 'Toque em duas cadeiras para trocar quem senta onde.' : 'Agora toque na cadeira para onde vai.')
-    : 'Quem criou a sala arruma as duplas.';
+    : (mano ? 'Quem criou a sala escolhe o formato.' : 'Quem criou a sala arruma as duplas.');
   box.appendChild(dica);
 }
 

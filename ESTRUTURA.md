@@ -350,6 +350,12 @@ baixadas com `import()` só quando alguém escolhe o modo ou cai numa sala dele.
   anfitrião troca o conteúdo de duas cadeiras com `{ t: 'cadeira', de, para }`;
   no `start`, as vagas viram robô (`jogadoresDaPartida`) e a ordem das cadeiras
   é a ordem da partida. `playAgain` repete a mesma mesa.
+- **1v1 ou 2v2.** O anfitrião escolhe no saguão (`{ t: 'formato', f }`,
+  recusado se já houver gente demais); `room.formato` vai no retrato, e
+  `lugaresDe(room)` dá quantas cadeiras a sala tem. No 1v1 o motor dá 7 pedras
+  a cada um e deixa 14 no **dorme** (`state.dorme`, `view.dorme`): sem pedra
+  que encaixe, `{ a: 'comprar' }` até poder jogar; só passa com o dorme vazio.
+  A 1ª mão sai com a maior carroça das mãos (sem nenhuma, embaralha de novo).
 - **A cobra.** SVG em "casas" (meia pedra = 1×1), enquadrado por `viewBox`. A
   carroça de saída fica em pé no centro (a cruz); cada ramo segue reto e dobra
   uma vez, sempre para o mesmo lado (esquerda sobe, cima vai para a direita,

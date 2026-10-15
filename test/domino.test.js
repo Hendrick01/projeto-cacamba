@@ -220,3 +220,84 @@ test('robô normal ganha do fácil na maioria', () => {
   }
   assert.ok(normal > N * 0.55, `normal venceu ${normal} de ${N}`);
 });
+
+// ---- Mano a mano (1v1) ------------------------------------------------------
+
+function mano(seed = 5, opts = {}) {
+  return createGame(['a', 'b'].map((id) => ({ id, name: id.toUpperCase(), isBot: true })), { rnd: mulberry32(seed), ...opts });
+}
+
+test('1v1: 7 pedras para cada um, 14 no dorme, um contra o outro', () => {
+  const s = mano();
+  startRound(s);
+  assert.deepEqual(s.players.map((p) => p.hand.length), [7, 7]);
+  assert.equal(s.dorme.length, 14);
+  assert.deepEqual(s.players.map((p) => p.time), [0, 1]);
+  const sai = s.players[s.turn];
+  const maior = s.players.flatMap((p) => p.hand).filter(ehCarroca).sort((x, y) => y.a - x.a)[0];
+  assert.equal(s.saida, maior.id, 'sai a maior carroça das mãos');
+  assert.ok(sai.hand.some((p) => p.id === maior.id));
+  const v = viewFor(s, 'a');
+  assert.equal(v.formato, '1v1');
+  assert.equal(v.dorme, 14);
+  assert.throws(() => createGame([{ id: 'x', name: 'X' }, { id: 'y', name: 'Y' }, { id: 'z', name: 'Z' }]), /2 .* ou de 4/);
+});
+
+test('1v1: sem pedra que encaixe, compra do dorme; só passa com o dorme vazio', () => {
+  const s = mano();
+  startRound(s);
+  s.players[0].hand = [P('6|6'), P('0|1')];
+  s.players[1].hand = [P('3|3'), P('4|4')];
+  s.dorme = [P('5|5'), P('6|2')];   // compra do fim: sai a 6|2 primeiro
+  s.saida = P('6|6').id; s.turn = 0; s.mesa = null; s.passes = [];
+  joga(s, 'a', '6|6');
+  assert.throws(() => passa(s, 'b'), /compre do dorme/);
+  assert.equal(viewFor(s, 'b').you.podeComprar, true);
+  assert.equal(viewFor(s, 'b').you.podePassar, false);
+  const ev = applyAction(s, 'b', { a: 'comprar' });
+  assert.ok(ev.some((e) => e.e === 'comprou' && e.resta === 1));
+  assert.equal(s.players[s.turn].id, 'b', 'a vez continua com quem comprou');
+  assert.throws(() => applyAction(s, 'b', { a: 'comprar' }), /tem pedra que encaixa/);
+  joga(s, 'b', '6|2', 'esq');
+  // a: 0|1 não encaixa em 2 nem em 6 → compra a 5|5, que também não encaixa;
+  // dorme vazio e ninguém tem jogada: trancou, e os 40 vão contra b, que jogou
+  // a última pedra
+  assert.deepEqual(botNextAction(s, 'a'), { a: 'comprar' });
+  const fim = applyAction(s, 'a', { a: 'comprar' });
+  assert.ok(fim.some((e) => e.e === 'trancou' && e.p === 'b'));
+  assert.equal(s.phase, 'roundEnd');
+  assert.equal(s.times[0] >= 40, true);
+});
+
+test('1v1: batida conta a mão do adversário', () => {
+  const s = mano();
+  startRound(s);
+  s.players[0].hand = [P('6|6')];
+  s.players[1].hand = [P('2|3'), P('4|4')];
+  s.saida = P('6|6').id; s.turn = 0; s.mesa = null; s.passes = [];
+  const ev = joga(s, 'a', '6|6');
+  assert.ok(ev.some((e) => e.e === 'bateu' && e.resto === 13 && e.pts === 15));
+});
+
+test('1v1: robôs jogam partidas inteiras, comprando e passando, sem sumir pedra', () => {
+  let compras = 0;
+  for (let seed = 1; seed <= 150; seed++) {
+    const s = mano(seed, { nivelRobos: seed % 3 === 0 ? 'facil' : 'normal' });
+    startRound(s);
+    let passos = 0;
+    while (s.phase !== 'gameEnd') {
+      assert.ok(++passos < 40000, `partida ${seed} não terminou`);
+      if (s.phase === 'roundEnd') { actNextRound(s); continue; }
+      const id = s.players[s.turn].id;
+      const acao = botNextAction(s, id);
+      if (acao.a === 'comprar') compras++;
+      applyAction(s, id, acao);
+      const naMesa = s.mesa ? 1 + RAMOS.reduce((n, r) => n + s.mesa.ramos[r].length, 0) : 0;
+      const nasMaos = s.players.reduce((n, p) => n + p.hand.length, 0);
+      assert.equal(naMesa + nasMaos + s.dorme.length, 28);
+      assert.ok(s.times.every((t) => t % 5 === 0), `placar ${s.times}`);
+    }
+    assert.ok(s.times[s.vencedor] >= 240);
+  }
+  assert.ok(compras > 0, 'os robôs compraram do dorme');
+});

@@ -44,18 +44,22 @@ const MODOS = {
     actNextRound: Presidente.actNextRound, viewFor: Presidente.viewFor, botNextAction: Presidente.botNextAction,
     FASES_DE_VEZ: Presidente.FASES_DE_VEZ, MIN: Presidente.MIN_JOGADORES, MAX: Presidente.MAX_JOGADORES,
   },
-  // Dominó de ponto: sempre 4, em duplas fixas (cadeiras 0+2 contra 1+3). A
-  // sala tem CADEIRAS: o anfitrião arruma quem senta onde, e as vazias viram
-  // robô na hora de começar.
+  // Dominó de ponto: 2v2 em duplas fixas (cadeiras 0+2 contra 1+3) ou 1v1,
+  // à escolha do anfitrião. A sala tem CADEIRAS: o anfitrião arruma quem senta
+  // onde, e as vazias viram robô na hora de começar.
   domino: {
     createGame: Domino.createGame, startRound: Domino.startRound, applyAction: Domino.applyAction,
     actNextRound: Domino.actNextRound, viewFor: Domino.viewFor, botNextAction: Domino.botNextAction,
     FASES_DE_VEZ: Domino.FASES_DE_VEZ, MIN: Domino.MIN_JOGADORES, MAX: Domino.MAX_JOGADORES,
     cadeiras: true,
+    lugares: (room) => Domino.FORMATOS[room.formato] || Domino.MAX_JOGADORES,
   },
 };
 const modoValido = (m) => (Object.hasOwn(MODOS, m) ? m : 'cacamba');
 const motorDe = (room) => MODOS[modoValido(room.modo)];
+// Quantos sentam: o máximo do modo, ou o do formato escolhido (dominó 1v1).
+const lugaresDe = (room) => { const m = motorDe(room); return m.lugares ? m.lugares(room) : m.MAX; };
+const formatoValido = (f) => (Object.hasOwn(Domino.FORMATOS, f) ? f : '2v2');
 const cliValue = (name) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
 const PORT = Number(process.env.PORT || cliValue('--port')) || 3000;
 // Hospedagens injetam a porta e esperam que o processo escute em todas as
@@ -395,7 +399,7 @@ function retratoDaSala(room) {
     v: 1, seq: room.seloSeq, em: Date.now(),
     code: room.code, origin: room.origin, gameSeq: room.gameSeq, createdAt: room.createdAt, nivelRobos: room.nivelRobos || 'normal',
     modo: modoValido(room.modo),
-    ...(room.cadeiras ? { cadeiras: room.cadeiras } : {}),
+    ...(room.cadeiras ? { cadeiras: room.cadeiras, formato: formatoValido(room.formato) } : {}),
     players: room.players.map(({ ws, ...p }) => p),   // sem o socket
     game: room.game,                                   // `rnd` é função: some no JSON, volta na restauração
   };
@@ -430,6 +434,7 @@ function recriaSala(d, origin) {
     nivelRobos: NIVEIS_DE_ROBO.includes(d.nivelRobos) ? d.nivelRobos : 'normal',
     modo: modoValido(d.modo),
     cadeiras: Array.isArray(d.cadeiras) ? d.cadeiras.slice(0, 8) : undefined,
+    formato: formatoValido(d.formato),
   };
   if (room.game) room.game.rnd = Math.random;
   rooms.set(room.code, room);
@@ -546,7 +551,7 @@ function sentaNasCadeiras(room) {
   if (!motor.cadeiras) return null;
   const ids = new Set(room.players.map((p) => p.id));
   const sentados = new Set();
-  const c = Array.from({ length: motor.MAX }, (_, i) => {
+  const c = Array.from({ length: lugaresDe(room) }, (_, i) => {
     const id = room.cadeiras?.[i];
     if (typeof id !== 'string' || !ids.has(id) || sentados.has(id)) return null;
     sentados.add(id);
@@ -604,7 +609,7 @@ function lobbyView(room) {
     qr: room.qr,
     started: !!room.game,
     modo: modoValido(room.modo),
-    ...(motorDe(room).cadeiras ? { cadeiras: sentaNasCadeiras(room) } : {}),
+    ...(motorDe(room).cadeiras ? { cadeiras: sentaNasCadeiras(room), formato: formatoValido(room.formato) } : {}),
     nivelRobos: room.nivelRobos || 'normal',
     players: room.players.map((p) => ({
       id: p.id, name: p.name, isBot: p.isBot, connected: p.isBot || p.connected,
@@ -973,7 +978,7 @@ function handle(ws, msg) {
       const room = rooms.get(String(msg.code || '').toUpperCase().trim());
       if (!room) { const e = new Error('Sala não encontrada. Confira o código.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('Essa partida já começou.'); e.gameRule = true; throw e; }
-      const max = motorDe(room).MAX;
+      const max = lugaresDe(room);
       if (room.players.length >= max) { const e = new Error(`A sala está cheia (${max} jogadores).`); e.gameRule = true; throw e; }
       const player = {
         id: crypto.randomUUID(), name: sanitizeName(msg.name), token: crypto.randomUUID(),
@@ -1061,9 +1066,23 @@ function handle(ws, msg) {
       const room = currentRoom(ws);
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode mexer nos robôs.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
-      const max = motorDe(room).MAX;
+      const max = lugaresDe(room);
       if (room.players.length >= max) { const e = new Error(`A sala está cheia (${max} jogadores).`); e.gameRule = true; throw e; }
       novoRobo(room);
+      broadcastLobby(room);
+      break;
+    }
+    // Formato do dominó: 2v2 (em dupla) ou 1v1 (mano a mano). Só antes de
+    // começar, e só se quem já está na sala couber.
+    case 'formato': {
+      const room = currentRoom(ws);
+      if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala escolhe o formato.'); e.gameRule = true; throw e; }
+      if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
+      if (!motorDe(room).cadeiras || !Object.hasOwn(Domino.FORMATOS, msg.f)) return;
+      if (room.players.length > Domino.FORMATOS[msg.f]) {
+        const e = new Error(`Tem gente demais na sala para o ${msg.f}.`); e.gameRule = true; throw e;
+      }
+      room.formato = msg.f;
       broadcastLobby(room);
       break;
     }
