@@ -106,11 +106,30 @@ export function criaMesaPresidente(ctx) {
     return el;
   }
 
+  // A JOGADA QUE FECHA A MESA. Quando o 2 cai, ou quando o último da volta
+  // cobre, o servidor já manda a mesa limpa na mesma mensagem — e a carta
+  // sumia sem ninguém ver qual foi ("a mesa é limpada antes mesmo de vermos",
+  // dono do jogo, 15/10/2026). A última jogada fica à vista um instante.
+  const SEGURA_MS = 1600;
+  let fechou = null;          // { p, cards, ate, motivo }
+  let timerFechou = null;
+  const segurando = () => !!fechou && Date.now() < fechou.ate;
+  function guardaFechamento(ev) {
+    fechou = { p: ev.p, cards: ev.cards, ate: Date.now() + SEGURA_MS, motivo: null };
+    clearTimeout(timerFechou);
+    timerFechou = setTimeout(() => { fechou = null; if (v()) ctx.render(); }, SEGURA_MS + 20);
+  }
+
   let ultimaMesa = null;
   function desenhaCentro() {
     const vw = v();
     centro.innerHTML = '';
-    const lances = vw.lances || [];
+    centro.classList.remove('segura');
+    let lances = vw.lances || [];
+    if (!lances.length && segurando()) {
+      lances = [{ p: fechou.p, cards: fechou.cards }];
+      centro.classList.add('segura');
+    }
     if (!lances.length) {
       const vazio = document.createElement('p');
       vazio.className = 'pres-vazio';
@@ -132,6 +151,9 @@ export function criaMesaPresidente(ctx) {
         const quem = document.createElement('span');
         quem.className = 'pres-quem';
         quem.textContent = l.p === ctx.me() ? 'sua jogada' : nome(l.p);
+        if (centro.classList.contains('segura')) {
+          quem.textContent += fechou.motivo === 'dois' ? ' · o 2 fecha a mesa' : fechou.motivo === 'volta' ? ' · fechou a volta' : '';
+        }
         grupo.appendChild(quem);
         const chave = l.cards.map((c) => c.id).join(',');
         if (chave !== ultimaMesa && !ctx.semMovimento()) grupo.classList.add('cai');
@@ -168,6 +190,7 @@ export function criaMesaPresidente(ctx) {
     const vw = v();
     if (vw.phase === 'roundEnd') {
       if (modalDaRodada === vw.round) return;
+      if (segurando()) return;   // deixa ver a última carta antes do placar
       modalDaRodada = vw.round;
       fimDaRodada();
     } else if (modalDaRodada !== null) {
@@ -271,6 +294,7 @@ export function criaMesaPresidente(ctx) {
       const eu = ctx.me();
       switch (ev.e) {
         case 'roundStart':
+          fechou = null;
           ctx.novaRodada();
           modalDaRodada = null;
           ctx.closeModal();
@@ -288,9 +312,11 @@ export function criaMesaPresidente(ctx) {
           ctx.toast(ev.p === eu ? 'Você abre a rodada.' : `${nome(ev.p)} abre a rodada.`);
           break;
         case 'jogou':
+          guardaFechamento(ev);
           if (ev.cards.length && forca(ev.cards[0]) === 12) ctx.reage(ev.p, 'levou');
           break;
         case 'limpou':
+          if (fechou) fechou.motivo = ev.motivo;
           if (ev.motivo === 'dois') ctx.toast(ev.p === eu ? '2 na mesa: ninguém cobre. Você começa de novo.' : `2 na mesa: ninguém cobre. ${nome(ev.p)} começa.`);
           else ctx.toast(ev.p === eu ? 'Volta fechada: mesa limpa, você começa.' : `Volta fechada: ${nome(ev.p)} começa.`);
           break;

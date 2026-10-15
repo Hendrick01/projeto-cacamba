@@ -32,7 +32,10 @@
   60%  { opacity: 1; }
   100% { transform: rotateX(30deg) translate(0, 0) scale(1); opacity: 1; }
 }
-@media (prefers-reduced-motion: reduce) { .pres-lance.cai { animation: none; } }
+/* A jogada que fechou a mesa fica um instante e sai varrida (presidente-mesa.js, SEGURA_MS). */
+.pres-centro.segura .pres-lance.atual { animation: presCai 0.42s cubic-bezier(0.2, 0.8, 0.3, 1), presVarre 0.35s ease-in 1.25s forwards; }
+@keyframes presVarre { to { opacity: 0; transform: rotateX(30deg) translateY(-18px) scale(0.92); } }
+@media (prefers-reduced-motion: reduce) { .pres-lance.cai, .pres-centro.segura .pres-lance.atual { animation: none; } }
 .pres-quem {
   position: absolute; left: 50%; bottom: -20px; transform: translateX(-50%) rotateX(-30deg);
   white-space: nowrap; font-size: 0.72rem; font-weight: 800; color: var(--sage);
