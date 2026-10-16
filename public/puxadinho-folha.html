@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2a1b12">
+<meta name="robots" content="noindex">
+<title>Folha de arte do Puxadinho</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="fonts/fontes.css">
+<link rel="stylesheet" href="puxadinho.css">
+<style>
+  /* A folha de conferência da arte do Puxadinho (ver a skill
+     .claude/skills/arte-do-puxadinho). Mostra cada desenho nos tamanhos em que
+     ele aparece no jogo, em silhueta e na escala real do tabuleiro no
+     celular. Não é tela do jogo: ninguém chega aqui por link. */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1d1813; color: #f5f1e6; font-family: 'Nunito', system-ui, sans-serif; padding: 16px; }
+  h1 { font-family: 'Paytone One', sans-serif; font-weight: 400; color: #f2c14e; font-size: 1.4rem; }
+  h2 { font-family: 'Paytone One', sans-serif; font-weight: 400; font-size: 1.05rem; margin: 22px 0 8px; }
+  p { color: #b9c9bf; font-size: 0.85rem; max-width: 60ch; }
+  .linha { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 8px; }
+  .item { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 0.7rem; color: #9dbbad; }
+  .silhueta { background: #f5f1e6; border-radius: 6px; padding: 4px; }
+  .silhueta svg, .silhueta img { filter: brightness(0); display: block; }
+  .feltro { background: #155238; padding: 12px; border-radius: 12px; }
+  .tabela { display: grid; grid-template-columns: auto repeat(5, auto); gap: 8px 14px; align-items: center; justify-items: center; margin-top: 8px; }
+  .tabela > span:first-child, .rot { justify-self: start; font-size: 0.75rem; color: #9dbbad; }
+</style>
+</head>
+<body>
+<h1>Folha de arte do Puxadinho</h1>
+<p>Cada material nos tamanhos do jogo (18 px na troca e nas ofertas, 26 px nos modais, 30 px na mão), em silhueta preta (tem de dar para saber qual é cada um só pela forma) e as quadras do tabuleiro em escala de celular e ampliadas.</p>
+
+<h2>Fichas</h2>
+<div id="fichas" class="tabela"></div>
+
+<h2>Silhuetas</h2>
+<div id="silhuetas" class="linha"></div>
+
+<h2>Quadras no tamanho do celular</h2>
+<div id="quadras-real" class="linha feltro"></div>
+
+<h2>Quadras ampliadas</h2>
+<div id="quadras" class="linha"></div>
+
+<script type="module" src="puxadinho-folha.js"></script>
+</body>
+</html>

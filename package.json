@@ -17,7 +17,8 @@
     "test:presidente": "node test/presidente.mjs",
     "test:domino": "node test/domino.mjs",
     "test:bazuca": "node test/bazuca.mjs",
-    "test:poker": "node test/poker.mjs"
+    "test:poker": "node test/poker.mjs",
+    "test:puxadinho": "node test/puxadinho.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -182,6 +182,15 @@ function handleMessage(msg) {
         }
         break;
       }
+      if (msg.view?.modo === 'puxadinho' && !mesaPuxadinho) {
+        filaPuxadinho.push(msg);
+        if (filaPuxadinho.length === 1) {
+          carregaPuxadinho()
+            .then(() => { const fila = filaPuxadinho.splice(0); for (const m of fila) handleMessage(m); })
+            .catch(() => { filaPuxadinho.length = 0; toast('Não deu para abrir a mesa do Puxadinho. Recarregue a página.'); });
+        }
+        break;
+      }
       view = msg.view;
       controlesVoz.presenca(view.players);
       showScreen('game');
@@ -284,6 +293,12 @@ const MODOS = {
     fatos: '<span><strong>2–8</strong>jogadores</span><span><strong>1.000</strong>em fichas para cada um</span><span><strong>Leva tudo</strong>quem ficar com todas</span>',
     min: 2,
   },
+  puxadinho: {
+    nome: 'Puxadinho',
+    titulo: 'Puxadinho<br><em>levante o bairro antes do fiscal</em>',
+    fatos: '<span><strong>3–4</strong>jogadores</span><span><strong>Troca</strong>material com a mesa</span><span><strong>10 pontos</strong>na sua vez ganha</span>',
+    min: 3, max: 4,
+  },
 };
 let modoDaCasa = 'cacamba';
 function telaInicial() { return params.get('sala') ? 'home' : 'modos'; }
@@ -311,6 +326,10 @@ $('modo-bazuca').onclick = () => {
 $('modo-poker').onclick = () => {
   escolheModo('poker');
   carregaPoker().catch(() => {});
+};
+$('modo-puxadinho').onclick = () => {
+  escolheModo('puxadinho');
+  carregaPuxadinho().catch(() => {});
 };
 $('btn-modos').onclick = () => showScreen('modos');
 
@@ -366,6 +385,19 @@ function carregaPoker() {
   return carregandoPoker;
 }
 const ehPoker = () => view?.modo === 'poker';
+
+// A MESA DO PUXADINHO, no mesmo esquema: o tabuleiro só vem com o modo.
+let mesaPuxadinho = null;
+let carregandoPuxadinho = null;
+const filaPuxadinho = [];
+function carregaPuxadinho() {
+  carregandoPuxadinho ||= import('./puxadinho-mesa.js').then((mod) => {
+    mesaPuxadinho = mod.criaMesaPuxadinho(contextoDaMesa());
+    return mesaPuxadinho;
+  });
+  return carregandoPuxadinho;
+}
+const ehPuxadinho = () => view?.modo === 'puxadinho';
 $('name-input').value = localStorage.getItem('cacamba-name') || '';
 
 function myNameInput() {
@@ -474,6 +506,7 @@ $('btn-rules-home').onclick = () => {
   else if (modoDaCasa === 'domino') carregaDomino().then((m) => m.regras()).catch(() => {});
   else if (modoDaCasa === 'bazuca') carregaBazuca().then((m) => m.regras()).catch(() => {});
   else if (modoDaCasa === 'poker') carregaPoker().then((m) => m.regras()).catch(() => {});
+  else if (modoDaCasa === 'puxadinho') carregaPuxadinho().then((m) => m.regras()).catch(() => {});
   else showRules();
 };
 
@@ -1145,8 +1178,14 @@ function renderMesa() {
   $('screen-game').classList.toggle('modo-domino', ehDomino());
   $('screen-game').classList.toggle('modo-bazuca', ehBazuca());
   $('screen-game').classList.toggle('modo-poker', ehPoker());
+  $('screen-game').classList.toggle('modo-puxadinho', ehPuxadinho());
   if (ehPoker()) {
     mesaPoker.render();
+    notifyTurn();
+    return;
+  }
+  if (ehPuxadinho()) {
+    mesaPuxadinho.render();
     notifyTurn();
     return;
   }
@@ -1416,6 +1455,7 @@ function mostraOponente(playerId) {
   if (ehDomino()) { mesaDomino.mostraJogador(playerId); return; }
   if (ehBazuca()) { mesaBazuca.mostraJogador(playerId); return; }
   if (ehPoker()) { mesaPoker.mostraJogador(playerId); return; }
+  if (ehPuxadinho()) { mesaPuxadinho.mostraJogador(playerId); return; }
   const p = view.players.find((x) => x.id === playerId);
   if (!p) return;
   const prog = progressoDoContrato(p);
@@ -1538,8 +1578,8 @@ function atualizaBanner() {
     banner.className = 'turn-banner evento';
     return;
   }
-  if (ehPresidente() || ehDomino() || ehBazuca() || ehPoker()) {
-    const t = (ehPoker() ? mesaPoker : ehBazuca() ? mesaBazuca : ehDomino() ? mesaDomino : mesaPresidente).textoDaVez();
+  if (ehPresidente() || ehDomino() || ehBazuca() || ehPoker() || ehPuxadinho()) {
+    const t = (ehPuxadinho() ? mesaPuxadinho : ehPoker() ? mesaPoker : ehBazuca() ? mesaBazuca : ehDomino() ? mesaDomino : mesaPresidente).textoDaVez();
     banner.textContent = t.texto;
     banner.className = `turn-banner${t.minha ? ' me' : ''}`;
     return;
@@ -2185,8 +2225,8 @@ $('btn-sort').onclick = () => {
   render();
 };
 
-$('btn-rules').onclick = () => (ehPoker() ? mesaPoker.regras() : ehBazuca() ? mesaBazuca.regras() : ehDomino() ? mesaDomino.regras() : ehPresidente() ? mesaPresidente.regras() : showRules());
-$('btn-score').onclick = () => (ehPoker() ? mesaPoker.placar() : ehBazuca() ? mesaBazuca.placar() : ehDomino() ? mesaDomino.placar() : ehPresidente() ? mesaPresidente.placar() : showScore());
+$('btn-rules').onclick = () => (ehPuxadinho() ? mesaPuxadinho.regras() : ehPoker() ? mesaPoker.regras() : ehBazuca() ? mesaBazuca.regras() : ehDomino() ? mesaDomino.regras() : ehPresidente() ? mesaPresidente.regras() : showRules());
+$('btn-score').onclick = () => (ehPuxadinho() ? mesaPuxadinho.placar() : ehPoker() ? mesaPoker.placar() : ehBazuca() ? mesaBazuca.placar() : ehDomino() ? mesaDomino.placar() : ehPresidente() ? mesaPresidente.placar() : showScore());
 // A mesa em 3D é outra janela para a MESMA partida: entra com a sessão
 // guardada e conversa com o mesmo servidor. A biblioteca dela (three.js) só é
 // baixada quando se abre — a mesa normal continua leve.
@@ -2375,6 +2415,7 @@ function announce(ev) {
   if (ehDomino() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaDomino.anuncia(ev); return; }
   if (ehBazuca() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaBazuca.anuncia(ev); return; }
   if (ehPoker() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaPoker.anuncia(ev); return; }
+  if (ehPuxadinho() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaPuxadinho.anuncia(ev); return; }
   switch (ev.e) {
     case 'roundStart':
       distribuirPendente = true;
@@ -2484,7 +2525,8 @@ function announce(ev) {
 function toast(text) {
   // Na mesa, o aviso vai para a linha da vez (veja `atualizaBanner`); o
   // pop-up fica só para onde não há banner — saguão, placar, avisos de sistema.
-  const naMesa = view && ['draw', 'play', 'troca'].includes(view.phase) && $('screen-game') && !$('screen-game').hidden;
+  const naMesa = view && (['draw', 'play', 'troca'].includes(view.phase) || (ehPuxadinho() && view.phase !== 'gameEnd'))
+    && $('screen-game') && !$('screen-game').hidden;
   if (naMesa && $('turn-banner')) {
     filaDeEventos.push(text);
     while (filaDeEventos.length > 3) filaDeEventos.shift();

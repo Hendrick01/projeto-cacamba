@@ -19,6 +19,30 @@
         "3023"
       ],
       "port": 3023
+    },
+    {
+      "name": "puxadinho",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "RITMO_DOS_ROBOS=0.15",
+        "node",
+        "server.js",
+        "--port",
+        "3031"
+      ],
+      "port": 3031
+    },
+    {
+      "name": "puxadinho-3d",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "RITMO_DOS_ROBOS=0.05",
+        "node",
+        "server.js",
+        "--port",
+        "3033"
+      ],
+      "port": 3033
     }
   ]
 }

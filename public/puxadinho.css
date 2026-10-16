@@ -1,0 +1,216 @@
+/* Puxadinho — o que muda na mesa 2D. Baixado só com o modo
+   (puxadinho-mesa.js). A mesa, os assentos e os modais continuam os do
+   Caçamba (style.css). O tabuleiro é um loteamento visto de cima: quadras
+   coloridas pelo que produzem, separadas pelas ruas onde se constrói, e a
+   avenida em volta com as revendas. */
+
+/* Sem monte, meio, jogos baixados, ordenar cartas, mãos desenhadas nem mesa
+   3D (ainda não tem). Nos assentos, o leque de cartas viradas também sai: o
+   material é contado no selo e nas marcas. */
+#screen-game.modo-puxadinho .piles,
+#screen-game.modo-puxadinho #btn-claim,
+#screen-game.modo-puxadinho #my-melds,
+#screen-game.modo-puxadinho #btn-sort,
+#screen-game.modo-puxadinho #btn-3d,
+#screen-game.modo-puxadinho .maos,
+#screen-game.modo-puxadinho .assento .leque { display: none !important; }
+#screen-game:not(.modo-puxadinho) .px-centro,
+#screen-game:not(.modo-puxadinho) .px-btn { display: none !important; }
+
+#screen-game.modo-puxadinho .mesa .table-center {
+  flex: 1; display: flex; flex-direction: column; margin: 0;
+}
+.px-centro { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 4px; }
+.px-palco { flex: 1; min-height: 250px; position: relative; }
+.px-tabuleiro { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+/* ---- O chão do bairro ------------------------------------------------------ */
+.px-avenida { fill: #2b2c2e; stroke: #1a1b1c; stroke-width: 0.06; stroke-linejoin: round; }
+.px-faixa { fill: none; stroke: #e8c766; stroke-opacity: 0.55; stroke-width: 0.045; stroke-dasharray: 0.22 0.18; stroke-linejoin: round; }
+.px-chao { fill: #4a463f; stroke: #8c8577; stroke-width: 0.07; stroke-linejoin: round; }
+
+.px-quadra { stroke: rgba(0, 0, 0, 0.35); stroke-width: 0.05; stroke-linejoin: round; }
+.px-lote .px-arte, .px-lote .px-textura, .px-revenda .px-arte { pointer-events: none; }
+.px-lote.embargado .px-quadra { filter: saturate(0.55) brightness(0.8); }
+.px-lote.embargado .px-textura, .px-lote.embargado .px-arte { opacity: 0.7; }
+.px-listras { pointer-events: none; }
+
+/* A placa do lote: o número e as barrinhas da chance. 6 e 8 em âmbar. */
+.px-placa rect:first-child { fill: #f5f1e6; stroke: rgba(0, 0, 0, 0.45); stroke-width: 0.04; }
+.px-num { font-family: var(--font-display); font-size: 0.34px; fill: var(--ink); }
+.px-chance { fill: var(--ink); opacity: 0.75; }
+.px-placa.quente rect:first-child { fill: var(--gold); }
+.px-placa.quente .px-num { fill: #5a1d0e; }
+.px-placa.quente .px-chance { fill: #5a1d0e; }
+.px-pref-txt { font-family: var(--font-body); font-weight: 900; font-size: 0.2px; fill: #eef5ee; letter-spacing: 0.01em; }
+
+/* ---- Revendas ------------------------------------------------------------------ */
+.px-acesso { stroke: #d9cfb8; stroke-width: 0.05; stroke-opacity: 0.6; }
+.px-rev-placa { fill: #f5f1e6; stroke: #1a1b1c; stroke-width: 0.04; }
+.px-rev-geral .px-rev-placa { fill: #e8dcc0; }
+.px-rev-txt { font-family: var(--font-body); font-weight: 900; font-size: 0.24px; fill: var(--ink); }
+
+/* ---- O fiscal -------------------------------------------------------------------- */
+.px-fiscal { pointer-events: none; }
+.px-sombra { fill: rgba(0, 0, 0, 0.45); }
+.px-cone { fill: #f07c1f; stroke: #5e2a07; stroke-width: 0.025; }
+.px-cone-faixa { fill: #fff6e6; }
+.px-cone-base { fill: #2a2622; }
+
+/* ---- Ruas e construções -------------------------------------------------------- */
+.px-rua-borda { stroke: #121212; stroke-width: 0.27; stroke-linecap: round; }
+.px-rua-cor { stroke-width: 0.17; stroke-linecap: round; }
+.px-predio-ou-casa image { pointer-events: none; }
+.px-alvo-anel { fill: none; stroke: none; }
+
+/* ---- Os lugares tocáveis --------------------------------------------------------- */
+.px-alvo { cursor: pointer; outline: none; }
+.px-alvo-toque { fill: transparent; stroke: transparent; }
+.px-alvo-rua .px-alvo-toque { stroke-width: 0.42; stroke-linecap: round; }
+.px-alvo-traco { stroke: var(--gold); stroke-width: 0.12; stroke-dasharray: 0.12 0.09; stroke-linecap: round; opacity: 0.85; }
+.px-alvo-circ { fill: rgba(242, 193, 78, 0.28); stroke: var(--gold); stroke-width: 0.05; stroke-dasharray: 0.08 0.06; }
+.px-alvo-casa .px-alvo-circ, .px-alvo-rua .px-alvo-traco { animation: pxPulsa 1.2s ease-in-out infinite; }
+.px-alvo.sel .px-alvo-circ { fill: var(--gold); stroke: #fff; stroke-dasharray: none; animation: none; }
+.px-alvo-rua.sel .px-alvo-traco { stroke: #fff; stroke-width: 0.2; stroke-dasharray: none; animation: none; opacity: 1; }
+.px-alvo-hex .px-quadra { stroke: var(--gold); stroke-width: 0.08; stroke-dasharray: 0.16 0.1; }
+.px-alvo-hex.sel .px-quadra { stroke: #fff; stroke-width: 0.13; stroke-dasharray: none; }
+.px-alvo-predio .px-alvo-anel { fill: rgba(242, 193, 78, 0.3); stroke: var(--gold); stroke-width: 0.05; stroke-dasharray: 0.08 0.06; animation: pxPulsa 1.2s ease-in-out infinite; }
+.px-alvo-predio.sel .px-alvo-anel { fill: var(--gold); stroke: #fff; stroke-dasharray: none; animation: none; }
+.px-alvo:focus-visible .px-alvo-circ, .px-alvo:focus-visible .px-alvo-traco { stroke: #fff; stroke-width: 0.1; }
+.px-alvo-hex:focus-visible .px-quadra { stroke: #fff; stroke-width: 0.12; }
+.px-alvo-predio:focus-visible .px-alvo-anel { stroke: #fff; stroke-width: 0.09; }
+@keyframes pxPulsa { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .px-alvo-casa .px-alvo-circ, .px-alvo-rua .px-alvo-traco, .px-alvo-predio .px-alvo-anel { animation: none; }
+}
+
+/* ---- Os dados ---------------------------------------------------------------------- */
+.px-dado { fill: var(--cream); stroke: #1a1b1c; stroke-width: 0.04; }
+.px-dado-ponto { fill: var(--ink); }
+.px-dados.sete .px-dado { fill: #f3b7a8; }
+.px-dados-soma { font-family: var(--font-display); font-size: 0.5px; fill: var(--cream); }
+
+/* ---- A oferta de troca ------------------------------------------------------------ */
+.px-oferta {
+  margin: 0 auto; max-width: min(100%, 520px); padding: 6px 10px; border-radius: 12px;
+  background: rgba(6, 32, 26, 0.85); border: 1px solid var(--gold-soft);
+  display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; color: var(--cream);
+}
+.px-oferta[hidden] { display: none; }
+.px-oferta-txt { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.px-oferta-lado { display: inline-flex; gap: 4px; }
+.px-respostas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.px-respostas .btn { padding: 6px 12px; min-height: 36px; font-size: 0.8rem; }
+.px-resp { font-size: 0.72rem; color: var(--sage); font-weight: 800; }
+.px-resp.nao { opacity: 0.75; }
+
+/* ---- As fichas de material (HTML) ------------------------------------------------- */
+.px-ficha {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+/* o desenho já vem recortado (viewBox 1.5…30.5) e a cor do fundo vem da
+   arte (puxadinho-arte.js, PALETA[r].fundo): aqui só o tamanho e a moldura */
+.px-ficha svg, .px-ficha img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.px-ficha.mini { width: 20px; height: 20px; border-radius: 5px; border-width: 1px; }
+.px-par { display: inline-flex; align-items: center; gap: 2px; font-weight: 900; }
+
+/* ---- A mão --------------------------------------------------------------------------- */
+#screen-game.modo-puxadinho .hand { padding-top: 8px; }
+.px-mao { display: flex; flex-direction: column; gap: 6px; align-items: center; width: 100%; }
+.px-recursos { display: flex; justify-content: center; gap: 6px; max-width: 100%; }
+.px-rec {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  flex: 0 1 62px; min-width: 52px; padding: 5px 4px 4px; border-radius: 10px;
+  background: rgba(6, 32, 26, 0.7); border: 1px solid var(--felt-line);
+}
+.px-rec .px-ficha { width: 30px; height: 30px; }
+.px-rec-n { font-family: var(--font-display); font-size: 1.15rem; line-height: 1.1; color: var(--cream); }
+.px-rec-nome { font-size: 0.62rem; font-weight: 800; color: var(--sage); text-transform: uppercase; letter-spacing: 0.04em; }
+.px-rec.zero { opacity: 0.5; }
+.px-ganho {
+  position: absolute; top: -8px; right: -4px; padding: 0 6px; border-radius: 999px;
+  background: var(--gold); color: var(--ink); font-weight: 900; font-size: 0.75rem;
+  animation: pxGanho 1.8s ease-out forwards;
+}
+@keyframes pxGanho { 0% { transform: translateY(6px); opacity: 0; } 15% { transform: none; opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .px-ganho { animation: none; } }
+.px-info { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; font-size: 0.72rem; color: var(--sage); font-weight: 700; }
+.px-pts strong { font-family: var(--font-display); font-weight: 400; font-size: 1rem; color: var(--gold); }
+
+.px-cartas { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.px-carta {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 40px;
+  padding: 6px 12px; border-radius: 10px; cursor: pointer;
+  background: #f5f1e6; color: var(--ink); border: 2px solid #8c8068; font-weight: 900; font-size: 0.78rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.45);
+}
+.px-carta.pode { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.45), 0 4px 8px rgba(0, 0, 0, 0.45); }
+.px-carta:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.px-carta-n { font-family: var(--font-display); font-weight: 400; color: #6b5a3a; }
+.px-carta-nova { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8c4a1e; }
+.px-c-mestre { background: #f3e2c4; }
+.px-c-obra { background: #dfeadf; }
+
+/* ---- Assentos ------------------------------------------------------------------------ */
+.px-m-titulo {
+  font-size: 0.6rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 1px 6px; border-radius: 999px; white-space: nowrap;
+}
+.px-m-titulo { background: var(--cream); color: var(--ink); }
+
+/* ---- Modais ----------------------------------------------------------------------------- */
+.px-opcoes { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.px-opcao {
+  display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'nome custo' 'motivo custo';
+  align-items: center; gap: 2px 10px; padding: 10px 12px; border-radius: 12px; text-align: left; cursor: pointer;
+  background: rgba(6, 32, 26, 0.6); border: 1px solid var(--felt-line); color: var(--cream); font: inherit;
+}
+.px-opcao:not(:disabled):hover, .px-opcao:focus-visible { border-color: var(--gold); outline: none; }
+.px-opcao:disabled { opacity: 0.5; cursor: default; }
+.px-opcao-nome { grid-area: nome; font-weight: 900; }
+.px-opcao-nome small { font-weight: 700; color: var(--sage); }
+.px-opcao-motivo { grid-area: motivo; font-size: 0.75rem; color: var(--sage); }
+.px-custo { grid-area: custo; display: flex; gap: 6px; }
+
+.px-abas { display: flex; gap: 6px; margin: 4px 0 8px; }
+.px-aba {
+  flex: 1; padding: 8px; border-radius: 999px; cursor: pointer; font: inherit; font-weight: 900;
+  background: transparent; color: var(--sage); border: 1px solid var(--felt-line);
+}
+.px-aba.sel { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+.px-rot { margin: 8px 0 4px; font-size: 0.72rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; color: var(--sage); }
+.px-escolhas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.px-esc {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; border-radius: 10px; cursor: pointer;
+  background: rgba(6, 32, 26, 0.6); border: 1px solid var(--felt-line); color: var(--cream); font: inherit; font-size: 0.7rem; font-weight: 800;
+}
+.px-esc small { color: var(--sage); font-weight: 700; }
+.px-esc.sel { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+.px-esc:disabled { opacity: 0.4; cursor: default; }
+/* Os contadores: os cinco materiais lado a lado, −/+ embaixo de cada um. */
+.px-grade5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.px-col {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0 5px; border-radius: 10px;
+  background: rgba(6, 32, 26, 0.45); border: 1px solid var(--felt-line); min-width: 0;
+}
+.px-col-n { font-family: var(--font-display); font-size: 1.1rem; line-height: 1; }
+.px-col-bt { display: flex; gap: 3px; }
+.px-col small { font-size: 0.64rem; font-weight: 700; color: var(--sage); white-space: nowrap; }
+.px-mm {
+  width: 28px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 900; padding: 0;
+  background: rgba(6, 32, 26, 0.8); color: var(--cream); border: 1px solid var(--felt-line);
+}
+.px-mm:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.px-mm:disabled { opacity: 0.35; cursor: default; }
+.px-conta { text-align: center; font-weight: 900; color: var(--gold); margin: 8px 0 0; }
+.px-lista { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.px-vitima { display: flex; align-items: center; gap: 10px; justify-content: flex-start; }
+.px-vitima .px-qtd { margin-left: auto; font-size: 0.75rem; opacity: 0.8; }
+.px-carta-grande {
+  margin: 4px auto 10px; padding: 18px 14px; max-width: 220px; text-align: center; border-radius: 14px;
+  background: #f5f1e6; color: var(--ink); border: 3px solid #8c8068;
+  font-family: var(--font-display); font-size: 1.25rem; box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5);
+}
+.score-table .px-sub { display: block; font-size: 0.68rem; font-weight: 700; color: var(--sage); }

@@ -129,6 +129,9 @@ html.debug .ui-version { display: inline; }
 .modo-obj.fichas img:nth-child(1) { left: 0; transform: rotate(-10deg); }
 .modo-obj.fichas img:nth-child(2) { left: 20px; transform: rotate(6deg); }
 .modo-obj.fichas svg { position: absolute; right: 0; bottom: 0; width: 70px; height: 38px; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.6)); }
+/* Puxadinho: três quadras do loteamento, uma rua, uma casa e o cone do fiscal */
+.modo-obj.loteamento { right: 14px; top: 10px; width: 96px; height: 82px; }
+.modo-obj.loteamento svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.6)); }
 .modo-principal { padding-top: 132px; }
 .modo:not(.modo-principal) { padding-top: 92px; }
 @media (min-width: 761px) {

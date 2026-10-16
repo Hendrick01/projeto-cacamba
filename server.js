@@ -22,6 +22,7 @@ import * as Presidente from './shared/presidente.js';
 import * as Domino from './shared/domino.js';
 import * as Bazuca from './shared/bazuca.js';
 import * as Poker from './shared/poker.js';
+import * as Puxadinho from './shared/puxadinho.js';
 import { personagemValido } from './shared/elenco.js';
 import { emoteDe } from './shared/emotes.js';
 import { chaveDasSalas, sela, abre } from './lib/selo-sala.js';
@@ -75,6 +76,16 @@ const MODOS = {
     actNextRound: Poker.actNextRound, viewFor: Poker.viewFor, botNextAction: Poker.botNextAction,
     FASES_DE_VEZ: Poker.FASES_DE_VEZ, MIN: Poker.MIN_JOGADORES, MAX: Poker.MAX_JOGADORES,
     pausaDoRobo: Poker.pausaDoRobo,
+  },
+  // Puxadinho: o tabuleiro de construir e trocar. Uma partida só (até 10
+  // pontos); a única jogada fora da vez é responder a uma oferta de troca, e o
+  // motor já confere quem pode o quê. Na vez de devolver material (o 7), quem
+  // age é quem devolve: `turn` aponta para ele, e o agendador segue igual.
+  puxadinho: {
+    createGame: Puxadinho.createGame, startRound: Puxadinho.startRound, applyAction: Puxadinho.applyAction,
+    actNextRound: Puxadinho.actNextRound, viewFor: Puxadinho.viewFor, botNextAction: Puxadinho.botNextAction,
+    FASES_DE_VEZ: Puxadinho.FASES_DE_VEZ, MIN: Puxadinho.MIN_JOGADORES, MAX: Puxadinho.MAX_JOGADORES,
+    pausaDoRobo: Puxadinho.pausaDoRobo,
   },
 };
 const modoValido = (m) => (Object.hasOwn(MODOS, m) ? m : 'cacamba');

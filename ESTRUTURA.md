@@ -534,6 +534,63 @@ em `test/poker.test.js`), mesa 2D em `public/poker-mesa.js` +
   que nenhuma ficha some, que quem saiu só dá mesa ou corre, e leva uma mesa
   de all-in até o fim do jogo e o "jogar de novo".
 
+## Puxadinho (15/10/2026)
+
+O modo de tabuleiro: a mecânica de um jogo de construir e trocar em hexágonos,
+com nome, tema, arte e textos próprios — o porquê de cada troca de nome e o que
+não pode ser copiado estão em `PROPOSTA-PUXADINHO.md` (documento interno;
+nunca citar o jogo de origem no jogo nem na divulgação). Mesmo esquema dos
+outros: `room.modo = 'puxadinho'`, motor em `shared/puxadinho.js` (a regra
+inteira resumida no topo; testes em `test/puxadinho.test.js`), mesa 2D em
+`public/puxadinho-mesa.js` + `public/puxadinho.css`, baixadas só com o modo.
+3 a 4 jogadores; robôs completam.
+
+- **O tabuleiro** (`GEO`) sai de coordenadas axiais de raio 2: 19 terrenos, 54
+  esquinas, 72 lados, 30 de beira e 9 vagas de revenda. A numeração é
+  determinística e é ela que viaja: `construcoes` (esquina → `{p, tipo}`) e
+  `ruas` (lado → id). A mesa desenha a partir do mesmo `GEO`.
+- **Uma partida só**: `startRound` monta o tabuleiro (6 e 8 nunca vizinhos) e
+  abre a colocação em cobra; `actNextRound` não faz nada; ganha quem chega a 10
+  na própria vez (`confereVitoria` olha só o dono da vez) e o fim é `gameEnd`,
+  com o `playAgain` genérico. `TETO_DE_VEZES` (600) encerra mesa esquecida.
+- **`turn` é quem age, `dono` é de quem é a vez.** No 7, quem tem mais de 7
+  cartas devolve a metade em ordem, e `turn` aponta para cada um — assim o
+  agendador de robôs e a cobrança do servidor funcionam sem nada especial. A
+  única jogada fora da vez é `responder` a uma oferta de troca; os robôs
+  respondem na hora, dentro de `actOferta`.
+- **Informação escondida**: material e cartas dos outros só em quantidade; o
+  material levado pelo fiscal só aparece para ladrão e vítima (`roubo`); as
+  Obras Públicas aparecem no fim (`lastRound.obras`).
+- **Regras opcionais** (`OPCOES`, todas desligadas até o dono do jogo
+  escolher): fiscal camarada, meta de 8, baralho de dados e a caçamba (o
+  material apreendido vai para ela e o caminhão a recolhe a cada 7 — sem isso
+  o fornecedor secava e a partida travava).
+- **A mesa**: construir é sempre escolher o lugar e confirmar no botão (as
+  esquinas ficam a ~30 px no celular). O material vai na área da mão; a troca
+  (fornecedor e jogadores), o descarte, as cartas e o menu de construção são
+  modais deste arquivo, redesenhados no lugar a cada toque.
+- **A arte** é modelada no Blender por `scripts/puxadinho_blender.py`, sem
+  janela e a partir do zero:
+  ```bash
+  /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python scripts/puxadinho_blender.py
+  ```
+  São ~45 s, e saem duas coisas:
+  - os renders WebP da 2D em `public/assets/puxadinho/`: as fichas dos cinco
+    materiais (paralelepípedos, areia com pá, tijolo baiano, sacos de cimento,
+    vergalhão), o chão de cada quadra visto de cima e a casa e o prédio em cada
+    cor de `CORES_DE_ASSENTO`;
+  - os GLB da 3D em `public/models/puxadinho/`.
+
+  `public/puxadinho-arte.js` liga os renders à página (`fichaHTML`,
+  `imagemDoMaterial`, `chaoDaQuadra`, `urlDaPeca`) e guarda os desenhos em
+  vetor antigos como plano B. `/puxadinho-folha.html` é a folha de
+  conferência. As regras de modelagem e o ciclo de conferência estão na skill
+  do projeto `.claude/skills/arte-do-puxadinho/`.
+- `npm run test:puxadinho` sobe um servidor próprio (`RITMO_DOS_ROBOS=0.01`) e
+  joga uma partida inteira com dois humanos roteirizados e dois robôs —
+  colocação, trocas no fornecedor, ofertas entre os humanos, fiscal — até
+  alguém chegar a 10, sem jogada recusada, e confere o "jogar de novo".
+
 ## `shared/engine.js` — motor de regras
 
 Módulo puro: recebe estado e devolve estado + lista de eventos. Nunca faz rede,
