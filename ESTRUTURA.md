@@ -582,8 +582,8 @@ inteira resumida no topo; testes em `test/puxadinho.test.js`), mesa 2D em
   - os GLB da 3D em `public/models/puxadinho/`.
 
   `public/puxadinho-arte.js` liga os renders à página (`fichaHTML`,
-  `imagemDoMaterial`, `chaoDaQuadra`, `urlDaPeca`) e guarda os desenhos em
-  vetor antigos como plano B. `/puxadinho-folha.html` é a folha de
+  `imagemDoMaterial`, `chaoDaQuadra`, `urlDaPeca`) e guarda as medidas e
+  cores que 2D, 3D e gerador dividem. `/puxadinho-folha.html` é a folha de
   conferência. As regras de modelagem e o ciclo de conferência estão na skill
   do projeto `.claude/skills/arte-do-puxadinho/`.
 - `npm run test:puxadinho` sobe um servidor próprio (`RITMO_DOS_ROBOS=0.01`) e

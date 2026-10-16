@@ -21,9 +21,9 @@ mesas. A 2D mostra os renders; a 3D carrega os GLB.
 | `scripts/puxadinho_blender.py` | **Fonte das peças.** Modela tudo do zero e gera os renders e os GLB. |
 | `public/assets/puxadinho/` | Renders WebP: `material-*` (fichas, 3/4), `quadra-*` (chão visto de cima), `peca-{casa,predio}-<cor>`. |
 | `public/models/puxadinho/` | GLB para a 3D: materiais, quadras, casa, prédio, cone. |
-| `public/puxadinho-arte.js` | Liga os renders à página: `fichaHTML` (HTML), `imagemDoMaterial`, `imagemDaQuadra`, `chaoDaQuadra` (SVG) e as URLs (`urlDoMaterial`, `urlDaQuadra`, `urlDaPeca`). Guarda `PALETA`, `COR_DO_TERRENO`, `POSICAO_DO_MATERIAL` e os desenhos em vetor antigos. |
+| `public/puxadinho-arte.js` | Liga os renders à página: `fichaHTML` (HTML), `imagemDoMaterial`, `imagemDaQuadra`, `chaoDaQuadra` (SVG) e as URLs (`urlDoMaterial`, `urlDaQuadra`, `urlDaPeca`). Guarda `PALETA`, `COR_DO_TERRENO`, `POSICAO_DO_MATERIAL` e `LUZ_DO_MATERIAL`. |
 | `public/puxadinho-mesa.js` | A mesa 2D; põe a arte no tabuleiro com `arteNoTabuleiro(markup, x, y, tam)`. |
-| `public/puxadinho-3d.js` | A mesa 3D: carrega os GLB, os renders de material e importa a arte. |
+| `public/puxadinho-3d.js` | A mesa 3D: põe o render da quadra como tampo de cada terreno, os `material-*.glb` em pé por cima e casa, prédio e cone em GLB. |
 | `public/puxadinho.css` | O CSS do modo inteiro; das fichas, só tamanho e moldura. |
 | `public/puxadinho-folha.html` + `.js` | A folha de arte, usada no passo de conferência. |
 
@@ -33,7 +33,7 @@ cópias, senão as mesas divergem:
 | O quê | Fonte | Cópias que precisam acompanhar |
 |---|---|---|
 | Cor do chão das quadras | `COR_DO_TERRENO` em `puxadinho-arte.js` (o gerador lê) | os renders: rode o gerador |
-| Cor das peças renderizadas | `mat()` em cada peça do gerador | `PALETA[r].base/luz/sombra` (vetor e reserva da 3D); o `fundo` da ficha só existe em `PALETA` |
+| Cor das peças renderizadas | `mat()` em cada peça do gerador | `PALETA[r].base/luz/sombra` (reserva da 3D); o `fundo` da ficha só existe em `PALETA` |
 | Cores dos jogadores | `CORES_DE_ASSENTO` em `public/client.js` (o gerador lê) | `CORES_DE_ASSENTO` em `public/mesa3d.js`; os renders `peca-*` |
 | Posição do material no alto | `POSICAO_DO_MATERIAL` em `puxadinho-arte.js` | `calmo()` no gerador (zonas livres do cenário) |
 | Tamanho do render da quadra | `RAIO_LOTE` no gerador | `LADO_DO_RENDER_DA_QUADRA` em `puxadinho-arte.js` (= 2 × `RAIO_LOTE`) |
@@ -41,10 +41,6 @@ cópias, senão as mesas divergem:
 | Avenida e placas das revendas | `puxadinho.css` | `puxadinho-3d.js` |
 | Embargo (listras, filtro, 70%) | `puxadinho-mesa.js` e `puxadinho.css` | `svgDaQuadra*` (folha) |
 
-Os desenhos em vetor de `puxadinho-arte.js` são plano B (enquanto o render não
-carrega) e a textura de canvas da 3D, onde imagem de fora não entra. Mexa neles
-só para esses dois usos; chave nova vai em `DESENHOS`, senão `desenhoDoMaterial`
-cai em silêncio no desenho da pedra.
 
 Antes de renomear uma função exportada, um arquivo de render ou um GLB, rode
 `grep -rn "puxadinho-arte\|assets/puxadinho\|models/puxadinho" public/` e
@@ -100,7 +96,7 @@ Pronto quando: o comando termina com `pronto em … s` e sem `Traceback`.
    na tinta da casa.
 5. Material novo: nome novo em `MATERIAIS`, fundo de ficha de **matiz
    próprio** em `PALETA`, o nome do arquivo igual ao que `urlDoMaterial`
-   espera e o desenho em vetor em `DESENHOS` (ver acima).
+   espera.
 
 Pronto quando: na folha, a ficha de 18 px se reconhece pela forma e pela cor,
 e a silhueta preta não se confunde com nenhuma das outras.
@@ -155,8 +151,8 @@ não lista nada.
    - cancele a oferta no fim.
 
    Pronto quando: há captura de cada um, sem desenho cortado, borrado ou sumido.
-4. Se mudou GLB, render de material (a 3D o usa nas revendas) ou desenho em
-   vetor que a 3D usa em textura, suba
+4. Se mudou GLB ou render (a 3D usa os mesmos: quadra no tampo, material
+   nas revendas), suba
    `puxadinho-3d` (porta 3033, outro processo: as salas do 3031 não existem
    lá), crie uma sala Puxadinho com 3 robôs e toque no botão 3D da mesa.
    Pronto quando: há captura do tabuleiro 3D com a arte nova.
