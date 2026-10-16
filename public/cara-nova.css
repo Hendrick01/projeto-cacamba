@@ -139,6 +139,14 @@ html.debug .ui-version { display: inline; }
 .modo-obj.mexe img:nth-child(2) { left: 18px; }
 .modo-obj.mexe img:nth-child(3) { left: 36px; }
 .modo-obj.mexe img:nth-child(4) { left: 68px; top: 2px; transform: rotate(14deg); box-shadow: 0 0 0 2px #f2c14e, 0 8px 14px -6px rgba(0, 0, 0, 0.8); }
+/* Canastra: um leque de copas fechando canastra, com o coringa no meio */
+.modo-obj.canastra { right: 18px; top: 12px; width: 104px; height: 74px; }
+.modo-obj.canastra img { width: 30px; height: 42px; top: 22px; border-radius: 4px; transform-origin: 50% 120%; }
+.modo-obj.canastra img:nth-child(1) { left: 0; transform: rotate(-20deg); }
+.modo-obj.canastra img:nth-child(2) { left: 17px; transform: rotate(-10deg); }
+.modo-obj.canastra img:nth-child(3) { left: 34px; top: 18px; }
+.modo-obj.canastra img:nth-child(4) { left: 51px; transform: rotate(10deg); box-shadow: 0 0 0 2px #f2c14e, 0 8px 14px -6px rgba(0, 0, 0, 0.8); }
+.modo-obj.canastra img:nth-child(5) { left: 68px; transform: rotate(20deg); }
 .modo-principal { padding-top: 132px; }
 .modo:not(.modo-principal) { padding-top: 92px; }
 @media (min-width: 761px) {

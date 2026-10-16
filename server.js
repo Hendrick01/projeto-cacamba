@@ -24,6 +24,7 @@ import * as Bazuca from './shared/bazuca.js';
 import * as Poker from './shared/poker.js';
 import * as Puxadinho from './shared/puxadinho.js';
 import * as MexeMexe from './shared/mexemexe.js';
+import * as Canastra from './shared/canastra.js';
 import { personagemValido } from './shared/elenco.js';
 import { emoteDe } from './shared/emotes.js';
 import { chaveDasSalas, sela, abre } from './lib/selo-sala.js';
@@ -103,6 +104,19 @@ const MODOS = {
     proximoPrazo: MexeMexe.proximoPrazo, tick: MexeMexe.tick, retoma: MexeMexe.retoma,
     niveis: MexeMexe.NIVEIS_DE_ROBO,
   },
+  // Canastra: 1v1 ou 2v2 em cadeiras, como o dominó (duplas 0+2 contra 1+3),
+  // e duas VARIANTES que o anfitrião escolhe antes de começar: a convencional
+  // e a do 3 (3 preto tranca o lixo, 3 vermelho vale 100).
+  canastra: {
+    createGame: Canastra.createGame, startRound: Canastra.startRound, applyAction: Canastra.applyAction,
+    actNextRound: Canastra.actNextRound, viewFor: Canastra.viewFor, botNextAction: Canastra.botNextAction,
+    FASES_DE_VEZ: Canastra.FASES_DE_VEZ, MIN: Canastra.MIN_JOGADORES, MAX: Canastra.MAX_JOGADORES,
+    cadeiras: true,
+    formatos: Canastra.FORMATOS,
+    lugares: (room) => Canastra.FORMATOS[room.formato] || Canastra.MAX_JOGADORES,
+    variantes: Canastra.VARIANTES,
+    niveis: Canastra.NIVEIS_DE_ROBO,
+  },
 };
 const modoValido = (m) => (Object.hasOwn(MODOS, m) ? m : 'cacamba');
 const motorDe = (room) => MODOS[modoValido(room.modo)];
@@ -111,6 +125,16 @@ const lugaresDe = (room) => { const m = motorDe(room); return m.lugares ? m.luga
 // O nível dos robôs: cada modo diz os que tem (o Bazuca tem o difícil).
 const nivelValido = (modo, n) => ((MODOS[modoValido(modo)].niveis || NIVEIS_DE_ROBO).includes(n) ? n : 'normal');
 const formatoValido = (f) => (Object.hasOwn(Domino.FORMATOS, f) ? f : '2v2');
+// A variante da sala (canastra): a primeira do modo, se não veio uma válida.
+const varianteValida = (modo, v) => {
+  const vs = MODOS[modoValido(modo)].variantes;
+  return vs ? (vs.includes(v) ? v : vs[0]) : undefined;
+};
+// O que a sala passa ao motor ao criar a partida.
+const opcoesDaPartida = (room) => ({
+  nivelRobos: room.nivelRobos || 'normal',
+  ...(motorDe(room).variantes ? { variante: varianteValida(room.modo, room.variante) } : {}),
+});
 const cliValue = (name) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
 const PORT = Number(process.env.PORT || cliValue('--port')) || 3000;
 // Hospedagens injetam a porta e esperam que o processo escute em todas as
@@ -451,6 +475,7 @@ function retratoDaSala(room) {
     code: room.code, origin: room.origin, gameSeq: room.gameSeq, createdAt: room.createdAt, nivelRobos: room.nivelRobos || 'normal',
     modo: modoValido(room.modo),
     ...(room.cadeiras ? { cadeiras: room.cadeiras, formato: formatoValido(room.formato) } : {}),
+    ...(room.variante ? { variante: room.variante } : {}),
     players: room.players.map(({ ws, ...p }) => p),   // sem o socket
     game: room.game,                                   // `rnd` é função: some no JSON, volta na restauração
   };
@@ -486,6 +511,7 @@ function recriaSala(d, origin) {
     modo: modoValido(d.modo),
     cadeiras: Array.isArray(d.cadeiras) ? d.cadeiras.slice(0, 8) : undefined,
     formato: formatoValido(d.formato),
+    variante: varianteValida(d.modo, d.variante),
   };
   if (room.game) room.game.rnd = Math.random;
   // os prazos do retrato venceram enquanto o servidor estava fora
@@ -663,6 +689,7 @@ function lobbyView(room) {
     started: !!room.game,
     modo: modoValido(room.modo),
     ...(motorDe(room).cadeiras ? { cadeiras: sentaNasCadeiras(room), formato: formatoValido(room.formato) } : {}),
+    ...(motorDe(room).variantes ? { variante: varianteValida(room.modo, room.variante) } : {}),
     nivelRobos: room.nivelRobos || 'normal',
     players: room.players.map((p) => ({
       id: p.id, name: p.name, isBot: p.isBot, connected: p.isBot || p.connected,
@@ -1223,11 +1250,22 @@ function handle(ws, msg) {
       const room = currentRoom(ws);
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala escolhe o formato.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
-      if (!motorDe(room).cadeiras || !Object.hasOwn(Domino.FORMATOS, msg.f)) return;
-      if (room.players.length > Domino.FORMATOS[msg.f]) {
+      const formatos = motorDe(room).formatos || Domino.FORMATOS;
+      if (!motorDe(room).cadeiras || !Object.hasOwn(formatos, msg.f)) return;
+      if (room.players.length > formatos[msg.f]) {
         const e = new Error(`Tem gente demais na sala para o ${msg.f}.`); e.gameRule = true; throw e;
       }
       room.formato = msg.f;
+      broadcastLobby(room);
+      break;
+    }
+    // A variante (canastra): convencional ou do 3. Só antes de começar.
+    case 'variante': {
+      const room = currentRoom(ws);
+      if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala escolhe a variante.'); e.gameRule = true; throw e; }
+      if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
+      if (!motorDe(room).variantes?.includes(msg.v)) return;
+      room.variante = msg.v;
       broadcastLobby(room);
       break;
     }
@@ -1279,7 +1317,7 @@ function handle(ws, msg) {
         const e = new Error(`Não dá para jogar com ${room.players.length} jogadores: a rodada ${aperto.round + 1} precisaria de ${aperto.precisa} cartas e o baralho tem ${aperto.total}.`);
         e.gameRule = true; throw e;
       }
-      room.game = motor.createGame(jogadoresDaPartida(room).map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), { nivelRobos: room.nivelRobos || 'normal' });
+      room.game = motor.createGame(jogadoresDaPartida(room).map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), opcoesDaPartida(room));
       room.gameSeq++;
       const events = motor.startRound(room.game);
       broadcastLobby(room);
@@ -1378,7 +1416,7 @@ function handle(ws, msg) {
       // Mesma mesa, mesmos lugares: no dominó, as mesmas duplas.
       const motor = motorDe(room);
       const mesa = room.game.players.map((gp) => room.players.find((p) => p.id === gp.id)).filter(Boolean);
-      room.game = motor.createGame(mesa.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), { nivelRobos: room.nivelRobos || 'normal' });
+      room.game = motor.createGame(mesa.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), opcoesDaPartida(room));
       room.gameSeq++;
       const events = motor.startRound(room.game);
       broadcastState(room, events);

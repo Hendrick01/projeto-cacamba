@@ -221,6 +221,8 @@ function conecta() {
       if (msg.view?.modo === 'puxadinho' && !px) { carregaPuxadinho().then(() => trataEstado(msg)); return; }
       // O Mexe-Mexe ainda não tem mesa 3D: volta para a normal, que é a mesma partida.
       if (msg.view?.modo === 'mexemexe') { location.replace('./'); return; }
+      // A Canastra também ainda não tem mesa 3D.
+      if (msg.view?.modo === 'canastra') { location.replace('./'); return; }
       trataEstado(msg);
     } else if (msg.t === 'lobby') {
 

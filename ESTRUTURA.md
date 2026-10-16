@@ -681,6 +681,93 @@ Ainda sem 3D: o botão some e o `mesa3d.js` devolve à mesa normal.
   sem id no evento, partida até o fim sem jogada recusada, nenhuma carta
   sumida e a partida seguinte aberta por quem ganhou.
 
+## Canastra (16/10/2026)
+
+Duas canastras numa sala só: a **convencional** e a **do 3**, que o anfitrião
+escolhe no lobby (mensagem `variante`, como o `formato`). A convencional foi
+combinada com o dono uma por pergunta, a partir de pesquisa (Copag,
+regulamentos de torneio de Joinville e da FENAE, guias de Tranca); a do 3 saiu
+de cinco áudios que o dono mandou (de quem joga essa canastra), transcritos e
+conferidos com ele pergunta a pergunta. Estão no topo de `shared/canastra.js`,
+e **tudo o que muda de uma para a outra mora em `REGRAS[variante]`** (cartas,
+morto, baralhos, valores, bônus, abertura, o que suja, o lixo, o −500); o resto
+do motor pergunta a `regrasDa(variante)`. Testes em `test/canastra.test.js`. Mesa 2D em
+`public/canastra-mesa.js` + `public/canastra.css`, baixadas com `import()` só
+com o modo. Ainda sem 3D: o botão some e o `mesa3d.js` devolve à mesa normal.
+
+- **Mesa.** 1v1 ou 2v2 (cadeiras 0+2 contra 1+3, como o dominó: `cadeiras`,
+  `formatos` e `lugares` no `MODOS` do servidor). Cada baralho tem 2 jokers.
+  Convencional: 11 na mão e um **morto de 11 para cada jogador**, 2 baralhos
+  no 1v1 e 3 no 2v2 (com 4 mortos e 2 baralhos o monte ficaria com 20). Do 3:
+  **15 na mão, sem morto**, 2 baralhos nos dois formatos.
+- **Jogos.** Sequência do mesmo naipe (a escada tem o Ás nas duas pontas; na
+  do 3 não tem o 3 — depois do 2 vem o 4) ou trinca do mesmo valor, que nasce
+  com 3 naipes diferentes e depois aceita qualquer carta do valor. Coringa é o
+  2 e o joker, **um por jogo**; o 2 do naipe na casa dele é carta normal, e
+  quem decide isso é `analisaJogo`, sem guardar estado (a suja vira limpa
+  sozinha quando chega a carta que o 2 cobria). Canastra é jogo de 7 ou mais.
+  Convencional: limpa (sem coringa nenhum) 300, suja 200, Ás ao K 500, Ás ao
+  Ás 1.000. Do 3: **o joker não suja** ("com bezzigue", nos áudios), só o 2;
+  limpa 500, suja 250, Ás ao Ás 1.000; e a trinca pode **nascer com um
+  coringa** (dois ases de naipes diferentes e um 2).
+- **A vez** tem duas fases, `draw` e `play`. Na primeira: `comprar` ou
+  `pegarLixo` (o bolo inteiro, com a carta de cima obrigatoriamente num jogo
+  na mesma ação; na do 3 só para quem já abriu, e num jogo NOVO). Na segunda: `baixar` quantas vezes quiser e `descartar`.
+  `baixar` e `pegarLixo` levam `{ jogos: [[ids]], encaixes: [{ jogo, ids }] }`
+  e passam por `preparaBaixada`, que confere tudo antes de mexer em nada:
+  formação dos jogos novos, encaixes só nos jogos do próprio lado, abertura
+  (o lado sem jogo precisa somar o mínimo de uma vez) e o beco da batida.
+- **Abertura.** Convencional: 50 abaixo de 1.500 no placar, 90 de 1.500 em
+  diante (120 só a partir de 3.000, que já é o fim). A primeira proposta, 90 a
+  partir de 1.000 e 120 a partir de 2.000, travava o fim da partida: em
+  partidas de robôs, 1 abertura em 9 tentativas a 120. Do 3: 75 sempre, e o
+  coringa não conta — o joker e o 2 fora da casa dele; o 2 na casa dele
+  (A-2-4♠) é carta normal, não suja e conta 20. Quem decide é a análise de cada
+  jogo novo (`somaNaAbertura`, pelos `coringasIds` de `analisaJogo`).
+- **Morto e batida.** Mão vazia sem morto pego: pega o morto (`morto`, com
+  `direta` quando foi baixando — aí segue jogando). Mão vazia com o morto já
+  pego é a batida, e só vale com canastra limpa no lado. Por isso, sem limpa e
+  com o morto pego, a baixada precisa deixar 2 cartas (uma para descartar e
+  uma para ficar), e o descarte da última é recusado. Na do 3, sem morto, cada
+  um começa com `pegouMorto: true`: esvaziar a mão já é bater, e a regra das
+  2 cartas vale desde a primeira vez (a visão manda `semMorto` para a tela).
+- **O 3, só na do 3.** O 3 vermelho vai para `lados[i].tresVermelhos` na
+  hora em que chega (na distribuição e na compra) e quem o recebeu compra
+  outra; vale +100. O 3 preto, o 2 e o joker no topo do lixo o trancam
+  (`lixoTrancado`, calculado pelo topo: o seguinte sempre descarta por cima).
+  Cartas na do 3: 4 a 7 valem 5, 8 a K 10, Ás 20, o 2 20, joker 50, o 3 nada.
+- **Fim da rodada.** Batida, ou alguém precisa comprar e o monte acabou —
+  inclusive ao repor um 3 vermelho. `lastRound.lados` traz a conta de cada
+  lado (mesa, canastras, batida, 3 vermelho, mão, morto na mesa); a partida
+  acaba quando um lado passa de 3.000 sem empate no topo. Quem abre a rodada
+  vai em rodízio. Batida: 100 na convencional, 200 na do 3. Na do 3, o lado
+  que termina a rodada (batida ou monte) **sem canastra limpa** leva −500
+  cravado (`cravado: true`): o resto da conta dele não vale, e a tela mostra
+  as linhas riscadas.
+- **Nada alheio no fio.** A visão traz a própria mão e só `handCount` e
+  `pegouMorto` dos outros; o morto não viaja.
+- **A tela.** Os jogos deles em cima, os seus embaixo. Depois que o lado
+  abriu, "Baixar jogo novo" e o ＋ de cada jogo mandam na hora. A abertura e
+  o lixo se montam num rascunho no aparelho (o topo do lixo entra na mão já
+  escolhido) até o Confirmar. Mão grande (quem leva o lixo fica com 30
+  cartas) encavala as fileiras para a mesa não sair da tela.
+- **Robôs.** Compram ou pegam o lixo quando o topo fecha jogo; baixam jogos
+  firmes e encaixes; guardam o coringa (só fecham canastra suja quando o lado
+  já tem limpa, e o usam para abrir); na reta final viram jogo de 2 + coringa
+  para bater. Na do 3 o joker, que não suja, fecha canastra e leva o lixo
+  (carta de cima + uma da mão + joker), e sem morto eles guardam 6 cartas na
+  mão até o lado ter limpa — quem despejava tudo ficava com 1 carta, nunca
+  mais pegava o lixo e a rodada acabava com −500 para os dois lados. O fácil
+  nunca pega o lixo e descarta à toa 1 vez em 3 (na do 3 ele quase sempre
+  fica sem limpa). Toda ação passa pelo motor numa cópia antes de sair.
+  Simulado em 480 partidas (2.883 rodadas), nenhuma jogada recusada nem
+  rodada travada.
+- `npm run test:canastra` sobe um servidor próprio e joga a do 3 em 2v2 com
+  dois humanos roteirizados e dois robôs: variante e cadeiras pelo anfitrião,
+  15 cartas sem morto, recusas do juiz, nada alheio no fio, rodada até o fim
+  sem jogada recusada, conta fechando (com o −500 cravado), nenhuma carta
+  sumida e a rodada seguinte em rodízio.
+
 ## `shared/engine.js` — motor de regras
 
 Módulo puro: recebe estado e devolve estado + lista de eventos. Nunca faz rede,

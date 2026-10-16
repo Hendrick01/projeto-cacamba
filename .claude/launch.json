@@ -35,6 +35,18 @@
       "port": 3031
     },
     {
+      "name": "canastra",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "RITMO_DOS_ROBOS=0.3",
+        "node",
+        "server.js",
+        "--port",
+        "3051"
+      ],
+      "port": 3051
+    },
+    {
       "name": "mexemexe",
       "runtimeExecutable": "env",
       "runtimeArgs": [

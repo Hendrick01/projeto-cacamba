@@ -1,0 +1,154 @@
+/* Canastra — o que muda na mesa 2D. Baixado só com o modo
+   (canastra-mesa.js). A mesa, os assentos, o leque da mão e os modais
+   continuam os do Caçamba (style.css). O meio da mesa vira o monte, o lixo e
+   os jogos dos dois lados: os deles em cima, os seus embaixo, perto da mão. */
+
+/* Sem o monte e o meio do Caçamba (os daqui moram no topo), sem a faixa de
+   jogos de baixo e sem 3D por enquanto. */
+#screen-game.modo-canastra .piles,
+#screen-game.modo-canastra #btn-claim,
+#screen-game.modo-canastra #my-melds,
+#screen-game.modo-canastra #btn-3d { display: none !important; }
+#screen-game:not(.modo-canastra) .cn-centro,
+#screen-game:not(.modo-canastra) .cn-btn { display: none !important; }
+
+/* A tela tem a altura do celular, não a do conteúdo: no fim da rodada a mesa
+   tem dezenas de cartas, e sem esse teto ela empurrava a mão para fora. */
+#screen-game.modo-canastra { height: 100dvh; }
+#screen-game.modo-canastra .mesa { min-height: 0; }
+#screen-game.modo-canastra .mesa .table-center {
+  flex: 1; display: flex; flex-direction: column; margin: 0; min-height: 0;
+}
+.cn-centro { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 6px; }
+#screen-game.modo-canastra .turn-banner { margin-left: 50px; font-size: 0.8rem; line-height: 1.3; }
+
+/* ---- o monte, o lixo e a linha de informação ------------------------------- */
+.cn-topo { display: flex; align-items: center; gap: 8px; padding: 0 4px; flex-wrap: wrap; }
+.cn-monte, .cn-lixo {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 3px 12px 3px 4px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32); border: 1.5px solid rgba(242, 193, 78, 0.35);
+  color: var(--cream); font: inherit; font-size: 0.78rem; font-weight: 800;
+  cursor: pointer;
+}
+.cn-monte .card.mini, .cn-lixo .card.mini { width: 26px; height: 36px; border-radius: 4px; border-width: 1px; flex-shrink: 0; }
+.cn-lixo .card.mini .idx { font-size: 0.6rem; }
+.cn-monte:disabled { cursor: default; border-color: rgba(245, 241, 230, 0.14); }
+.cn-monte:not(:disabled):hover, .cn-lixo:hover { border-color: var(--gold); }
+.cn-monte.vazio .card.mini { opacity: 0.3; }
+.cn-lixo-carta { display: inline-flex; }
+.cn-lixo.trancado { border-color: rgba(224, 87, 74, 0.8); }
+.cn-lixo.trancado .cn-lixo-txt { color: #f3a097; }
+.cn-lixo.escolhido { border-color: var(--gold); background: rgba(242, 193, 78, 0.16); }
+.cn-info {
+  margin-left: auto; padding: 4px 10px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32); color: var(--sage);
+  font-size: 0.72rem; font-weight: 800; white-space: nowrap;
+}
+
+/* ---- os dois lados da mesa ----------------------------------------------------- */
+.cn-lado {
+  display: flex; flex-direction: column; min-height: 0;
+  border-radius: 12px; background: rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(140, 106, 69, 0.22);
+}
+/* Os deles ocupam só o que precisam (até 42%); o resto é dos seus, que é onde
+   se mexe. */
+.cn-lado.eles { flex: 0 1 auto; max-height: 42%; }
+.cn-lado.nos { flex: 1 1 auto; border-color: rgba(242, 193, 78, 0.28); }
+.cn-lado-cab {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 5px 10px 0; font-size: 0.74rem; color: var(--sage);
+}
+.cn-lado-cab strong { color: var(--cream); font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.cn-lado.nos .cn-lado-cab strong { color: var(--gold); }
+.cn-pontos { font-weight: 900; font-variant-numeric: tabular-nums; }
+.cn-ncan {
+  font-size: 0.62rem; font-weight: 900; padding: 1px 7px; border-radius: 999px;
+  background: rgba(242, 193, 78, 0.2); color: var(--gold);
+}
+.cn-tres { display: inline-flex; }
+.cn-tres .card.mini { width: 18px; height: 25px; margin-left: -8px; border-radius: 3px; border-width: 1px; }
+.cn-tres .card.mini:first-child { margin-left: 0; }
+.cn-tres .card.mini .idx { display: none; }
+
+/* Rola quando não cabe. Os jogos quebram linha como palavras. */
+.cn-jogos {
+  flex: 1; min-height: 64px; overflow-y: auto;
+  display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px;
+  padding: 8px 6px 10px;
+  overscroll-behavior: contain;
+}
+.cn-vazio { width: 100%; margin: auto 0; text-align: center; color: var(--sage); font-size: 0.82rem; line-height: 1.45; padding: 0 14px; }
+.cn-jogo {
+  position: relative;
+  display: flex; align-items: center;
+  padding: 4px 5px; border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 2px solid rgba(140, 106, 69, 0.28);
+  border-top-color: rgba(242, 193, 78, 0.22);
+}
+.cn-jogo .card.mini { width: 38px; height: 52px; margin-left: -20px; border-radius: 6px; }
+.cn-jogo .card.mini:first-child { margin-left: 0; }
+.cn-jogo .card.mini .idx { font-size: 0.8rem; }
+/* jogo comprido aperta as cartas: a canastra de mil tem 14 */
+.cn-jogo.longo .card.mini { margin-left: -25px; }
+.cn-jogo.longo .card.mini:first-child { margin-left: 0; }
+.cn-jogo.alvo { cursor: pointer; }
+
+/* a canastra fecha: a limpa ganha o dourado, a suja a prata */
+.cn-jogo.canastra.limpa { border-color: var(--gold); background: rgba(242, 193, 78, 0.12); }
+.cn-jogo.canastra.suja { border-color: #b9c3c7; background: rgba(185, 195, 199, 0.1); }
+.cn-selo {
+  position: absolute; top: -9px; left: 8px;
+  padding: 0 6px; border-radius: 999px;
+  font-size: 0.58rem; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; line-height: 16px;
+  background: var(--gold); color: #2d291d;
+}
+.cn-jogo.suja .cn-selo { background: #b9c3c7; }
+
+/* o que ainda é rascunho: o jogo novo e as cartas que vão entrar num jogo */
+.cn-jogo.rascunho, .cn-jogo.mexido { border-style: dashed; border-color: rgba(242, 193, 78, 0.7); }
+.cn-jogo .card.mini.pendente { box-shadow: inset 0 -4px 0 #7fb8a0, 0 3px 7px -2px rgba(0, 0, 0, 0.7); }
+
+/* o ＋ de cada jogo: dourado quando as escolhidas cabem */
+.cn-por {
+  width: 28px; height: 52px; margin-left: 5px; border-radius: 7px; padding: 0;
+  font: inherit; font-size: 1.1rem; font-weight: 900; color: var(--cream); cursor: pointer;
+  border: 2px dashed rgba(245, 241, 230, 0.38); background: rgba(245, 241, 230, 0.05);
+}
+.cn-por.cabe { border-color: var(--gold); color: var(--gold); background: rgba(242, 193, 78, 0.14); }
+
+/* ---- assentos, lixo inteiro e fim de rodada ------------------------------------ */
+.cn-marca-morto {
+  font-size: 0.6rem; font-weight: 900; padding: 1px 6px; border-radius: 999px;
+  background: rgba(127, 184, 160, 0.22); color: #9fd3bb;
+}
+.cn-lixo-todo { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.cn-lixo-todo .card.mini { width: 38px; height: 52px; border-radius: 6px; }
+.cn-conta td:first-child { color: var(--sage); }
+.cn-conta tr.cn-total td { border-top: 1px solid rgba(245, 241, 230, 0.2); font-weight: 900; color: var(--cream); }
+.cn-conta tr.cn-placar td { font-weight: 900; color: var(--gold); }
+.cn-quem { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; font-size: 0.78rem; }
+.cn-sobras { line-height: 1.7; }
+.cn-sobra {
+  display: inline-block; margin: 0 3px 2px 0; padding: 0 4px; border-radius: 4px;
+  background: var(--cream); color: var(--ink); font-size: 0.72rem; font-weight: 800;
+}
+.cn-sobra.red { color: var(--red); }
+.cn-sem-morto { color: #f3a097; font-size: 0.74rem; }
+.lobby-variante { margin-top: -4px; }
+
+/* ---- mão grande ------------------------------------------------------------------ */
+/* Quem leva o lixo fica com 20, 30 cartas: três fileiras inteiras empurravam a
+   mesa para fora da tela. As fileiras se encavalam como cartas na mão de
+   verdade — de cada uma aparece o canto, que é onde está o valor. */
+#screen-game.modo-canastra .hand { gap: 0; }
+#screen-game.modo-canastra .hand .fila + .fila { margin-top: -48px; }
+.cn-lado.eles { min-height: 84px; }
+.cn-lado.nos { min-height: 108px; }
+
+/* do 3: o lado sem canastra limpa leva −500 cravado; o resto da conta dele
+   aparece riscado, porque não vale */
+.cn-conta td.cn-riscado { text-decoration: line-through; opacity: 0.45; }
+.cn-conta tr.cn-cravado td { color: #f3a097; font-weight: 900; }

@@ -19,7 +19,8 @@
     "test:bazuca": "node test/bazuca.mjs",
     "test:poker": "node test/poker.mjs",
     "test:puxadinho": "node test/puxadinho.mjs",
-    "test:mexemexe": "node test/mexemexe.mjs"
+    "test:mexemexe": "node test/mexemexe.mjs",
+    "test:canastra": "node test/canastra.mjs"
   },
   "engines": {
     "node": ">=20"
