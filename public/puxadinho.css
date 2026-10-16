@@ -4,14 +4,13 @@
    coloridas pelo que produzem, separadas pelas ruas onde se constrói, e a
    avenida em volta com as revendas. */
 
-/* Sem monte, meio, jogos baixados, ordenar cartas, mãos desenhadas nem mesa
-   3D (ainda não tem). Nos assentos, o leque de cartas viradas também sai: o
-   material é contado no selo e nas marcas. */
+/* Sem monte, meio, jogos baixados, ordenar cartas nem mãos desenhadas. Nos
+   assentos, o leque de cartas viradas também sai: o material é contado no
+   selo e nas marcas. O botão 3D fica: a mesa 3D é a puxadinho-3d.js. */
 #screen-game.modo-puxadinho .piles,
 #screen-game.modo-puxadinho #btn-claim,
 #screen-game.modo-puxadinho #my-melds,
 #screen-game.modo-puxadinho #btn-sort,
-#screen-game.modo-puxadinho #btn-3d,
 #screen-game.modo-puxadinho .maos,
 #screen-game.modo-puxadinho .assento .leque { display: none !important; }
 #screen-game:not(.modo-puxadinho) .px-centro,

@@ -158,6 +158,30 @@ function carregaPoker() {
   });
   return carregandoPoker;
 }
+// O PUXADINHO na 3D (15/10/2026), no mesmo esquema: puxadinho-3d.js só é
+// baixado quando a sala é dele. O meio da mesa é o bairro (o tabuleiro), o
+// seu material fica num painel no pé da tela, e a câmera se debruça sobre o
+// tabuleiro (`camera`/`mira`, lá embaixo em ajustaCameraParaAssentos e
+// alvoDoPescoco). O toque no tabuleiro entra pelo mesmo caminho do Bazuca.
+let px = null, carregandoPuxadinho = null;
+function carregaPuxadinho() {
+  carregandoPuxadinho ||= import('./puxadinho-3d.js').then((mod) => {
+    document.title = 'Puxadinho em 3D';
+    px = mod.criaPuxadinho3D({
+      THREE, scene, camera, renderer, MESA_TOPO, geoCarta, materialVerso, semMovimento,
+      view: () => view, me, assentos, rotulo, trocaRotulo,
+      corDe: (id) => CORES_DE_ASSENTO[assentoDe(id) % CORES_DE_ASSENTO.length],
+      avatarDe: (id) => { const p = view?.players.find((q) => q.id === id); return p ? caraDe(personagemDe(p)) : ''; },
+      lequeDe, temGesto, gestoCarta,
+      botao, aviso, sendAction, enviaAoServidor, souAnfitriao: () => hostId === me(),
+      atualizaBotoes: () => montaBotoes(), abrePlacar,
+      verbo: (id, texto) => { const a = assentos.get(id); if (a) { a.aviso = texto; a.avisoAte = performance.now() + 1800; a.avisoEmote = false; } },
+      cara: fazCara,
+      palcoDe, cabecalho, linhaDoPlacar, acaoDoPlacar, nomeDe,
+    });
+  });
+  return carregandoPuxadinho;
+}
 // O QUE CADA MODO HERDA DA MESA DO CAÇAMBA. A mesa base é a do Caçamba; o
 // módulo de um modo diz, em `recursos`, o que dela NÃO é dele — o que não
 // disser, herda. "Cada um deve ter sua independência" (usuário, 15/10/2026):
@@ -170,7 +194,7 @@ function carregaPoker() {
 //   distribuicao         — as três cartas que voam do monte a cada assento
 //                          quando a rodada começa
 function herda(recurso) {
-  return (bz || pres || pk)?.recursos?.[recurso] ?? true;
+  return (bz || pres || pk || px)?.recursos?.[recurso] ?? true;
 }
 function trataEstado(msg) {
   const primeira = !view;
@@ -194,6 +218,7 @@ function conecta() {
       if (msg.view?.modo === 'presidente' && !pres) { carregaPresidente().then(() => trataEstado(msg)); return; }
       if (msg.view?.modo === 'bazuca' && !bz) { carregaBazuca().then(() => trataEstado(msg)); return; }
       if (msg.view?.modo === 'poker' && !pk) { carregaPoker().then(() => trataEstado(msg)); return; }
+      if (msg.view?.modo === 'puxadinho' && !px) { carregaPuxadinho().then(() => trataEstado(msg)); return; }
       trataEstado(msg);
     } else if (msg.t === 'lobby') {
 
@@ -2060,7 +2085,8 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   // no Bazuca as cartas de todos estão viradas no feltro: o toque escolhe uma
   // (de quem for), e o monte compra
-  const alvoBz = bz?.alvo(raycaster, e.clientX, e.clientY);
+  // (no Puxadinho, o lugar marcado no tabuleiro: esquina, lado, casa ou terreno)
+  const alvoBz = (bz || px)?.alvo(raycaster, e.clientX, e.clientY);
   if (alvoBz) { toqueNoBz = { alvo: alvoBz, x0: e.clientX, y0: e.clientY }; return; }
   // toque num jogo do feltro: abre o visor naquele jogador. É o caminho para
   // ler carta por carta numa mesa cheia — e para encaixar sem sair da 3D.
@@ -2090,7 +2116,7 @@ window.addEventListener('pointerup', (e) => {
   if (toqueNoBz) {
     const { alvo, x0, y0 } = toqueNoBz;
     toqueNoBz = null;
-    if (Math.hypot(e.clientX - x0, e.clientY - y0) < LIMIAR_ARRASTO) bz.toca(alvo);
+    if (Math.hypot(e.clientX - x0, e.clientY - y0) < LIMIAR_ARRASTO) (bz || px).toca(alvo);
     return;
   }
   if (toqueNoJogo) {
@@ -2161,7 +2187,7 @@ function limiteDoPescoco() {
   return Math.min(maior, 2.6);
 }
 function alvoDoPescoco() {
-  const mesa = anguloAte(new THREE.Vector3(camera.position.x * 0.25, MESA_TOPO + 0.12, -0.35));
+  const mesa = anguloAte(px?.mira() || new THREE.Vector3(camera.position.x * 0.25, MESA_TOPO + 0.12, -0.35));
   const giro = arrastoOlhar?.ativo ? arrastoOlhar.giro : giroLivre;
   if (giro != null) {
     // virado, a linha do olhar sobe do tampo para a altura das cabeças
@@ -2244,6 +2270,7 @@ function montaBotoes() {
   if (pres) { pres.botoes(barra); return; }
   if (bz) { bz.botoes(barra); return; }
   if (pk) { pk.botoes(barra); return; }
+  if (px) { px.botoes(barra); return; }
   // o visor de jogos sempre à mão: na mesa cheia é por ele que se lê carta por
   // carta, e com uma carta escolhida é por ele que se encaixa
   if (view.players.some((p) => p.melds?.length)) {
@@ -2508,6 +2535,7 @@ function desenhaPlacar() {
   if (pres) { pres.desenhaPlacar(corpo, acoes); return; }
   if (bz) { bz.desenhaPlacar(corpo, acoes); return; }
   if (pk) { pk.desenhaPlacar(corpo, acoes); return; }
+  if (px) { px.desenhaPlacar(corpo, acoes); return; }
   const souAnfitriao = hostId === me();
   const tabela = document.createElement('table');
   const jogador = (id) => view.players.find((p) => p.id === id);
@@ -2559,7 +2587,7 @@ async function sincroniza(primeira) {
   if (sincronizando) return;
   sincronizando = true;
   try {
-    if (!pres && !bz && !pk) {
+    if (!pres && !bz && !pk && !px) {
       $('rot-rodada').textContent = `Rodada ${view.round + 1}/${view.totalRounds}`;
       $('rot-contrato').textContent = view.contract ? view.contract.label : '—';
     }
@@ -2611,7 +2639,7 @@ async function sincroniza(primeira) {
       }
       a.leque.visible = naMao > 0;
       a.naVez = view.turnId === p.id && view.phase !== 'roundEnd';
-      a.proximo = ((pres || pk) ? (pres || pk).proximoId() : view.players[(view.players.findIndex((q) => q.id === view.turnId) + 1) % view.players.length]?.id) === p.id
+      a.proximo = ((pres || pk || px) ? (pres || pk || px).proximoId() : view.players[(view.players.findIndex((q) => q.id === view.turnId) + 1) % view.players.length]?.id) === p.id
         && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
       minhaVez = view.turnId === me() && view.phase !== 'roundEnd' && view.phase !== 'gameEnd';
       // `fora`: no Poker, quem ficou sem fichas
@@ -2712,6 +2740,8 @@ async function sincroniza(primeira) {
     if (bz) bz.sincroniza();
     // as cinco da mesa, as fichas, o botão do dealer e o resultado (poker-3d.js)
     if (pk) pk.sincroniza();
+    // o bairro, as peças, o fiscal, os dados e o seu material (puxadinho-3d.js)
+    if (px) px.sincroniza();
 
     // Jogos baixados: cartas DEITADAS no feltro na frente de quem baixou
     // (decisão do usuário, 2026-09-04 e de novo em 08/09: nada de erguer,
@@ -2885,7 +2915,8 @@ async function sincroniza(primeira) {
     {
       // no Bazuca não há leque: a barra desce até o pé da tela e a sua grade
       // de cartas fica com a faixa de baixo
-      const base = bz ? 0 : parseFloat(document.body.style.getPropertyValue('--hand-height')) || 160;
+      // (no Puxadinho, o painel do seu material)
+      const base = bz ? 0 : px ? px.alturaDoPe() : parseFloat(document.body.style.getPropertyValue('--hand-height')) || 160;
       document.body.style.setProperty('--acao-fundo', `${Math.round(base + 14)}px`);
     }
     montaBotoes();
@@ -2901,8 +2932,8 @@ async function sincroniza(primeira) {
     } else if (placarMostrado) { placarMostrado = null; clearTimeout(placarTimer); fechaPlacar(); }
 
     // aviso da vez
-    if (pres || bz || pk) {
-      const texto = (pres || bz || pk).textoDaVez();
+    if (pres || bz || pk || px) {
+      const texto = (pres || bz || pk || px).textoDaVez();
       if (texto) aviso(texto, true);
     } else if (view.phase === 'draw' || view.phase === 'play') {
       if (view.turnId === me()) {
@@ -2940,6 +2971,7 @@ function reageAoEvento(ev) {
   pres?.evento(ev);
   bz?.evento(ev);
   pk?.evento(ev);
+  px?.evento(ev);
   if (ev.e === 'roundStart') {
     ordemManual = []; selecionadas.clear();
     jogosVistos.clear();
@@ -3071,6 +3103,9 @@ function ajustaCameraParaAssentos(total) {
   // é o rodízio do turno que os traz para o meio.
   for (let i=0;i<total;i++) { const p=posicaoDoAssento(i,total); z=Math.max(z, p.z + (Math.abs(p.x)+0.22)/tanH); }
   camera.position.z=Math.min(1.95, z); camera.position.y=alturaDoOlho(camera.position.z);
+  // o modo de tabuleiro (Puxadinho) diz onde a cabeça fica: debruçada sobre ele
+  const doModo = px?.camera();
+  if (doModo) { camera.position.z = doModo.z; camera.position.y = doModo.y; }
 }
 function encaixaTela() {
   const w = innerWidth; const h = innerHeight;
@@ -3277,6 +3312,7 @@ function quadro(t) {
   pres?.quadro();
   bz?.quadro(t);
   pk?.quadro(t);
+  px?.quadro(t);
 
   // a carta do meio chega girando e assenta no lugar de pé
   const face = descarte.grupo.children[1];
@@ -3385,6 +3421,7 @@ window.mesa3d = { assentos, scene, camera, renderer, quadro, cenaMao, maoGrupo, 
   get gestoPinca() { return gestoPinca ? { modo: gestoPinca.modo, desde: performance.now() - gestoPinca.t0, soltou: !!gestoPinca.soltouEm, outras: gestoPinca.extras.length } : null; },
   get bz() { return bz; },
   get pk() { return pk; },
+  get px() { return px; },
   olharPara: (id) => escolheOlhar(id), get pescoco() { return { escolhido: olharEscolhido, livre: giroLivre, giro: pescoco.giro, inclina: pescoco.inclina }; } };
 
 // interface-2026-09-07-r1

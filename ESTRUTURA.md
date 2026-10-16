@@ -586,6 +586,43 @@ inteira resumida no topo; testes em `test/puxadinho.test.js`), mesa 2D em
   cores que 2D, 3D e gerador dividem. `/puxadinho-folha.html` é a folha de
   conferência. As regras de modelagem e o ciclo de conferência estão na skill
   do projeto `.claude/skills/arte-do-puxadinho/`.
+- **Mesa 3D** em `public/puxadinho-3d.js`, baixada pelo `mesa3d.js`
+  (`carregaPuxadinho`) quando chega visão com `modo: 'puxadinho'`, como as
+  outras; a 2D mostra o botão 3D. O bairro fica sobre o tampo (17,5 cm por
+  raio de hexágono, ~93 cm com a avenida): um canvas só desenha asfalto e
+  revendas. Cada quadra é um prisma um dedo acima do asfalto (o meio-fio)
+  com o raio do render da 2D (0,86) e, no tampo, o MESMO render do Blender
+  que a 2D usa (`urlDaQuadra`, mais o clarão `LUZ_DO_MATERIAL`; na
+  Prefeitura, também o prédio e o nome) — as duas mesas mostram a mesma
+  quadra. Em cima dela, o material de pé (o modelo do Blender, com
+  contorno) e a placa do número, maior que a da 2D: deitada e de longe, é
+  ela que se lê. Casa, prédio, cone e os materiais que voam são os modelos
+  de `public/models/puxadinho/` (gerados por `scripts/puxadinho_blender.py`,
+  na régua da GEO: 1 = raio, pé em y=0), no toon do elenco; o material
+  "jogador" vira a cor do assento. As maquetes das quadras (`quadra-*.glb`)
+  ficam de fora: em toon e de lado elas saíam outra quadra que não a da 2D.
+  Sem os renders ou os modelos, valem a cor lisa do terreno e as peças
+  desenhadas no código. A rua é uma barra na cor do dono no vão entre
+  quadras, acima do meio-fio; o cone e as listras no terreno embargado; os
+  dois dados no tampo, à direita (em pé, na beirada da frente). O dado sai
+  da mão de quem rolou, as quadras do número acendem e o material voa delas
+  para quem tem construção; a peça nova sai da mão de quem
+  construiu. O toque escolhe esquina, lado, casa ou terreno marcados em
+  dourado (a peça translúcida mostra o que vai ficar) e confirma no botão ou
+  no segundo toque. Em `recursos` não herda `maoEmPrimeiraPessoa` (o seu
+  material é um painel HTML no pé da tela, com as fichas e as cartas de obra),
+  `cartasNaMaoDosOutros` (não há baralho; a 2D também esconde o leque),
+  `monteEDescarte` nem `distribuicao`. Nome, pontos e quantas cartas de
+  material cada um tem vão numa plaquinha na beirada do tampo (âmbar na vez
+  dele). A câmera se debruça sobre o tabuleiro
+  (`camera`/`mira`, perguntados em `ajustaCameraParaAssentos` e
+  `alvoDoPescoco`): procura a mais perto que enquadra as quadras e os dados
+  acima do painel, com a cabeça de quem senta à frente à vista, sem passar de
+  2,6 m de recuo (o limite da `visual3d.js`) nem subir acima da cúpula da
+  luminária. Construir, trocar, devolver e jogar carta abrem a caixa do visor
+  da 3D com o miolo da 2D (fichas, contadores e textos iguais; os textos e as
+  contas vêm exportados de `puxadinho-mesa.js`). Para ver:
+  `node test/mesa-qa.mjs 3 3000 puxadinho`.
 - `npm run test:puxadinho` sobe um servidor próprio (`RITMO_DOS_ROBOS=0.01`) e
   joga uma partida inteira com dois humanos roteirizados e dois robôs —
   colocação, trocas no fornecedor, ofertas entre os humanos, fiscal — até
