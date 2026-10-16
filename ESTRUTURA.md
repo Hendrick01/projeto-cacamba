@@ -628,6 +628,59 @@ inteira resumida no topo; testes em `test/puxadinho.test.js`), mesa 2D em
   colocação, trocas no fornecedor, ofertas entre os humanos, fiscal — até
   alguém chegar a 10, sem jogada recusada, e confere o "jogar de novo".
 
+## Mexe-Mexe (16/10/2026)
+
+O rummy em que a mesa é de todo mundo. As regras foram combinadas com o dono
+uma por pergunta, a partir de pesquisa nas versões que circulam (Wikipédia,
+MegaJogos, Copag, blogs), e estão no topo de `shared/mexemexe.js` (testes em
+`test/mexemexe.test.js`). Mesa 2D em `public/mexemexe-mesa.js` +
+`public/mexemexe.css`, baixadas com `import()` só com o modo. 2 a 6 jogadores.
+Ainda sem 3D: o botão some e o `mesa3d.js` devolve à mesa normal.
+
+- **As regras.** Dois baralhos sem coringa, 11 cartas, o resto é o monte.
+  Jogo é sequência do mesmo naipe (Ás embaixo ou depois do K, sem K-A-2) ou
+  trinca do mesmo valor, pelo menos 3 cartas; trinca de 3 tem os 3 naipes
+  diferentes, e com 4 ou mais pode repetir UM naipe (no máximo 5). Sem
+  descarte, sem abertura mínima, sem pontuação: na vez, joga OU compra 1
+  (compra livre), e quem bate ganha. Uma rodada por partida (`round` conta as
+  partidas da sala; `vitorias` só alimenta o placar).
+- **A jogada é a mesa inteira.** `{ a: 'jogar', mesa: [[ids], …] }`: a lista
+  de jogos como a mesa fica. `actJogar` confere tudo de uma vez — nenhuma
+  carta da mesa sumiu (não volta para a mão), as novas vieram da mão de quem
+  joga, pelo menos uma veio, todo jogo vale (`analisaJogo`, que também dá o
+  motivo e a ordem de mostrar). Jogo que não mudou guarda o `id`; o resto
+  ganha id novo, e é assim que a tela sabe o que piscar.
+- **O rascunho é do aparelho.** Na sua vez a 2D copia a mesa e a mão: tocar
+  escolhe cartas (da mão ou de qualquer jogo), o ＋ de um jogo leva as
+  escolhidas para lá (dourado quando fica valendo), "＋ Novo jogo" faz outro;
+  Desfazer, Recomeçar, Voltar para a mão (só a carta que veio da SUA mão nesta
+  vez) e Confirmar. Jogo errado fica vermelho e o motivo vai para o aviso da
+  vez. O servidor nunca vê mesa pela metade. O `sortedHand` do `client.js`
+  pede a mão a `maoDoRascunho()`.
+- **O relógio da vez (90 s).** `proximoPrazo`/`tick`/`retoma` no motor;
+  `armaPrazoDaVez` no servidor (genérico: qualquer modo com `proximoPrazo` e
+  sem `tempoReal`). Estourou: o rascunho morre no aparelho e quem estava na
+  vez compra 1 (`estourou` + `comprou`). A visão manda `restaMs` (quanto
+  falta), não a hora, para o relógio do celular não importar.
+- **Fim pelo monte.** Monte zerado não acaba a partida: acaba quando alguém
+  precisa comprar e não há carta (`semMonte`). Ganha quem tem menos cartas;
+  empate, a menor soma (Ás 1 … K 13); empate de novo, todos os empatados. A
+  partida seguinte abre quem ganhou (a primeira, o anfitrião).
+- **Nada de carta alheia no fio.** O id diz qual é a carta (o baralho é
+  montado em ordem), então o evento `comprou` não leva id nenhum.
+- **Robôs.** `planejaJogada(mesa, mao)` faz mexidas pequenas enquanto alguma
+  couber: jogo inteiro da mão, encaixe, sequência partida pela carta repetida
+  (3-4-5-6-7 + 5 vira 3-4-5 e 5-6-7) e empréstimo de carta que sobra num jogo
+  da mesa. O fácil só faz as duas primeiras. A mesa final passa pelo
+  `actJogar` numa cópia: se não fechar, o robô compra (robô recusado travaria
+  a sala). Simulado em 1.200 partidas: o normal bate em ~95%, o fácil quase
+  sempre termina pelo monte; cada decisão leva menos de 2 ms.
+- `npm run test:mexemexe` sobe um servidor próprio (`RITMO_DOS_ROBOS=0.05`,
+  `MEXE_VEZ_MS=1500` — a variável só existe para teste e encurta a vez) e
+  joga com dois humanos e um robô: recusas do juiz, vez que estoura, compra
+  sem id no evento, partida até o fim sem jogada recusada, nenhuma carta
+  sumida e a partida seguinte aberta por quem ganhou.
+
 ## `shared/engine.js` — motor de regras
 
 Módulo puro: recebe estado e devolve estado + lista de eventos. Nunca faz rede,

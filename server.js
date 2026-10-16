@@ -23,6 +23,7 @@ import * as Domino from './shared/domino.js';
 import * as Bazuca from './shared/bazuca.js';
 import * as Poker from './shared/poker.js';
 import * as Puxadinho from './shared/puxadinho.js';
+import * as MexeMexe from './shared/mexemexe.js';
 import { personagemValido } from './shared/elenco.js';
 import { emoteDe } from './shared/emotes.js';
 import { chaveDasSalas, sela, abre } from './lib/selo-sala.js';
@@ -33,6 +34,10 @@ import { contaDaSessao } from './lib/contas.js';
 import { migra, temBanco } from './lib/banco.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Só para teste: MEXE_VEZ_MS=1500 encurta a vez do Mexe-Mexe (90 s) para o
+// teste de integração ver o tempo estourar. Nunca menos de 1 s.
+const VEZ_DO_MEXE_NO_TESTE = Number(process.env.MEXE_VEZ_MS) >= 1000 ? Number(process.env.MEXE_VEZ_MS) : undefined;
 
 // MODOS DE JOGO. A sala nasce num modo e não muda. Cada modo tem o seu motor
 // em shared/; o servidor só escolhe qual chamar. O Caçamba é o principal e o
@@ -86,6 +91,17 @@ const MODOS = {
     actNextRound: Puxadinho.actNextRound, viewFor: Puxadinho.viewFor, botNextAction: Puxadinho.botNextAction,
     FASES_DE_VEZ: Puxadinho.FASES_DE_VEZ, MIN: Puxadinho.MIN_JOGADORES, MAX: Puxadinho.MAX_JOGADORES,
     pausaDoRobo: Puxadinho.pausaDoRobo,
+  },
+  // Mexe-Mexe: a mesa é de todos e a jogada é a mesa inteira, mandada de uma
+  // vez ao confirmar. A vez tem relógio (90 s): `proximoPrazo`/`tick` são
+  // chamados por armaPrazoDaVez, à parte do agendador dos robôs.
+  mexemexe: {
+    createGame: (players, opts) => MexeMexe.createGame(players, { ...opts, vezMs: VEZ_DO_MEXE_NO_TESTE }),
+    startRound: MexeMexe.startRound, applyAction: MexeMexe.applyAction,
+    actNextRound: MexeMexe.actNextRound, viewFor: MexeMexe.viewFor, botNextAction: MexeMexe.botNextAction,
+    FASES_DE_VEZ: MexeMexe.FASES_DE_VEZ, MIN: MexeMexe.MIN_JOGADORES, MAX: MexeMexe.MAX_JOGADORES,
+    proximoPrazo: MexeMexe.proximoPrazo, tick: MexeMexe.tick, retoma: MexeMexe.retoma,
+    niveis: MexeMexe.NIVEIS_DE_ROBO,
   },
 };
 const modoValido = (m) => (Object.hasOwn(MODOS, m) ? m : 'cacamba');
@@ -760,6 +776,7 @@ function scheduleBots(room) {
   const game = room.game;
   const motor = motorDe(room);
   if (motor.tempoReal) { agendaTempoReal(room); return; }
+  if (motor.proximoPrazo) armaPrazoDaVez(room);
   if (!game || !motor.FASES_DE_VEZ.includes(game.phase)) {
     if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; room.botTimerKey = null; }
     return;
@@ -836,6 +853,28 @@ function scheduleBots(room) {
       console.error('erro de bot:', err);
     }
   }, delay);
+}
+
+// O RELÓGIO DA VEZ (Mexe-Mexe): a vez tem prazo e, quando ele vence, o motor
+// decide o que acontece (lá, quem estava na vez compra). Um timer por sala,
+// refeito só quando o prazo muda — a mesma ideia da chave do agendador.
+function armaPrazoDaVez(room) {
+  const game = room.game;
+  const motor = motorDe(room);
+  const prox = game ? motor.proximoPrazo(game) : null;
+  if (room.prazoVezTimer && room.prazoVezEm === prox) return;
+  clearTimeout(room.prazoVezTimer); room.prazoVezTimer = null; room.prazoVezEm = prox;
+  if (prox == null) return;
+  room.prazoVezTimer = setTimeout(() => {
+    room.prazoVezTimer = null; room.prazoVezEm = null;
+    if (room.game !== game) return;
+    try {
+      const events = motor.tick(game, Date.now());
+      if (events.length) broadcastState(room, events);
+    } catch (err) { console.error('erro no relógio da vez:', err); }
+    scheduleBots(room);
+  }, Math.max(0, prox - Date.now()) + 20);
+  room.prazoVezTimer.unref?.();
 }
 
 // O RELÓGIO E OS ROBÔS DO BAZUCA. Dois timers por sala: um para o próximo
@@ -1360,6 +1399,7 @@ setInterval(() => {
     const lastSeen = Math.max(room.createdAt, ...humans.map((p) => p.lastSeen || 0));
     if (!active && now - lastSeen > 30 * 60 * 1000) {
       if (room.botTimer) clearTimeout(room.botTimer);
+      clearTimeout(room.prazoVezTimer);
       limpaPlanos(room);
       rooms.delete(code);
     }

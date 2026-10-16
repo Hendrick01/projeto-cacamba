@@ -191,6 +191,15 @@ function handleMessage(msg) {
         }
         break;
       }
+      if (msg.view?.modo === 'mexemexe' && !mesaMexe) {
+        filaMexe.push(msg);
+        if (filaMexe.length === 1) {
+          carregaMexe()
+            .then(() => { const fila = filaMexe.splice(0); for (const m of fila) handleMessage(m); })
+            .catch(() => { filaMexe.length = 0; toast('Não deu para abrir a mesa do Mexe-Mexe. Recarregue a página.'); });
+        }
+        break;
+      }
       view = msg.view;
       controlesVoz.presenca(view.players);
       showScreen('game');
@@ -299,6 +308,12 @@ const MODOS = {
     fatos: '<span><strong>3–4</strong>jogadores</span><span><strong>Troca</strong>material com a mesa</span><span><strong>10 pontos</strong>na sua vez ganha</span>',
     min: 3, max: 4,
   },
+  mexemexe: {
+    nome: 'Mexe-Mexe',
+    titulo: 'Mexe-Mexe<br><em>a mesa é de todo mundo</em>',
+    fatos: '<span><strong>2–6</strong>jogadores</span><span><strong>11</strong>cartas na mão</span><span><strong>Bateu</strong>ganhou</span>',
+    min: 2, max: 6,
+  },
 };
 let modoDaCasa = 'cacamba';
 function telaInicial() { return params.get('sala') ? 'home' : 'modos'; }
@@ -330,6 +345,10 @@ $('modo-poker').onclick = () => {
 $('modo-puxadinho').onclick = () => {
   escolheModo('puxadinho');
   carregaPuxadinho().catch(() => {});
+};
+$('modo-mexemexe').onclick = () => {
+  escolheModo('mexemexe');
+  carregaMexe().catch(() => {});
 };
 $('btn-modos').onclick = () => showScreen('modos');
 
@@ -398,6 +417,20 @@ function carregaPuxadinho() {
   return carregandoPuxadinho;
 }
 const ehPuxadinho = () => view?.modo === 'puxadinho';
+
+// A MESA DO MEXE-MEXE, no mesmo esquema. Ela também guarda o rascunho da vez:
+// as cartas da mão que já foram para a mesa saem do leque (ver sortedHand).
+let mesaMexe = null;
+let carregandoMexe = null;
+const filaMexe = [];
+function carregaMexe() {
+  carregandoMexe ||= import('./mexemexe-mesa.js').then((mod) => {
+    mesaMexe = mod.criaMesaMexe(contextoDaMesa());
+    return mesaMexe;
+  });
+  return carregandoMexe;
+}
+const ehMexe = () => view?.modo === 'mexemexe';
 $('name-input').value = localStorage.getItem('cacamba-name') || '';
 
 function myNameInput() {
@@ -507,6 +540,7 @@ $('btn-rules-home').onclick = () => {
   else if (modoDaCasa === 'bazuca') carregaBazuca().then((m) => m.regras()).catch(() => {});
   else if (modoDaCasa === 'poker') carregaPoker().then((m) => m.regras()).catch(() => {});
   else if (modoDaCasa === 'puxadinho') carregaPuxadinho().then((m) => m.regras()).catch(() => {});
+  else if (modoDaCasa === 'mexemexe') carregaMexe().then((m) => m.regras()).catch(() => {});
   else showRules();
 };
 
@@ -734,7 +768,9 @@ function renderLobby() {
     $('btn-nivel-robos').textContent = facil ? 'Robôs: fáceis' : 'Robôs: normais';
     const comoEFacil = modoDaSala === 'poker'
       ? 'Fácil: o robô lê mal a própria mão, paga demais e quase não aumenta.'
-      : 'Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.';
+      : modoDaSala === 'mexemexe'
+        ? 'Fácil: o robô só baixa jogos da mão e encaixa cartas; não desmonta os jogos da mesa.'
+        : 'Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.';
     $('btn-nivel-robos').title = isHost() ? `Toque para trocar. ${comoEFacil}` : 'Quem criou a sala escolhe o nível dos robôs.';
   }
   $('btn-start').hidden = !isHost();
@@ -1114,6 +1150,9 @@ function sortedHand() {
   if (ehPresidente() && !ordemManual.length) {
     return ordemPresidente === 'suit' ? ordenaMao(view?.you?.hand || [], [], 'suit') : mesaPresidente.ordena(view?.you?.hand || []);
   }
+  // No Mexe-Mexe, durante a vez, a mão é a do rascunho: o que já foi para a
+  // mesa sai do leque, e o que voltou entra de novo.
+  if (ehMexe()) return ordenaMao(mesaMexe.maoDoRascunho(), ordemManual, sortMode);
   return ordenaMao(view?.you?.hand || [], ordemManual, sortMode);
 }
 
@@ -1179,6 +1218,13 @@ function renderMesa() {
   $('screen-game').classList.toggle('modo-bazuca', ehBazuca());
   $('screen-game').classList.toggle('modo-poker', ehPoker());
   $('screen-game').classList.toggle('modo-puxadinho', ehPuxadinho());
+  $('screen-game').classList.toggle('modo-mexemexe', ehMexe());
+  if (ehMexe()) {
+    marcaCartasNovas();
+    mesaMexe.render();
+    notifyTurn();
+    return;
+  }
   if (ehPoker()) {
     mesaPoker.render();
     notifyTurn();
@@ -1456,6 +1502,7 @@ function mostraOponente(playerId) {
   if (ehBazuca()) { mesaBazuca.mostraJogador(playerId); return; }
   if (ehPoker()) { mesaPoker.mostraJogador(playerId); return; }
   if (ehPuxadinho()) { mesaPuxadinho.mostraJogador(playerId); return; }
+  if (ehMexe()) { mesaMexe.mostraJogador(playerId); return; }
   const p = view.players.find((x) => x.id === playerId);
   if (!p) return;
   const prog = progressoDoContrato(p);
@@ -1578,8 +1625,8 @@ function atualizaBanner() {
     banner.className = 'turn-banner evento';
     return;
   }
-  if (ehPresidente() || ehDomino() || ehBazuca() || ehPoker() || ehPuxadinho()) {
-    const t = (ehPuxadinho() ? mesaPuxadinho : ehPoker() ? mesaPoker : ehBazuca() ? mesaBazuca : ehDomino() ? mesaDomino : mesaPresidente).textoDaVez();
+  if (ehPresidente() || ehDomino() || ehBazuca() || ehPoker() || ehPuxadinho() || ehMexe()) {
+    const t = (ehMexe() ? mesaMexe : ehPuxadinho() ? mesaPuxadinho : ehPoker() ? mesaPoker : ehBazuca() ? mesaBazuca : ehDomino() ? mesaDomino : mesaPresidente).textoDaVez();
     banner.textContent = t.texto;
     banner.className = `turn-banner${t.minha ? ' me' : ''}`;
     return;
@@ -1956,6 +2003,7 @@ function montaLeque(fila, cartas, largura) {
       // Se o dedo arrastou, o gesto foi de arrumar: não seleciona.
       if (el.dataset.arrastou === '1') { delete el.dataset.arrastou; return; }
       if (ehPoker()) return;   // no poker as duas cartas não se escolhem: a aposta é nos botões
+      if (ehMexe()) { mesaMexe.tocaNaMao(card); return; }
       if (ehPresidente()) mesaPresidente.toca(card, selected);
       else if (selected.has(card.id)) selected.delete(card.id);
       else selected.add(card.id);
@@ -2225,8 +2273,8 @@ $('btn-sort').onclick = () => {
   render();
 };
 
-$('btn-rules').onclick = () => (ehPuxadinho() ? mesaPuxadinho.regras() : ehPoker() ? mesaPoker.regras() : ehBazuca() ? mesaBazuca.regras() : ehDomino() ? mesaDomino.regras() : ehPresidente() ? mesaPresidente.regras() : showRules());
-$('btn-score').onclick = () => (ehPuxadinho() ? mesaPuxadinho.placar() : ehPoker() ? mesaPoker.placar() : ehBazuca() ? mesaBazuca.placar() : ehDomino() ? mesaDomino.placar() : ehPresidente() ? mesaPresidente.placar() : showScore());
+$('btn-rules').onclick = () => (ehMexe() ? mesaMexe.regras() : ehPuxadinho() ? mesaPuxadinho.regras() : ehPoker() ? mesaPoker.regras() : ehBazuca() ? mesaBazuca.regras() : ehDomino() ? mesaDomino.regras() : ehPresidente() ? mesaPresidente.regras() : showRules());
+$('btn-score').onclick = () => (ehMexe() ? mesaMexe.placar() : ehPuxadinho() ? mesaPuxadinho.placar() : ehPoker() ? mesaPoker.placar() : ehBazuca() ? mesaBazuca.placar() : ehDomino() ? mesaDomino.placar() : ehPresidente() ? mesaPresidente.placar() : showScore());
 // A mesa em 3D é outra janela para a MESMA partida: entra com a sessão
 // guardada e conversa com o mesmo servidor. A biblioteca dela (three.js) só é
 // baixada quando se abre — a mesa normal continua leve.
@@ -2322,6 +2370,8 @@ const REACOES = {
   ponto:      { texto: 'na conta!',         gesto: 'pula', cara: 'feliz' },
   passo:      { texto: 'passo…',            gesto: 'murcha', cara: null },
   trancou:    { texto: 'tranquei…',         gesto: 'murcha', cara: 'bravo' },
+  // Mexe-Mexe
+  mexeu:      { texto: 'mexi na mesa!',     gesto: 'pula', cara: 'feliz' },
 };
 
 // EMOTES e frases prontas (17/09/2026): o mesmo balão das reações, maior e
@@ -2416,6 +2466,7 @@ function announce(ev) {
   if (ehBazuca() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaBazuca.anuncia(ev); return; }
   if (ehPoker() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaPoker.anuncia(ev); return; }
   if (ehPuxadinho() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaPuxadinho.anuncia(ev); return; }
+  if (ehMexe() && ev.e !== 'desistiu' && ev.e !== 'away') { mesaMexe.anuncia(ev); return; }
   switch (ev.e) {
     case 'roundStart':
       distribuirPendente = true;

@@ -18,7 +18,8 @@
     "test:domino": "node test/domino.mjs",
     "test:bazuca": "node test/bazuca.mjs",
     "test:poker": "node test/poker.mjs",
-    "test:puxadinho": "node test/puxadinho.mjs"
+    "test:puxadinho": "node test/puxadinho.mjs",
+    "test:mexemexe": "node test/mexemexe.mjs"
   },
   "engines": {
     "node": ">=20"

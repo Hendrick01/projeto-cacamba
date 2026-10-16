@@ -132,6 +132,13 @@ html.debug .ui-version { display: inline; }
 /* Puxadinho: três quadras do loteamento, uma rua, uma casa e o cone do fiscal */
 .modo-obj.loteamento { right: 14px; top: 10px; width: 96px; height: 82px; }
 .modo-obj.loteamento svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.6)); }
+/* Mexe-Mexe: uma sequência na mesa e a carta que chega para encaixar nela */
+.modo-obj.mexe { right: 14px; top: 14px; width: 102px; height: 70px; }
+.modo-obj.mexe img { width: 30px; height: 42px; top: 26px; border-radius: 4px; }
+.modo-obj.mexe img:nth-child(1) { left: 0; }
+.modo-obj.mexe img:nth-child(2) { left: 18px; }
+.modo-obj.mexe img:nth-child(3) { left: 36px; }
+.modo-obj.mexe img:nth-child(4) { left: 68px; top: 2px; transform: rotate(14deg); box-shadow: 0 0 0 2px #f2c14e, 0 8px 14px -6px rgba(0, 0, 0, 0.8); }
 .modo-principal { padding-top: 132px; }
 .modo:not(.modo-principal) { padding-top: 92px; }
 @media (min-width: 761px) {

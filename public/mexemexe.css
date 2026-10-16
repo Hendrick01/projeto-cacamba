@@ -1,0 +1,134 @@
+/* Mexe-Mexe — o que muda na mesa 2D. Baixado só com o modo
+   (mexemexe-mesa.js). A mesa, os assentos, o leque da mão e os modais
+   continuam os do Caçamba (style.css). O meio da mesa vira a mesa de jogos:
+   todo mundo baixa no mesmo lugar, e é ali que se mexe. */
+
+/* Sem monte e meio do Caçamba (o monte daqui mora no topo dos jogos), sem a
+   faixa de jogos de baixo e sem 3D por enquanto. */
+#screen-game.modo-mexemexe .piles,
+#screen-game.modo-mexemexe #btn-claim,
+#screen-game.modo-mexemexe #my-melds,
+#screen-game.modo-mexemexe #btn-3d { display: none !important; }
+#screen-game:not(.modo-mexemexe) .mm-centro,
+#screen-game:not(.modo-mexemexe) .mm-btn { display: none !important; }
+
+/* A tela tem a altura do celular, não a do conteúdo: no fim da partida a
+   mesa tem quase o baralho inteiro, e sem esse teto ela crescia e empurrava a
+   mão para fora da tela. Assim a folga é da mesa, e é ela que rola. */
+#screen-game.modo-mexemexe { height: 100dvh; }
+#screen-game.modo-mexemexe .mesa { min-height: 0; }
+#screen-game.modo-mexemexe .mesa .table-center {
+  flex: 1; display: flex; flex-direction: column; margin: 0; min-height: 0;
+}
+.mm-centro { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 6px; }
+/* A mesa de jogos desce até o pé do tampo, onde o seu boneco senta: o aviso
+   da vez abre espaço para ele à esquerda, senão o começo da frase some. */
+#screen-game.modo-mexemexe .turn-banner { margin-left: 50px; font-size: 0.8rem; line-height: 1.3; }
+
+/* ---- o monte e o relógio ---------------------------------------------------- */
+.mm-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 4px; }
+.mm-monte {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 3px 12px 3px 4px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32); border: 1.5px solid rgba(242, 193, 78, 0.35);
+  color: var(--cream); font: inherit; font-size: 0.78rem; font-weight: 800;
+  cursor: pointer;
+}
+.mm-monte .card.mini { width: 24px; height: 33px; border-radius: 4px; border-width: 1px; }
+.mm-monte:disabled { cursor: default; border-color: rgba(245, 241, 230, 0.14); }
+.mm-monte:not(:disabled):hover { border-color: var(--gold); }
+.mm-monte.vazio .card.mini { opacity: 0.3; }
+.mm-relogio {
+  min-width: 52px; text-align: center;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32); color: var(--cream);
+  font-size: 0.86rem; font-weight: 900; font-variant-numeric: tabular-nums;
+}
+.mm-relogio.meu { background: rgba(242, 193, 78, 0.18); color: var(--gold); }
+.mm-relogio.pouco { background: rgba(200, 60, 50, 0.85); color: #fff; }
+
+/* ---- a mesa de jogos -------------------------------------------------------- */
+/* Rola para baixo quando não cabe: no fim da partida a mesa tem quase o
+   baralho inteiro. Os jogos quebram linha como palavras. */
+.mm-mesa {
+  flex: 1; min-height: 120px; overflow-y: auto;
+  display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px;
+  padding: 10px 2px 12px;
+  overscroll-behavior: contain;
+}
+.mm-vazio {
+  width: 100%; margin: auto 0; text-align: center;
+  color: var(--sage); font-size: 0.86rem; line-height: 1.45; padding: 0 18px;
+}
+.mm-jogo {
+  position: relative;
+  display: flex; align-items: center;
+  padding: 4px 5px; border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 2px solid rgba(140, 106, 69, 0.28);
+  border-top-color: rgba(242, 193, 78, 0.22);
+}
+.mm-jogo .card.mini { width: 40px; height: 55px; margin-left: -19px; border-radius: 6px; transition: transform 0.12s ease; }
+.mm-jogo .card.mini:first-child { margin-left: 0; }
+.mm-jogo .card.mini .idx { font-size: 0.82rem; }
+.mesa .mm-mesa.editando .mm-jogo .card.mini { cursor: pointer; }
+
+/* o jogo mudou no seu rascunho; o jogo não vale; o jogo acabou de chegar */
+.mm-jogo.mexido { border-color: rgba(242, 193, 78, 0.7); border-style: dashed; }
+.mm-jogo.ruim { border-color: #e0574a; border-style: solid; background: rgba(120, 20, 15, 0.35); }
+.mm-aviso {
+  position: absolute; top: -9px; right: -7px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #e0574a; color: #fff;
+  font-size: 0.72rem; font-weight: 900; line-height: 18px; text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+.mm-jogo.chegou { animation: mmChegou 1.3s ease-out 2; }
+@keyframes mmChegou {
+  0% { box-shadow: 0 0 0 0 rgba(242, 193, 78, 0.8); border-color: var(--gold); }
+  100% { box-shadow: 0 0 0 9px rgba(242, 193, 78, 0); }
+}
+
+/* carta escolhida (sobe e ganha o aro dourado) e carta que veio da sua mão
+   nesta vez (o risco sálvia embaixo: é a que ainda pode voltar) */
+.mm-jogo .card.mini.sel {
+  transform: translateY(-9px);
+  outline: 3px solid var(--gold); outline-offset: 0;
+  z-index: 2;
+}
+.mm-jogo .card.mini.minha { box-shadow: inset 0 -4px 0 #7fb8a0, 0 3px 7px -2px rgba(0, 0, 0, 0.7); }
+
+/* os alvos: o ＋ de cada jogo e o "＋ Novo jogo". Dourado = fica valendo. */
+.mm-por, .mm-novo {
+  font: inherit; color: var(--cream); cursor: pointer;
+  border: 2px dashed rgba(245, 241, 230, 0.38); background: rgba(245, 241, 230, 0.05);
+}
+.mm-por {
+  width: 30px; height: 55px; margin-left: 5px; border-radius: 7px;
+  font-size: 1.15rem; font-weight: 900; padding: 0;
+}
+.mm-novo {
+  height: 67px; padding: 0 14px; border-radius: 9px;
+  font-size: 0.82rem; font-weight: 800;
+}
+.mm-por.cabe, .mm-novo.cabe {
+  border-color: var(--gold); color: var(--gold); background: rgba(242, 193, 78, 0.14);
+}
+
+/* ---- assentos e fim da partida ---------------------------------------------- */
+.mm-vitorias {
+  font-size: 0.6rem; font-weight: 900; padding: 1px 6px; border-radius: 999px;
+  background: rgba(242, 193, 78, 0.2); color: var(--gold);
+}
+.score-table tr.mm-ganhou td { color: var(--gold); }
+.mm-sobras { line-height: 1.7; }
+.mm-sobra {
+  display: inline-block; margin: 0 3px 2px 0; padding: 0 4px; border-radius: 4px;
+  background: var(--cream); color: var(--ink); font-size: 0.72rem; font-weight: 800;
+}
+.mm-sobra.red { color: var(--red); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-jogo .card.mini { transition: none; }
+  .mm-jogo.chegou { animation: none; }
+}
