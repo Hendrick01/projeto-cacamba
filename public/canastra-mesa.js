@@ -197,6 +197,8 @@ export function criaMesaCanastra(ctx) {
   }
 
   function pegaLixo() {
+    // na fase de jogar, tocar no lixo é descartar a carta escolhida
+    if (minhaVez() && v().phase === 'play' && !rasc?.lixo && escolhidas().length) { descarta(); return; }
     if (!minhaVez() || v().phase !== 'draw') { mostraLixo(); return; }
     const t = topoDoLixo();
     if (!t) { ctx.toast('O lixo está vazio: compre do monte.'); return; }
@@ -228,10 +230,13 @@ export function criaMesaCanastra(ctx) {
     sel().clear();
     envia({ a: 'comprar' });
   }
+  // Descartar encerra a vez. Uma abertura montada e não confirmada fica de
+  // lado: ela nunca saiu do aparelho, e as cartas dela voltam para a mão.
   function descarta() {
+    if (!minhaVez() || v().phase !== 'play' || rasc?.lixo) return;
     const cs = escolhidas();
-    if (cs.length !== 1) { ctx.toast('Escolha uma carta só para descartar.'); return; }
-    if (pendente()) { ctx.toast('Confirme ou cancele a baixada antes de descartar.'); return; }
+    if (cs.length !== 1) { ctx.toast(cs.length ? 'Para descartar, escolha uma carta só.' : 'Escolha na mão a carta que vai para o lixo.'); return; }
+    if (pendente()) { rasc = null; ctx.toast('A abertura que você montou não foi baixada.'); }
     sel().clear();
     envia({ a: 'descartar', id: cs[0].id });
   }
@@ -294,7 +299,12 @@ export function criaMesaCanastra(ctx) {
     lixo.querySelector('.cn-lixo-txt').textContent = !qtd ? 'lixo vazio' : vw.lixoTrancado ? `trancado · ${qtd}` : `lixo · ${qtd}`;
     lixo.classList.toggle('trancado', !!vw.lixoTrancado);
     lixo.classList.toggle('escolhido', !!rasc?.lixo);
-    lixo.setAttribute('aria-label', `Lixo com ${cartas(qtd)}${t ? `, em cima ${nomeCurto(t)}` : ''}${vw.lixoTrancado ? ', trancado' : ''}. ${minhaVez() && vw.phase === 'draw' ? 'Toque para pegar.' : 'Toque para ver.'}`);
+    // na fase de jogar, com uma carta escolhida, o lixo vira o alvo do descarte
+    const descarteAqui = minhaVez() && vw.phase === 'play' && !rasc?.lixo && escolhidas().length === 1;
+    lixo.classList.toggle('descarte', descarteAqui);
+    const dica = descarteAqui ? `Toque para descartar ${nomeCurto(escolhidas()[0])}.`
+      : minhaVez() && vw.phase === 'draw' ? 'Toque para pegar.' : 'Toque para ver.';
+    lixo.setAttribute('aria-label', `Lixo com ${cartas(qtd)}${t ? `, em cima ${nomeCurto(t)}` : ''}${vw.lixoTrancado ? ', trancado' : ''}. ${dica}`);
 
     // a linha de informação: o que falta para abrir, ou o morto
     const eu = vw.you;
@@ -428,10 +438,13 @@ export function criaMesaCanastra(ctx) {
       bDesfazer.hidden = !rasc.passos.length;
       bCancelar.hidden = false;
       bCancelar.textContent = rasc.lixo ? 'Não pegar o lixo' : 'Recomeçar';
-      return;
     }
-    if (vw.phase === 'play') {
-      bDescartar.hidden = n !== 1;
+    // Na fase de jogar o Descartar fica sempre à vista: apagado até você
+    // escolher uma carta, e com o nome dela quando há uma escolhida.
+    if (vw.phase === 'play' && !rasc?.lixo) {
+      bDescartar.hidden = false;
+      bDescartar.textContent = n === 1 ? `Descartar ${nomeCurto(escolhidas()[0])}︎` : 'Descartar';
+      bDescartar.classList.toggle('soft-disabled', n !== 1);
     }
   }
 
@@ -603,8 +616,8 @@ export function criaMesaCanastra(ctx) {
           : `Abra com ${vw.minimoDaAbertura} pontos de uma vez, ou descarte uma carta.` };
       }
       const n = escolhidas().length;
-      if (n) return { minha: true, texto: n === 1 ? 'Descarte essa carta ou leve-a ao ＋ de um jogo seu.' : 'Baixe como jogo novo ou toque no ＋ de um jogo seu.' };
-      return { minha: true, texto: 'Baixe o que quiser e descarte uma carta para passar a vez.' };
+      if (n) return { minha: true, texto: n === 1 ? 'Descarte essa carta (no botão ou tocando no lixo) ou leve-a ao ＋ de um jogo seu.' : 'Baixe como jogo novo ou toque no ＋ de um jogo seu.' };
+      return { minha: true, texto: 'Baixe o que quiser e, para passar a vez, escolha uma carta e descarte.' };
     },
 
     anuncia(ev) {

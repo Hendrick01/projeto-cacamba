@@ -152,3 +152,6 @@
    aparece riscado, porque não vale */
 .cn-conta td.cn-riscado { text-decoration: line-through; opacity: 0.45; }
 .cn-conta tr.cn-cravado td { color: #f3a097; font-weight: 900; }
+
+/* com uma carta escolhida na fase de jogar, o lixo chama o descarte */
+.cn-lixo.descarte { border-style: dashed; border-color: var(--gold); background: rgba(242, 193, 78, 0.16); }
