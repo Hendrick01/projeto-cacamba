@@ -482,6 +482,14 @@ em `test/poker.test.js`), mesa 2D em `public/poker-mesa.js` +
   mesa da mão que acabou, as cinco que ganharam acesas e a sua mão antiga; o
   servidor segura os robôs no mesmo tanto com o gancho opcional
   `pausaDoRobo(game)` do motor, somado ao atraso de `scheduleBots`.
+- **O resultado se explica** (pedido do dono, 15/10/2026: dois flushes
+  dourados e ele perdeu — era pote paralelo). O nome do flush traz a carta
+  alta ("Flush de copas, Ás alto"); cada pote guarda `partes` (quanto cada
+  vencedor levou dele) e `desempate` — quando quem perdeu tem a MESMA
+  descrição de quem ganhou, a carta que decidiu ("Dama contra Valete"). Na
+  lista do resultado, cada um diz o que levou (`levouNaMao`: "levou o
+  principal: 900", "dividiu o paralelo: 700", "não levou"), e só fica
+  dourado quem levou algum pote.
 - **Robôs.** `equidade` sorteia as cartas que ninguém viu (Monte Carlo) e o
   robô compara com as odds do pote; `facil` lê mal a mão e paga demais. Quem
   caiu ou saiu da partida nunca aposta: dá mesa ou corre até ser engolido

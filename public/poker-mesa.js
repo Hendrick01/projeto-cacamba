@@ -84,18 +84,42 @@ export function botoesDaVez(vw, eu, segurando) {
 // O resultado de uma mão, em linhas: potes que foram para os mesmos
 // vencedores viram uma linha só. `antes` é o texto até o valor ("Pote
 // paralelo: Ana e Você dividem"), sem HTML — quem desenha escapa.
+// quanto cada vencedor levou de um pote (resultado antigo, sem `partes`: a divisão)
+const partesDe = (pt) => pt.partes || Object.fromEntries(pt.vencedores.map((id) => [id, Math.floor(pt.valor / pt.vencedores.length)]));
+
 export function linhasDoResultado(ev, eu, nome) {
   let disputados = ev.potes.filter((x) => !x.devolvido);
   const chave = (pt) => pt.vencedores.join(',');
   if (disputados.length > 1 && disputados.every((pt) => chave(pt) === chave(disputados[0]))) {
-    disputados = [{ ...disputados[0], valor: disputados.reduce((s, pt) => s + pt.valor, 0) }];
+    const partes = {};
+    for (const pt of disputados) for (const [id, v] of Object.entries(partesDe(pt))) partes[id] = (partes[id] || 0) + v;
+    disputados = [{ ...disputados[0], valor: disputados.reduce((s, pt) => s + pt.valor, 0), partes }];
   }
   return disputados.map((pt, k) => {
     const quem = pt.vencedores.map((id) => (id === eu ? 'Você' : nome(id))).join(' e ');
     const verbo = pt.vencedores.length > 1 ? 'dividem' : 'leva';
-    const qual = disputados.length > 1 ? (k === 0 ? 'Pote principal: ' : `Pote paralelo${disputados.length > 2 ? ` ${k}` : ''}: `) : '';
-    return { antes: `${qual}${quem} ${verbo}`, valor: pt.valor, mao: pt.mao, meu: pt.vencedores.includes(eu), vencedores: pt.vencedores };
+    const qual = disputados.length > 1 ? (k === 0 ? 'Pote principal' : `Pote paralelo${disputados.length > 2 ? ` ${k}` : ''}`) : '';
+    return {
+      antes: `${qual ? `${qual}: ` : ''}${quem} ${verbo}`, valor: pt.valor, mao: pt.mao, desempate: pt.desempate || null,
+      meu: pt.vencedores.includes(eu), vencedores: pt.vencedores, qual, partes: partesDe(pt),
+    };
   });
+}
+
+// O que um jogador levou nesta mão, pote por pote: "levou o principal: 900 ·
+// dividiu o paralelo: 700". Quem não levou nada, "não levou".
+export function levouNaMao(ev, id) {
+  const pedacos = [];
+  for (const l of linhasDoResultado(ev, id, () => '')) {
+    const v = l.partes[id];
+    if (!(v > 0)) continue;
+    const qual = l.qual ? `o ${l.qual.replace(/^Pote /, '')}` : 'o pote';
+    pedacos.push(`${l.vencedores.length > 1 ? 'dividiu' : 'levou'} ${qual}: ${fmt(v)}`);
+  }
+  const volta = ev.potes.filter((x) => x.devolvido).reduce((s, x) => s + (partesDe(x)[id] || 0), 0);
+  if (volta > 0) pedacos.push(`de volta: ${fmt(volta)}`);
+  const levou = pedacos.length > 0 && !(pedacos.length === 1 && volta > 0);
+  return { texto: pedacos.length ? pedacos.join(' · ') : 'não levou', levou };
 }
 
 // As cinco que ganharam (as do primeiro pote disputado), para acender na mesa.
@@ -417,15 +441,16 @@ export function criaMesaPoker(ctx) {
     const atraso = segura.corrida.length ? segura.corrida.length * 0.9 + 0.2 : 0;
     resultado.style.setProperty('--atraso', `${ctx.semMovimento() ? 0 : atraso}s`);
     const potes = linhasDoResultado(ev, me(), nome);
-    const linhas = potes.map((l) => `<p class="pk-res-titulo${l.meu ? ' meu' : ''}">${ctx.escapeHTML(l.antes)} <b>${fmt(l.valor)}</b>${l.mao ? ` <span>com ${ctx.escapeHTML(l.mao)}</span>` : ''}</p>`);
-    const vencedores = new Set(potes.flatMap((x) => x.vencedores));
+    const linhas = potes.map((l) => `<p class="pk-res-titulo${l.meu ? ' meu' : ''}">${ctx.escapeHTML(l.antes)} <b>${fmt(l.valor)}</b>${l.mao ? ` <span>com ${ctx.escapeHTML(l.mao)}</span>` : ''}${l.desempate ? ` <em class="pk-res-desempate">(desempate: ${ctx.escapeHTML(l.desempate)})</em>` : ''}</p>`);
     const mostradas = ev.mostradas.map((m) => {
       const cartas = m.cards.map((c) => ctx.cardEl(c, true).outerHTML).join('');
-      return `<li class="${vencedores.has(m.p) ? 'venceu' : ''}">
+      const levou = levouNaMao(ev, m.p);
+      return `<li class="${levou.levou ? 'venceu' : ''}">
         <img class="avatar" src="${ctx.caraDoJogador(m.p)}" alt="" width="22" height="22" style="--anel:${ctx.corDoJogador(m.p)}">
         <span class="pk-res-nome">${m.p === me() ? 'Você' : ctx.escapeHTML(nome(m.p))}</span>
         <span class="pk-res-cartas">${cartas}</span>
-        <span class="pk-res-mao">${ctx.escapeHTML(m.mao)}</span></li>`;
+        <span class="pk-res-mao">${ctx.escapeHTML(m.mao)}</span>
+        <span class="pk-res-levou">${ctx.escapeHTML(levou.texto)}</span></li>`;
     }).join('');
     resultado.innerHTML = `<div class="pk-res-dentro">${linhas.join('')}${mostradas ? `<ul class="pk-res-maos">${mostradas}</ul>` : ''}
       <span class="pk-res-dica">toque para continuar</span></div>`;

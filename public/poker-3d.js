@@ -26,7 +26,7 @@
 import { emFichas, FICHAS, NOME_DA_ETAPA } from '/shared/poker.js';
 import {
   fmt, msDaSegura, posicaoDe, falaDoLance, textoDaVez, botoesDaVez,
-  linhasDoResultado, cartasVencedoras, classificacao, pilhas, criaBandeja,
+  linhasDoResultado, levouNaMao, cartasVencedoras, classificacao, pilhas, criaBandeja,
 } from './poker-mesa.js';
 import { arteDaCarta } from './baralho.js';
 
@@ -578,7 +578,7 @@ export function criaPoker3D(ctx) {
     for (const pt of ev.potes) {
       const cada = pt.valor / pt.vencedores.length;
       for (const id of pt.vencedores) {
-        voaFichas(Math.round(cada), pontoDoPote(), maoDe(id), { atraso: k++ * 120, dur: 620, arco: 0.12, visivelAntes: true });
+        voaFichas(pt.partes?.[id] ?? Math.round(cada), pontoDoPote(), maoDe(id), { atraso: k++ * 120, dur: 620, arco: 0.12, visivelAntes: true });
       }
     }
   }
@@ -618,15 +618,16 @@ export function criaPoker3D(ctx) {
       p.append(`${l.antes} `);
       const b = document.createElement('b'); b.textContent = fmt(l.valor); p.append(b);
       if (l.mao) { const s = document.createElement('span'); s.textContent = ` com ${l.mao}`; p.append(s); }
+      if (l.desempate) { const d = document.createElement('em'); d.className = 'pk-res-desempate'; d.textContent = ` (desempate: ${l.desempate})`; p.append(d); }
       dentro.appendChild(p);
     }
-    const vencedores = new Set(potes.flatMap((x) => x.vencedores));
     if (ev.mostradas.length) {
       const ul = document.createElement('ul');
       ul.className = 'pk-res-maos';
       for (const m of ev.mostradas) {
         const li = document.createElement('li');
-        if (vencedores.has(m.p)) li.className = 'venceu';
+        const levou = levouNaMao(ev, m.p);
+        if (levou.levou) li.className = 'venceu';
         const img = document.createElement('img');
         img.className = 'avatar'; img.alt = ''; img.width = 22; img.height = 22;
         img.src = ctx.avatarDe(m.p);
@@ -639,7 +640,8 @@ export function criaPoker3D(ctx) {
           cartas.appendChild(ci);
         }
         const mao = document.createElement('span'); mao.className = 'pk-res-mao'; mao.textContent = m.mao;
-        li.append(img, n, cartas, mao);
+        const quanto = document.createElement('span'); quanto.className = 'pk-res-levou'; quanto.textContent = levou.texto;
+        li.append(img, n, cartas, mao, quanto);
         ul.appendChild(li);
       }
       dentro.appendChild(ul);

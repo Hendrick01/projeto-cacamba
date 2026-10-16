@@ -27,7 +27,8 @@
 // AS FICHAS. Cada cor tem um valor (FICHAS); toda aposta é múltiplo da menor,
 // e a pilha de cada um é desenhada com as cores certas (emFichas).
 //
-// REGRAS DA CASA que eu decidi e ele ainda não confirmou (ajustáveis aqui):
+// REGRAS DA CASA, propostas por mim e CONFIRMADAS pelo dono do jogo em
+// 15/10/2026, uma por uma (ajustáveis aqui):
 //  - 1.000 em fichas para cada um; blinds começam em 10/20 e sobem a cada
 //    6 mãos (BLINDS, MAOS_POR_NIVEL). Sem ante.
 //  - O botão da primeira mão é sorteado.
@@ -167,6 +168,7 @@ const PLURAL = { 14: 'Ases', 13: 'Reis', 12: 'Damas', 11: 'Valetes' };
 const nomeDe = (v) => NOME[v] || String(v);
 const pluralDe = (v) => PLURAL[v] || String(v);
 const ateO = (v) => (v === 12 ? 'a Dama' : `o ${nomeDe(v)}`);
+const alto = (v) => (v === 12 ? 'Dama alta' : `${nomeDe(v)} alto`);
 
 export function descreve(score, cinco = []) {
   const [cat, a, b] = score;
@@ -176,7 +178,8 @@ export function descreve(score, cinco = []) {
     case 2: return `Dois pares: ${pluralDe(a)} e ${pluralDe(b)}`;
     case 3: return `Trinca de ${pluralDe(a)}`;
     case 4: return `Sequência até ${ateO(a)}`;
-    case 5: return `Flush de ${NAIPES[cinco[0]?.suit] || ''}`.trim();
+    // dois flushes do mesmo naipe se decidem pela carta mais alta: ela vai no nome
+    case 5: return `Flush${cinco[0] ? ` de ${NAIPES[cinco[0].suit]}` : ''}, ${alto(a)}`;
     case 6: return `Full house: ${pluralDe(a)} com ${pluralDe(b)}`;
     case 7: return `Quadra de ${pluralDe(a)}`;
     case 8: return a === 14 ? 'Royal flush' : `Straight flush até ${ateO(a)}`;
@@ -401,18 +404,34 @@ function ordemAPartirDoBotao(state, ids) {
   return [...ids].sort((a, b) => pos(a) - pos(b));
 }
 
+// Reparte um pote entre os vencedores; devolve quanto cada um levou dele.
 function reparte(state, valor, vencedores, ganhos) {
   const ordem = ordemAPartirDoBotao(state, vencedores);
   const unidades = Math.floor(valor / FICHA_MINIMA);
   const cada = Math.floor(unidades / ordem.length) * FICHA_MINIMA;
   let sobra = valor - cada * ordem.length;
+  const partes = {};
   for (const id of ordem) {
     let leva = cada;
     if (sobra >= FICHA_MINIMA) { leva += FICHA_MINIMA; sobra -= FICHA_MINIMA; }
-    ganhos[id] = (ganhos[id] || 0) + leva;
+    partes[id] = leva;
   }
   // o que nem chega a uma ficha (blind curto de all-in) vai ao primeiro
-  if (sobra > 0) ganhos[ordem[0]] += sobra;
+  if (sobra > 0) partes[ordem[0]] += sobra;
+  for (const [id, leva] of Object.entries(partes)) ganhos[id] = (ganhos[id] || 0) + leva;
+  return partes;
+}
+
+// Quando quem perdeu tem a MESMA descrição de mão de quem ganhou (dois "Flush
+// de copas, Ás alto", dois "Par de Reis"), quem decide é uma carta de baixo:
+// "Dama contra 10". Sem isso a tela mostrava duas mãos iguais e um vencedor.
+function desempateDoPote(vencedor, perdedores) {
+  let melhor = null;
+  for (const a of perdedores) if (!melhor || compara(a.score, melhor.score) > 0) melhor = a;
+  if (!melhor || melhor.descricao !== vencedor.descricao) return null;
+  const i = vencedor.score.findIndex((v, k) => v !== melhor.score[k]);
+  if (i < 1 || melhor.score[i] == null) return null;
+  return `${nomeDe(vencedor.score[i])} contra ${nomeDe(melhor.score[i])}`;
 }
 
 function showdown(state, events) {
@@ -432,13 +451,16 @@ function showdown(state, events) {
       }
       vencedores = pote.elegiveis.filter((id) => compara(avaliacao.get(id).score, melhor) === 0);
     }
-    reparte(state, pote.valor, vencedores, ganhos);
+    const partes = reparte(state, pote.valor, vencedores, ganhos);
+    const disputado = pote.elegiveis.length > 1;
     // Só um disputando: se mais alguém pôs ficha ali (e correu), ele GANHOU
     // esse pote; se só ele pôs, é a aposta que ninguém cobriu voltando.
     resumo.push({
-      valor: pote.valor, vencedores: ordemAPartirDoBotao(state, vencedores),
+      valor: pote.valor, vencedores: ordemAPartirDoBotao(state, vencedores), partes,
       devolvido: pote.elegiveis.length === 1 && pote.pagantes <= 1,
-      mao: pote.elegiveis.length === 1 ? null : avaliacao.get(vencedores[0]).descricao,
+      mao: disputado ? avaliacao.get(vencedores[0]).descricao : null,
+      desempate: disputado ? desempateDoPote(avaliacao.get(vencedores[0]),
+        pote.elegiveis.filter((id) => !vencedores.includes(id)).map((id) => avaliacao.get(id))) : null,
     });
   }
   const mostradas = ativos.map((p) => {
@@ -452,7 +474,7 @@ function ganhaSemMostrar(state, events, vencedor) {
   const total = poteDe(state);
   const ganhos = { [vencedor.id]: total };
   return fimDaMao(state, events, {
-    ganhos, potes: [{ valor: total, vencedores: [vencedor.id], devolvido: false, mao: null }],
+    ganhos, potes: [{ valor: total, vencedores: [vencedor.id], partes: { [vencedor.id]: total }, devolvido: false, mao: null, desempate: null }],
     mostradas: [], semShowdown: true,
   });
 }

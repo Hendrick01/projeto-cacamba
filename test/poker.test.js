@@ -208,6 +208,53 @@ test('potes paralelos: o all-in curto só disputa o que cobriu', () => {
   assert.equal(pausaDoRobo(s), 6000, 'os robôs esperam a corrida acabar na tela');
 });
 
+test('flush contra flush: a carta alta vai no nome, e cada pote diz quanto deu a cada um', () => {
+  assert.equal(melhorMao(cs('A♥ 5♠ 2♥ 7♥ 10♥ 4♥ 9♦')).descricao, 'Flush de copas, Ás alto');
+  assert.equal(melhorMao(cs('Q♣ 5♣ 2♣ 7♣ 9♣ 4♥ 9♦')).descricao, 'Flush de paus, Dama alta');
+  // A partida do dono do jogo (15/10/2026): três flushes de copas e um robô
+  // curto. O curto leva o principal com o maior flush; o outro robô bate o
+  // seu no paralelo. Dois dourados, e você perdeu — certo, mas a tela
+  // chamava os três de "Flush de copas".
+  const s = mesa(3);
+  startRound(s);
+  const [curto, medio, grande] = [s.players[s.turn], s.players[(s.turn + 1) % 3], s.players[(s.turn + 2) % 3]];
+  curto.fichas = 100 - curto.aposta;
+  medio.fichas = 300 - medio.aposta;
+  fixa(s, s.players.map((p) => (p === curto ? 'A♥ 5♠' : p === medio ? 'K♥ 8♠' : '9♥ 3♠')), '2♥ 7♥ 10♥ 4♥ 9♦');
+  age(s, { a: 'allin' });
+  age(s, { a: 'allin' });
+  age(s, { a: 'pagar' });
+  const um = s.ultimaMao;
+  assert.deepEqual(um.potes.map((p) => [p.valor, p.mao, p.partes]), [
+    [300, 'Flush de copas, Ás alto', { [curto.id]: 300 }],
+    [400, 'Flush de copas, Rei alto', { [medio.id]: 400 }],
+  ]);
+  assert.ok(um.potes.every((p) => p.desempate === null), 'as descrições já dizem quem venceu');
+  assert.equal(um.mostradas.find((m) => m.p === grande.id).mao, 'Flush de copas, 10 alto');
+});
+
+test('mesma descrição de mão: o pote diz a carta que desempatou', () => {
+  const joga = (maoX, maoY, board) => {
+    const s = mesa(2);
+    startRound(s);
+    const [x] = [s.players[s.botao]];
+    fixa(s, s.players.map((p) => (p === x ? maoX : maoY)), board);
+    age(s, { a: 'pagar' });
+    age(s, { a: 'mesa' });
+    for (let k = 0; k < 3; k++) { age(s, { a: 'mesa' }); age(s, { a: 'mesa' }); }
+    return { pote: s.ultimaMao.potes[0], x };
+  };
+  // os dois têm o Ás de copas da mesa no flush: decide a carta de baixo
+  let { pote, x } = joga('Q♥ 4♣', 'J♥ 5♣', 'A♥ K♥ 7♥ 2♥ 3♠');
+  assert.deepEqual([pote.vencedores, pote.mao, pote.desempate], [[x.id], 'Flush de copas, Ás alto', 'Dama contra Valete']);
+  // par de Reis contra par de Reis: o kicker
+  ({ pote, x } = joga('A♣ 9♦', 'Q♣ 8♦', 'K♠ K♦ 7♣ 4♥ 2♠'));
+  assert.deepEqual([pote.vencedores, pote.mao, pote.desempate], [[x.id], 'Par de Reis', 'Ás contra Dama']);
+  // descrições diferentes não precisam de desempate
+  ({ pote } = joga('A♣ A♦', 'K♣ Q♦', '2♠ 7♦ 9♣ J♥ 4♠'));
+  assert.equal(pote.desempate, null);
+});
+
 test('pote paralelo de quem correu não é devolução: quem ficou ganhou', () => {
   const s = mesa(3);
   startRound(s);
