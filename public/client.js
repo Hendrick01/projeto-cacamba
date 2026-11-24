@@ -210,6 +210,7 @@ function handleMessage(msg) {
         break;
       }
       view = msg.view;
+      viewChegouEm = performance.now();   // o relógio da vez desconta a partir daqui
       controlesVoz.presenca(view.players);
       showScreen('game');
       for (const ev of msg.events || []) announce(ev);
@@ -810,6 +811,16 @@ function renderLobby() {
           : 'Fácil: o robô não pega do meio, só encaixa nos próprios jogos e às vezes descarta mal.';
     $('btn-nivel-robos').title = isHost() ? `Toque para trocar. ${comoEFacil}` : 'Quem criou a sala escolhe o nível dos robôs.';
   }
+  // o relógio da vez (só o Caçamba tem: o servidor manda `relogios` só nele)
+  const prazos = Array.isArray(lobby.relogios) ? lobby.relogios : null;
+  $('btn-relogio').hidden = !prazos;
+  $('btn-relogio').disabled = !isHost();
+  if (prazos) {
+    $('btn-relogio').textContent = lobby.relogio > 0 ? `Relógio: ${lobby.relogio} s` : 'Relógio: sem';
+    $('btn-relogio').title = isHost()
+      ? 'Toque para trocar. Com relógio, quem estoura o tempo da vez tem a vez jogada no mínimo: puxa do monte e descarta.'
+      : 'Quem criou a sala escolhe o relógio da vez.';
+  }
   $('btn-start').hidden = !isHost();
   const faltam = MODOS[modoDaSala].min - lobby.players.length;
   $('btn-start').disabled = faltam > 0;
@@ -922,6 +933,13 @@ $('btn-nivel-robos').onclick = () => {
   const niveis = MODOS[lobby?.modo]?.niveis || ['facil', 'normal'];
   const k = niveis.indexOf(lobby?.nivelRobos);
   sendMsg({ t: 'nivelRobos', nivel: niveis[(k + 1) % niveis.length] });
+};
+// o relógio da vez: cada toque passa para o próximo prazo que o servidor oferece
+$('btn-relogio').onclick = () => {
+  const prazos = Array.isArray(lobby?.relogios) ? lobby.relogios : [];
+  if (!prazos.length) return;
+  const k = prazos.indexOf(lobby.relogio);
+  sendMsg({ t: 'relogio', s: prazos[(k + 1) % prazos.length] });
 };
 $('btn-start').onclick = () => sendMsg({ t: 'start' });
 
@@ -1683,6 +1701,15 @@ function renderCenter() {
 // fica 2,2 s e o próximo espera o seu; a fila guarda só os três últimos.
 const filaDeEventos = [];
 let eventoNoBanner = null;
+// O RELÓGIO DA VEZ do Caçamba (11/11/2026): opcional, ligado pelo anfitrião no
+// lobby. A visão traz `restaMs` (o que faltava quando o servidor mandou); daqui
+// em diante é só descontar o tempo desde que ela chegou.
+let viewChegouEm = 0;
+function segundosDaVez() {
+  if (!view || !(view.vezMs > 0) || typeof view.restaMs !== 'number') return null;
+  return Math.max(0, Math.ceil((view.restaMs - (performance.now() - viewChegouEm)) / 1000));
+}
+setInterval(() => { if (!eventoNoBanner && segundosDaVez() != null) atualizaBanner(); }, 500);
 function atualizaBanner() {
   const banner = $('turn-banner');
   if (!banner || !view) return;
@@ -1698,11 +1725,14 @@ function atualizaBanner() {
     return;
   }
   if (view.phase === 'draw' || view.phase === 'play') {
+    // o relógio da vez, quando a sala tem (o anfitrião liga no lobby)
+    const s = segundosDaVez();
+    const relogio = s == null ? '' : ` · ${s} s`;
     if (myTurn()) {
-      banner.textContent = dicaDaVez() || (view.phase === 'draw' ? 'Sua vez! Puxe do monte ou pegue do meio.' : 'Baixe, encaixe ou descarte uma carta.');
-      banner.className = 'turn-banner me';
+      banner.textContent = (dicaDaVez() || (view.phase === 'draw' ? 'Sua vez! Puxe do monte ou pegue do meio.' : 'Baixe, encaixe ou descarte uma carta.')) + relogio;
+      banner.className = `turn-banner me${s != null && s <= 10 ? ' pouco-tempo' : ''}`;
     } else {
-      banner.textContent = `Vez de ${playerName(view.turnId)}…`;
+      banner.textContent = `Vez de ${playerName(view.turnId)}…${relogio}`;
       banner.className = 'turn-banner';
     }
   } else {
@@ -2634,6 +2664,9 @@ function announce(ev) {
       break;
     case 'away':
       toast(`${playerName(ev.p)} caiu — o jogo joga por ${ev.p === me() ? 'você' : 'ele'} até voltar.`);
+      break;
+    case 'tempo':
+      toast(ev.p === me() ? 'Seu tempo acabou: o jogo puxou e descartou por você.' : `O tempo de ${playerName(ev.p)} acabou: o jogo jogou a vez.`);
       break;
     case 'reshuffle':
       toast('O monte acabou — o meio foi embaralhado de volta.');

@@ -49,6 +49,9 @@ projeto-caçamba/
     ├── engine.test.js       # 51 testes unitários do motor
     ├── e2e.mjs              # integração: 3 jogadores contra o servidor real
     ├── sair.mjs             # integração: sair da partida no meio e o robô assumir
+    ├── relogio.mjs          # integração: o relógio da vez do Caçamba (opcional, do anfitrião)
+    ├── tutorial.test.js     # o roteiro do tutorial jogado com o motor e o robô de verdade
+    ├── tutorial.mjs         # integração: a sala de tutorial pelo fio, até bater
     └── convite.mjs          # integração: o link da sala atrás de proxy
 ```
 
@@ -65,6 +68,10 @@ projeto-caçamba/
 | [`test/convite.mjs`](test/convite.mjs) | 64 | O link de convite atrás de proxy: sai em https quando o proxy diz https, continua http sem proxy, e ignora host forjado. |
 | [`test/voz.mjs`](test/voz.mjs) | 56 | O repasse da sinalização de voz: direto, para todos, e o que o servidor ignora (robô, sala alheia, dados fora do formato). |
 | [`test/sair.mjs`](test/sair.mjs) | 100 | Dois humanos numa sala, um sai no meio da partida: confere o evento, a marca no assento, o robô assumindo, a vez seguindo e o token velho não voltando. |
+| [`shared/tutorial.js`](shared/tutorial.js) | 72 | O roteiro do tutorial: depois que o motor distribui a 1ª rodada de uma sala de tutorial (mesa de dois, dois baralhos, robô normal), arruma a mão de quem aprende, a do robô, a virada e o topo do monte para que, em duas vezes, apareçam puxar, baixar, encaixar, descartar, pegar do meio e bater. Não muda regra nenhuma. |
+| [`test/tutorial.test.js`](test/tutorial.test.js) | 120 | Joga o roteiro com o motor e a heurística do robô de verdade, em vários sorteios do resto do baralho: o robô sempre larga o K♠ e quem aprende sempre bate. Se a heurística do robô mudar, é aqui que o tutorial quebra. |
+| [`test/tutorial.mjs`](test/tutorial.mjs) | 110 | A sala de tutorial pelo fio: `create` com `tutorial: true` já devolve a partida começada com um robô, ninguém de fora entra, a mão é a do roteiro e, jogando o roteiro, quem aprende bate. Rodar com `RITMO_DOS_ROBOS=0.05 node server.js`. |
+| [`test/relogio.mjs`](test/relogio.mjs) | 133 | O relógio da vez do Caçamba: a sala nasce sem; só o anfitrião liga, só antes de começar e só com os prazos da lista; a visão leva `vezMs`/`restaMs`; puxar não devolve tempo; ao vencer chega o evento `tempo`, o jogo puxa e descarta (sem baixar) e a vez passa; na vez seguinte o relógio volta inteiro. Rodar com `CACAMBA_VEZ_MS=1500 RITMO_DOS_ROBOS=0.05 node server.js`. |
 | [`test/sobra.mjs`](test/sobra.mjs) | 189 | As três portas da sobra pelo fio: **quatro** jogadores roteirizados (com três é um baralho só, e a quarta carta de cada valor é uma), baixando um jogo por vez para abrir a janela dos encaixes — é dos encaixes que as sobras nascem. A Ana leva uma sobra alheia para a mão e descarta outra, conferindo o estado que volta. Sai com código 2 quando o sorteio não gera sobra: rodar de novo. |
 | [`test/mesa-qa.mjs`](test/mesa-qa.mjs) | 32 | Ferramenta de QA, não teste: cria uma sala com robôs, começa a partida e imprime a sessão para colar em `localStorage` e abrir `/3d.html`. Sem partida em andamento a mesa 3D não desenha ninguém, e era esse o degrau para conferir o elenco na cena. `node test/mesa-qa.mjs [robôs] [porta]`. |
 | [`test/mesa-qa-jogando.mjs`](test/mesa-qa-jogando.mjs) | 45 | O irmão do anterior que também JOGA a minha vez até a mesa encher de jogos baixados: é o degrau para ver a 3D com oito jogadores e todo mundo com jogo na frente, que é onde a leitura das cartas aperta. `node test/mesa-qa-jogando.mjs [robôs] [porta] [turnos]`. |

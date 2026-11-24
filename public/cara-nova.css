@@ -196,6 +196,8 @@ html.debug .ui-version { display: inline; }
 #screen-lobby .lobby-actions:not(:has(.btn:not([hidden]))) { display: none; }
 #screen-lobby #btn-start { width: 100%; }
 #screen-lobby #btn-nivel-robos { border: 1.5px solid rgba(245, 241, 230, 0.12); }
+/* o relógio da vez (Caçamba) ocupa a linha de baixo inteira */
+#screen-lobby #btn-relogio { grid-column: 1 / -1; border: 1.5px solid rgba(245, 241, 230, 0.12); }
 .lobby-rodape { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
 .lobby-rodape .btn { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: .92rem; border: 1.5px solid rgba(245, 241, 230, 0.12); }
 

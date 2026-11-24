@@ -1,0 +1,27 @@
+# Unity: gerados pelo editor, refeitos ao abrir o projeto
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/[Bb]uild/
+/[Bb]uilds/
+
+# Projetos de IDE gerados
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.pidb
+*.booproj
+.vs/
+.idea/
+
+# Saídas de build
+*.apk
+*.aab
+*.unitypackage
+crashlytics-build.properties

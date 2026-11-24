@@ -12,6 +12,8 @@ npm-debug.log*
 # Artefatos de sistema / editor
 .DS_Store
 Thumbs.db
+# trava que o Word e o Excel criam enquanto um documento está aberto
+~$*
 .vscode/
 .idea/
 *.swp
@@ -39,3 +41,8 @@ qa-interface/
 # refeitos pelos scripts (mao_para_posar.py / mao_pose_segura.py)
 mao-para-posar.blend*
 mao-posada.blend*
+
+# Build WebGL do app Unity (sai de unity/ com Construir.WebGL e o servidor a
+# serve em /unity/). São dezenas de MB a cada build: fica fora do git até a
+# decisão de como publicá-la (ver unity/LEIA-ME.md).
+public/unity/

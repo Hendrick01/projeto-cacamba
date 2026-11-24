@@ -1,0 +1,12 @@
+<linker>
+  <!-- GameObject.CreatePrimitive põe um collider em cada forma (esfera, plano,
+       quad). A remoção de código da engine não enxerga esse uso e tirava as
+       classes da build: no WebGL o console enchia de "Can't add component
+       because class 'MeshCollider' doesn't exist". -->
+  <assembly fullname="UnityEngine.PhysicsModule">
+    <type fullname="UnityEngine.BoxCollider" preserve="all"/>
+    <type fullname="UnityEngine.SphereCollider" preserve="all"/>
+    <type fullname="UnityEngine.CapsuleCollider" preserve="all"/>
+    <type fullname="UnityEngine.MeshCollider" preserve="all"/>
+  </assembly>
+</linker>

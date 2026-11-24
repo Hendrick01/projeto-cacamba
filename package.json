@@ -20,7 +20,9 @@
     "test:poker": "node test/poker.mjs",
     "test:puxadinho": "node test/puxadinho.mjs",
     "test:mexemexe": "node test/mexemexe.mjs",
-    "test:canastra": "node test/canastra.mjs"
+    "test:canastra": "node test/canastra.mjs",
+    "test:relogio": "node test/relogio.mjs",
+    "test:tutorial": "node test/tutorial.mjs"
   },
   "engines": {
     "node": ">=20"

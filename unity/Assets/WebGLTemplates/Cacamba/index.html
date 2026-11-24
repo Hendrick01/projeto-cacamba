@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+  <meta name="theme-color" content="#1b110b">
+  <title>{{{ PRODUCT_NAME }}}</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <div id="carregando">
+    <div class="titulo">Caçamba</div>
+    <div class="barra"><div id="progresso"></div></div>
+    <div id="mensagem">Arrumando a mesa…</div>
+  </div>
+  <!-- Sem script inline: a CSP do servidor (server.js) só aceita script de arquivo.
+       Os nomes da build chegam por atributo e o inicia.js lê daqui. -->
+  <script src="inicia.js"
+          data-loader="Build/{{{ LOADER_FILENAME }}}"
+          data-data="Build/{{{ DATA_FILENAME }}}"
+          data-framework="Build/{{{ FRAMEWORK_FILENAME }}}"
+          data-code="Build/{{{ CODE_FILENAME }}}"
+          data-company="{{{ COMPANY_NAME }}}"
+          data-product="{{{ PRODUCT_NAME }}}"
+          data-version="{{{ PRODUCT_VERSION }}}"></script>
+</body>
+</html>

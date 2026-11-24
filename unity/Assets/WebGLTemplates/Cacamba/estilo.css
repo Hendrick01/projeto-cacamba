@@ -1,0 +1,59 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1b110b;
+  color: #f5f1e6;
+  font-family: system-ui, sans-serif;
+  touch-action: none;
+}
+
+#unity-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+}
+
+#carregando {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: radial-gradient(circle at 50% 0%, #1a5b44, #06201a 70%);
+}
+
+#carregando .titulo {
+  font-size: 48px;
+  font-weight: 900;
+  color: #f2c14e;
+}
+
+#carregando .barra {
+  width: min(320px, 70vw);
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+#progresso {
+  width: 0;
+  height: 100%;
+  background: #f2c14e;
+  transition: width 0.2s;
+}
+
+#mensagem {
+  font-size: 15px;
+  color: #e4dcc8;
+  text-align: center;
+  padding: 0 16px;
+}

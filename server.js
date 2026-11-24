@@ -16,7 +16,7 @@ import QRCode from 'qrcode';
 import {
   createGame, startRound, applyAction, actNextRound, viewFor,
   botNextAction, botWantsCard, actClaim, DEFAULT_OPTS, conferirBaralho, NIVEIS_DE_ROBO,
-  podeComprarDoDescarte, topoDoDescarte,
+  podeComprarDoDescarte, topoDoDescarte, botPickDiscard,
 } from './shared/engine.js';
 import * as Presidente from './shared/presidente.js';
 import * as Domino from './shared/domino.js';
@@ -26,6 +26,7 @@ import * as Puxadinho from './shared/puxadinho.js';
 import * as MexeMexe from './shared/mexemexe.js';
 import * as Canastra from './shared/canastra.js';
 import { personagemValido } from './shared/elenco.js';
+import { montaRodadaDoTutorial, OPCOES_DO_TUTORIAL } from './shared/tutorial.js';
 import { emoteDe } from './shared/emotes.js';
 import { chaveDasSalas, sela, abre } from './lib/selo-sala.js';
 import { codigoPix, normalizaChave } from './lib/pix.js';
@@ -135,6 +136,19 @@ const opcoesDaPartida = (room) => ({
   nivelRobos: room.nivelRobos || 'normal',
   ...(motorDe(room).variantes ? { variante: varianteValida(room.modo, room.variante) } : {}),
 });
+// O RELÓGIO DA VEZ DO CAÇAMBA (11/11/2026). Opcional: a sala nasce sem relógio,
+// como sempre foi, e o anfitrião liga no lobby (`relogio`, em segundos). Com
+// ele ligado, a vez de cada HUMANO tem prazo; quando vence, o jogo faz o
+// mínimo por ele NAQUELA vez — puxa do monte e descarta — e a vez seguinte
+// volta a ser dele. Robô não tem relógio. A visão leva `vezMs` (o prazo
+// inteiro) e `restaMs` (o que falta), do mesmo jeito que o Mexe-Mexe.
+const RELOGIOS = [0, 30, 45, 60, 90];
+const relogioValido = (s) => (RELOGIOS.includes(Number(s)) ? Number(s) : 0);
+// Só para teste: CACAMBA_VEZ_MS=1500 encurta o prazo de toda sala que tem relógio.
+const VEZ_DO_CACAMBA_NO_TESTE = Number(process.env.CACAMBA_VEZ_MS) >= 200 ? Number(process.env.CACAMBA_VEZ_MS) : 0;
+const relogioMs = (room) => (modoValido(room.modo) === 'cacamba' && relogioValido(room.relogio) > 0
+  ? (VEZ_DO_CACAMBA_NO_TESTE || relogioValido(room.relogio) * 1000) : 0);
+const chaveDaVez = (room, game) => `${room.gameSeq}:${game.round}:${game.turnNo}:${game.players[game.turn]?.id}`;
 const cliValue = (name) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
 const PORT = Number(process.env.PORT || cliValue('--port')) || 3000;
 // Hospedagens injetam a porta e esperam que o processo escute em todas as
@@ -196,6 +210,22 @@ const MIME = {
   // a licença OFL acompanha as fontes: quem baixa a fonte tem direito a ela
   '.txt': 'text/plain; charset=utf-8',
 };
+
+// A BUILD WEBGL DO APP UNITY (unity/LEIA-ME.md) mora em public/unity/ e só é
+// servida ali. Ela chega pré-comprimida em gzip — `unity.wasm.gz`,
+// `unity.data.gz`, `unity.framework.js.gz` — e o carregador do Unity espera
+// receber cada uma com o tipo do arquivo de dentro e `Content-Encoding: gzip`.
+// O WebAssembly precisa de 'wasm-unsafe-eval' na CSP, e só nessas páginas.
+const MIME_UNITY = {
+  '.wasm': 'application/wasm',
+  '.data': 'application/octet-stream',
+  '.ico': 'image/x-icon',
+};
+function tipoDaUnity(full) {
+  const gz = full.endsWith('.gz');
+  const ext = path.extname(gz ? full.slice(0, -3) : full);
+  return { tipo: MIME[ext] || MIME_UNITY[ext] || null, gz };
+}
 
 // Cabeçalhos de segurança do que sai daqui. A CSP diz ao navegador de onde a
 // página pode carregar cada coisa: só daqui (script, fonte, som), mais `data:`
@@ -272,11 +302,12 @@ function corpoComprimido(full, stat, ext) {
   return tarefa;
 }
 
-function politicaDaPagina(req) {
+function politicaDaPagina(req, wasm = false) {
   let host = req.headers.host;
   try { if (PUBLIC_URL) host = new URL(PUBLIC_URL).host; } catch { host = ''; }
   const destinos = hostValido(host) ? ` ws://${host} wss://${host}` : '';
-  return CSP.replace("connect-src 'self' ws: wss: blob:", `connect-src 'self' blob:${destinos}`);
+  const csp = CSP.replace("connect-src 'self' ws: wss: blob:", `connect-src 'self' blob:${destinos}`);
+  return wasm ? csp.replace("script-src 'self'", "script-src 'self' 'wasm-unsafe-eval'") : csp;
 }
 
 const STATIC_ROOTS = [path.join(__dirname, 'public'), __dirname];
@@ -358,7 +389,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  let file = url.pathname === '/' ? '/index.html' : url.pathname;
+  // A build WebGL do app (public/unity/): a página tem caminhos relativos
+  // (Build/…), então /unity sem barra vira /unity/ antes de servir.
+  if (url.pathname === '/unity') {
+    res.writeHead(301, { Location: '/unity/', 'Cache-Control': 'no-cache' });
+    res.end();
+    return;
+  }
+  const daUnity = url.pathname.startsWith('/unity/');
+  let file = url.pathname === '/' ? '/index.html' : url.pathname === '/unity/' ? '/unity/index.html' : url.pathname;
   file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
   for (const root of STATIC_ROOTS) {
     const full = path.join(root, file);
@@ -371,7 +410,9 @@ const server = http.createServer((req, res) => {
       // da arte, o README do elenco e os geradores em Python que a desenham —
       // e com o octet-stream de reserva eles eram baixáveis por quem pedisse o
       // caminho. Não é segredo, mas também não é para servir.
-      if (!MIME[ext]) continue;
+      const unity = daUnity && root !== __dirname ? tipoDaUnity(full) : null;
+      const tipo = unity ? unity.tipo : MIME[ext];
+      if (!tipo) continue;
       const stat = fs.statSync(full);
       // ETag de tamanho + mtime. Sem ele, `no-cache` significava baixar tudo de
       // novo a cada abertura: o elenco sozinho são 32 SVGs e ~850 KB de disco.
@@ -394,12 +435,13 @@ const server = http.createServer((req, res) => {
       const arte = file.startsWith('/assets/') || file.startsWith('/fonts/')
         || (file.startsWith('/models/') && !file.endsWith('lista.json'));
       const cabecalho = {
-        'Content-Type': MIME[ext],
+        'Content-Type': tipo,
         'Cache-Control': arte ? 'private, max-age=300, must-revalidate' : 'no-cache',
         ETag: etag,
         Vary: 'Accept-Encoding',
         ...CABECALHOS_SEGUROS,
-        ...(ext === '.html' ? { 'Content-Security-Policy': politicaDaPagina(req) } : {}),
+        ...(unity?.gz ? { 'Content-Encoding': 'gzip' } : {}),
+        ...(ext === '.html' ? { 'Content-Security-Policy': politicaDaPagina(req, !!unity) } : {}),
       };
       if (req.headers['if-none-match'] === etag) {
         res.writeHead(304, cabecalho);
@@ -474,6 +516,8 @@ function retratoDaSala(room) {
     v: 1, seq: room.seloSeq, em: Date.now(),
     code: room.code, origin: room.origin, gameSeq: room.gameSeq, createdAt: room.createdAt, nivelRobos: room.nivelRobos || 'normal',
     modo: modoValido(room.modo),
+    ...(relogioValido(room.relogio) ? { relogio: relogioValido(room.relogio) } : {}),
+    ...(room.tutorial ? { tutorial: true } : {}),
     ...(room.cadeiras ? { cadeiras: room.cadeiras, formato: formatoValido(room.formato) } : {}),
     ...(room.variante ? { variante: room.variante } : {}),
     players: room.players.map(({ ws, ...p }) => p),   // sem o socket
@@ -509,6 +553,8 @@ function recriaSala(d, origin) {
     seloSeq: d.seq || 0, restauradaEm: Date.now(), mexeu: false,
     nivelRobos: nivelValido(d.modo, d.nivelRobos),
     modo: modoValido(d.modo),
+    relogio: relogioValido(d.relogio),
+    tutorial: d.tutorial === true,
     cadeiras: Array.isArray(d.cadeiras) ? d.cadeiras.slice(0, 8) : undefined,
     formato: formatoValido(d.formato),
     variante: varianteValida(d.modo, d.variante),
@@ -691,6 +737,9 @@ function lobbyView(room) {
     ...(motorDe(room).cadeiras ? { cadeiras: sentaNasCadeiras(room), formato: formatoValido(room.formato) } : {}),
     ...(motorDe(room).variantes ? { variante: varianteValida(room.modo, room.variante) } : {}),
     nivelRobos: room.nivelRobos || 'normal',
+    // o relógio da vez: só o Caçamba tem; `relogios` diz ao cliente as opções
+    ...(modoValido(room.modo) === 'cacamba' ? { relogio: relogioValido(room.relogio), relogios: RELOGIOS } : {}),
+    ...(room.tutorial ? { tutorial: true } : {}),
     players: room.players.map((p) => ({
       id: p.id, name: p.name, isBot: p.isBot, connected: p.isBot || p.connected,
       avatar: p.avatar || null, desistiu: !!p.desistiu,
@@ -714,7 +763,26 @@ function comPresenca(room, view) {
     vp.avatar = rp ? (rp.avatar || null) : null;
     vp.desistiu = rp ? !!rp.desistiu : false;
   }
+  // O relógio também é da sala: o motor do Caçamba não sabe de prazo.
+  const relogio = relogioNaVisao(room);
+  if (relogio) { view.vezMs = relogio.vezMs; view.restaMs = relogio.restaMs; }
   return view;
+}
+
+// Quanto falta do prazo de quem está na vez — ou null, se esta vez não tem
+// relógio (sala sem relógio, vez de robô, fora de partida).
+function relogioNaVisao(room) {
+  const game = room.game;
+  const ms = relogioMs(room);
+  if (!ms || !game || !MODOS.cacamba.FASES_DE_VEZ.includes(game.phase)) return null;
+  const atual = game.players[game.turn];
+  const jogador = atual && room.players.find((p) => p.id === atual.id);
+  if (!jogador || jogador.isBot || jogador.desistiu) return null;
+  const chave = chaveDaVez(room, game);
+  if (room.vezEstourada === chave) return { vezMs: ms, restaMs: 0 };
+  if (room.relogioChave === chave) return { vezMs: ms, restaMs: Math.max(0, room.relogioFim - Date.now()) };
+  // a vez acabou de chegar nele: o estado sai antes de o agendador armar o prazo
+  return { vezMs: ms, restaMs: ms };
 }
 
 function broadcastState(room, events = []) {
@@ -806,11 +874,15 @@ function scheduleBots(room) {
   if (motor.proximoPrazo) armaPrazoDaVez(room);
   if (!game || !motor.FASES_DE_VEZ.includes(game.phase)) {
     if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; room.botTimerKey = null; }
+    desarmaRelogio(room);
     return;
   }
 
   const current = game.players[game.turn];
   const currentPlayer = room.players.find((p) => p.id === current.id);
+  // O relógio desta vez já venceu? Então o jogo joga por ele até a vez passar.
+  const daVez = chaveDaVez(room, game);
+  const semTempo = room.vezEstourada === daVez;
 
   // Bots fora da vez pedem a carta recém-descartada (se ela ajuda e se ela
   // está comprável — coringa descartado tranca o meio)
@@ -829,8 +901,13 @@ function scheduleBots(room) {
 
   // Vez de humano presente: nada a agendar (o jogo espera por ele) — só a
   // cobrança de um robô, se ele demorar.
-  const away = currentPlayer && !currentPlayer.isBot && !currentPlayer.connected;
-  if (currentPlayer && !currentPlayer.isBot && !away) armaCobranca(room, game, current);
+  const humano = currentPlayer && !currentPlayer.isBot;
+  const away = humano && (!currentPlayer.connected || semTempo);
+  if (humano && !away) armaCobranca(room, game, current);
+  // O prazo corre para o humano da vez, presente ou caído (cair não zera o
+  // relógio); quem desistiu já é jogado pelo robô e não tem prazo nenhum.
+  if (humano && !currentPlayer.desistiu) { if (!semTempo) armaRelogio(room, game, current); }
+  else desarmaRelogio(room);
   if (!currentPlayer || (!currentPlayer.isBot && !away)) {
     if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; room.botTimerKey = null; }
     return;
@@ -851,7 +928,7 @@ function scheduleBots(room) {
   // Ritmo do robô: rápido demais a mesa parecia um caixa eletrônico, com as
   // jogadas dos outros acontecendo antes de dar tempo de ler o que houve.
   const delay = away
-    ? (currentPlayer.awayActed ? 1400 : AWAY_TAKEOVER_MS)
+    ? (semTempo ? 700 : (currentPlayer.awayActed ? 1400 : AWAY_TAKEOVER_MS))
     : (buyWindow ? 3200 : 1500 + Math.random() * 1300 + (motor.pausaDoRobo?.(game) || 0)) * RITMO_DOS_ROBOS;
 
   room.botTimer = setTimeout(() => {
@@ -862,15 +939,26 @@ function scheduleBots(room) {
     if (game.players[game.turn].id !== current.id) return;
     const actor = room.players.find((p) => p.id === current.id);
     if (!actor) return;
-    if (!actor.isBot) {
+    // o prazo desta vez venceu: joga-se por ele mesmo estando presente
+    const estourou = !actor.isBot && room.vezEstourada === chaveDaVez(room, game);
+    if (!actor.isBot && !estourou) {
       if (actor.connected) return; // voltou a tempo: a vez é dele de verdade
       actor.awayActed = true;
     }
     try {
-      const action = motor.botNextAction(game, current.id);
-      if (!action) return;
-      let events = motor.applyAction(game, current.id, action);
-      if (!actor.isBot && !actor.awayNotified) {
+      let events;
+      try {
+        const action = estourou ? jogadaDoRelogio(game, current.id) : motor.botNextAction(game, current.id);
+        if (!action) return;
+        events = motor.applyAction(game, current.id, action);
+      } catch (err) {
+        if (!estourou) throw err;
+        // a jogada mínima não coube nas regras: o robô resolve a vez, para a mesa não travar
+        const action = motor.botNextAction(game, current.id);
+        if (!action) return;
+        events = motor.applyAction(game, current.id, action);
+      }
+      if (!actor.isBot && !actor.connected && !actor.awayNotified) {
         actor.awayNotified = true;
         events = [{ e: 'away', p: current.id }, ...events];
       }
@@ -880,6 +968,45 @@ function scheduleBots(room) {
       console.error('erro de bot:', err);
     }
   }, delay);
+}
+
+// O RELÓGIO DA VEZ DO CAÇAMBA: um timer por sala, armado uma vez por vez (a
+// chave é a vez, não a fase — puxar a carta não devolve tempo). Quando vence,
+// marca a vez como estourada, avisa a mesa (`tempo`) e devolve ao agendador,
+// que joga por ele pelo caminho de quem caiu.
+function armaRelogio(room, game, atual) {
+  const ms = relogioMs(room);
+  if (!ms) { desarmaRelogio(room); return; }
+  const chave = chaveDaVez(room, game);
+  if (room.relogioChave === chave) return;
+  clearTimeout(room.relogioTimer);
+  room.relogioChave = chave;
+  room.relogioFim = Date.now() + ms;
+  room.relogioTimer = setTimeout(() => {
+    room.relogioTimer = null;
+    if (room.game !== game || game.players[game.turn]?.id !== atual.id) return;
+    if (!MODOS.cacamba.FASES_DE_VEZ.includes(game.phase) || chaveDaVez(room, game) !== chave) return;
+    room.vezEstourada = chave;
+    broadcastState(room, [{ e: 'tempo', p: atual.id }]);
+    scheduleBots(room);
+  }, ms);
+  room.relogioTimer.unref?.();
+}
+function desarmaRelogio(room) {
+  clearTimeout(room.relogioTimer);
+  room.relogioTimer = null; room.relogioChave = null; room.relogioFim = null;
+}
+// O que o jogo faz por quem deixou o tempo acabar: o MÍNIMO. Puxa do monte e
+// descarta a carta que puxou; se o tempo acabou depois de ele já ter puxado,
+// descarta a que menos serve (a mesma conta do robô, que protege os jogos da
+// mão). Nunca baixa jogo nem encaixa por ele: isso é escolha de quem joga.
+function jogadaDoRelogio(game, playerId) {
+  if (game.phase === 'draw') return { a: 'draw', source: 'deck' };
+  const jogador = game.players.find((p) => p.id === playerId);
+  const puxada = game.compraDaVez && game.compraDaVez.p === playerId && game.compraDaVez.turnNo === game.turnNo
+    ? jogador.hand.find((c) => c.id === game.compraDaVez.cardId) : null;
+  const carta = puxada || botPickDiscard(game, jogador);
+  return carta ? { a: 'discard', cardId: carta.id } : botNextAction(game, playerId);
 }
 
 // O RELÓGIO DA VEZ (Mexe-Mexe): a vez tem prazo e, quando ele vence, o motor
@@ -1130,12 +1257,30 @@ function attach(ws, room, player) {
   }
 }
 
+// Começa a partida da sala (as conferências de quem pode e de quantos são
+// ficam em quem chama). Na sala de tutorial a primeira rodada sai do roteiro
+// de shared/tutorial.js, com dois baralhos e o robô normal.
+function comecaPartida(room) {
+  const motor = motorDe(room);
+  const opcoes = room.tutorial ? { ...opcoesDaPartida(room), ...OPCOES_DO_TUTORIAL } : opcoesDaPartida(room);
+  room.game = motor.createGame(jogadoresDaPartida(room).map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), opcoes);
+  room.gameSeq++;
+  const events = motor.startRound(room.game);
+  if (room.tutorial) montaRodadaDoTutorial(room.game);
+  broadcastLobby(room);
+  broadcastState(room, events);
+  scheduleBots(room);
+}
+
 function handle(ws, msg) {
   if (!['create', 'join', 'resume', 'restaura'].includes(msg.t)) currentPlayer(ws, currentRoom(ws));
   switch (msg.t) {
     case 'create': {
       if (rooms.size >= MAX_SALAS) { const e = new Error('O servidor está lotado de salas agora. Tente daqui a pouco.'); e.gameRule = true; throw e; }
       const room = newRoom(ws.origin, msg.modo);
+      // O TUTORIAL: a sala já nasce com um robô e com a partida começada, e a
+      // primeira rodada sai do roteiro (shared/tutorial.js). Só o Caçamba tem.
+      room.tutorial = msg.tutorial === true && modoValido(msg.modo) === 'cacamba';
       const player = {
         id: crypto.randomUUID(), name: sanitizeName(msg.name), token: crypto.randomUUID(),
         avatar: personagemEscolhido(msg.avatar),
@@ -1143,11 +1288,17 @@ function handle(ws, msg) {
       };
       room.players.push(player);
       attach(ws, room, player);
+      if (room.tutorial) {
+        novoRobo(room);
+        comecaPartida(room);
+      }
       break;
     }
     case 'join': {
       const room = rooms.get(String(msg.code || '').toUpperCase().trim());
       if (!room) { const e = new Error('Sala não encontrada. Confira o código.'); e.gameRule = true; throw e; }
+      // a rodada do tutorial é arrumada: ninguém de fora senta numa mesa de cartas marcadas
+      if (room.tutorial) { const e = new Error('Essa sala é um tutorial: só quem a abriu joga nela.'); e.gameRule = true; throw e; }
       if (room.game) { const e = new Error('Essa partida já começou.'); e.gameRule = true; throw e; }
       const max = lugaresDe(room);
       if (room.players.length >= max) { const e = new Error(`A sala está cheia (${max} jogadores).`); e.gameRule = true; throw e; }
@@ -1291,6 +1442,16 @@ function handle(ws, msg) {
       broadcastLobby(room);
       break;
     }
+    // O relógio da vez (Caçamba): o anfitrião escolhe antes de começar.
+    case 'relogio': {
+      const room = currentRoom(ws);
+      if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala escolhe o relógio.'); e.gameRule = true; throw e; }
+      if (room.game) { const e = new Error('A partida já começou.'); e.gameRule = true; throw e; }
+      if (modoValido(room.modo) !== 'cacamba') return;
+      room.relogio = relogioValido(msg.s);
+      broadcastLobby(room);
+      break;
+    }
     case 'removeBot': {
       const room = currentRoom(ws);
       if (ws.playerId !== hostOf(room)) { const e = new Error('Só quem criou a sala pode mexer nos robôs.'); e.gameRule = true; throw e; }
@@ -1317,12 +1478,7 @@ function handle(ws, msg) {
         const e = new Error(`Não dá para jogar com ${room.players.length} jogadores: a rodada ${aperto.round + 1} precisaria de ${aperto.precisa} cartas e o baralho tem ${aperto.total}.`);
         e.gameRule = true; throw e;
       }
-      room.game = motor.createGame(jogadoresDaPartida(room).map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), opcoesDaPartida(room));
-      room.gameSeq++;
-      const events = motor.startRound(room.game);
-      broadcastLobby(room);
-      broadcastState(room, events);
-      scheduleBots(room);
+      comecaPartida(room);
       break;
     }
     case 'action': {
@@ -1438,6 +1594,7 @@ setInterval(() => {
     if (!active && now - lastSeen > 30 * 60 * 1000) {
       if (room.botTimer) clearTimeout(room.botTimer);
       clearTimeout(room.prazoVezTimer);
+      clearTimeout(room.relogioTimer);
       limpaPlanos(room);
       rooms.delete(code);
     }

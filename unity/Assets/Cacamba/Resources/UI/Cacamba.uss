@@ -1,0 +1,743 @@
+/* Caçamba — interface do app (UI Toolkit). As cores são as do site
+   (public/style.css): feltro, nogueira, âmbar do elenco e creme. */
+
+.raiz {
+    flex-grow: 1;
+    color: rgb(245, 241, 230);
+    font-size: 17px;
+}
+
+.camada {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* ------------------------------------------------------------ painéis */
+
+.painel {
+    background-color: rgba(27, 17, 11, 0.92);
+    border-radius: 18px;
+    border-width: 2px;
+    border-color: rgba(201, 162, 78, 0.55);
+    padding: 20px 22px;
+}
+
+.tela-centro {
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+/* Num painel mais alto que a tela, o Unity espremeria os itens uns sobre
+   os outros; assim eles mantêm a altura e o painel rola. */
+.painel > * {
+    flex-shrink: 0;
+}
+
+.coluna {
+    flex-direction: column;
+}
+
+.linha {
+    flex-direction: row;
+    align-items: center;
+}
+
+.cresce {
+    flex-grow: 1;
+}
+
+.titulo {
+    font-size: 46px;
+    color: rgb(242, 193, 78);
+    -unity-text-align: middle-center;
+    margin-bottom: 0;
+}
+
+.subtitulo {
+    font-size: 18px;
+    color: rgb(228, 220, 200);
+    -unity-text-align: middle-center;
+    -unity-font-style: italic;
+    margin-bottom: 10px;
+}
+
+.fatos {
+    font-size: 14px;
+    color: rgb(157, 187, 173);
+    -unity-text-align: middle-center;
+    margin-bottom: 14px;
+}
+
+.rotulo {
+    font-size: 14px;
+    color: rgb(201, 162, 78);
+    margin-top: 10px;
+    margin-bottom: 4px;
+}
+
+.nota {
+    font-size: 13px;
+    color: rgb(190, 180, 160);
+    white-space: normal;
+}
+
+.centro {
+    -unity-text-align: middle-center;
+}
+
+/* ------------------------------------------------------------ campos */
+
+.campo {
+    margin: 0;
+    height: 44px;
+}
+
+.campo > .unity-base-text-field__input,
+.campo > .unity-text-field__input {
+    background-color: rgb(245, 241, 230);
+    color: rgb(35, 42, 51);
+    border-radius: 10px;
+    border-width: 0;
+    padding: 0 12px;
+    font-size: 18px;
+    -unity-font-style: bold;
+}
+
+.campo-codigo > .unity-base-text-field__input,
+.campo-codigo > .unity-text-field__input {
+    letter-spacing: 6px;
+    -unity-text-align: middle-center;
+    font-size: 22px;
+}
+
+/* ------------------------------------------------------------ botões */
+
+.botao {
+    height: 46px;
+    margin: 4px;
+    padding: 0 18px;
+    border-radius: 12px;
+    border-width: 0;
+    background-color: rgb(62, 39, 23);
+    color: rgb(245, 241, 230);
+    font-size: 17px;
+    -unity-font-style: bold;
+}
+
+.botao:hover {
+    background-color: rgb(92, 58, 34);
+}
+
+.botao:active {
+    background-color: rgb(42, 27, 18);
+    scale: 0.97 0.97;
+}
+
+.botao:disabled {
+    opacity: 0.4;
+}
+
+.botao-principal {
+    background-color: rgb(242, 193, 78);
+    color: rgb(35, 26, 14);
+}
+
+.botao-principal:hover {
+    background-color: rgb(250, 207, 105);
+}
+
+.botao-principal:active {
+    background-color: rgb(201, 162, 78);
+}
+
+.botao-perigo {
+    background-color: rgb(140, 45, 30);
+}
+
+.botao-pequeno {
+    height: 34px;
+    padding: 0 12px;
+    font-size: 14px;
+    border-radius: 9px;
+}
+
+.botao-ativo {
+    background-color: rgb(26, 91, 68);
+    border-width: 2px;
+    border-color: rgb(242, 193, 78);
+}
+
+/* ------------------------------------------------------------ elenco */
+
+.elenco {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.avatar {
+    width: 46px;
+    height: 46px;
+    margin: 2px;
+    border-radius: 23px;
+    border-width: 3px;
+    border-color: rgba(0, 0, 0, 0);
+}
+
+.avatar-escolhido {
+    border-color: rgb(242, 193, 78);
+    scale: 1.08 1.08;
+}
+
+.avatar-pequeno {
+    width: 42px;
+    height: 42px;
+    border-radius: 21px;
+    margin-right: 10px;
+}
+
+/* ------------------------------------------------------------ sala */
+
+.codigo-sala {
+    font-size: 56px;
+    color: rgb(242, 193, 78);
+    letter-spacing: 10px;
+    -unity-text-align: middle-center;
+}
+
+.qr {
+    width: 180px;
+    height: 180px;
+    align-self: center;
+    margin: 8px;
+    border-radius: 8px;
+}
+
+.jogador-sala {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 8px;
+    margin: 2px 0;
+    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.etiqueta {
+    font-size: 12px;
+    color: rgb(35, 26, 14);
+    background-color: rgb(157, 187, 173);
+    border-radius: 6px;
+    padding: 1px 6px;
+    margin-left: 6px;
+}
+
+.etiqueta-ouro {
+    background-color: rgb(242, 193, 78);
+}
+
+.etiqueta-fora {
+    background-color: rgb(228, 87, 46);
+    color: rgb(245, 241, 230);
+}
+
+/* ------------------------------------------------------------ partida */
+
+.barra-topo {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 10px;
+    background-color: rgba(15, 10, 6, 0.72);
+}
+
+.info-rodada {
+    font-size: 15px;
+    color: rgb(242, 193, 78);
+}
+
+.info-contrato {
+    font-size: 14px;
+    color: rgb(245, 241, 230);
+    margin-left: 10px;
+    white-space: normal;
+    flex-shrink: 1;
+}
+
+.rodape {
+    position: absolute;
+    left: 0;
+    right: 0;
+    align-items: center;
+}
+
+.faixa-vez {
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.faixa-vez-texto {
+    font-size: 16px;
+    padding: 5px 16px;
+    border-radius: 14px;
+    background-color: rgba(27, 17, 11, 0.85);
+    color: rgb(245, 241, 230);
+    white-space: normal;
+    -unity-text-align: middle-center;
+    max-width: 560px;
+}
+
+.faixa-vez-minha {
+    background-color: rgb(242, 193, 78);
+    color: rgb(35, 26, 14);
+}
+
+.avisos {
+    position: absolute;
+    top: 52px;
+    left: 0;
+    right: 0;
+    align-items: center;
+}
+
+.aviso {
+    font-size: 14px;
+    margin: 2px 16px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    background-color: rgba(10, 7, 4, 0.82);
+    color: rgb(245, 241, 230);
+    white-space: normal;
+    max-width: 560px;
+    -unity-text-align: middle-center;
+    transition-property: opacity;
+    transition-duration: 0.4s;
+}
+
+.aviso-erro {
+    background-color: rgba(140, 45, 30, 0.92);
+}
+
+.placa {
+    position: absolute;
+    align-items: center;
+    translate: -50% -100%;
+}
+
+.placa-nome {
+    font-size: 14px;
+    padding: 2px 9px;
+    border-radius: 9px;
+    background-color: rgba(27, 17, 11, 0.85);
+    color: rgb(245, 241, 230);
+}
+
+.placa-vez .placa-nome {
+    background-color: rgb(242, 193, 78);
+    color: rgb(35, 26, 14);
+}
+
+.placa-detalhe {
+    font-size: 12px;
+    color: rgb(157, 187, 173);
+    margin-top: 2px;
+}
+
+.placa-verbo {
+    font-size: 12px;
+    color: rgb(35, 26, 14);
+    background-color: rgb(157, 187, 173);
+    padding: 1px 6px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+}
+
+.placa-balao {
+    font-size: 13px;
+    color: rgb(35, 42, 51);
+    background-color: rgb(245, 241, 230);
+    padding: 3px 9px;
+    border-radius: 10px;
+    margin-bottom: 3px;
+}
+
+.acoes {
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.mao {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* As cartas da mão PERMANECEM de um lance para o outro: quando a mão se
+   rearruma (chegou carta, saiu carta, mudou a ordem) elas deslizam até o
+   lugar novo. A que está no dedo vai junto com ele, sem atraso. */
+.carta-mao {
+    position: absolute;
+    border-radius: 8px;
+    transition-property: left, top, rotate, translate;
+    transition-duration: 0.2s, 0.2s, 0.2s, 0.12s;
+    transition-timing-function: ease-out-cubic;
+}
+
+.carta-arrastando {
+    transition-duration: 0s;
+    scale: 1.08 1.08;
+    border-width: 3px;
+    border-color: rgb(242, 193, 78);
+}
+
+/* A carta que o treinador do tutorial manda olhar: borda que pisca. */
+.carta-destaque {
+    border-width: 4px;
+    border-color: rgb(242, 193, 78);
+}
+
+.carta-destaque-b {
+    border-color: rgb(255, 244, 200);
+}
+
+/* A marca de jogo pronto: uma faixa na borda de baixo, uma cor por jogo. */
+.carta-marca {
+    position: absolute;
+    left: 7%;
+    right: 7%;
+    bottom: 4px;
+    height: 7px;
+    border-radius: 4px;
+}
+
+.carta-marca-0 {
+    background-color: rgb(242, 193, 78);
+}
+
+.carta-marca-1 {
+    background-color: rgb(84, 196, 160);
+}
+
+.carta-marca-2 {
+    background-color: rgb(236, 112, 158);
+}
+
+.carta-marca-3 {
+    background-color: rgb(108, 156, 238);
+}
+
+/* O contrato em pílulas: verde na mesa, âmbar pronto na mão, apagada falta. */
+.contrato {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 3px;
+}
+
+.pilula {
+    font-size: 12px;
+    padding: 1px 7px;
+    margin: 1px 2px;
+    border-radius: 9px;
+}
+
+.pilula-mesa {
+    background-color: rgb(26, 91, 68);
+    color: rgb(245, 241, 230);
+}
+
+.pilula-mao {
+    background-color: rgb(242, 193, 78);
+    color: rgb(35, 26, 14);
+}
+
+.pilula-falta {
+    background-color: rgba(15, 10, 6, 0.6);
+    color: rgb(190, 180, 160);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* O relógio da vez (quando a sala tem): a barra que esvazia e os segundos. */
+.relogio {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 3px;
+}
+
+.relogio-trilho {
+    width: 120px;
+    height: 7px;
+    border-radius: 4px;
+    margin-right: 6px;
+    background-color: rgba(255, 255, 255, 0.15);
+    overflow: hidden;
+}
+
+.relogio-cheio {
+    height: 100%;
+    border-radius: 4px;
+    background-color: rgb(157, 230, 190);
+}
+
+.relogio-pouco {
+    background-color: rgb(228, 87, 46);
+}
+
+.relogio-texto {
+    font-size: 13px;
+    color: rgb(245, 241, 230);
+    background-color: rgba(15, 10, 6, 0.6);
+    padding: 1px 8px;
+    border-radius: 8px;
+}
+
+.relogio-texto-pouco {
+    color: rgb(255, 255, 255);
+    background-color: rgb(160, 50, 30);
+}
+
+.carta-nova {
+    border-width: 3px;
+    border-color: rgb(242, 193, 78);
+}
+
+.carta-escolhida {
+    border-width: 3px;
+    border-color: rgb(157, 230, 190);
+}
+
+.minha-info {
+    font-size: 13px;
+    color: rgb(228, 220, 200);
+    background-color: rgba(15, 10, 6, 0.6);
+    padding: 2px 9px;
+    border-radius: 8px;
+    margin-bottom: 2px;
+}
+
+/* ------------------------------------------------------------ modais */
+
+.fundo-modal {
+    background-color: rgba(0, 0, 0, 0.6);
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+}
+
+.modal {
+    max-width: 640px;
+    width: 100%;
+    max-height: 100%;
+}
+
+.modal-titulo {
+    font-size: 30px;
+    color: rgb(242, 193, 78);
+    -unity-text-align: middle-center;
+    margin-bottom: 10px;
+}
+
+.placar-linha {
+    flex-direction: row;
+    align-items: center;
+    padding: 5px 6px;
+    border-bottom-width: 1px;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.placar-nome {
+    flex-grow: 1;
+    font-size: 16px;
+}
+
+.placar-num {
+    width: 80px;
+    font-size: 16px;
+    -unity-text-align: middle-right;
+}
+
+.placar-destaque {
+    color: rgb(242, 193, 78);
+}
+
+.visor-jogador {
+    margin-bottom: 12px;
+}
+
+.visor-nome {
+    font-size: 16px;
+    color: rgb(242, 193, 78);
+    margin-bottom: 4px;
+}
+
+.visor-jogos {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.visor-jogo {
+    flex-direction: row;
+    padding: 4px;
+    margin: 0 8px 8px 0;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.visor-carta {
+    width: 52px;
+    height: 73px;
+    margin-right: -18px;
+    border-radius: 5px;
+}
+
+.visor-carta-sobra {
+    border-width: 2px;
+    border-color: rgb(157, 230, 190);
+}
+
+.opcoes {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.conexao {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 8px;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(140, 45, 30, 0.95);
+}
+
+.emotes {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* ------------------------------------------------------------ tutorial */
+
+.botao-tutorial {
+    background-color: rgb(26, 91, 68);
+    border-width: 2px;
+    border-color: rgba(242, 193, 78, 0.7);
+}
+
+.botao-tutorial:hover {
+    background-color: rgb(34, 112, 84);
+}
+
+.treinador {
+    position: absolute;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border-width: 2px;
+    border-color: rgb(242, 193, 78);
+    background-color: rgba(27, 17, 11, 0.94);
+    transition-property: scale;
+    transition-duration: 0.18s;
+}
+
+.treinador-novo {
+    scale: 1.04 1.04;
+}
+
+.treinador-rosto {
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    border-width: 2px;
+    border-color: rgb(242, 193, 78);
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.treinador-quem {
+    font-size: 13px;
+    color: rgb(157, 187, 173);
+}
+
+.treinador-titulo {
+    font-size: 22px;
+    color: rgb(242, 193, 78);
+    white-space: normal;
+    margin-top: 4px;
+}
+
+.treinador-texto {
+    font-size: 15px;
+    color: rgb(245, 241, 230);
+    white-space: normal;
+    margin-top: 6px;
+}
+
+.treinador-botoes {
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.treinador-sair {
+    background-color: rgba(0, 0, 0, 0);
+    color: rgb(190, 180, 160);
+}
+
+/* ------------------------------------------------------------ regras */
+
+.painel-opaco {
+    background-color: rgb(27, 17, 11);
+}
+
+.regras-secao {
+    font-size: 18px;
+    color: rgb(242, 193, 78);
+    margin-top: 14px;
+    margin-bottom: 4px;
+}
+
+.regras-texto {
+    font-size: 15px;
+    color: rgb(235, 228, 210);
+    white-space: normal;
+    margin-bottom: 4px;
+}
+
+.regras-item {
+    padding-left: 6px;
+}
+
+.regras-contrato {
+    flex-direction: row;
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+
+.regras-contrato-atual {
+    background-color: rgba(242, 193, 78, 0.18);
+    border-width: 1px;
+    border-color: rgb(242, 193, 78);
+}
+
+.regras-contrato-rodada {
+    width: 130px;
+    font-size: 15px;
+    color: rgb(157, 187, 173);
+}
+
+.regras-contrato-nome {
+    font-size: 15px;
+    color: rgb(245, 241, 230);
+    flex-shrink: 1;
+    white-space: normal;
+}
